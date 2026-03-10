@@ -1,0 +1,85 @@
+package com.example.wags.domain.usecase.readiness
+
+import com.example.wags.domain.model.OrthostasisMetrics
+import com.example.wags.domain.model.RrInterval
+import javax.inject.Inject
+import kotlin.math.abs
+
+/**
+ * Computes Orthostatic Heart Rate Recovery (OHRR) metrics.
+ *
+ * Measures how quickly HR drops after the initial sympathetic spike of standing,
+ * at 20 s and 60 s post-peak. Also derives the 30:15 ratio and peak HR values.
+ */
+class OhrrCalculator @Inject constructor() {
+
+    /**
+     * Computes orthostatic HR recovery metrics.
+     *
+     * @param peakStandHr Absolute highest HR (bpm) during the stand
+     * @param standingRrIntervals RR intervals from moment of standing (with timestamps)
+     * @return [OrthostasisMetrics] with all computed values
+     */
+    fun calculate(
+        peakStandHr: Int,
+        standingRrIntervals: List<RrInterval>
+    ): OrthostasisMetrics {
+        val validBeats = standingRrIntervals.filter { !it.isArtifact }
+
+        // Peak beat: shortest RR in beats 6–24 (indices 5–23)
+        val peakWindow = if (validBeats.size >= 24) validBeats.subList(5, 24) else validBeats
+        val peakBeat = peakWindow.minByOrNull { it.intervalMs }
+
+        val shortestRrMs = peakBeat?.intervalMs
+        val peakTimestampMs = peakBeat?.timestampMs
+
+        // Vagal rebound: longest RR in beats 21–39 (indices 20–38)
+        val longestRrMs = if (validBeats.size >= 39) {
+            validBeats.subList(20, 39).maxOfOrNull { it.intervalMs }
+        } else null
+
+        val thirtyFifteenRatio = if (shortestRrMs != null && longestRrMs != null && shortestRrMs > 0) {
+            (longestRrMs / shortestRrMs).toFloat()
+        } else null
+
+        // HR at 20 s and 60 s post-peak
+        val hrAt20s = peakTimestampMs?.let { findHrAtOffset(validBeats, it, offsetMs = 20_000L) }
+        val hrAt60s = peakTimestampMs?.let { findHrAtOffset(validBeats, it, offsetMs = 60_000L) }
+
+        val ohrrAt20s = hrAt20s?.let { hr ->
+            (peakStandHr - hr).toFloat() / peakStandHr * 100f
+        }
+        val ohrrAt60s = hrAt60s?.let { hr ->
+            (peakStandHr - hr).toFloat() / peakStandHr * 100f
+        }
+
+        return OrthostasisMetrics(
+            peakStandHr = peakStandHr,
+            shortestRrBeat15 = shortestRrMs,
+            longestRrBeat30 = longestRrMs,
+            thirtyFifteenRatio = thirtyFifteenRatio,
+            hrAt20s = hrAt20s,
+            hrAt60s = hrAt60s,
+            ohrrAt20sPercent = ohrrAt20s,
+            ohrrAt60sPercent = ohrrAt60s
+        )
+    }
+
+    /**
+     * Finds the HR (bpm) at [offsetMs] milliseconds after [peakTimestampMs]
+     * by locating the closest beat to the target timestamp.
+     */
+    private fun findHrAtOffset(
+        beats: List<RrInterval>,
+        peakTimestampMs: Long,
+        offsetMs: Long
+    ): Int? {
+        val targetTs = peakTimestampMs + offsetMs
+        val beat = beats
+            .filter { it.timestampMs >= peakTimestampMs }
+            .minByOrNull { abs(it.timestampMs - targetTs) }
+            ?: return null
+        if (beat.intervalMs <= 0) return null
+        return (60_000.0 / beat.intervalMs).toInt()
+    }
+}

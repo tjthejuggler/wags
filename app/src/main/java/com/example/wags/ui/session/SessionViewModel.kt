@@ -7,6 +7,7 @@ import com.example.wags.data.db.entity.SessionLogEntity
 import com.example.wags.data.repository.SessionRepository
 import com.example.wags.di.IoDispatcher
 import com.example.wags.di.MathDispatcher
+import com.example.wags.domain.model.BleConnectionState
 import com.example.wags.domain.model.SessionType
 import com.example.wags.domain.usecase.hrv.ArtifactCorrectionUseCase
 import com.example.wags.domain.usecase.session.HrSonificationEngine
@@ -37,7 +38,12 @@ data class SessionUiState(
     val hrSlopeBpmPerMin: Float? = null,
     val startRmssdMs: Float? = null,
     val endRmssdMs: Float? = null,
-    val lnRmssdSlope: Float? = null
+    val lnRmssdSlope: Float? = null,
+    /** ID of the monitor used for the active/completed session, null if none. */
+    val monitorId: String? = null,
+    /** ID of the currently connected BLE device (pre-session), null if none. */
+    val connectedDeviceId: String? = null,
+    val hasHrMonitor: Boolean = false
 )
 
 @HiltViewModel
@@ -60,6 +66,36 @@ class SessionViewModel @Inject constructor(
     // Accumulated HR samples (1 Hz) for analytics
     private val hrTimeSeries = mutableListOf<Float>()
 
+    init {
+        // Observe BLE connection state to keep hasHrMonitor + connectedDeviceId in sync
+        viewModelScope.launch {
+            bleManager.h10State.collect { state ->
+                val connectedId = (state as? BleConnectionState.Connected)?.deviceId
+                _uiState.update {
+                    it.copy(
+                        hasHrMonitor = connectedId != null || bleManager.verityState.value is BleConnectionState.Connected,
+                        connectedDeviceId = connectedId
+                            ?: (bleManager.verityState.value as? BleConnectionState.Connected)?.deviceId
+                    )
+                }
+            }
+        }
+        viewModelScope.launch {
+            bleManager.verityState.collect { state ->
+                val connectedId = (state as? BleConnectionState.Connected)?.deviceId
+                val h10Id = (bleManager.h10State.value as? BleConnectionState.Connected)?.deviceId
+                // H10 takes priority
+                val activeId = h10Id ?: connectedId
+                _uiState.update {
+                    it.copy(
+                        hasHrMonitor = activeId != null,
+                        connectedDeviceId = activeId
+                    )
+                }
+            }
+        }
+    }
+
     fun setSessionType(type: SessionType) {
         if (_uiState.value.sessionState == SessionState.IDLE) {
             _uiState.update { it.copy(sessionType = type) }
@@ -70,9 +106,18 @@ class SessionViewModel @Inject constructor(
         _uiState.update { it.copy(sonificationEnabled = enabled) }
     }
 
-    fun startSession(deviceId: String) {
+    /**
+     * Start a session. If a monitor is connected its deviceId is passed; otherwise null
+     * to run a timer-only session with no HR data.
+     */
+    fun startSession(deviceId: String?) {
         if (_uiState.value.sessionState == SessionState.ACTIVE) return
-        bleManager.startRrStream(deviceId)
+
+        val activeMonitorId = deviceId?.takeIf { it.isNotBlank() }
+        if (activeMonitorId != null) {
+            bleManager.startRrStream(activeMonitorId)
+        }
+
         hrTimeSeries.clear()
         sessionStartMs = System.currentTimeMillis()
 
@@ -86,11 +131,12 @@ class SessionViewModel @Inject constructor(
                 hrSlopeBpmPerMin = null,
                 startRmssdMs = null,
                 endRmssdMs = null,
-                lnRmssdSlope = null
+                lnRmssdSlope = null,
+                monitorId = activeMonitorId
             )
         }
 
-        if (_uiState.value.sonificationEnabled) {
+        if (_uiState.value.sonificationEnabled && activeMonitorId != null) {
             sonificationEngine.start(viewModelScope)
         }
 
@@ -98,24 +144,30 @@ class SessionViewModel @Inject constructor(
             while (isActive) {
                 delay(1_000L)
                 val elapsed = (System.currentTimeMillis() - sessionStartMs) / 1_000L
-                val rrSnapshot = bleManager.rrBuffer.readLast(64)
-                val currentHr = if (rrSnapshot.isNotEmpty())
-                    (60_000.0 / rrSnapshot.last()).toFloat() else null
-                val liveRmssd = computeLiveRmssd(rrSnapshot)
 
-                if (currentHr != null) {
-                    hrTimeSeries.add(currentHr)
-                    if (_uiState.value.sonificationEnabled) {
-                        sonificationEngine.updateHr(currentHr)
+                if (activeMonitorId != null) {
+                    val rrSnapshot = bleManager.rrBuffer.readLast(64)
+                    val currentHr = if (rrSnapshot.isNotEmpty())
+                        (60_000.0 / rrSnapshot.last()).toFloat() else null
+                    val liveRmssd = computeLiveRmssd(rrSnapshot)
+
+                    if (currentHr != null) {
+                        hrTimeSeries.add(currentHr)
+                        if (_uiState.value.sonificationEnabled) {
+                            sonificationEngine.updateHr(currentHr)
+                        }
                     }
-                }
 
-                _uiState.update {
-                    it.copy(
-                        elapsedSeconds = elapsed,
-                        currentHrBpm = currentHr,
-                        currentRmssd = liveRmssd
-                    )
+                    _uiState.update {
+                        it.copy(
+                            elapsedSeconds = elapsed,
+                            currentHrBpm = currentHr,
+                            currentRmssd = liveRmssd
+                        )
+                    }
+                } else {
+                    // Timer-only: just tick elapsed time
+                    _uiState.update { it.copy(elapsedSeconds = elapsed) }
                 }
             }
         }
@@ -137,43 +189,75 @@ class SessionViewModel @Inject constructor(
     private fun processSession(durationMs: Long) {
         viewModelScope.launch {
             _uiState.update { it.copy(sessionState = SessionState.PROCESSING) }
-            try {
-                val analytics = withContext(mathDispatcher) {
-                    val rrSnapshot = bleManager.rrBuffer.readLast(1024)
-                    val corrected = artifactCorrection.execute(rrSnapshot)
-                    analyticsCalculator.calculate(
-                        hrTimeSeries = hrTimeSeries.toList(),
-                        nnIntervals = corrected.correctedNn
-                    )
-                }
+            val monitorId = _uiState.value.monitorId
+            val sessionType = _uiState.value.sessionType
 
-                val sessionType = _uiState.value.sessionType
-                withContext(ioDispatcher) {
-                    sessionRepository.saveSession(
-                        SessionLogEntity(
-                            timestamp = sessionStartMs,
-                            durationMs = durationMs,
-                            sessionType = sessionType.name,
+            try {
+                if (monitorId != null && hrTimeSeries.isNotEmpty()) {
+                    // Full HR analytics path
+                    val analytics = withContext(mathDispatcher) {
+                        val rrSnapshot = bleManager.rrBuffer.readLast(1024)
+                        val corrected = artifactCorrection.execute(rrSnapshot)
+                        analyticsCalculator.calculate(
+                            hrTimeSeries = hrTimeSeries.toList(),
+                            nnIntervals = corrected.correctedNn
+                        )
+                    }
+
+                    withContext(ioDispatcher) {
+                        sessionRepository.saveSession(
+                            SessionLogEntity(
+                                timestamp = sessionStartMs,
+                                durationMs = durationMs,
+                                sessionType = sessionType.name,
+                                monitorId = monitorId,
+                                avgHrBpm = analytics.avgHrBpm,
+                                hrSlopeBpmPerMin = analytics.hrSlopeBpmPerMin,
+                                startRmssdMs = analytics.startRmssdMs,
+                                endRmssdMs = analytics.endRmssdMs,
+                                lnRmssdSlope = analytics.lnRmssdSlope
+                            )
+                        )
+                    }
+
+                    _uiState.update {
+                        it.copy(
+                            sessionState = SessionState.COMPLETE,
                             avgHrBpm = analytics.avgHrBpm,
                             hrSlopeBpmPerMin = analytics.hrSlopeBpmPerMin,
                             startRmssdMs = analytics.startRmssdMs,
                             endRmssdMs = analytics.endRmssdMs,
                             lnRmssdSlope = analytics.lnRmssdSlope
                         )
-                    )
-                }
-
-                _uiState.update {
-                    it.copy(
-                        sessionState = SessionState.COMPLETE,
-                        avgHrBpm = analytics.avgHrBpm,
-                        hrSlopeBpmPerMin = analytics.hrSlopeBpmPerMin,
-                        startRmssdMs = analytics.startRmssdMs,
-                        endRmssdMs = analytics.endRmssdMs,
-                        lnRmssdSlope = analytics.lnRmssdSlope
-                    )
+                    }
+                } else {
+                    // No-monitor path: save session with duration only
+                    withContext(ioDispatcher) {
+                        sessionRepository.saveSession(
+                            SessionLogEntity(
+                                timestamp = sessionStartMs,
+                                durationMs = durationMs,
+                                sessionType = sessionType.name,
+                                monitorId = null
+                            )
+                        )
+                    }
+                    _uiState.update { it.copy(sessionState = SessionState.COMPLETE) }
                 }
             } catch (e: Exception) {
+                // On any error still save a minimal record so the session isn't lost
+                withContext(ioDispatcher) {
+                    runCatching {
+                        sessionRepository.saveSession(
+                            SessionLogEntity(
+                                timestamp = sessionStartMs,
+                                durationMs = durationMs,
+                                sessionType = sessionType.name,
+                                monitorId = monitorId
+                            )
+                        )
+                    }
+                }
                 _uiState.update { it.copy(sessionState = SessionState.COMPLETE) }
             }
         }
@@ -183,7 +267,14 @@ class SessionViewModel @Inject constructor(
         sessionJob?.cancel()
         sonificationEngine.stop()
         hrTimeSeries.clear()
-        _uiState.value = SessionUiState()
+        // Preserve BLE connection state across reset
+        val h10Id = (bleManager.h10State.value as? BleConnectionState.Connected)?.deviceId
+        val verityId = (bleManager.verityState.value as? BleConnectionState.Connected)?.deviceId
+        val activeId = h10Id ?: verityId
+        _uiState.value = SessionUiState(
+            hasHrMonitor = activeId != null,
+            connectedDeviceId = activeId
+        )
     }
 
     override fun onCleared() {

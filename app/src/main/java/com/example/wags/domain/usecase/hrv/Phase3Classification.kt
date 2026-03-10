@@ -1,5 +1,6 @@
 package com.example.wags.domain.usecase.hrv
 
+import org.apache.commons.math3.analysis.interpolation.SplineInterpolator
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -9,12 +10,14 @@ import kotlin.math.min
  * Classifies beats using S1/S2 space and applies corrections:
  * - Missed beat: interval too long → divide by 2, insert synthetic beat
  * - Extra beat: two short intervals → merge into one
- * - Ectopic beat: discard, replace via neighbor average (spline placeholder)
+ * - Ectopic beat: replace via cubic spline (fallback: neighbor average)
  */
 object Phase3Classification {
 
     private const val C1 = 0.13
     private const val C2 = 0.17
+    private const val SPLINE_CONTEXT = 5   // valid beats to gather on each side
+    private const val MIN_SPLINE_POINTS = 4 // minimum points required to fit a spline
 
     enum class BeatType { NORMAL, MISSED, EXTRA, ECTOPIC }
 
@@ -40,36 +43,91 @@ object Phase3Classification {
     }
 
     fun correct(nn: DoubleArray, types: Array<BeatType>): DoubleArray {
+        // Build cumulative time axis (x) for spline fitting
+        val cumTime = DoubleArray(nn.size)
+        for (i in 1 until nn.size) cumTime[i] = cumTime[i - 1] + nn[i - 1]
+
         val corrected = mutableListOf<Double>()
 
         for (i in nn.indices) {
             when (types[i]) {
-                BeatType.NORMAL -> {
-                    corrected.add(nn[i])
-                }
+                BeatType.NORMAL -> corrected.add(nn[i])
+
                 BeatType.MISSED -> {
                     // Interval too long — split into two equal halves
                     val half = nn[i] / 2.0
                     corrected.add(half)
                     corrected.add(half)
                 }
+
                 BeatType.EXTRA -> {
                     // Two short intervals — merge with next if available
                     if (i + 1 < nn.size) {
-                        val merged = nn[i] + nn[i + 1]
-                        corrected.add(merged)
+                        corrected.add(nn[i] + nn[i + 1])
                     }
-                    // Skip next beat (it was merged); handled by the loop continuing
+                    // Next beat was consumed by the merge; loop continues past it
                 }
+
                 BeatType.ECTOPIC -> {
-                    // Replace with neighbor average as placeholder
-                    val prev = if (i > 0) nn[i - 1] else nn[i]
-                    val next = if (i < nn.size - 1) nn[i + 1] else nn[i]
-                    corrected.add((prev + next) / 2.0)
+                    corrected.add(interpolateEctopic(nn, types, cumTime, i))
                 }
             }
         }
 
         return corrected.toDoubleArray()
+    }
+
+    /**
+     * Replaces an ectopic beat using cubic spline interpolation over the
+     * surrounding valid beats (up to [SPLINE_CONTEXT] on each side).
+     * Falls back to neighbor average when fewer than [MIN_SPLINE_POINTS]
+     * valid context beats are available.
+     */
+    private fun interpolateEctopic(
+        nn: DoubleArray,
+        types: Array<BeatType>,
+        cumTime: DoubleArray,
+        idx: Int
+    ): Double {
+        // Collect valid context indices before the artifact
+        val before = mutableListOf<Int>()
+        var k = idx - 1
+        while (k >= 0 && before.size < SPLINE_CONTEXT) {
+            if (types[k] != BeatType.ECTOPIC) before.add(0, k)
+            k--
+        }
+
+        // Collect valid context indices after the artifact
+        val after = mutableListOf<Int>()
+        k = idx + 1
+        while (k < nn.size && after.size < SPLINE_CONTEXT) {
+            if (types[k] != BeatType.ECTOPIC) after.add(k)
+            k++
+        }
+
+        val contextIndices = before + after
+        if (contextIndices.size < MIN_SPLINE_POINTS) {
+            // Fallback: neighbor average
+            val prev = if (idx > 0) nn[idx - 1] else nn[idx]
+            val next = if (idx < nn.size - 1) nn[idx + 1] else nn[idx]
+            return (prev + next) / 2.0
+        }
+
+        // Build x/y arrays for the spline (cumulative time vs RR value)
+        val xArr = DoubleArray(contextIndices.size) { cumTime[contextIndices[it]] }
+        val yArr = DoubleArray(contextIndices.size) { nn[contextIndices[it]] }
+
+        return try {
+            val spline = SplineInterpolator().interpolate(xArr, yArr)
+            val targetX = cumTime[idx]
+            // Clamp to spline domain to avoid extrapolation exceptions
+            val clampedX = targetX.coerceIn(xArr.first(), xArr.last())
+            spline.value(clampedX)
+        } catch (_: Exception) {
+            // Any numerical failure → neighbor average fallback
+            val prev = if (idx > 0) nn[idx - 1] else nn[idx]
+            val next = if (idx < nn.size - 1) nn[idx + 1] else nn[idx]
+            (prev + next) / 2.0
+        }
     }
 }

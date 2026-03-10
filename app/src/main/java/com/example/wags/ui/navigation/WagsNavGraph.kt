@@ -11,6 +11,7 @@ import com.example.wags.ui.breathing.BreathingScreen
 import com.example.wags.ui.dashboard.DashboardScreen
 import com.example.wags.ui.readiness.ReadinessScreen
 import com.example.wags.ui.session.SessionScreen
+import com.example.wags.ui.morning.MorningReadinessScreen
 import com.example.wags.ui.settings.SettingsScreen
 
 object WagsRoutes {
@@ -20,6 +21,7 @@ object WagsRoutes {
     const val APNEA_FREE = "apnea_free"
     const val APNEA_TABLE = "apnea_table/{tableType}"
     const val SESSION = "session/{sessionType}"
+    const val MORNING_READINESS = "morning_readiness"
     const val SETTINGS = "settings"
 
     fun apneaTable(type: String) = "apnea_table/$type"
@@ -51,6 +53,9 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
         }
         composable(WagsRoutes.SETTINGS) {
             SettingsScreen(navController = navController)
+        }
+        composable(WagsRoutes.MORNING_READINESS) {
+            MorningReadinessScreen(onNavigateBack = { navController.popBackStack() })
         }
     }
 }

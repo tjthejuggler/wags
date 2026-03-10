@@ -14,4 +14,13 @@ interface SessionLogDao {
 
     @Query("SELECT * FROM session_logs WHERE sessionType = :type ORDER BY timestamp DESC")
     fun getByType(type: String): Flow<List<SessionLogEntity>>
+
+    @Query("SELECT * FROM session_logs WHERE monitorId = :monitorId ORDER BY timestamp DESC")
+    fun getByMonitor(monitorId: String): Flow<List<SessionLogEntity>>
+
+    @Query("SELECT * FROM session_logs WHERE monitorId IS NOT NULL ORDER BY timestamp DESC")
+    fun getWithHrData(): Flow<List<SessionLogEntity>>
+
+    @Query("SELECT * FROM session_logs WHERE monitorId IS NULL ORDER BY timestamp DESC")
+    fun getWithoutHrData(): Flow<List<SessionLogEntity>>
 }

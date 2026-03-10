@@ -9,9 +9,11 @@ data class SessionLogEntity(
     val timestamp: Long,
     val durationMs: Long,
     val sessionType: String,
-    val avgHrBpm: Float,
-    val hrSlopeBpmPerMin: Float,
-    val startRmssdMs: Float,
-    val endRmssdMs: Float,
-    val lnRmssdSlope: Float
+    /** Null when session was recorded without a heart rate monitor. */
+    val monitorId: String? = null,
+    val avgHrBpm: Float? = null,
+    val hrSlopeBpmPerMin: Float? = null,
+    val startRmssdMs: Float? = null,
+    val endRmssdMs: Float? = null,
+    val lnRmssdSlope: Float? = null
 )

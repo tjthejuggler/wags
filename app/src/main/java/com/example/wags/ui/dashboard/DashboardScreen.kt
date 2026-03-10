@@ -90,6 +90,11 @@ fun DashboardScreen(
                 }
             }
             item {
+                NavigationCard("Morning Readiness", "Daily ANS readiness test") {
+                    navController.navigate(WagsRoutes.MORNING_READINESS)
+                }
+            }
+            item {
                 NavigationCard("Apnea Training", "Free hold & table sessions") {
                     navController.navigate(WagsRoutes.APNEA_FREE)
                 }

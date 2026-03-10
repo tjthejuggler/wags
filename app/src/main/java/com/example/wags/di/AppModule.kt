@@ -2,8 +2,10 @@ package com.example.wags.di
 
 import com.example.wags.data.db.dao.ApneaRecordDao
 import com.example.wags.data.db.dao.DailyReadingDao
+import com.example.wags.data.db.dao.MorningReadinessDao
 import com.example.wags.data.db.dao.SessionLogDao
 import com.example.wags.data.repository.ApneaRepository
+import com.example.wags.data.repository.MorningReadinessRepository
 import com.example.wags.data.repository.ReadinessRepository
 import com.example.wags.data.repository.SessionRepository
 import dagger.Module
@@ -30,4 +32,9 @@ object AppModule {
     @Singleton
     fun provideSessionRepository(dao: SessionLogDao): SessionRepository =
         SessionRepository(dao)
+
+    @Provides
+    @Singleton
+    fun provideMorningReadinessRepository(dao: MorningReadinessDao): MorningReadinessRepository =
+        MorningReadinessRepository(dao)
 }

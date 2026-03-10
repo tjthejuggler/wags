@@ -14,6 +14,15 @@ class SessionRepository @Inject constructor(
     fun getByType(type: String): Flow<List<SessionLogEntity>> =
         dao.getByType(type)
 
+    fun getByMonitor(monitorId: String): Flow<List<SessionLogEntity>> =
+        dao.getByMonitor(monitorId)
+
+    fun getWithHrData(): Flow<List<SessionLogEntity>> =
+        dao.getWithHrData()
+
+    fun getWithoutHrData(): Flow<List<SessionLogEntity>> =
+        dao.getWithoutHrData()
+
     suspend fun saveSession(entity: SessionLogEntity): Long =
         dao.insert(entity)
 }

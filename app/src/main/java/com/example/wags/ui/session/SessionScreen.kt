@@ -23,10 +23,8 @@ fun SessionScreen(
     viewModel: SessionViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val deviceId = "PLACEHOLDER_H10_ID"
     val parsedType = runCatching { SessionType.valueOf(sessionType) }.getOrDefault(SessionType.MEDITATION)
 
-    // Set session type when screen first loads (only if idle)
     LaunchedEffect(parsedType) {
         viewModel.setSessionType(parsedType)
     }
@@ -57,9 +55,11 @@ fun SessionScreen(
             when (state.sessionState) {
                 SessionState.IDLE -> IdleContent(
                     sessionType = parsedType,
+                    hasHrMonitor = state.hasHrMonitor,
+                    connectedDeviceId = state.connectedDeviceId,
                     sonificationEnabled = state.sonificationEnabled,
                     onSonificationToggle = { viewModel.setSonificationEnabled(!state.sonificationEnabled) },
-                    onStart = { viewModel.startSession(deviceId) }
+                    onStart = { deviceId -> viewModel.startSession(deviceId) }
                 )
                 SessionState.ACTIVE -> ActiveContent(
                     state = state,
@@ -78,9 +78,11 @@ fun SessionScreen(
 @Composable
 private fun IdleContent(
     sessionType: SessionType,
+    hasHrMonitor: Boolean,
+    connectedDeviceId: String?,
     sonificationEnabled: Boolean,
     onSonificationToggle: () -> Unit,
-    onStart: () -> Unit
+    onStart: (String?) -> Unit
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -90,27 +92,53 @@ private fun IdleContent(
             sessionType.name.lowercase().replaceFirstChar { it.uppercase() },
             style = MaterialTheme.typography.headlineMedium
         )
-        Text(
-            "HR-tracked session with analytics",
-            style = MaterialTheme.typography.bodyMedium
-        )
 
-        Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
-            Row(
-                modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text("HR Sonification", style = MaterialTheme.typography.bodyLarge)
-                    Text("Auditory heartbeat feedback", style = MaterialTheme.typography.bodyMedium)
+        MonitorStatusBanner(hasHrMonitor = hasHrMonitor, deviceId = connectedDeviceId)
+
+        if (hasHrMonitor) {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Row(
+                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("HR Sonification", style = MaterialTheme.typography.bodyLarge)
+                        Text("Auditory heartbeat feedback", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Switch(checked = sonificationEnabled, onCheckedChange = { onSonificationToggle() })
                 }
-                Switch(checked = sonificationEnabled, onCheckedChange = { onSonificationToggle() })
             }
         }
 
-        Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
-            Text("Start Session")
+        Button(
+            onClick = { onStart(connectedDeviceId) },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(if (hasHrMonitor) "Start Session" else "Start Session (no HR monitor)")
+        }
+    }
+}
+
+@Composable
+private fun MonitorStatusBanner(hasHrMonitor: Boolean, deviceId: String?) {
+    val bgColor = if (hasHrMonitor) SurfaceDark else SurfaceVariant
+    val dot = if (hasHrMonitor) "●" else "○"
+    val dotColor = if (hasHrMonitor) ReadinessGreen else Color.Gray
+    val text = if (hasHrMonitor) {
+        "Monitor connected: ${deviceId ?: "Unknown"}"
+    } else {
+        "No HR monitor — session will be recorded without HR data"
+    }
+
+    Card(colors = CardDefaults.cardColors(containerColor = bgColor)) {
+        Row(
+            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(dot, color = dotColor, style = MaterialTheme.typography.bodyLarge)
+            Text(text, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -132,20 +160,31 @@ private fun ActiveContent(state: SessionUiState, onStop: () -> Unit) {
             color = EcgCyan
         )
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            LiveMetricCard(
-                label = "Heart Rate",
-                value = state.currentHrBpm?.let { "${String.format("%.0f", it)} BPM" } ?: "—",
-                modifier = Modifier.weight(1f)
-            )
-            LiveMetricCard(
-                label = "RMSSD",
-                value = state.currentRmssd?.let { "${String.format("%.1f", it)} ms" } ?: "—",
-                modifier = Modifier.weight(1f)
-            )
+        if (state.hasHrMonitor) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                LiveMetricCard(
+                    label = "Heart Rate",
+                    value = state.currentHrBpm?.let { "${String.format("%.0f", it)} BPM" } ?: "—",
+                    modifier = Modifier.weight(1f)
+                )
+                LiveMetricCard(
+                    label = "RMSSD",
+                    value = state.currentRmssd?.let { "${String.format("%.1f", it)} ms" } ?: "—",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        } else {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceVariant)) {
+                Text(
+                    "Timer only — no HR monitor connected",
+                    modifier = Modifier.padding(12.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.Gray
+                )
+            }
         }
 
         OutlinedButton(
@@ -199,23 +238,36 @@ private fun CompleteContent(state: SessionUiState, onReset: () -> Unit) {
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Analytics", style = MaterialTheme.typography.titleLarge)
-                state.avgHrBpm?.let {
-                    AnalyticsRow("Avg HR", "${String.format("%.1f", it)} BPM")
-                }
-                state.hrSlopeBpmPerMin?.let {
-                    val sign = if (it >= 0) "+" else ""
-                    AnalyticsRow("HR Slope", "$sign${String.format("%.2f", it)} BPM/min")
-                }
-                state.startRmssdMs?.let {
-                    AnalyticsRow("Start RMSSD", "${String.format("%.1f", it)} ms")
-                }
-                state.endRmssdMs?.let {
-                    AnalyticsRow("End RMSSD", "${String.format("%.1f", it)} ms")
-                }
-                state.lnRmssdSlope?.let {
-                    val sign = if (it >= 0) "+" else ""
-                    AnalyticsRow("ln(RMSSD) Slope", "$sign${String.format("%.4f", it)}")
+                Text("Summary", style = MaterialTheme.typography.titleLarge)
+                AnalyticsRow(
+                    label = "Monitor",
+                    value = state.monitorId ?: "None (no HR data)"
+                )
+
+                if (state.avgHrBpm != null) {
+                    Divider(color = Color.Gray.copy(alpha = 0.3f))
+                    Text("Analytics", style = MaterialTheme.typography.titleMedium)
+                    AnalyticsRow("Avg HR", "${String.format("%.1f", state.avgHrBpm)} BPM")
+                    state.hrSlopeBpmPerMin?.let {
+                        val sign = if (it >= 0) "+" else ""
+                        AnalyticsRow("HR Slope", "$sign${String.format("%.2f", it)} BPM/min")
+                    }
+                    state.startRmssdMs?.let {
+                        AnalyticsRow("Start RMSSD", "${String.format("%.1f", it)} ms")
+                    }
+                    state.endRmssdMs?.let {
+                        AnalyticsRow("End RMSSD", "${String.format("%.1f", it)} ms")
+                    }
+                    state.lnRmssdSlope?.let {
+                        val sign = if (it >= 0) "+" else ""
+                        AnalyticsRow("ln(RMSSD) Slope", "$sign${String.format("%.4f", it)}")
+                    }
+                } else {
+                    Text(
+                        "Connect a monitor next time for full HR analytics.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Gray
+                    )
                 }
             }
         }
