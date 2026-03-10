@@ -172,13 +172,17 @@ class PolarBleManager @Inject constructor(
         val key = "$deviceId-rr"
         streamJobs[key]?.cancel()
         streamJobs[key] = scope.launch {
-            polarApi.startHrStreaming(deviceId).toKotlinFlow().collect { hrData ->
-                hrData.samples.forEach { sample ->
-                    sample.rrsMs.forEach { rrRaw ->
-                        val rrMs = rrRaw * RR_CONVERSION_FACTOR
-                        rrBuffer.write(rrMs)
+            try {
+                polarApi.startHrStreaming(deviceId).toKotlinFlow().collect { hrData ->
+                    hrData.samples.forEach { sample ->
+                        sample.rrsMs.forEach { rrRaw ->
+                            val rrMs = rrRaw * RR_CONVERSION_FACTOR
+                            rrBuffer.write(rrMs)
+                        }
                     }
                 }
+            } catch (e: Exception) {
+                // stream ended or device not connected
             }
         }
     }

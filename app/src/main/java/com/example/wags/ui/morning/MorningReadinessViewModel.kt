@@ -39,6 +39,7 @@ data class MorningReadinessUiState(
     val hooperStress: Int = 3,
     val result: MorningReadinessResult? = null,
     val errorMessage: String? = null,
+    val noHrmDialogVisible: Boolean = false,
     val isCalculating: Boolean = false,
     val triggerStandAlert: Boolean = false
 )
@@ -94,21 +95,19 @@ class MorningReadinessViewModel @Inject constructor(
         }
     }
 
-    fun startSession(deviceId: String) {
-        val connState = bleManager.h10State.value
-        if (connState !is BleConnectionState.Connected) {
-            _uiState.update {
-                it.copy(
-                    fsmState = MorningReadinessState.ERROR,
-                    errorMessage = "No BLE device connected. Please connect your Polar H10 first."
-                )
-            }
+    fun startSession() {
+        if (bleManager.h10State.value !is BleConnectionState.Connected) {
+            _uiState.update { it.copy(noHrmDialogVisible = true) }
             return
         }
 
         lastRrBufferSize = 0
         fsm.start(viewModelScope)
         startRrPolling()
+    }
+
+    fun dismissNoHrmDialog() {
+        _uiState.update { it.copy(noHrmDialogVisible = false) }
     }
 
     private fun startRrPolling() {

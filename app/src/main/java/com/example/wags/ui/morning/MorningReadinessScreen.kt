@@ -36,6 +36,26 @@ fun MorningReadinessScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
+    // No HRM dialog
+    if (uiState.noHrmDialogVisible) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissNoHrmDialog() },
+            title = { Text("Heart Rate Monitor Required", color = TextPrimary) },
+            text = {
+                Text(
+                    "Please connect your Polar H10 heart rate monitor before starting the Morning Readiness test.",
+                    color = TextSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.dismissNoHrmDialog() }) {
+                    Text("OK", color = EcgCyan)
+                }
+            },
+            containerColor = SurfaceDark
+        )
+    }
+
     // Stand alert: play tone + vibrate when flag is set
     LaunchedEffect(uiState.triggerStandAlert) {
         if (uiState.triggerStandAlert) {
@@ -86,9 +106,9 @@ fun MorningReadinessScreen(
         ) {
             when (uiState.fsmState) {
                 MorningReadinessState.IDLE ->
-                    IdleContent(onStart = { viewModel.startSession("") })
+                    IdleContent(onStart = { viewModel.startSession() })
                 MorningReadinessState.INIT ->
-                    InitContent()
+                    InitContent(uiState)
                 MorningReadinessState.SUPINE_REST ->
                     SupineRestContent(uiState)
                 MorningReadinessState.SUPINE_HRV ->
@@ -156,19 +176,30 @@ private fun IdleContent(onStart: () -> Unit) {
 }
 
 @Composable
-private fun InitContent() {
+private fun InitContent(uiState: MorningReadinessUiState) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        CircularProgressIndicator(color = EcgCyan)
-        Text("Connecting...", style = MaterialTheme.typography.headlineSmall, color = EcgCyan)
+        Text("Get Ready", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+        CountdownCircle(
+            seconds = uiState.remainingSeconds,
+            totalSeconds = com.example.wags.domain.usecase.readiness.MorningReadinessFsm.INIT_DURATION_SECONDS,
+            color = EcgCyanDim
+        )
         Text(
-            "Lie down flat and relax",
+            "Lie down flat on your back and relax",
             style = MaterialTheme.typography.bodyLarge,
             color = TextSecondary,
             textAlign = TextAlign.Center
         )
+        Text(
+            "The test will begin automatically",
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextDisabled,
+            textAlign = TextAlign.Center
+        )
+        PulsingDot()
     }
 }
 
@@ -289,7 +320,7 @@ private fun StandHrvContent(uiState: MorningReadinessUiState) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text("Recording Standing HRV", style = MaterialTheme.typography.headlineSmall, color = EcgCyan)
-        CountdownCircle(seconds = uiState.remainingSeconds, totalSeconds = 120, color = EcgCyan)
+        CountdownCircle(seconds = uiState.remainingSeconds, totalSeconds = com.example.wags.domain.usecase.readiness.MorningReadinessFsm.STAND_HRV_SECONDS, color = EcgCyan)
         if (uiState.liveRmssd > 0.0) {
             Text(
                 "Live RMSSD: ${String.format("%.1f", uiState.liveRmssd)} ms",
