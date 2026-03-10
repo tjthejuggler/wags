@@ -24,7 +24,7 @@ object DatabaseModule {
     @Singleton
     fun provideWagsDatabase(@ApplicationContext context: Context): WagsDatabase =
         Room.databaseBuilder(context, WagsDatabase::class.java, "wags.db")
-            .addMigrations(WagsDatabase.MIGRATION_1_2)
+            .addMigrations(WagsDatabase.MIGRATION_1_2, WagsDatabase.MIGRATION_2_3)
             .build()
 
     @Provides fun provideDailyReadingDao(db: WagsDatabase): DailyReadingDao = db.dailyReadingDao()
