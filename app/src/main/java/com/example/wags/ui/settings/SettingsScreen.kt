@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -138,7 +139,10 @@ fun SettingsScreen(
                                 color = EcgCyan,
                                 strokeWidth = 2.dp
                             )
-                            OutlinedButton(onClick = { viewModel.stopScan() }) {
+                            OutlinedButton(
+                                onClick = { viewModel.stopScan() },
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                            ) {
                                 Text("Stop")
                             }
                         }
@@ -246,7 +250,7 @@ private fun DeviceStatusRow(
         if (state is BleConnectionState.Connected) {
             OutlinedButton(
                 onClick = onDisconnect,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = ReadinessRed)
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
             ) { Text("Disconnect") }
         }
     }
@@ -305,7 +309,8 @@ private fun DeviceResultCard(
                     OutlinedButton(
                         onClick = onConnectVerity,
                         modifier = Modifier.height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
                     ) { Text("Verity", style = MaterialTheme.typography.bodySmall) }
                 }
             }

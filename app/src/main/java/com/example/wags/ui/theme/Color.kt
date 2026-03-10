@@ -7,11 +7,11 @@ val BackgroundDark = Color(0xFF0A0E1A)
 val SurfaceDark = Color(0xFF111827)
 val SurfaceVariant = Color(0xFF1E2A3A)
 
-// ECG cyan accent
+// ECG cyan accent (used for text/icons only — high luminance, maps to light grey in greyscale)
 val EcgCyan = Color(0xFF00E5FF)
 val EcgCyanDim = Color(0xFF0097A7)
 
-// Status colors
+// Status colors (used for text/icons only)
 val ReadinessGreen = Color(0xFF4CAF50)
 val ReadinessOrange = Color(0xFFFF9800)
 val ReadinessRed = Color(0xFFF44336)
@@ -35,7 +35,12 @@ val TextDisabled = Color(0xFF546E7A)
 val PacerInhale = Color(0xFF00BCD4)
 val PacerExhale = Color(0xFF7C4DFF)
 
-// Apnea states
+// Apnea states (used for text/icons only)
 val ApneaVentilation = Color(0xFF4CAF50)
 val ApneaHold = Color(0xFFF44336)
 val ApneaRecovery = Color(0xFF2196F3)
+
+// Button backgrounds — greyscale-safe dark greys so white text is always visible
+val ButtonPrimary = Color(0xFF444444)
+val ButtonDanger = Color(0xFF333333)
+val ButtonSuccess = Color(0xFF3A3A3A)

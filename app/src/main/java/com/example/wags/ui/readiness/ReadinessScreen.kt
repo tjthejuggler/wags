@@ -7,6 +7,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -116,7 +117,11 @@ private fun RecordingContent(state: ReadinessUiState, onCancel: () -> Unit) {
             "RR intervals collected: ${state.rrCount}",
             style = MaterialTheme.typography.bodyMedium
         )
-        OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(
+            onClick = onCancel,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+        ) {
             Text("Cancel")
         }
     }

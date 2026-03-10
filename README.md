@@ -1,5 +1,5 @@
 # WAGS — Cardiac Biofeedback App
-*Last updated: 2026-03-10 (live HR top bar + BLE scan-and-select)*
+*Last updated: 2026-03-10 (greyscale button visibility fix)*
 
 ---
 

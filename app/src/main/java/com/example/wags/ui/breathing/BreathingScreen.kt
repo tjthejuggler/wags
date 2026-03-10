@@ -9,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -71,7 +72,8 @@ fun BreathingScreen(
             if (state.isSessionActive) {
                 OutlinedButton(
                     onClick = { viewModel.stopSession() },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
                 ) { Text("Stop Session") }
             } else {
                 Button(
@@ -193,14 +195,22 @@ private fun RfAssessmentSection(
             RfPhase.BASELINE -> {
                 Text("Baseline: ${remainingSeconds}s remaining",
                     style = MaterialTheme.typography.bodyLarge, color = EcgCyan)
-                OutlinedButton(onClick = onStop, modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = onStop,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                ) {
                     Text("Cancel")
                 }
             }
             RfPhase.TEST_BLOCK -> {
                 Text("Testing ${String.format("%.1f", currentTestRateBpm)} BPM — ${remainingSeconds}s",
                     style = MaterialTheme.typography.bodyLarge, color = EcgCyan)
-                OutlinedButton(onClick = onStop, modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = onStop,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                ) {
                     Text("Cancel")
                 }
             }

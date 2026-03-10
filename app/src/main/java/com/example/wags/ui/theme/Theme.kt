@@ -5,20 +5,22 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 private val WagsDarkColorScheme = darkColorScheme(
-    primary = EcgCyan,
-    onPrimary = BackgroundDark,
+    primary = ButtonPrimary,
+    onPrimary = Color.White,
     primaryContainer = EcgCyanDim,
     onPrimaryContainer = TextPrimary,
-    secondary = PacerInhale,
-    onSecondary = BackgroundDark,
+    secondary = ButtonSuccess,
+    onSecondary = Color.White,
     background = BackgroundDark,
     onBackground = TextPrimary,
     surface = SurfaceDark,
     onSurface = TextPrimary,
     surfaceVariant = SurfaceVariant,
     onSurfaceVariant = TextSecondary,
-    error = ReadinessRed,
-    onError = Color.White
+    error = ButtonDanger,
+    onError = Color.White,
+    outline = Color.White,
+    outlineVariant = TextSecondary
 )
 
 @Composable

@@ -7,6 +7,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -108,7 +109,10 @@ private fun FreeHoldSection(
                 )
                 Button(
                     onClick = onStop,
-                    colors = ButtonDefaults.buttonColors(containerColor = ApneaHold),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ButtonDanger,
+                        contentColor = Color.White
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Release") }
             } else {
@@ -123,7 +127,10 @@ private fun FreeHoldSection(
                 }
                 Button(
                     onClick = onStart,
-                    colors = ButtonDefaults.buttonColors(containerColor = ApneaVentilation),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ButtonSuccess,
+                        contentColor = Color.White
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Start Hold") }
             }
