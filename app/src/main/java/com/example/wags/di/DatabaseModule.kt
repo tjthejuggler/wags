@@ -5,10 +5,13 @@ import androidx.room.Room
 import com.example.wags.data.db.WagsDatabase
 import com.example.wags.data.db.dao.AccCalibrationDao
 import com.example.wags.data.db.dao.ApneaRecordDao
+import com.example.wags.data.db.dao.ApneaSessionDao
+import com.example.wags.data.db.dao.ContractionDao
 import com.example.wags.data.db.dao.DailyReadingDao
 import com.example.wags.data.db.dao.MorningReadinessDao
 import com.example.wags.data.db.dao.RfAssessmentDao
 import com.example.wags.data.db.dao.SessionLogDao
+import com.example.wags.data.db.dao.TelemetryDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -24,7 +27,11 @@ object DatabaseModule {
     @Singleton
     fun provideWagsDatabase(@ApplicationContext context: Context): WagsDatabase =
         Room.databaseBuilder(context, WagsDatabase::class.java, "wags.db")
-            .addMigrations(WagsDatabase.MIGRATION_1_2, WagsDatabase.MIGRATION_2_3)
+            .addMigrations(
+                WagsDatabase.MIGRATION_1_2,
+                WagsDatabase.MIGRATION_2_3,
+                WagsDatabase.MIGRATION_3_4
+            )
             .build()
 
     @Provides fun provideDailyReadingDao(db: WagsDatabase): DailyReadingDao = db.dailyReadingDao()
@@ -33,4 +40,7 @@ object DatabaseModule {
     @Provides fun provideRfAssessmentDao(db: WagsDatabase): RfAssessmentDao = db.rfAssessmentDao()
     @Provides fun provideAccCalibrationDao(db: WagsDatabase): AccCalibrationDao = db.accCalibrationDao()
     @Provides fun provideMorningReadinessDao(db: WagsDatabase): MorningReadinessDao = db.morningReadinessDao()
+    @Provides fun provideApneaSessionDao(db: WagsDatabase): ApneaSessionDao = db.apneaSessionDao()
+    @Provides fun provideContractionDao(db: WagsDatabase): ContractionDao = db.contractionDao()
+    @Provides fun provideTelemetryDao(db: WagsDatabase): TelemetryDao = db.telemetryDao()
 }

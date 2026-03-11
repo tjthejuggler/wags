@@ -14,9 +14,12 @@ import com.example.wags.data.db.entity.*
         SessionLogEntity::class,
         RfAssessmentEntity::class,
         AccCalibrationEntity::class,
-        MorningReadinessEntity::class
+        MorningReadinessEntity::class,
+        ApneaSessionEntity::class,
+        ContractionEntity::class,
+        TelemetryEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -26,18 +29,17 @@ abstract class WagsDatabase : RoomDatabase() {
     abstract fun rfAssessmentDao(): RfAssessmentDao
     abstract fun accCalibrationDao(): AccCalibrationDao
     abstract fun morningReadinessDao(): MorningReadinessDao
+    abstract fun apneaSessionDao(): ApneaSessionDao
+    abstract fun contractionDao(): ContractionDao
+    abstract fun telemetryDao(): TelemetryDao
 
     companion object {
         /**
          * v1 → v2: Make HR columns nullable and add monitorId to session_logs.
-         * SQLite does not support ALTER COLUMN, so we add the new nullable monitorId column
-         * and leave existing HR columns as-is (Room treats missing nullable columns as null).
          */
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE session_logs ADD COLUMN monitorId TEXT")
-                // Existing rows will have NULL for monitorId — correct behaviour.
-                // HR columns were NOT NULL in v1; we recreate the table to make them nullable.
                 db.execSQL("""
                     CREATE TABLE session_logs_new (
                         sessionId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -100,6 +102,86 @@ abstract class WagsDatabase : RoomDatabase() {
                         rhrLimiterApplied INTEGER NOT NULL
                     )
                 """.trimIndent())
+            }
+        }
+
+        /**
+         * v3 → v4:
+         * - Creates rf_assessments (was missing from prior migrations — fixes schema mismatch crash)
+         * - Creates acc_calibrations (was missing from prior migrations — fixes schema mismatch crash)
+         * - Creates apnea_sessions (new)
+         * - Creates contractions (new, FK → apnea_sessions)
+         * - Creates telemetry (new, FK → apnea_sessions)
+         */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `rf_assessments` (
+                        `assessmentId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `timestamp` INTEGER NOT NULL,
+                        `protocolType` TEXT NOT NULL,
+                        `optimalBpm` REAL NOT NULL,
+                        `optimalIeRatio` REAL NOT NULL,
+                        `compositeScore` REAL NOT NULL,
+                        `isValid` INTEGER NOT NULL,
+                        `leaderboardJson` TEXT NOT NULL
+                    )
+                """.trimIndent())
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `acc_calibrations` (
+                        `calibrationId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `timestamp` INTEGER NOT NULL,
+                        `posture` TEXT NOT NULL,
+                        `withHold` INTEGER NOT NULL,
+                        `inhaleDeltaThreshold` REAL NOT NULL,
+                        `exhaleDeltaThreshold` REAL NOT NULL,
+                        `holdDebounceCount` INTEGER NOT NULL
+                    )
+                """.trimIndent())
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `apnea_sessions` (
+                        `sessionId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `timestamp` INTEGER NOT NULL,
+                        `tableType` TEXT NOT NULL,
+                        `tableVariant` TEXT NOT NULL,
+                        `tableParamsJson` TEXT NOT NULL,
+                        `pbAtSessionMs` INTEGER NOT NULL,
+                        `totalSessionDurationMs` INTEGER NOT NULL,
+                        `contractionTimestampsJson` TEXT NOT NULL,
+                        `maxHrBpm` INTEGER,
+                        `lowestSpO2` INTEGER,
+                        `roundsCompleted` INTEGER NOT NULL,
+                        `totalRounds` INTEGER NOT NULL
+                    )
+                """.trimIndent())
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `contractions` (
+                        `contractionId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `sessionId` INTEGER NOT NULL,
+                        `roundNumber` INTEGER NOT NULL,
+                        `timestampMs` INTEGER NOT NULL,
+                        `elapsedInRoundMs` INTEGER NOT NULL,
+                        `phase` TEXT NOT NULL,
+                        FOREIGN KEY(`sessionId`) REFERENCES `apnea_sessions`(`sessionId`) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_contractions_sessionId` ON `contractions` (`sessionId`)")
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `telemetry` (
+                        `telemetryId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `sessionId` INTEGER NOT NULL,
+                        `timestampMs` INTEGER NOT NULL,
+                        `spO2` INTEGER,
+                        `heartRateBpm` INTEGER,
+                        `source` TEXT NOT NULL,
+                        FOREIGN KEY(`sessionId`) REFERENCES `apnea_sessions`(`sessionId`) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_telemetry_sessionId` ON `telemetry` (`sessionId`)")
             }
         }
     }

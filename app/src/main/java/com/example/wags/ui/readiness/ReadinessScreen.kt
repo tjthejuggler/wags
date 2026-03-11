@@ -32,7 +32,7 @@ fun ReadinessScreen(
         containerColor = BackgroundDark,
         topBar = {
             TopAppBar(
-                title = { Text("Morning Readiness") },
+                title = { Text("HRV Readiness") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
@@ -79,8 +79,8 @@ private fun IdleContent(onStart: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Morning HRV Readiness", style = MaterialTheme.typography.headlineMedium)
-        Text("2-minute resting measurement", style = MaterialTheme.typography.bodyMedium)
+        Text("HRV Readiness", style = MaterialTheme.typography.headlineMedium)
+        Text("2-minute resting HRV measurement", style = MaterialTheme.typography.bodyMedium)
         Text(
             "Ensure Polar H10 is connected and worn correctly.",
             style = MaterialTheme.typography.bodyMedium

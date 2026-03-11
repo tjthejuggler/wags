@@ -4,8 +4,10 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.wags.data.ble.OximeterBleManager
 import com.example.wags.data.ble.PolarBleManager
 import com.example.wags.domain.model.BleConnectionState
+import com.example.wags.domain.model.OximeterConnectionState
 import com.polar.sdk.api.model.PolarDeviceInfo
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -22,6 +24,7 @@ private const val KEY_VERITY_ID = "verity_device_id"
 data class SettingsUiState(
     val h10State: BleConnectionState = BleConnectionState.Disconnected,
     val verityState: BleConnectionState = BleConnectionState.Disconnected,
+    val oximeterState: OximeterConnectionState = OximeterConnectionState.Disconnected,
     val isScanning: Boolean = false,
     val scanResults: List<PolarDeviceInfo> = emptyList(),
     val savedH10Id: String = "",
@@ -31,7 +34,8 @@ data class SettingsUiState(
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val bleManager: PolarBleManager
+    private val bleManager: PolarBleManager,
+    private val oximeterBleManager: OximeterBleManager
 ) : ViewModel() {
 
     private val prefs: SharedPreferences =
@@ -41,11 +45,13 @@ class SettingsViewModel @Inject constructor(
         bleManager.h10State,
         bleManager.verityState,
         bleManager.isScanning,
-        bleManager.scanResults
-    ) { h10State, verityState, isScanning, scanResults ->
+        bleManager.scanResults,
+        oximeterBleManager.connectionState
+    ) { h10State, verityState, isScanning, scanResults, oximeterState ->
         SettingsUiState(
             h10State = h10State,
             verityState = verityState,
+            oximeterState = oximeterState,
             isScanning = isScanning,
             scanResults = scanResults,
             savedH10Id = prefs.getString(KEY_H10_ID, "") ?: "",
@@ -83,8 +89,16 @@ class SettingsViewModel @Inject constructor(
         if (id.isNotBlank()) bleManager.disconnectDevice(id)
     }
 
+    // ── Oximeter ─────────────────────────────────────────────────────────────
+
+    fun startOximeterScan() = oximeterBleManager.startScan()
+    fun stopOximeterScan() = oximeterBleManager.stopScan()
+    fun connectOximeter(address: String) = oximeterBleManager.connect(address)
+    fun disconnectOximeter() = oximeterBleManager.disconnect()
+
     override fun onCleared() {
         bleManager.stopScan()
+        oximeterBleManager.stopScan()
         super.onCleared()
     }
 }

@@ -21,12 +21,12 @@ class ApneaCountdownTimer @Inject constructor() {
     private var timerJob: Job? = null
 
     companion object {
-        private val WARNING_POINTS = setOf(10L, 5L, 3L, 2L, 1L)
+        private val WARNING_POINTS = setOf(120L, 60L, 30L, 10L, 9L, 8L, 7L, 6L, 5L, 4L, 3L, 2L, 1L)
     }
 
     /**
      * Start countdown from [durationMs].
-     * [onWarning] fires at 10s, 5s, 3s, 2s, 1s remaining.
+     * [onWarning] fires at 120s, 60s, 30s, 10s–1s remaining.
      * [onComplete] fires when countdown reaches 0.
      */
     fun start(

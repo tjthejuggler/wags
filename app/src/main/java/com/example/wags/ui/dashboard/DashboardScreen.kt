@@ -80,18 +80,18 @@ fun DashboardScreen(
                 )
             }
             item {
-                NavigationCard("Morning Readiness", "HRV measurement & scoring") {
+                NavigationCard("Morning Readiness", "Full ANS readiness: supine → stand protocol") {
+                    navController.navigate(WagsRoutes.MORNING_READINESS)
+                }
+            }
+            item {
+                NavigationCard("HRV Readiness", "Quick 2-min resting HRV measurement") {
                     navController.navigate(WagsRoutes.READINESS)
                 }
             }
             item {
                 NavigationCard("Resonance Breathing", "Coherence biofeedback") {
                     navController.navigate(WagsRoutes.BREATHING)
-                }
-            }
-            item {
-                NavigationCard("Morning Readiness", "Daily ANS readiness test") {
-                    navController.navigate(WagsRoutes.MORNING_READINESS)
                 }
             }
             item {

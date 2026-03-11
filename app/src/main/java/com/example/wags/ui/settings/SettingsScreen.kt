@@ -1,6 +1,7 @@
 package com.example.wags.ui.settings
 
 import android.Manifest
+import android.bluetooth.le.ScanResult
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,6 +22,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.domain.model.BleConnectionState
+import com.example.wags.domain.model.OximeterConnectionState
 import com.example.wags.ui.theme.*
 import com.polar.sdk.api.model.PolarDeviceInfo
 
@@ -60,14 +62,28 @@ fun SettingsScreen(
         }
     }
 
+    val oximeterPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        if (results.values.all { it }) viewModel.startOximeterScan()
+    }
+
     fun requestScan() {
         if (allGranted()) viewModel.startScan()
         else permissionLauncher.launch(blePermissions)
     }
 
-    // Stop scan when leaving the screen
+    fun requestOximeterScan() {
+        if (allGranted()) viewModel.startOximeterScan()
+        else oximeterPermissionLauncher.launch(blePermissions)
+    }
+
+    // Stop scans when leaving the screen
     DisposableEffect(Unit) {
-        onDispose { viewModel.stopScan() }
+        onDispose {
+            viewModel.stopScan()
+            viewModel.stopOximeterScan()
+        }
     }
 
     Scaffold(
@@ -109,7 +125,9 @@ fun SettingsScreen(
                 }
             }
 
-            // Connected devices status
+            // ── Polar Devices ─────────────────────────────────────────────────
+
+            // Connected Polar devices status
             item {
                 ConnectedDevicesCard(
                     h10State = state.h10State,
@@ -121,7 +139,7 @@ fun SettingsScreen(
                 )
             }
 
-            // Scan button
+            // Polar scan button
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -154,7 +172,7 @@ fun SettingsScreen(
                 }
             }
 
-            // Scan results
+            // Polar scan results
             if (state.scanResults.isEmpty() && !state.isScanning) {
                 item {
                     Text(
@@ -181,9 +199,102 @@ fun SettingsScreen(
                     }
                 )
             }
+
+            // ── Oximeter ──────────────────────────────────────────────────────
+
+            item {
+                HorizontalDivider(color = SurfaceVariant)
+            }
+
+            item {
+                OximeterConnectionCard(
+                    oximeterState = state.oximeterState,
+                    onScan = { requestOximeterScan() },
+                    onStopScan = { viewModel.stopOximeterScan() },
+                    onDisconnect = { viewModel.disconnectOximeter() },
+                    onConnect = { address -> viewModel.connectOximeter(address) }
+                )
+            }
         }
     }
 }
+
+// ── Oximeter connection card ──────────────────────────────────────────────────
+
+@Composable
+private fun OximeterConnectionCard(
+    oximeterState: OximeterConnectionState,
+    onScan: () -> Unit,
+    onStopScan: () -> Unit,
+    onDisconnect: () -> Unit,
+    onConnect: (String) -> Unit
+) {
+    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Oximeter (SpO₂)", style = MaterialTheme.typography.titleMedium)
+
+            // Status
+            val (statusText, statusColor) = when (oximeterState) {
+                is OximeterConnectionState.Connected ->
+                    "Connected: ${oximeterState.deviceName}" to ReadinessGreen
+                is OximeterConnectionState.Connecting ->
+                    "Connecting…" to ReadinessOrange
+                is OximeterConnectionState.Scanning ->
+                    "Scanning… (${oximeterState.devicesFound} found)" to EcgCyan
+                is OximeterConnectionState.Error ->
+                    "Error: ${oximeterState.message}" to ReadinessRed
+                is OximeterConnectionState.Disconnected ->
+                    "Not connected" to TextSecondary
+            }
+            Text(statusText, style = MaterialTheme.typography.bodySmall, color = statusColor)
+
+            // Action button
+            when (oximeterState) {
+                is OximeterConnectionState.Connected -> {
+                    OutlinedButton(
+                        onClick = onDisconnect,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                    ) { Text("Disconnect") }
+                }
+                is OximeterConnectionState.Scanning -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = EcgCyan,
+                            strokeWidth = 2.dp
+                        )
+                        OutlinedButton(
+                            onClick = onStopScan,
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                        ) { Text("Stop") }
+                    }
+                }
+                else -> {
+                    Button(onClick = onScan) { Text("Scan for Oximeter") }
+                }
+            }
+
+            // Scan results
+            if (oximeterState is OximeterConnectionState.Scanning && oximeterState.devicesFound > 0) {
+                Text(
+                    "Tap a device below to connect",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondary
+                )
+            }
+        }
+    }
+}
+
+// ── Polar device cards (unchanged) ───────────────────────────────────────────
 
 @Composable
 private fun ConnectedDevicesCard(

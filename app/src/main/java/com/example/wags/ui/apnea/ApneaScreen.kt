@@ -3,6 +3,8 @@ package com.example.wags.ui.apnea
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,6 +16,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.domain.model.ApneaTableType
+import com.example.wags.domain.model.TableDifficulty
+import com.example.wags.domain.model.TableLength
+import com.example.wags.domain.model.TrainingModality
+import com.example.wags.ui.common.InfoHelpBubble
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 
@@ -71,9 +77,21 @@ fun ApneaScreen(
             // Personal Best & Table Navigation
             PersonalBestSection(
                 personalBestMs = state.personalBestMs,
+                selectedLength = state.selectedLength,
+                selectedDifficulty = state.selectedDifficulty,
                 onSetPersonalBest = { viewModel.setPersonalBest(it) },
+                onLengthSelected = { viewModel.setLength(it) },
+                onDifficultySelected = { viewModel.setDifficulty(it) },
                 onNavigateO2 = { navController.navigate(WagsRoutes.apneaTable("O2")) },
-                onNavigateCo2 = { navController.navigate(WagsRoutes.apneaTable("CO2")) }
+                onNavigateCo2 = { navController.navigate(WagsRoutes.apneaTable("CO2")) },
+                onNavigateAdvanced = { modality ->
+                    navController.navigate(
+                        WagsRoutes.advancedApnea(modality.name, state.selectedLength.name)
+                    )
+                },
+                onNavigateAnalytics = {
+                    navController.navigate(WagsRoutes.SESSION_ANALYTICS_HISTORY)
+                }
             )
 
             HorizontalDivider(color = SurfaceVariant)
@@ -181,9 +199,15 @@ private fun FreeHoldSettings(
 @Composable
 private fun PersonalBestSection(
     personalBestMs: Long,
+    selectedLength: TableLength,
+    selectedDifficulty: TableDifficulty,
     onSetPersonalBest: (Long) -> Unit,
+    onLengthSelected: (TableLength) -> Unit,
+    onDifficultySelected: (TableDifficulty) -> Unit,
     onNavigateO2: () -> Unit,
-    onNavigateCo2: () -> Unit
+    onNavigateCo2: () -> Unit,
+    onNavigateAdvanced: (TrainingModality) -> Unit,
+    onNavigateAnalytics: () -> Unit
 ) {
     var pbInput by remember { mutableStateOf("") }
 
@@ -209,7 +233,12 @@ private fun PersonalBestSection(
                 OutlinedTextField(
                     value = pbInput,
                     onValueChange = { pbInput = it },
-                    label = { Text("PB (seconds)") },
+                    label = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Personal Best (seconds)")
+                            InfoHelpBubble(title = PB_HELP_TITLE, content = PB_HELP_CONTENT)
+                        }
+                    },
                     modifier = Modifier.weight(1f),
                     singleLine = true
                 )
@@ -218,19 +247,146 @@ private fun PersonalBestSection(
                 }) { Text("Set") }
             }
 
+            // Session Length selector
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Session Length", style = MaterialTheme.typography.bodyMedium)
+                InfoHelpBubble(title = LENGTH_DIFFICULTY_HELP_TITLE, content = LENGTH_DIFFICULTY_HELP_CONTENT)
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(
+                    TableLength.SHORT  to "Short (4)",
+                    TableLength.MEDIUM to "Medium (8)",
+                    TableLength.LONG   to "Long (12)"
+                ).forEach { (length, label) ->
+                    FilterChip(
+                        selected = selectedLength == length,
+                        onClick = { onLengthSelected(length) },
+                        label = { Text(label) }
+                    )
+                }
+            }
+
+            // Difficulty selector
+            Text("Difficulty", style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(
+                    TableDifficulty.EASY   to "Easy",
+                    TableDifficulty.MEDIUM to "Medium",
+                    TableDifficulty.HARD   to "Hard"
+                ).forEach { (difficulty, label) ->
+                    FilterChip(
+                        selected = selectedDifficulty == difficulty,
+                        onClick = { onDifficultySelected(difficulty) },
+                        label = { Text(label) }
+                    )
+                }
+            }
+
+            // Standard table buttons
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Button(
                     onClick = onNavigateO2,
                     enabled = personalBestMs > 0L,
                     modifier = Modifier.weight(1f)
                 ) { Text("O2 Table") }
+                TableHelpIcon(title = O2_HELP_TITLE, text = O2_HELP_TEXT)
+
                 Button(
                     onClick = onNavigateCo2,
                     enabled = personalBestMs > 0L,
                     modifier = Modifier.weight(1f)
                 ) { Text("CO2 Table") }
+                TableHelpIcon(title = CO2_HELP_TITLE, text = CO2_HELP_TEXT)
+            }
+
+            HorizontalDivider(color = SurfaceVariant)
+            Text("Advanced Modalities", style = MaterialTheme.typography.titleMedium)
+
+            // Progressive O2
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = { onNavigateAdvanced(TrainingModality.PROGRESSIVE_O2) },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Progressive O₂") }
+                TableHelpIcon(title = PROGRESSIVE_O2_HELP_TITLE, text = PROGRESSIVE_O2_HELP_TEXT)
+            }
+
+            // Min Breath
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = { onNavigateAdvanced(TrainingModality.MIN_BREATH) },
+                    enabled = personalBestMs > 0L,
+                    modifier = Modifier.weight(1f)
+                ) { Text("Min Breath") }
+                TableHelpIcon(title = MIN_BREATH_HELP_TITLE, text = MIN_BREATH_HELP_TEXT)
+            }
+
+            // Wonka: Till Contraction
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = { onNavigateAdvanced(TrainingModality.WONKA_FIRST_CONTRACTION) },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Wonka: Till Contraction") }
+                TableHelpIcon(title = WONKA_HELP_TITLE, text = WONKA_HELP_TEXT)
+            }
+
+            // Wonka: Endurance
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = { onNavigateAdvanced(TrainingModality.WONKA_ENDURANCE) },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Wonka: Endurance") }
+                TableHelpIcon(title = WONKA_HELP_TITLE, text = WONKA_HELP_TEXT)
+            }
+
+            HorizontalDivider(color = SurfaceVariant)
+
+            OutlinedButton(
+                onClick = onNavigateAnalytics,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("📊 View Session Analytics")
             }
         }
+    }
+}
+
+@Composable
+private fun TableHelpIcon(title: String, text: String) {
+    var showDialog by remember { mutableStateOf(false) }
+
+    IconButton(onClick = { showDialog = true }) {
+        Icon(
+            imageVector = Icons.Outlined.Info,
+            contentDescription = "Info: $title",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+        )
+    }
+
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = { Text(title, style = MaterialTheme.typography.titleMedium) },
+            text = { Text(text, style = MaterialTheme.typography.bodySmall) },
+            confirmButton = {
+                TextButton(onClick = { showDialog = false }) { Text("Got it") }
+            }
+        )
     }
 }
 

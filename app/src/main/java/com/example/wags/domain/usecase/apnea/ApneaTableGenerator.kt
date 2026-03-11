@@ -3,58 +3,105 @@ package com.example.wags.domain.usecase.apnea
 import com.example.wags.domain.model.ApneaTable
 import com.example.wags.domain.model.ApneaTableStep
 import com.example.wags.domain.model.ApneaTableType
+import com.example.wags.domain.model.TableConfig
+import com.example.wags.domain.model.TableDifficulty
+import com.example.wags.domain.model.TableLength
 import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
- * Generates O2 and CO2 apnea training tables based on personal best (PB).
+ * Generates dynamic CO2 and O2 apnea training tables based on personal best (PB),
+ * a TableLength (controls number of rounds), and a TableDifficulty (controls PB percentages).
  *
- * O2 Table (Hypoxia): constant ventilation, increasing apnea
- *   - ventilationMs = 2 min (constant)
- *   - apneaSteps = [0.5, 0.6, 0.7, 0.75, 0.8] × PB (capped at 80% PB)
- *   - 6 rounds
- *
- * CO2 Table (Hypercapnia): decreasing ventilation, constant apnea
- *   - apneaMs = 0.5 × PB (constant)
- *   - ventilationSteps = [2.0, 1.75, 1.5, 1.25, 1.0] × 60s
- *   - 5 rounds
+ * CO2 Table (Hypercapnia): fixed hold, progressively shorter rests
+ * O2 Table  (Hypoxia):     fixed rest, progressively longer holds
  */
+@Singleton
 class ApneaTableGenerator @Inject constructor() {
 
-    companion object {
-        private val O2_APNEA_RATIOS = listOf(0.5, 0.6, 0.7, 0.75, 0.8)
-        private val CO2_VENTILATION_MINUTES = listOf(2.0, 1.75, 1.5, 1.25, 1.0)
-        private const val O2_VENTILATION_MS = 2 * 60 * 1000L
-        private const val ROUNDS = 5
-    }
+    // ── Public API ────────────────────────────────────────────────────────────
 
-    fun generateO2Table(personalBestMs: Long): ApneaTable {
-        val steps = mutableListOf<ApneaTableStep>()
-        O2_APNEA_RATIOS.take(ROUNDS).forEachIndexed { index, ratio ->
-            val apneaMs = (personalBestMs * ratio).toLong()
-            steps.add(
-                ApneaTableStep(
-                    apneaDurationMs = apneaMs,
-                    ventilationDurationMs = O2_VENTILATION_MS,
-                    roundNumber = index + 1
-                )
+    fun generateCo2Table(pbMs: Long, length: TableLength, difficulty: TableDifficulty): ApneaTable {
+        val cfg = buildConfig(length, difficulty)
+        val tHold = (pbMs * cfg.co2HoldPercent.toDouble())
+            .coerceAtMost(pbMs * 0.55)          // clamped to 55% max
+        val r1 = tHold
+        val rMin = cfg.co2RestMinSec * 1_000.0
+        val n = cfg.rounds
+        val deltaR = if (n > 1) (r1 - rMin) / (n - 1) else 0.0
+
+        val steps = (1..n).map { round ->
+            val rN = (r1 - ((round - 1) * deltaR)).coerceAtLeast(rMin)
+            ApneaTableStep(
+                apneaDurationMs = tHold.toLong(),
+                ventilationDurationMs = rN.toLong(),
+                roundNumber = round
             )
         }
-        return ApneaTable(ApneaTableType.O2, steps, personalBestMs)
+        return ApneaTable(ApneaTableType.CO2, steps, pbMs)
     }
 
-    fun generateCo2Table(personalBestMs: Long): ApneaTable {
-        val apneaMs = (personalBestMs * 0.5).toLong()
-        val steps = mutableListOf<ApneaTableStep>()
-        CO2_VENTILATION_MINUTES.take(ROUNDS).forEachIndexed { index, minutes ->
-            val ventilationMs = (minutes * 60 * 1000).toLong()
-            steps.add(
-                ApneaTableStep(
-                    apneaDurationMs = apneaMs,
-                    ventilationDurationMs = ventilationMs,
-                    roundNumber = index + 1
-                )
+    fun generateO2Table(pbMs: Long, length: TableLength, difficulty: TableDifficulty): ApneaTable {
+        val cfg = buildConfig(length, difficulty)
+        val tRest = cfg.o2RestSec * 1_000L
+        val hMax = pbMs * cfg.o2MaxHoldPercent.toDouble()
+        val h1 = pbMs * cfg.o2FirstHoldPercent.toDouble()
+        val n = cfg.rounds
+        val deltaH = if (n > 1) (hMax - h1) / (n - 1) else 0.0
+
+        val steps = (1..n).map { round ->
+            val hN = h1 + ((round - 1) * deltaH)
+            ApneaTableStep(
+                apneaDurationMs = hN.toLong(),
+                ventilationDurationMs = tRest,
+                roundNumber = round
             )
         }
-        return ApneaTable(ApneaTableType.CO2, steps, personalBestMs)
+        return ApneaTable(ApneaTableType.O2, steps, pbMs)
+    }
+
+    fun getConfig(length: TableLength, difficulty: TableDifficulty): TableConfig =
+        buildConfig(length, difficulty)
+
+    // ── Private ───────────────────────────────────────────────────────────────
+
+    private fun buildConfig(length: TableLength, difficulty: TableDifficulty): TableConfig {
+        val rounds = when (length) {
+            TableLength.SHORT  -> 4
+            TableLength.MEDIUM -> 8
+            TableLength.LONG   -> 12
+        }
+        return when (difficulty) {
+            TableDifficulty.EASY -> TableConfig(
+                length = length,
+                difficulty = difficulty,
+                rounds = rounds,
+                co2HoldPercent = 0.40f,
+                co2RestMinSec = 30,
+                o2MaxHoldPercent = 0.70f,
+                o2FirstHoldPercent = 0.40f,
+                o2RestSec = 120
+            )
+            TableDifficulty.MEDIUM -> TableConfig(
+                length = length,
+                difficulty = difficulty,
+                rounds = rounds,
+                co2HoldPercent = 0.50f,
+                co2RestMinSec = 15,
+                o2MaxHoldPercent = 0.80f,
+                o2FirstHoldPercent = 0.40f,
+                o2RestSec = 120
+            )
+            TableDifficulty.HARD -> TableConfig(
+                length = length,
+                difficulty = difficulty,
+                rounds = rounds,
+                co2HoldPercent = 0.55f,
+                co2RestMinSec = 10,
+                o2MaxHoldPercent = 0.85f,
+                o2FirstHoldPercent = 0.40f,
+                o2RestSec = 150
+            )
+        }
     }
 }

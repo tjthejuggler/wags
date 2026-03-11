@@ -12,10 +12,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
-import com.example.wags.domain.model.ApneaTable
 import com.example.wags.domain.model.ApneaTableStep
 import com.example.wags.domain.model.ApneaTableType
 import com.example.wags.domain.usecase.apnea.ApneaState
+import com.example.wags.ui.common.InfoHelpBubble
 import com.example.wags.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,45 +53,55 @@ fun ApneaTableScreen(
         if (state.personalBestMs <= 0L) {
             NoPbContent(modifier = Modifier.padding(padding))
         } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                item {
-                    SessionStatusCard(
-                        apneaState = state.apneaState,
-                        currentRound = state.currentRound,
-                        totalRounds = state.totalRounds,
-                        remainingSeconds = state.remainingSeconds
-                    )
-                }
-                item {
-                    SessionControlRow(
-                        apneaState = state.apneaState,
-                        onStart = {
-                            viewModel.loadTable(parsedType)
-                            viewModel.startTableSession(deviceId)
-                        },
-                        onStop = { viewModel.stopTableSession() }
-                    )
-                }
-                state.currentTable?.let { table ->
+            // Box allows the overlay to sit behind the scrollable content
+            Box(modifier = Modifier.fillMaxSize()) {
+                ContractionOverlay(
+                    uiState = state,
+                    onLogContraction = { viewModel.logContraction() }
+                )
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     item {
-                        Text(
-                            "Table Steps (PB: ${table.personalBestMs / 1000L}s)",
-                            style = MaterialTheme.typography.titleLarge
+                        SessionStatusCard(
+                            apneaState = state.apneaState,
+                            currentRound = state.currentRound,
+                            totalRounds = state.totalRounds,
+                            remainingSeconds = state.remainingSeconds
                         )
                     }
-                    itemsIndexed(table.steps) { index, step ->
-                        TableStepRow(
-                            step = step,
-                            isActive = state.apneaState != ApneaState.IDLE &&
-                                    state.currentRound == step.roundNumber,
-                            isComplete = state.currentRound > step.roundNumber
+                    item {
+                        ContractionSummaryCard(uiState = state)
+                    }
+                    item {
+                        SessionControlRow(
+                            apneaState = state.apneaState,
+                            onStart = {
+                                viewModel.loadTable(parsedType)
+                                viewModel.startTableSession(deviceId)
+                            },
+                            onStop = { viewModel.stopTableSession() }
                         )
+                    }
+                    state.currentTable?.let { table ->
+                        item {
+                            Text(
+                                "Table Steps (PB: ${table.personalBestMs / 1000L}s)",
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                        }
+                        itemsIndexed(table.steps) { index, step ->
+                            TableStepRow(
+                                step = step,
+                                isActive = state.apneaState != ApneaState.IDLE &&
+                                        state.currentRound == step.roundNumber,
+                                isComplete = state.currentRound > step.roundNumber
+                            )
+                        }
                     }
                 }
             }
@@ -210,7 +220,13 @@ private fun TableStepRow(
             )
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Hold", style = MaterialTheme.typography.labelMedium)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Hold", style = MaterialTheme.typography.labelMedium)
+                        InfoHelpBubble(
+                            title = HOLD_HELP_TITLE,
+                            content = HOLD_HELP_CONTENT
+                        )
+                    }
                     Text(
                         "${step.apneaDurationMs / 1000L}s",
                         style = MaterialTheme.typography.bodyLarge,
@@ -218,7 +234,13 @@ private fun TableStepRow(
                     )
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Breathe", style = MaterialTheme.typography.labelMedium)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Rest", style = MaterialTheme.typography.labelMedium)
+                        InfoHelpBubble(
+                            title = REST_HELP_TITLE,
+                            content = REST_HELP_CONTENT
+                        )
+                    }
                     Text(
                         "${step.ventilationDurationMs / 1000L}s",
                         style = MaterialTheme.typography.bodyLarge,
@@ -242,3 +264,47 @@ private fun apneaStateColor(state: ApneaState) = when (state) {
     ApneaState.RECOVERY -> ApneaRecovery
     ApneaState.COMPLETE -> ReadinessGreen
 }
+
+private const val REST_HELP_TITLE = "Rest Phase (Ventilation)"
+private const val REST_HELP_CONTENT = """
+Purpose: Recovery between breath-holds. Allows CO₂ to clear and O₂ to replenish.
+
+In CO₂ Tables: Rest decreases each round to build CO₂ tolerance.
+Formula: R_n = R₁ - ((n-1) × ΔR)
+• R₁ = Initial rest (equals hold time)
+• ΔR = (R₁ - R_min) / (N-1)
+• n = Current round number
+
+In O₂ Tables: Rest is fixed (120–180s) to allow full O₂ recovery.
+"""
+
+private const val HOLD_HELP_TITLE = "Breath-Hold Phase (Apnea)"
+private const val HOLD_HELP_CONTENT = """
+Purpose: The actual breath-hold. Your body consumes O₂ and produces CO₂.
+
+In CO₂ Tables: Hold is fixed at T_hold = T_PB × hold%
+In O₂ Tables: Hold increases each round.
+Formula: H_n = H₁ + ((n-1) × ΔH)
+• H₁ = T_PB × 40% (first hold)
+• H_max = T_PB × 80–85% (max hold)
+• ΔH = (H_max - H₁) / (N-1)
+• T_PB = Your Personal Best
+
+Physiological note: The urge to breathe is triggered by rising CO₂, not falling O₂.
+"""
+
+private const val CONTRACTION_HELP_TITLE = "Diaphragmatic Contractions"
+private const val CONTRACTION_HELP_CONTENT = """
+Purpose: Involuntary diaphragm contractions signal rising CO₂ levels.
+
+Phases:
+• Cruising Phase: Time from hold start to first contraction (aerobic zone)
+• Struggle Phase: Time from first contraction to hold end (anaerobic zone)
+
+Training insight: A longer Cruising Phase indicates better CO₂ tolerance.
+The ratio Cruising/Total Hold is your "efficiency score".
+
+Formula: Efficiency = T_cruise / T_total × 100%
+• T_cruise = Time to first contraction
+• T_total = Total hold duration
+"""
