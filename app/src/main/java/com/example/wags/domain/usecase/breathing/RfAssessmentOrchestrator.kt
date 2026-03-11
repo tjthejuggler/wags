@@ -110,7 +110,7 @@ class RfAssessmentOrchestrator @Inject constructor(
             4.5f to 1.0f, 4.5f to 1.5f
         )
 
-        private const val BASELINE_DURATION_MS = 2 * 60 * 1000L
+        private const val BASELINE_DURATION_MS = 1 * 60 * 1000L
         private const val PHASE_SYNC_THRESHOLD = 0.25f
         private const val PT_AMPLITUDE_THRESHOLD = 1.5f
         private const val SLIDING_TICK_MS = 50L   // 20 Hz pacer update

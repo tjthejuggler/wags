@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.PolarBleManager
 import com.example.wags.data.db.entity.RfAssessmentEntity
 import com.example.wags.data.repository.RfAssessmentRepository
+import com.example.wags.domain.usecase.breathing.ContinuousPacerEngine
 import com.example.wags.domain.usecase.breathing.RfAssessmentOrchestrator
 import com.example.wags.domain.usecase.breathing.RfEpochResult
 import com.example.wags.domain.usecase.breathing.RfOrchestratorState
@@ -26,6 +27,7 @@ class AssessmentRunViewModel @Inject constructor(
     private val orchestrator: RfAssessmentOrchestrator,
     private val repository: RfAssessmentRepository,
     private val bleManager: PolarBleManager,
+    private val pacerEngine: ContinuousPacerEngine,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -50,11 +52,19 @@ class AssessmentRunViewModel @Inject constructor(
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     private var rrPollingJob: Job? = null
+    private var pacerJob: Job? = null
+
+    // Tracks the current pacer rate/ratio so the pacer loop can read them
+    @Volatile private var pacerRateBpm: Float = 5.5f
+    @Volatile private var pacerIeRatio: Float = 1.0f
+    @Volatile private var pacerActive: Boolean = false
 
     init {
+        pacerEngine.reset()
         orchestrator.start(protocol = protocol, scope = viewModelScope)
         collectOrchestratorState()
         startRrPolling()
+        startPacerLoop()
     }
 
     // -------------------------------------------------------------------------
@@ -66,12 +76,27 @@ class AssessmentRunViewModel @Inject constructor(
             orchestrator.state.collect { orchState ->
                 when (orchState) {
                     is RfOrchestratorState.Idle -> {
+                        pacerActive = false
                         _uiState.value = _uiState.value.copy(phase = "IDLE")
                     }
 
                     is RfOrchestratorState.Active -> {
                         val phaseLabel = phaseLabel(orchState.phase, orchState.rateBpm)
                         val warning = qualityWarning(orchState.latestEpoch)
+
+                        // Only animate the pacer during TEST_BLOCK — BASELINE and WASHOUT
+                        // are unguided phases where the user breathes freely.
+                        when (orchState.phase) {
+                            RfPhase.TEST_BLOCK -> {
+                                pacerRateBpm = orchState.rateBpm.takeIf { it > 0f } ?: 5.5f
+                                pacerIeRatio = orchState.ieRatio.takeIf { it > 0f } ?: 1.0f
+                                pacerActive = true
+                            }
+                            else -> {
+                                pacerActive = false
+                            }
+                        }
+
                         _uiState.value = _uiState.value.copy(
                             phase             = phaseLabel,
                             currentBpm        = orchState.rateBpm,
@@ -83,6 +108,7 @@ class AssessmentRunViewModel @Inject constructor(
                     }
 
                     is RfOrchestratorState.SlidingTick -> {
+                        pacerActive = false   // sliding window drives its own refWave
                         _uiState.value = _uiState.value.copy(
                             phase            = "TESTING %.1f BPM".format(orchState.pacerState.instantBpm),
                             currentBpm       = orchState.pacerState.instantBpm,
@@ -92,6 +118,7 @@ class AssessmentRunViewModel @Inject constructor(
                     }
 
                     is RfOrchestratorState.Complete -> {
+                        pacerActive = false
                         saveSteppedSession(orchState.epochs)
                     }
 
@@ -188,17 +215,33 @@ class AssessmentRunViewModel @Inject constructor(
     }
 
     // -------------------------------------------------------------------------
-    // Cancel
+    // Pacer loop — drives refWave for stepped protocol phases
     // -------------------------------------------------------------------------
+
+    private fun startPacerLoop() {
+        pacerJob = viewModelScope.launch {
+            while (isActive) {
+                delay(16L) // ~60 FPS
+                if (!pacerActive) continue
+                val rate = pacerRateBpm
+                val ie   = pacerIeRatio
+                pacerEngine.tick(rate, ie)
+                val wave = pacerEngine.getPacerRadius(ie)
+                _uiState.value = _uiState.value.copy(refWave = wave)
+            }
+        }
+    }
 
     fun cancel() {
         rrPollingJob?.cancel()
+        pacerJob?.cancel()
         orchestrator.stop()
     }
 
     override fun onCleared() {
         super.onCleared()
         rrPollingJob?.cancel()
+        pacerJob?.cancel()
         orchestrator.stop()
     }
 
