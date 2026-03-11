@@ -19,7 +19,7 @@ import com.example.wags.data.db.entity.*
         ContractionEntity::class,
         TelemetryEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -191,6 +191,41 @@ abstract class WagsDatabase : RoomDatabase() {
         val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE rf_assessments ADD COLUMN accBreathingUsed INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        /**
+         * v5 → v6: Replace hyperventilationPrep (INTEGER/BOOLEAN) with prepType (TEXT) in apnea_records.
+         * Old rows with hyperventilationPrep = 1 become HYPER; 0 becomes NO_PREP.
+         */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 1. Create replacement table with prepType column
+                db.execSQL("""
+                    CREATE TABLE apnea_records_new (
+                        recordId   INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        timestamp  INTEGER NOT NULL,
+                        durationMs INTEGER NOT NULL,
+                        lungVolume TEXT    NOT NULL,
+                        prepType   TEXT    NOT NULL,
+                        minHrBpm   REAL    NOT NULL,
+                        maxHrBpm   REAL    NOT NULL,
+                        tableType  TEXT
+                    )
+                """.trimIndent())
+                // 2. Copy rows, mapping old boolean to enum name
+                db.execSQL("""
+                    INSERT INTO apnea_records_new
+                        (recordId, timestamp, durationMs, lungVolume, prepType, minHrBpm, maxHrBpm, tableType)
+                    SELECT
+                        recordId, timestamp, durationMs, lungVolume,
+                        CASE WHEN hyperventilationPrep = 1 THEN 'HYPER' ELSE 'NO_PREP' END,
+                        minHrBpm, maxHrBpm, tableType
+                    FROM apnea_records
+                """.trimIndent())
+                // 3. Swap tables
+                db.execSQL("DROP TABLE apnea_records")
+                db.execSQL("ALTER TABLE apnea_records_new RENAME TO apnea_records")
             }
         }
     }

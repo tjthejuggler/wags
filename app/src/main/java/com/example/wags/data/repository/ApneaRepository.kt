@@ -14,6 +14,14 @@ class ApneaRepository @Inject constructor(
     fun getByType(type: String): Flow<List<ApneaRecordEntity>> =
         dao.getByType(type)
 
+    /** All records matching the current settings combination (for history screen). */
+    fun getBySettings(lungVolume: String, prepType: String): Flow<List<ApneaRecordEntity>> =
+        dao.getBySettings(lungVolume, prepType)
+
+    /** Best free-hold duration for the current settings combination. */
+    fun getBestFreeHold(lungVolume: String, prepType: String): Flow<Long?> =
+        dao.getBestFreeHold(lungVolume, prepType)
+
     suspend fun saveRecord(entity: ApneaRecordEntity): Long =
         dao.insert(entity)
 }

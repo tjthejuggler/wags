@@ -10,12 +10,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.domain.model.ApneaTableType
+import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TableDifficulty
 import com.example.wags.domain.model.TableLength
 import com.example.wags.domain.model.TrainingModality
@@ -54,27 +56,30 @@ fun ApneaScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Free Hold Section
+            // ── 1. Global Settings (top) ───────────────────────────────────
+            ApneaSettingsSection(
+                selectedLungVolume = state.selectedLungVolume,
+                prepType = state.prepType,
+                onLungVolumeChange = { viewModel.setLungVolume(it) },
+                onPrepTypeChange = { viewModel.setPrepType(it) }
+            )
+
+            HorizontalDivider(color = SurfaceVariant)
+
+            // ── 2. Free Hold / Best Time ───────────────────────────────────
             FreeHoldSection(
                 freeHoldActive = state.freeHoldActive,
                 freeHoldDurationMs = state.freeHoldDurationMs,
+                bestTimeMs = state.bestTimeForSettingsMs,
+                showBestTime = state.showBestTime,
+                onShowBestTimeChange = { viewModel.setShowBestTime(it) },
                 onStart = { viewModel.startFreeHold(deviceId) },
                 onStop = { viewModel.stopFreeHold() }
             )
 
             HorizontalDivider(color = SurfaceVariant)
 
-            // Settings
-            FreeHoldSettings(
-                selectedLungVolume = state.selectedLungVolume,
-                hyperventilationPrep = state.hyperventilationPrep,
-                onLungVolumeChange = { viewModel.setLungVolume(it) },
-                onHyperventilationChange = { viewModel.setHyperventilationPrep(it) }
-            )
-
-            HorizontalDivider(color = SurfaceVariant)
-
-            // Personal Best & Table Navigation
+            // ── 3. Table Training & Advanced ──────────────────────────────
             PersonalBestSection(
                 personalBestMs = state.personalBestMs,
                 selectedLength = state.selectedLength,
@@ -91,12 +96,17 @@ fun ApneaScreen(
                 },
                 onNavigateAnalytics = {
                     navController.navigate(WagsRoutes.SESSION_ANALYTICS_HISTORY)
+                },
+                onNavigateHistory = {
+                    navController.navigate(
+                        WagsRoutes.apneaHistory(state.selectedLungVolume, state.prepType.name)
+                    )
                 }
             )
 
             HorizontalDivider(color = SurfaceVariant)
 
-            // Recent Records
+            // ── 4. Recent Records ─────────────────────────────────────────
             if (state.recentRecords.isNotEmpty()) {
                 RecentRecordsSection(records = state.recentRecords)
             }
@@ -104,20 +114,101 @@ fun ApneaScreen(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Settings Section (moved to top, global for all features)
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun ApneaSettingsSection(
+    selectedLungVolume: String,
+    prepType: PrepType,
+    onLungVolumeChange: (String) -> Unit,
+    onPrepTypeChange: (PrepType) -> Unit
+) {
+    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Settings", style = MaterialTheme.typography.titleLarge)
+
+            // Lung Volume — 3-chip toggle (Full / Partial / Empty)
+            Text("Lung Volume", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("FULL", "PARTIAL", "EMPTY").forEach { volume ->
+                    FilterChip(
+                        selected = selectedLungVolume == volume,
+                        onClick = { onLungVolumeChange(volume) },
+                        label = { Text(volume.lowercase().replaceFirstChar { it.uppercase() }) }
+                    )
+                }
+            }
+
+            // Prep Type — 3-chip toggle (No Prep / Resonance / Hyper)
+            Text("Prep Type", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PrepType.entries.forEach { type ->
+                    FilterChip(
+                        selected = prepType == type,
+                        onClick = { onPrepTypeChange(type) },
+                        label = { Text(type.displayName()) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Free Hold / Best Time Section
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
 private fun FreeHoldSection(
     freeHoldActive: Boolean,
     freeHoldDurationMs: Long,
+    bestTimeMs: Long,
+    showBestTime: Boolean,
+    onShowBestTimeChange: (Boolean) -> Unit,
     onStart: () -> Unit,
     onStop: () -> Unit
 ) {
     Card(colors = CardDefaults.cardColors(containerColor = SurfaceVariant)) {
         Column(
-            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Free Hold", style = MaterialTheme.typography.titleLarge)
+            // Header row: "Best Time" title + "Show Time" checkbox
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Best Time", style = MaterialTheme.typography.titleLarge)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text("Show time", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    Checkbox(
+                        checked = showBestTime,
+                        onCheckedChange = onShowBestTimeChange
+                    )
+                }
+            }
+
+            // Best time display (only when showBestTime is checked and we have a value)
+            if (showBestTime && bestTimeMs > 0L) {
+                Text(
+                    "🏆 ${formatMs(bestTimeMs)}",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = EcgCyan,
+                    fontWeight = FontWeight.Bold
+                )
+            }
 
             if (freeHoldActive) {
                 Text(
@@ -156,45 +247,17 @@ private fun FreeHoldSection(
     }
 }
 
-@Composable
-private fun FreeHoldSettings(
-    selectedLungVolume: String,
-    hyperventilationPrep: Boolean,
-    onLungVolumeChange: (String) -> Unit,
-    onHyperventilationChange: (Boolean) -> Unit
-) {
-    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text("Settings", style = MaterialTheme.typography.titleLarge)
-
-            Text("Lung Volume", style = MaterialTheme.typography.bodyMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("FULL", "PARTIAL", "EMPTY").forEach { volume ->
-                    FilterChip(
-                        selected = selectedLungVolume == volume,
-                        onClick = { onLungVolumeChange(volume) },
-                        label = { Text(volume) }
-                    )
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Hyperventilation Prep", style = MaterialTheme.typography.bodyLarge)
-                Switch(
-                    checked = hyperventilationPrep,
-                    onCheckedChange = onHyperventilationChange
-                )
-            }
-        }
-    }
+private fun formatMs(ms: Long): String {
+    val totalSeconds = ms / 1000L
+    val minutes = totalSeconds / 60L
+    val seconds = totalSeconds % 60L
+    val centis = (ms % 1000L) / 10L
+    return if (minutes > 0) "${minutes}m ${seconds}s" else "${seconds}s ${centis}ms"
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Table Training Section
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun PersonalBestSection(
@@ -207,7 +270,8 @@ private fun PersonalBestSection(
     onNavigateO2: () -> Unit,
     onNavigateCo2: () -> Unit,
     onNavigateAdvanced: (TrainingModality) -> Unit,
-    onNavigateAnalytics: () -> Unit
+    onNavigateAnalytics: () -> Unit,
+    onNavigateHistory: () -> Unit
 ) {
     var pbInput by remember { mutableStateOf("") }
 
@@ -216,7 +280,20 @@ private fun PersonalBestSection(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Table Training", style = MaterialTheme.typography.titleLarge)
+            // Header row with History button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Table Training", style = MaterialTheme.typography.titleLarge)
+                OutlinedButton(
+                    onClick = onNavigateHistory,
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text("📋 History", style = MaterialTheme.typography.labelMedium)
+                }
+            }
 
             if (personalBestMs > 0L) {
                 Text(
@@ -365,6 +442,10 @@ private fun PersonalBestSection(
         }
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun TableHelpIcon(title: String, text: String) {

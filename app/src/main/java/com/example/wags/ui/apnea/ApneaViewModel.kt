@@ -10,6 +10,7 @@ import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.data.repository.ApneaSessionRepository
 import com.example.wags.domain.model.ApneaTable
 import com.example.wags.domain.model.ApneaTableType
+import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TableDifficulty
 import com.example.wags.domain.model.TableLength
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
@@ -20,6 +21,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -36,7 +39,10 @@ data class ApneaUiState(
     val freeHoldActive: Boolean = false,
     val freeHoldDurationMs: Long = 0L,
     val selectedLungVolume: String = "FULL",
-    val hyperventilationPrep: Boolean = false,
+    val prepType: PrepType = PrepType.NO_PREP,
+    val showBestTime: Boolean = true,
+    /** Best free-hold for the current lungVolume + prepType combination (from DB). */
+    val bestTimeForSettingsMs: Long = 0L,
     val selectedLength: TableLength = TableLength.MEDIUM,
     val selectedDifficulty: TableDifficulty = TableDifficulty.MEDIUM,
     // Contraction tracking
@@ -62,6 +68,10 @@ class ApneaViewModel @Inject constructor(
     val uiState: StateFlow<ApneaUiState> = _uiState.asStateFlow()
 
     private var freeHoldStartTime = 0L
+
+    // Separate flows for the two settings that drive the best-time query
+    private val _lungVolume = MutableStateFlow("FULL")
+    private val _prepType   = MutableStateFlow(PrepType.NO_PREP)
 
     init {
         // Load persisted PB on startup
@@ -91,6 +101,16 @@ class ApneaViewModel @Inject constructor(
                 _uiState.update { it.copy(remainingSeconds = secs) }
             }
         }
+
+        // Whenever lungVolume or prepType changes, re-subscribe to the best-time query
+        viewModelScope.launch {
+            combine(_lungVolume, _prepType) { lv, pt -> lv to pt }
+                .collectLatest { (lv, pt) ->
+                    apneaRepository.getBestFreeHold(lv, pt.name).collect { best ->
+                        _uiState.update { it.copy(bestTimeForSettingsMs = best ?: 0L) }
+                    }
+                }
+        }
     }
 
     private fun onStateChanged(state: ApneaState) {
@@ -101,7 +121,6 @@ class ApneaViewModel @Inject constructor(
             }
             ApneaState.RECOVERY -> {
                 audioHapticEngine.announceBreath()
-                // Capture hold duration for the summary card
                 val table = _uiState.value.currentTable
                 val round = _uiState.value.currentRound
                 val holdMs = table?.steps?.getOrNull(round - 1)?.apneaDurationMs ?: 0L
@@ -245,7 +264,7 @@ class ApneaViewModel @Inject constructor(
                     timestamp = System.currentTimeMillis(),
                     durationMs = durationMs,
                     lungVolume = state.selectedLungVolume,
-                    hyperventilationPrep = state.hyperventilationPrep,
+                    prepType = state.prepType.name,
                     minHrBpm = minHr,
                     maxHrBpm = maxHr,
                     tableType = null
@@ -254,10 +273,19 @@ class ApneaViewModel @Inject constructor(
         }
     }
 
-    fun setLungVolume(volume: String) = _uiState.update { it.copy(selectedLungVolume = volume) }
+    fun setLungVolume(volume: String) {
+        _lungVolume.value = volume
+        _uiState.update { it.copy(selectedLungVolume = volume) }
+    }
 
-    fun setHyperventilationPrep(value: Boolean) =
-        _uiState.update { it.copy(hyperventilationPrep = value) }
+    fun setPrepType(type: PrepType) {
+        _prepType.value = type
+        _uiState.update { it.copy(prepType = type) }
+    }
+
+    fun setShowBestTime(show: Boolean) {
+        _uiState.update { it.copy(showBestTime = show) }
+    }
 
     override fun onCleared() {
         super.onCleared()

@@ -9,7 +9,8 @@ data class ApneaRecordEntity(
     val timestamp: Long,
     val durationMs: Long,
     val lungVolume: String,
-    val hyperventilationPrep: Boolean,
+    /** One of PrepType enum names: NO_PREP, RESONANCE, HYPER */
+    val prepType: String,
     val minHrBpm: Float,
     val maxHrBpm: Float,
     val tableType: String?

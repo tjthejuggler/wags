@@ -11,6 +11,7 @@ import com.example.wags.domain.model.TableLength
 import com.example.wags.domain.model.TrainingModality
 import com.example.wags.domain.usecase.breathing.RfProtocol
 import com.example.wags.ui.apnea.AdvancedApneaScreen
+import com.example.wags.ui.apnea.ApneaHistoryScreen
 import com.example.wags.ui.apnea.ApneaScreen
 import com.example.wags.ui.apnea.ApneaTableScreen
 import com.example.wags.ui.apnea.SessionAnalyticsHistoryScreen
@@ -42,6 +43,7 @@ object WagsRoutes {
     const val RF_ASSESSMENT_PICKER = "rf_assessment_picker"
     const val RF_ASSESSMENT_RUN = "rf_assessment_run/{protocol}"
     const val RF_ASSESSMENT_RESULT = "rf_assessment_result/{sessionTimestamp}"
+    const val APNEA_HISTORY = "apnea_history/{lungVolume}/{prepType}"
 
     fun apneaTable(type: String) = "apnea_table/$type"
     fun advancedApnea(modality: String, length: String) = "advanced_apnea/$modality/$length"
@@ -49,6 +51,7 @@ object WagsRoutes {
     fun sessionAnalytics(sessionId: Long) = "session_analytics/$sessionId"
     fun rfAssessmentRun(protocol: String) = "rf_assessment_run/$protocol"
     fun rfAssessmentResult(sessionTimestamp: Long) = "rf_assessment_result/$sessionTimestamp"
+    fun apneaHistory(lungVolume: String, prepType: String) = "apnea_history/$lungVolume/$prepType"
 }
 
 @Composable
@@ -111,6 +114,15 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
         }
         composable(WagsRoutes.SESSION_ANALYTICS_HISTORY) {
             SessionAnalyticsHistoryScreen(navController = navController)
+        }
+        composable(
+            route = WagsRoutes.APNEA_HISTORY,
+            arguments = listOf(
+                navArgument("lungVolume") { type = NavType.StringType },
+                navArgument("prepType")   { type = NavType.StringType }
+            )
+        ) {
+            ApneaHistoryScreen(navController = navController)
         }
         composable(WagsRoutes.RF_ASSESSMENT_PICKER) {
             AssessmentPickerScreen(
