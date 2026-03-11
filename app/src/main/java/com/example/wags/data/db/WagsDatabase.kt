@@ -19,7 +19,7 @@ import com.example.wags.data.db.entity.*
         ContractionEntity::class,
         TelemetryEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -182,6 +182,15 @@ abstract class WagsDatabase : RoomDatabase() {
                     )
                 """.trimIndent())
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_telemetry_sessionId` ON `telemetry` (`sessionId`)")
+            }
+        }
+
+        /**
+         * v4 → v5: Add accBreathingUsed column to rf_assessments.
+         */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE rf_assessments ADD COLUMN accBreathingUsed INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

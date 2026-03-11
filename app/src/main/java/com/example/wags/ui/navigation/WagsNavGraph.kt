@@ -9,11 +9,15 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.wags.domain.model.TableLength
 import com.example.wags.domain.model.TrainingModality
+import com.example.wags.domain.usecase.breathing.RfProtocol
 import com.example.wags.ui.apnea.AdvancedApneaScreen
 import com.example.wags.ui.apnea.ApneaScreen
 import com.example.wags.ui.apnea.ApneaTableScreen
 import com.example.wags.ui.apnea.SessionAnalyticsHistoryScreen
 import com.example.wags.ui.apnea.SessionAnalyticsScreen
+import com.example.wags.ui.breathing.AssessmentPickerScreen
+import com.example.wags.ui.breathing.AssessmentResultScreen
+import com.example.wags.ui.breathing.AssessmentRunScreen
 import com.example.wags.ui.breathing.BreathingScreen
 import com.example.wags.ui.dashboard.DashboardScreen
 import com.example.wags.ui.readiness.ReadinessScreen
@@ -33,11 +37,16 @@ object WagsRoutes {
     const val SETTINGS = "settings"
     const val SESSION_ANALYTICS = "session_analytics/{sessionId}"
     const val SESSION_ANALYTICS_HISTORY = "session_analytics_history"
+    const val RF_ASSESSMENT_PICKER = "rf_assessment_picker"
+    const val RF_ASSESSMENT_RUN = "rf_assessment_run/{protocol}"
+    const val RF_ASSESSMENT_RESULT = "rf_assessment_result/{sessionTimestamp}"
 
     fun apneaTable(type: String) = "apnea_table/$type"
     fun advancedApnea(modality: String, length: String) = "advanced_apnea/$modality/$length"
     fun session(type: String) = "session/$type"
     fun sessionAnalytics(sessionId: Long) = "session_analytics/$sessionId"
+    fun rfAssessmentRun(protocol: String) = "rf_assessment_run/$protocol"
+    fun rfAssessmentResult(sessionTimestamp: Long) = "rf_assessment_result/$sessionTimestamp"
 }
 
 @Composable
@@ -50,7 +59,10 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             ReadinessScreen(navController = navController)
         }
         composable(WagsRoutes.BREATHING) {
-            BreathingScreen(navController = navController)
+            BreathingScreen(
+                navController = navController,
+                onNavigateToRfAssessment = { navController.navigate(WagsRoutes.RF_ASSESSMENT_PICKER) }
+            )
         }
         composable(WagsRoutes.APNEA_FREE) {
             ApneaScreen(navController = navController)
@@ -91,6 +103,48 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
         }
         composable(WagsRoutes.SESSION_ANALYTICS_HISTORY) {
             SessionAnalyticsHistoryScreen(navController = navController)
+        }
+        composable(WagsRoutes.RF_ASSESSMENT_PICKER) {
+            AssessmentPickerScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onStartAssessment = { protocol ->
+                    navController.navigate(WagsRoutes.rfAssessmentRun(protocol.name))
+                }
+            )
+        }
+        composable(
+            route = WagsRoutes.RF_ASSESSMENT_RUN,
+            arguments = listOf(navArgument("protocol") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val protocolStr = backStackEntry.arguments?.getString("protocol") ?: RfProtocol.EXPRESS.name
+            val protocol = runCatching { RfProtocol.valueOf(protocolStr) }
+                .getOrDefault(RfProtocol.EXPRESS)
+            AssessmentRunScreen(
+                protocol = protocol,
+                onNavigateBack = { navController.popBackStack() },
+                onSessionComplete = { sessionTimestamp ->
+                    navController.navigate(WagsRoutes.rfAssessmentResult(sessionTimestamp)) {
+                        popUpTo(WagsRoutes.RF_ASSESSMENT_RUN) { inclusive = true }
+                    }
+                }
+            )
+        }
+        composable(
+            route = WagsRoutes.RF_ASSESSMENT_RESULT,
+            arguments = listOf(navArgument("sessionTimestamp") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val sessionTimestamp = backStackEntry.arguments?.getLong("sessionTimestamp") ?: 0L
+            AssessmentResultScreen(
+                sessionTimestamp = sessionTimestamp,
+                onNavigateBack = {
+                    navController.popBackStack(WagsRoutes.BREATHING, inclusive = false)
+                },
+                onRunAgain = {
+                    navController.navigate(WagsRoutes.RF_ASSESSMENT_PICKER) {
+                        popUpTo(WagsRoutes.RF_ASSESSMENT_RESULT) { inclusive = true }
+                    }
+                }
+            )
         }
     }
 }

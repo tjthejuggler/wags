@@ -1,5 +1,6 @@
 package com.example.wags.data.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -12,5 +13,7 @@ data class RfAssessmentEntity(
     val optimalIeRatio: Float,
     val compositeScore: Float,
     val isValid: Boolean,
-    val leaderboardJson: String
+    val leaderboardJson: String,
+    @ColumnInfo(name = "accBreathingUsed", defaultValue = "0")
+    val accBreathingUsed: Boolean = false
 )

@@ -61,6 +61,7 @@ com.example.wags/
 │       ├── ApneaSessionRepository.kt
 │       ├── MorningReadinessRepository.kt
 │       ├── ReadinessRepository.kt
+│       ├── RfAssessmentRepository.kt
 │       └── SessionRepository.kt
 │
 ├── di/
@@ -103,7 +104,10 @@ com.example.wags/
     │                   ContractionOverlay, SessionAnalyticsScreen,
     │                   ApneaViewModel, AdvancedApneaViewModel,
     │                   SessionAnalyticsViewModel
-    ├── breathing/      BreathingScreen, BreathingViewModel
+    ├── breathing/      BreathingScreen, BreathingViewModel,
+    │                   AssessmentPickerScreen, AssessmentPickerViewModel,
+    │                   AssessmentRunScreen, AssessmentRunViewModel,
+    │                   AssessmentResultScreen, AssessmentResultViewModel
     ├── common/         InfoHelpBubble (reusable ⓘ bottom-sheet)
     ├── dashboard/      DashboardScreen, DashboardViewModel
     ├── morning/        MorningReadinessScreen, MorningReadinessResultScreen,
@@ -312,7 +316,7 @@ Combine freely: e.g., "Long + Hard" = 12 rounds at 55%/85% PB intensity.
 
 ## Database Schema
 
-The Room database (`wags.db`) is at version 4 with 9 tables:
+The Room database (`wags.db`) is at version 5 with 9 tables:
 
 | Table | Entity | Purpose |
 |---|---|---|
@@ -333,6 +337,7 @@ The Room database (`wags.db`) is at version 4 with 9 tables:
 | 1 → 2 | Added `monitorId` to `session_logs`; made HR columns nullable |
 | 2 → 3 | Added `morning_readiness` table |
 | 3 → 4 | Added `apnea_sessions`, `contractions`, `telemetry` tables |
+| 4 → 5 | Added `accBreathingUsed` column to `rf_assessments` |
 
 ---
 
@@ -386,3 +391,54 @@ cd wags
 5. Tap **Start** — the table auto-generates from your PB
 6. During holds: double-tap screen or press volume buttons to log contractions
 7. After session: view analytics in **Session Analytics History**
+
+---
+
+## Changelog
+
+### 2026-03-11 — RF Assessment Expansion
+
+Ported the full RF Assessment ecosystem from the desktop hrvm app to Android.
+
+#### New Files
+
+**Domain layer (`domain/usecase/breathing/`)**
+
+- [`SteppedEpochScorer.kt`](app/src/main/java/com/example/wags/domain/usecase/breathing/SteppedEpochScorer.kt) — Composite epoch scoring formula:
+  ```
+  score = (phase×0.40 + PT/baseline_PT×0.30 + LFnu/100×0.20 + RMSSD/baseline_RMSSD×0.10) × 260
+  ```
+  Quality gates: phase ≥ 0.25, PT amplitude ≥ 1.5 BPM. 7-tier color scale (Red → White).
+
+- [`SlidingWindowPacerEngine.kt`](app/src/main/java/com/example/wags/domain/usecase/breathing/SlidingWindowPacerEngine.kt) — Analytically-integrated chirp pacer sweeping 6.75 → 4.5 BPM over 78 breath cycles (~16 min). Port of desktop `ContinuousPacer`.
+
+- [`SlidingWindowAnalytics.kt`](app/src/main/java/com/example/wags/domain/usecase/breathing/SlidingWindowAnalytics.kt) — Post-session analytics for the sliding-window protocol: resamples RR to 4 Hz, sliding 60-second FFT windows for LF power, PT amplitude, Hilbert PLV. Resonance index = `0.4×norm(LF) + 0.4×norm(PT) + 0.2×norm(PLV)`.
+
+**Data layer (`data/repository/`)**
+
+- [`RfAssessmentRepository.kt`](app/src/main/java/com/example/wags/data/repository/RfAssessmentRepository.kt) — Repository wrapping `RfAssessmentDao`: `saveSession()`, `getAllSessions()`, `getLatestForProtocol()`, `getBestSession()`, `hasAnySession()`.
+
+**UI layer (`ui/breathing/`)**
+
+- [`AssessmentPickerScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/AssessmentPickerScreen.kt) + [`AssessmentPickerViewModel.kt`](app/src/main/java/com/example/wags/ui/breathing/AssessmentPickerViewModel.kt) — Protocol picker with 5 protocols; TARGETED disabled if no history.
+- [`AssessmentRunScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/AssessmentRunScreen.kt) + [`AssessmentRunViewModel.kt`](app/src/main/java/com/example/wags/ui/breathing/AssessmentRunViewModel.kt) — Live pacer + HUD during assessment; saves session to DB on completion.
+- [`AssessmentResultScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/AssessmentResultScreen.kt) + [`AssessmentResultViewModel.kt`](app/src/main/java/com/example/wags/ui/breathing/AssessmentResultViewModel.kt) — Leaderboard + History tabs; color-coded scores; ⚠ on invalid epochs.
+
+#### Modified Files
+
+- [`RfAssessmentOrchestrator.kt`](app/src/main/java/com/example/wags/domain/usecase/breathing/RfAssessmentOrchestrator.kt) — Added `SLIDING_WINDOW` to `RfProtocol` enum; wired real epoch math (RMSSD, LF power, phase synchrony, PT amplitude) via `SteppedEpochScorer`; added `DEEP_GRID` constant; exposes `Flow<RfOrchestratorState>` with 5 variants.
+- [`RfAssessmentEntity.kt`](app/src/main/java/com/example/wags/data/db/entity/RfAssessmentEntity.kt) — Added `accBreathingUsed: Boolean` column.
+- [`WagsDatabase.kt`](app/src/main/java/com/example/wags/data/db/WagsDatabase.kt) — Bumped version 4 → 5; added `MIGRATION_4_5`.
+- [`RfAssessmentDao.kt`](app/src/main/java/com/example/wags/data/db/dao/RfAssessmentDao.kt) — Added `getLatestForProtocol()` and `hasAnySession()` queries.
+- [`WagsNavGraph.kt`](app/src/main/java/com/example/wags/ui/navigation/WagsNavGraph.kt) — Added 3 new routes: `rf_assessment_picker`, `rf_assessment_run/{protocol}`, `rf_assessment_result/{sessionTimestamp}`.
+- [`BreathingScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/BreathingScreen.kt) — Replaced inline RF section with a single "RF Assessment" button navigating to the picker.
+
+#### RF Protocols Supported
+
+| Protocol | Duration | Description |
+|---|---|---|
+| `EXPRESS` | ~8 min | 5 rates × 1 min, quick scan |
+| `STANDARD` | ~18 min | 5 rates × 2 min, standard calibration |
+| `DEEP` | ~42 min | 13 combos × 3 min, deep calibration |
+| `TARGETED` | ~10 min | Optimal ±0.2 BPM × 3 min (requires history) |
+| `SLIDING_WINDOW` | ~16 min | Chirp 6.75 → 4.5 BPM, continuous scan |

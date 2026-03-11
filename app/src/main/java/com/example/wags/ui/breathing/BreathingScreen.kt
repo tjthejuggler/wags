@@ -8,21 +8,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
-import com.example.wags.domain.usecase.breathing.RfEpochResult
-import com.example.wags.domain.usecase.breathing.RfPhase
-import com.example.wags.domain.usecase.breathing.RfProtocol
 import com.example.wags.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BreathingScreen(
     navController: NavController,
+    onNavigateToRfAssessment: () -> Unit = {},
     viewModel: BreathingViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -84,15 +81,13 @@ fun BreathingScreen(
 
             HorizontalDivider(color = SurfaceVariant)
 
-            // RF Assessment section
-            RfAssessmentSection(
-                rfPhase = state.rfPhase,
-                remainingSeconds = state.remainingSeconds,
-                currentTestRateBpm = state.currentTestRateBpm,
-                epochResults = state.epochResults,
-                onStart = { viewModel.startRfAssessment(RfProtocol.EXPRESS, deviceId) },
-                onStop = { viewModel.stopRfAssessment() }
-            )
+            // RF Assessment navigation
+            Button(
+                onClick = onNavigateToRfAssessment,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("RF Assessment")
+            }
         }
     }
 }
@@ -170,87 +165,6 @@ private fun BreathingControls(
                 valueRange = 0.5f..3f,
                 steps = 9
             )
-        }
-    }
-}
-
-@Composable
-private fun RfAssessmentSection(
-    rfPhase: RfPhase,
-    remainingSeconds: Long,
-    currentTestRateBpm: Float,
-    epochResults: List<RfEpochResult>,
-    onStart: () -> Unit,
-    onStop: () -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("RF Assessment (Express)", style = MaterialTheme.typography.titleLarge)
-
-        when (rfPhase) {
-            RfPhase.IDLE -> {
-                Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
-                    Text("Start Express RF Assessment")
-                }
-            }
-            RfPhase.BASELINE -> {
-                Text("Baseline: ${remainingSeconds}s remaining",
-                    style = MaterialTheme.typography.bodyLarge, color = EcgCyan)
-                OutlinedButton(
-                    onClick = onStop,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
-                ) {
-                    Text("Cancel")
-                }
-            }
-            RfPhase.TEST_BLOCK -> {
-                Text("Testing ${String.format("%.1f", currentTestRateBpm)} BPM — ${remainingSeconds}s",
-                    style = MaterialTheme.typography.bodyLarge, color = EcgCyan)
-                OutlinedButton(
-                    onClick = onStop,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
-                ) {
-                    Text("Cancel")
-                }
-            }
-            RfPhase.WASHOUT -> {
-                Text("Washout: ${remainingSeconds}s remaining",
-                    style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-            }
-            RfPhase.COMPLETE -> {
-                Text("Assessment Complete", style = MaterialTheme.typography.titleLarge,
-                    color = ReadinessGreen)
-            }
-        }
-
-        if (epochResults.isNotEmpty()) {
-            EpochResultsTable(results = epochResults)
-        }
-    }
-}
-
-@Composable
-private fun EpochResultsTable(results: List<RfEpochResult>) {
-    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Epoch Results", style = MaterialTheme.typography.titleLarge)
-            results.forEach { result ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        "${String.format("%.1f", result.rateBpm)} BPM",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        "Score: ${String.format("%.1f", result.compositeScore)}",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = if (result.isValid) ReadinessGreen else TextSecondary
-                    )
-                }
-            }
         }
     }
 }

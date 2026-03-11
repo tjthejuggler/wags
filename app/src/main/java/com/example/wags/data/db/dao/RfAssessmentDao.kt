@@ -14,4 +14,10 @@ interface RfAssessmentDao {
 
     @Query("SELECT * FROM rf_assessments WHERE isValid = 1 ORDER BY compositeScore DESC LIMIT 1")
     suspend fun getBestValid(): RfAssessmentEntity?
+
+    @Query("SELECT * FROM rf_assessments WHERE protocolType = :protocol ORDER BY timestamp DESC LIMIT 1")
+    suspend fun getLatestForProtocol(protocol: String): RfAssessmentEntity?
+
+    @Query("SELECT COUNT(*) > 0 FROM rf_assessments")
+    suspend fun hasAnySession(): Boolean
 }

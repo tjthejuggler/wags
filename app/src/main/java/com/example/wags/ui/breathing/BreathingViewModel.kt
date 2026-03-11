@@ -9,8 +9,10 @@ import com.example.wags.domain.usecase.breathing.CoherenceScoreCalculator
 import com.example.wags.domain.usecase.breathing.ContinuousPacerEngine
 import com.example.wags.domain.usecase.breathing.RfAssessmentOrchestrator
 import com.example.wags.domain.usecase.breathing.RfEpochResult
+import com.example.wags.domain.usecase.breathing.RfOrchestratorState
 import com.example.wags.domain.usecase.breathing.RfPhase
 import com.example.wags.domain.usecase.breathing.RfProtocol
+import com.example.wags.domain.usecase.breathing.SlidingWindowResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
@@ -34,7 +36,8 @@ data class BreathingUiState(
     val rfPhase: RfPhase = RfPhase.IDLE,
     val currentTestRateBpm: Float = 0f,
     val remainingSeconds: Long = 0L,
-    val epochResults: List<RfEpochResult> = emptyList()
+    val epochResults: List<RfEpochResult> = emptyList(),
+    val slidingWindowResult: SlidingWindowResult? = null
 )
 
 @HiltViewModel
@@ -127,16 +130,36 @@ class BreathingViewModel @Inject constructor(
         bleManager.startRrStream(deviceId)
         rfCollectorJob?.cancel()
 
+        _uiState.update { it.copy(slidingWindowResult = null) }
+
         rfOrchestrator.start(
             protocol = protocol,
             scope = viewModelScope,
-            onEpochComplete = { /* placeholder; orchestrator records internally */ },
+            onEpochComplete = { /* epoch stored internally by orchestrator */ },
             onComplete = { results ->
                 _uiState.update { it.copy(epochResults = results) }
             }
         )
 
+        // Feed incoming RR intervals into the orchestrator
         rfCollectorJob = viewModelScope.launch {
+            // Poll rrBuffer and forward new beats to orchestrator
+            launch {
+                var lastSeenCount = bleManager.rrBuffer.size()
+                while (isActive) {
+                    delay(200L)
+                    val currentCount = bleManager.rrBuffer.size()
+                    val newCount = currentCount - lastSeenCount
+                    if (newCount > 0) {
+                        bleManager.rrBuffer.readLast(newCount).forEach { rrMs ->
+                            rfOrchestrator.feedRr(rrMs.toFloat())
+                        }
+                        lastSeenCount = currentCount
+                    }
+                }
+            }
+
+            // Collect legacy StateFlows (backward compat)
             launch {
                 rfOrchestrator.phase.collect { phase ->
                     _uiState.update { it.copy(rfPhase = phase) }
@@ -155,6 +178,17 @@ class BreathingViewModel @Inject constructor(
             launch {
                 rfOrchestrator.epochResults.collect { results ->
                     _uiState.update { it.copy(epochResults = results) }
+                }
+            }
+
+            // Collect unified state for SLIDING_WINDOW result
+            launch {
+                rfOrchestrator.state.collect { orchState ->
+                    when (orchState) {
+                        is RfOrchestratorState.SlidingDone ->
+                            _uiState.update { it.copy(slidingWindowResult = orchState.result) }
+                        else -> Unit
+                    }
                 }
             }
         }
