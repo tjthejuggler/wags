@@ -1,5 +1,6 @@
 package com.example.wags.ui.settings
 
+import android.bluetooth.le.ScanResult
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
@@ -25,8 +26,10 @@ data class SettingsUiState(
     val h10State: BleConnectionState = BleConnectionState.Disconnected,
     val verityState: BleConnectionState = BleConnectionState.Disconnected,
     val oximeterState: OximeterConnectionState = OximeterConnectionState.Disconnected,
+    /** true while either Polar or Oximeter scan is running */
     val isScanning: Boolean = false,
-    val scanResults: List<PolarDeviceInfo> = emptyList(),
+    val polarScanResults: List<PolarDeviceInfo> = emptyList(),
+    val oximeterScanResults: List<ScanResult> = emptyList(),
     val savedH10Id: String = "",
     val savedVerityId: String = ""
 )
@@ -46,14 +49,29 @@ class SettingsViewModel @Inject constructor(
         bleManager.verityState,
         bleManager.isScanning,
         bleManager.scanResults,
-        oximeterBleManager.connectionState
-    ) { h10State, verityState, isScanning, scanResults, oximeterState ->
+        oximeterBleManager.connectionState,
+        oximeterBleManager.scanResults
+    ) { args ->
+        @Suppress("UNCHECKED_CAST")
+        val h10State        = args[0] as BleConnectionState
+        @Suppress("UNCHECKED_CAST")
+        val verityState     = args[1] as BleConnectionState
+        val polarScanning   = args[2] as Boolean
+        @Suppress("UNCHECKED_CAST")
+        val polarResults    = args[3] as List<PolarDeviceInfo>
+        val oximeterState   = args[4] as OximeterConnectionState
+        @Suppress("UNCHECKED_CAST")
+        val oximeterResults = args[5] as List<ScanResult>
+
+        val oximeterScanning = oximeterState is OximeterConnectionState.Scanning
+
         SettingsUiState(
             h10State = h10State,
             verityState = verityState,
             oximeterState = oximeterState,
-            isScanning = isScanning,
-            scanResults = scanResults,
+            isScanning = polarScanning || oximeterScanning,
+            polarScanResults = polarResults,
+            oximeterScanResults = oximeterResults,
             savedH10Id = prefs.getString(KEY_H10_ID, "") ?: "",
             savedVerityId = prefs.getString(KEY_VERITY_ID, "") ?: ""
         )
@@ -66,15 +84,32 @@ class SettingsViewModel @Inject constructor(
         )
     )
 
-    fun startScan() = bleManager.startScan()
-    fun stopScan() = bleManager.stopScan()
+    // ── Unified scan ─────────────────────────────────────────────────────────
+
+    /** Starts both Polar and Oximeter scans simultaneously. */
+    fun startScan() {
+        bleManager.startScan()
+        oximeterBleManager.startScan()
+    }
+
+    /** Stops both scans. */
+    fun stopScan() {
+        bleManager.stopScan()
+        oximeterBleManager.stopScan()
+    }
+
+    // ── Polar connections ─────────────────────────────────────────────────────
 
     fun connectH10(device: PolarDeviceInfo) {
+        // Disconnect oximeter first — only one HR source at a time
+        oximeterBleManager.disconnect()
         prefs.edit().putString(KEY_H10_ID, device.deviceId).apply()
         bleManager.connectDevice(device.deviceId, isH10 = true)
     }
 
     fun connectVerity(device: PolarDeviceInfo) {
+        // Disconnect oximeter first — only one HR source at a time
+        oximeterBleManager.disconnect()
         prefs.edit().putString(KEY_VERITY_ID, device.deviceId).apply()
         bleManager.connectDevice(device.deviceId, isH10 = false)
     }
@@ -89,16 +124,20 @@ class SettingsViewModel @Inject constructor(
         if (id.isNotBlank()) bleManager.disconnectDevice(id)
     }
 
-    // ── Oximeter ─────────────────────────────────────────────────────────────
+    // ── Oximeter connections ──────────────────────────────────────────────────
 
-    fun startOximeterScan() = oximeterBleManager.startScan()
-    fun stopOximeterScan() = oximeterBleManager.stopScan()
-    fun connectOximeter(address: String) = oximeterBleManager.connect(address)
+    fun connectOximeter(address: String) {
+        stopScan()
+        // Disconnect Polar devices first — only one HR source at a time
+        disconnectH10()
+        disconnectVerity()
+        oximeterBleManager.connect(address)
+    }
+
     fun disconnectOximeter() = oximeterBleManager.disconnect()
 
     override fun onCleared() {
-        bleManager.stopScan()
-        oximeterBleManager.stopScan()
+        stopScan()
         super.onCleared()
     }
 }

@@ -62,28 +62,14 @@ fun SettingsScreen(
         }
     }
 
-    val oximeterPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { results ->
-        if (results.values.all { it }) viewModel.startOximeterScan()
-    }
-
     fun requestScan() {
         if (allGranted()) viewModel.startScan()
         else permissionLauncher.launch(blePermissions)
     }
 
-    fun requestOximeterScan() {
-        if (allGranted()) viewModel.startOximeterScan()
-        else oximeterPermissionLauncher.launch(blePermissions)
-    }
-
-    // Stop scans when leaving the screen
+    // Stop all scans when leaving the screen
     DisposableEffect(Unit) {
-        onDispose {
-            viewModel.stopScan()
-            viewModel.stopOximeterScan()
-        }
+        onDispose { viewModel.stopScan() }
     }
 
     Scaffold(
@@ -110,7 +96,8 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Permission denied banner
+
+            // ── Permission denied banner ───────────────────────────────────
             if (permissionDenied) {
                 item {
                     Card(colors = CardDefaults.cardColors(containerColor = ReadinessRed.copy(alpha = 0.2f))) {
@@ -125,28 +112,28 @@ fun SettingsScreen(
                 }
             }
 
-            // ── Polar Devices ─────────────────────────────────────────────────
-
-            // Connected Polar devices status
+            // ── Connected devices status ───────────────────────────────────
             item {
                 ConnectedDevicesCard(
                     h10State = state.h10State,
                     verityState = state.verityState,
+                    oximeterState = state.oximeterState,
                     savedH10Id = state.savedH10Id,
                     savedVerityId = state.savedVerityId,
                     onDisconnectH10 = { viewModel.disconnectH10() },
-                    onDisconnectVerity = { viewModel.disconnectVerity() }
+                    onDisconnectVerity = { viewModel.disconnectVerity() },
+                    onDisconnectOximeter = { viewModel.disconnectOximeter() }
                 )
             }
 
-            // Polar scan button
+            // ── Single unified scan button ─────────────────────────────────
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Nearby Polar Devices", style = MaterialTheme.typography.titleLarge)
+                    Text("Nearby Sensors", style = MaterialTheme.typography.titleLarge)
                     if (state.isScanning) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -172,20 +159,31 @@ fun SettingsScreen(
                 }
             }
 
-            // Polar scan results
-            if (state.scanResults.isEmpty() && !state.isScanning) {
+            // ── Empty state ────────────────────────────────────────────────
+            val totalResults = state.polarScanResults.size + state.oximeterScanResults.size
+            if (totalResults == 0 && !state.isScanning) {
                 item {
                     Text(
-                        "No devices found. Make sure your Polar sensor is powered on, " +
-                            "then tap Scan.",
+                        "No devices found. Make sure your sensors are powered on, then tap Scan.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = TextSecondary
                     )
                 }
             }
 
-            items(state.scanResults, key = { it.deviceId }) { device ->
-                DeviceResultCard(
+            // ── Polar scan results ─────────────────────────────────────────
+            if (state.polarScanResults.isNotEmpty()) {
+                item {
+                    Text(
+                        "Polar Devices",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = TextSecondary
+                    )
+                }
+            }
+
+            items(state.polarScanResults, key = { "polar-${it.deviceId}" }) { device ->
+                PolarDeviceResultCard(
                     device = device,
                     h10State = state.h10State,
                     verityState = state.verityState,
@@ -200,110 +198,40 @@ fun SettingsScreen(
                 )
             }
 
-            // ── Oximeter ──────────────────────────────────────────────────────
-
-            item {
-                HorizontalDivider(color = SurfaceVariant)
+            // ── Oximeter scan results ──────────────────────────────────────
+            if (state.oximeterScanResults.isNotEmpty()) {
+                item {
+                    Text(
+                        "Oximeter / SpO₂ Devices",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = TextSecondary
+                    )
+                }
             }
 
-            item {
-                OximeterConnectionCard(
+            items(state.oximeterScanResults, key = { "oxy-${it.device.address}" }) { result ->
+                OximeterDeviceResultCard(
+                    result = result,
                     oximeterState = state.oximeterState,
-                    onScan = { requestOximeterScan() },
-                    onStopScan = { viewModel.stopOximeterScan() },
-                    onDisconnect = { viewModel.disconnectOximeter() },
-                    onConnect = { address -> viewModel.connectOximeter(address) }
+                    onConnect = { viewModel.connectOximeter(result.device.address) }
                 )
             }
         }
     }
 }
 
-// ── Oximeter connection card ──────────────────────────────────────────────────
-
-@Composable
-private fun OximeterConnectionCard(
-    oximeterState: OximeterConnectionState,
-    onScan: () -> Unit,
-    onStopScan: () -> Unit,
-    onDisconnect: () -> Unit,
-    onConnect: (String) -> Unit
-) {
-    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text("Oximeter (SpO₂)", style = MaterialTheme.typography.titleMedium)
-
-            // Status
-            val (statusText, statusColor) = when (oximeterState) {
-                is OximeterConnectionState.Connected ->
-                    "Connected: ${oximeterState.deviceName}" to ReadinessGreen
-                is OximeterConnectionState.Connecting ->
-                    "Connecting…" to ReadinessOrange
-                is OximeterConnectionState.Scanning ->
-                    "Scanning… (${oximeterState.devicesFound} found)" to EcgCyan
-                is OximeterConnectionState.Error ->
-                    "Error: ${oximeterState.message}" to ReadinessRed
-                is OximeterConnectionState.Disconnected ->
-                    "Not connected" to TextSecondary
-            }
-            Text(statusText, style = MaterialTheme.typography.bodySmall, color = statusColor)
-
-            // Action button
-            when (oximeterState) {
-                is OximeterConnectionState.Connected -> {
-                    OutlinedButton(
-                        onClick = onDisconnect,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
-                    ) { Text("Disconnect") }
-                }
-                is OximeterConnectionState.Scanning -> {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = EcgCyan,
-                            strokeWidth = 2.dp
-                        )
-                        OutlinedButton(
-                            onClick = onStopScan,
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
-                        ) { Text("Stop") }
-                    }
-                }
-                else -> {
-                    Button(onClick = onScan) { Text("Scan for Oximeter") }
-                }
-            }
-
-            // Scan results
-            if (oximeterState is OximeterConnectionState.Scanning && oximeterState.devicesFound > 0) {
-                Text(
-                    "Tap a device below to connect",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextSecondary
-                )
-            }
-        }
-    }
-}
-
-// ── Polar device cards (unchanged) ───────────────────────────────────────────
+// ── Connected devices summary card ────────────────────────────────────────────
 
 @Composable
 private fun ConnectedDevicesCard(
     h10State: BleConnectionState,
     verityState: BleConnectionState,
+    oximeterState: OximeterConnectionState,
     savedH10Id: String,
     savedVerityId: String,
     onDisconnectH10: () -> Unit,
-    onDisconnectVerity: () -> Unit
+    onDisconnectVerity: () -> Unit,
+    onDisconnectOximeter: () -> Unit
 ) {
     Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
         Column(
@@ -325,6 +253,37 @@ private fun ConnectedDevicesCard(
                 state = verityState,
                 onDisconnect = onDisconnectVerity
             )
+
+            // Oximeter row
+            HorizontalDivider(color = SurfaceVariant, modifier = Modifier.padding(vertical = 2.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text("Oximeter (SpO₂)", style = MaterialTheme.typography.bodyLarge)
+                    val (statusText, statusColor) = when (oximeterState) {
+                        is OximeterConnectionState.Connected ->
+                            "Connected: ${oximeterState.deviceName}" to ReadinessGreen
+                        is OximeterConnectionState.Connecting ->
+                            "Connecting…" to ReadinessOrange
+                        is OximeterConnectionState.Scanning ->
+                            "Scanning…" to EcgCyan
+                        is OximeterConnectionState.Error ->
+                            "Error: ${oximeterState.message}" to ReadinessRed
+                        is OximeterConnectionState.Disconnected ->
+                            "Not connected" to TextSecondary
+                    }
+                    Text(statusText, style = MaterialTheme.typography.bodySmall, color = statusColor)
+                }
+                if (oximeterState is OximeterConnectionState.Connected) {
+                    OutlinedButton(
+                        onClick = onDisconnectOximeter,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                    ) { Text("Disconnect") }
+                }
+            }
         }
     }
 }
@@ -367,8 +326,10 @@ private fun DeviceStatusRow(
     }
 }
 
+// ── Polar device result card ──────────────────────────────────────────────────
+
 @Composable
-private fun DeviceResultCard(
+private fun PolarDeviceResultCard(
     device: PolarDeviceInfo,
     h10State: BleConnectionState,
     verityState: BleConnectionState,
@@ -395,7 +356,7 @@ private fun DeviceResultCard(
         ) {
             Column {
                 Text(
-                    text = device.name.ifBlank { "Unknown Device" },
+                    text = device.name.ifBlank { "Unknown Polar Device" },
                     style = MaterialTheme.typography.bodyLarge
                 )
                 Text(
@@ -423,6 +384,70 @@ private fun DeviceResultCard(
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
                     ) { Text("Verity", style = MaterialTheme.typography.bodySmall) }
+                }
+            }
+        }
+    }
+}
+
+// ── Oximeter device result card ───────────────────────────────────────────────
+
+@Composable
+private fun OximeterDeviceResultCard(
+    result: ScanResult,
+    oximeterState: OximeterConnectionState,
+    onConnect: () -> Unit
+) {
+    val address = result.device.address
+    val name = result.device.name ?: address
+    val isConnected = oximeterState is OximeterConnectionState.Connected &&
+        oximeterState.deviceAddress == address
+    val isConnecting = oximeterState is OximeterConnectionState.Connecting &&
+        oximeterState.deviceAddress == address
+
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = if (isConnected) SurfaceVariant else SurfaceDark
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(name, style = MaterialTheme.typography.bodyLarge)
+                Text(address, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                when {
+                    isConnected -> Text(
+                        "Connected",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ReadinessGreen
+                    )
+                    isConnecting -> Text(
+                        "Connecting…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ReadinessOrange
+                    )
+                }
+            }
+            when {
+                isConnected -> { /* no button — disconnect from the top card */ }
+                isConnecting -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = EcgCyan,
+                        strokeWidth = 2.dp
+                    )
+                }
+                else -> {
+                    Button(
+                        onClick = onConnect,
+                        modifier = Modifier.height(32.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                    ) { Text("Connect", style = MaterialTheme.typography.bodySmall) }
                 }
             }
         }

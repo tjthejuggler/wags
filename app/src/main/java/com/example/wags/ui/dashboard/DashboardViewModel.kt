@@ -2,7 +2,7 @@ package com.example.wags.ui.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.wags.data.ble.PolarBleManager
+import com.example.wags.data.ble.HrDataSource
 import com.example.wags.data.db.entity.DailyReadingEntity
 import com.example.wags.data.repository.ReadinessRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -16,24 +16,27 @@ data class DashboardUiState(
     val latestReadings: List<DailyReadingEntity> = emptyList(),
     val lastReadinessScore: Int? = null,
     val lastLnRmssd: Float? = null,
-    val liveHr: Int? = null
+    val liveHr: Int? = null,
+    val liveSpO2: Int? = null
 )
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val readinessRepository: ReadinessRepository,
-    private val bleManager: PolarBleManager
+    private val hrDataSource: HrDataSource
 ) : ViewModel() {
 
     val uiState: StateFlow<DashboardUiState> = combine(
         readinessRepository.getLatestReadings(14),
-        bleManager.liveHr
-    ) { readings, liveHr ->
+        hrDataSource.liveHr,
+        hrDataSource.liveSpO2
+    ) { readings, liveHr, liveSpO2 ->
         DashboardUiState(
             latestReadings = readings,
             lastReadinessScore = readings.firstOrNull()?.readinessScore,
             lastLnRmssd = readings.firstOrNull()?.lnRmssd,
-            liveHr = liveHr
+            liveHr = liveHr,
+            liveSpO2 = liveSpO2
         )
     }.stateIn(
         scope = viewModelScope,

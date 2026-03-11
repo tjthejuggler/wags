@@ -2,12 +2,15 @@ package com.example.wags.ui.session
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.wags.data.ble.HrDataSource
+import com.example.wags.data.ble.OximeterBleManager
 import com.example.wags.data.ble.PolarBleManager
 import com.example.wags.data.db.entity.SessionLogEntity
 import com.example.wags.data.repository.SessionRepository
 import com.example.wags.di.IoDispatcher
 import com.example.wags.di.MathDispatcher
 import com.example.wags.domain.model.BleConnectionState
+import com.example.wags.domain.model.OximeterConnectionState
 import com.example.wags.domain.model.SessionType
 import com.example.wags.domain.usecase.hrv.ArtifactCorrectionUseCase
 import com.example.wags.domain.usecase.session.HrSonificationEngine
@@ -49,6 +52,8 @@ data class SessionUiState(
 @HiltViewModel
 class SessionViewModel @Inject constructor(
     private val bleManager: PolarBleManager,
+    private val oximeterBleManager: OximeterBleManager,
+    private val hrDataSource: HrDataSource,
     private val sessionRepository: SessionRepository,
     private val analyticsCalculator: NsdrAnalyticsCalculator,
     private val artifactCorrection: ArtifactCorrectionUseCase,
@@ -67,28 +72,17 @@ class SessionViewModel @Inject constructor(
     private val hrTimeSeries = mutableListOf<Float>()
 
     init {
-        // Observe BLE connection state to keep hasHrMonitor + connectedDeviceId in sync
+        // Observe all HR-capable connection states to keep hasHrMonitor + connectedDeviceId in sync
         viewModelScope.launch {
-            bleManager.h10State.collect { state ->
-                val connectedId = (state as? BleConnectionState.Connected)?.deviceId
-                _uiState.update {
-                    it.copy(
-                        hasHrMonitor = connectedId != null || bleManager.verityState.value is BleConnectionState.Connected,
-                        connectedDeviceId = connectedId
-                            ?: (bleManager.verityState.value as? BleConnectionState.Connected)?.deviceId
-                    )
-                }
-            }
-        }
-        viewModelScope.launch {
-            bleManager.verityState.collect { state ->
-                val connectedId = (state as? BleConnectionState.Connected)?.deviceId
+            hrDataSource.isAnyHrDeviceConnected.collect { anyConnected ->
                 val h10Id = (bleManager.h10State.value as? BleConnectionState.Connected)?.deviceId
-                // H10 takes priority
-                val activeId = h10Id ?: connectedId
+                val verityId = (bleManager.verityState.value as? BleConnectionState.Connected)?.deviceId
+                val oxyAddr = (oximeterBleManager.connectionState.value as? OximeterConnectionState.Connected)?.deviceAddress
+                // Polar takes priority for RR-based analytics; oximeter is HR-only
+                val activeId = h10Id ?: verityId ?: oxyAddr
                 _uiState.update {
                     it.copy(
-                        hasHrMonitor = activeId != null,
+                        hasHrMonitor = anyConnected,
                         connectedDeviceId = activeId
                     )
                 }
@@ -146,9 +140,11 @@ class SessionViewModel @Inject constructor(
                 val elapsed = (System.currentTimeMillis() - sessionStartMs) / 1_000L
 
                 if (activeMonitorId != null) {
+                    // Try Polar RR buffer first (gives RMSSD); fall back to oximeter HR
                     val rrSnapshot = bleManager.rrBuffer.readLast(64)
-                    val currentHr = if (rrSnapshot.isNotEmpty())
+                    val polarHr = if (rrSnapshot.isNotEmpty())
                         (60_000.0 / rrSnapshot.last()).toFloat() else null
+                    val currentHr = polarHr ?: hrDataSource.liveHr.value?.toFloat()
                     val liveRmssd = computeLiveRmssd(rrSnapshot)
 
                     if (currentHr != null) {
@@ -267,10 +263,11 @@ class SessionViewModel @Inject constructor(
         sessionJob?.cancel()
         sonificationEngine.stop()
         hrTimeSeries.clear()
-        // Preserve BLE connection state across reset
+        // Preserve connection state across reset
         val h10Id = (bleManager.h10State.value as? BleConnectionState.Connected)?.deviceId
         val verityId = (bleManager.verityState.value as? BleConnectionState.Connected)?.deviceId
-        val activeId = h10Id ?: verityId
+        val oxyAddr = (oximeterBleManager.connectionState.value as? OximeterConnectionState.Connected)?.deviceAddress
+        val activeId = h10Id ?: verityId ?: oxyAddr
         _uiState.value = SessionUiState(
             hasHrMonitor = activeId != null,
             connectedDeviceId = activeId

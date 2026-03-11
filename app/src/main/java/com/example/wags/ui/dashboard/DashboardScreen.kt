@@ -15,6 +15,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
+import androidx.compose.ui.text.font.FontWeight
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,23 +31,52 @@ fun DashboardScreen(
             TopAppBar(
                 title = { Text("WAGS", style = MaterialTheme.typography.headlineMedium) },
                 actions = {
-                    state.liveHr?.let { bpm ->
+                    // Live sensor readings row — shown whenever any value is available
+                    if (state.liveHr != null || state.liveSpO2 != null) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
                             modifier = Modifier.padding(end = 8.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Favorite,
-                                contentDescription = "Heart rate",
-                                tint = ReadinessRed,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Text(
-                                text = "$bpm",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = ReadinessRed
-                            )
+                            // Heart rate
+                            state.liveHr?.let { bpm ->
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Favorite,
+                                        contentDescription = "Heart rate",
+                                        tint = ReadinessRed,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "$bpm",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = ReadinessRed
+                                    )
+                                }
+                            }
+                            // SpO₂
+                            state.liveSpO2?.let { spo2 ->
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    Text(
+                                        text = "SpO₂",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = EcgCyan
+                                    )
+                                    Text(
+                                        text = "$spo2%",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = EcgCyan
+                                    )
+                                }
+                            }
                         }
                     }
                     IconButton(onClick = { navController.navigate(WagsRoutes.SETTINGS) }) {
