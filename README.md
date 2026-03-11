@@ -111,7 +111,8 @@ com.example.wags/
     ├── common/         InfoHelpBubble (reusable ⓘ bottom-sheet)
     ├── dashboard/      DashboardScreen, DashboardViewModel
     ├── morning/        MorningReadinessScreen, MorningReadinessResultScreen,
-    │                   MorningReadinessViewModel
+    │                   MorningReadinessViewModel,
+    │                   MorningReadinessHistoryScreen, MorningReadinessHistoryViewModel
     ├── navigation/     WagsNavGraph, WagsRoutes
     ├── readiness/      ReadinessScreen, ReadinessViewModel
     ├── realtime/       EcgChartView, TachogramView (Canvas-based)
@@ -395,6 +396,27 @@ cd wags
 ---
 
 ## Changelog
+
+### 2026-03-11 — Morning Readiness: FSM Simplification, Bug Fix & History Screen
+
+#### Bug Fix
+
+- **`ArtifactCorrectionUseCase`** — Fixed size mismatch crash (`nn and artifactMask must have same size`). When the pre-filter stage reduced the RR buffer below 10 samples, the early-return path returned `correctedNn` sized to `validRr` but `artifactMask` sized to the original input. Both arrays are now sized to `validRr`, eliminating the mismatch that prevented Morning Readiness results from being saved.
+
+#### FSM Simplification
+
+- **`MorningReadinessState`** — Removed `SUPINE_REST`, `STAND_CAPTURE`, and `STAND_HRV` states. Replaced with a single `STANDING` state. New flow: `IDLE → INIT → SUPINE_HRV → STAND_PROMPT → STANDING → QUESTIONNAIRE → CALCULATING → COMPLETE`.
+- **`MorningReadinessFsm`** — Removed the separate `enterStandCapture` / `enterStandHrv` phases. A single 120s `STANDING` phase now collects all standing raw data (peak HR tracking + RR intervals). All metric derivation (HRV, orthostatic, 30:15 ratio, OHRR) happens in `CALCULATING` from the raw buffers.
+- **`MorningReadinessStateHandler`** — Updated `canTransitionTo()` to reflect the simplified 8-state machine.
+- **`MorningReadinessScreen`** — Removed `StandCaptureContent` and `StandHrvContent`. Added single `StandingContent` composable showing countdown, live RMSSD, RR count, and peak HR. Added "History" button in the top bar.
+
+#### New Feature — Morning Readiness History
+
+- **[`MorningReadinessHistoryViewModel`](app/src/main/java/com/example/wags/ui/morning/MorningReadinessHistoryViewModel.kt)** — Observes all readings from the repository. Combines with a selected-date `StateFlow` to produce `MorningReadinessHistoryUiState` containing the full reading list, the set of dates with readings (for calendar dots), and the currently selected reading.
+- **[`MorningReadinessHistoryScreen`](app/src/main/java/com/example/wags/ui/morning/MorningReadinessHistoryScreen.kt)** — Calendar view with month navigation. Days with readings show a cyan dot and are tappable. Tapping a day opens a detail card showing all stored metrics: readiness score, supine HRV, standing HRV, orthostatic response, respiratory rate, Hooper Index, and data quality. Empty state shown when no readings exist.
+- **[`WagsNavGraph`](app/src/main/java/com/example/wags/ui/navigation/WagsNavGraph.kt)** — Added `morning_readiness_history` route. `MorningReadinessScreen` now receives `onNavigateToHistory` callback wired to this route.
+
+---
 
 ### 2026-03-11 — RF Assessment Expansion
 

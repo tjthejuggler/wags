@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.wags.domain.usecase.readiness.MorningReadinessFsm
 import com.example.wags.domain.usecase.readiness.MorningReadinessState
 import com.example.wags.ui.theme.*
 
@@ -31,6 +32,7 @@ import com.example.wags.ui.theme.*
 @Composable
 fun MorningReadinessScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToHistory: () -> Unit = {},
     viewModel: MorningReadinessViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -91,6 +93,11 @@ fun MorningReadinessScreen(
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
                     }
                 },
+                actions = {
+                    TextButton(onClick = onNavigateToHistory) {
+                        Text("History", color = EcgCyan)
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )
         }
@@ -109,16 +116,12 @@ fun MorningReadinessScreen(
                     IdleContent(onStart = { viewModel.startSession() })
                 MorningReadinessState.INIT ->
                     InitContent(uiState)
-                MorningReadinessState.SUPINE_REST ->
-                    SupineRestContent(uiState)
                 MorningReadinessState.SUPINE_HRV ->
                     SupineHrvContent(uiState)
                 MorningReadinessState.STAND_PROMPT ->
                     StandPromptContent()
-                MorningReadinessState.STAND_CAPTURE ->
-                    StandCaptureContent(uiState)
-                MorningReadinessState.STAND_HRV ->
-                    StandHrvContent(uiState)
+                MorningReadinessState.STANDING ->
+                    StandingContent(uiState)
                 MorningReadinessState.QUESTIONNAIRE ->
                     QuestionnaireContent(uiState, viewModel)
                 MorningReadinessState.CALCULATING ->
@@ -162,7 +165,7 @@ private fun IdleContent(onStart: () -> Unit) {
                 Text("1. Connect your Polar H10 heart rate monitor", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 Text("2. Lie down flat on your back", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 Text("3. Relax and breathe normally", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-                Text("4. The test takes approximately 7 minutes", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                Text("4. The test takes approximately 5 minutes", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
             }
         }
         Button(
@@ -184,7 +187,7 @@ private fun InitContent(uiState: MorningReadinessUiState) {
         Text("Get Ready", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
         CountdownCircle(
             seconds = uiState.remainingSeconds,
-            totalSeconds = com.example.wags.domain.usecase.readiness.MorningReadinessFsm.INIT_DURATION_SECONDS,
+            totalSeconds = MorningReadinessFsm.INIT_DURATION_SECONDS,
             color = EcgCyanDim
         )
         Text(
@@ -204,31 +207,13 @@ private fun InitContent(uiState: MorningReadinessUiState) {
 }
 
 @Composable
-private fun SupineRestContent(uiState: MorningReadinessUiState) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text("Stabilizing...", style = MaterialTheme.typography.headlineSmall, color = EcgCyan)
-        CountdownCircle(seconds = uiState.remainingSeconds, totalSeconds = 60, color = EcgCyanDim)
-        Text(
-            "Relax and breathe normally",
-            style = MaterialTheme.typography.bodyLarge,
-            color = TextSecondary,
-            textAlign = TextAlign.Center
-        )
-        PulsingDot()
-    }
-}
-
-@Composable
 private fun SupineHrvContent(uiState: MorningReadinessUiState) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Recording Supine HRV", style = MaterialTheme.typography.headlineSmall, color = EcgCyan)
-        CountdownCircle(seconds = uiState.remainingSeconds, totalSeconds = 120, color = EcgCyan)
+        Text("Recording Supine Data", style = MaterialTheme.typography.headlineSmall, color = EcgCyan)
+        CountdownCircle(seconds = uiState.remainingSeconds, totalSeconds = MorningReadinessFsm.SUPINE_HRV_SECONDS, color = EcgCyan)
         if (uiState.liveRmssd > 0.0) {
             Text(
                 "Live RMSSD: ${String.format("%.1f", uiState.liveRmssd)} ms",
@@ -284,13 +269,17 @@ private fun StandPromptContent() {
 }
 
 @Composable
-private fun StandCaptureContent(uiState: MorningReadinessUiState) {
+private fun StandingContent(uiState: MorningReadinessUiState) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Orthostatic Capture", style = MaterialTheme.typography.headlineSmall, color = EcgCyan)
-        CountdownCircle(seconds = uiState.remainingSeconds, totalSeconds = 60, color = ReadinessOrange)
+        Text("Recording Standing Data", style = MaterialTheme.typography.headlineSmall, color = EcgCyan)
+        CountdownCircle(
+            seconds = uiState.remainingSeconds,
+            totalSeconds = MorningReadinessFsm.STANDING_SECONDS,
+            color = ReadinessOrange
+        )
         if (uiState.peakStandHr > 0) {
             Text(
                 "Peak HR: ${uiState.peakStandHr} bpm",
@@ -299,28 +288,6 @@ private fun StandCaptureContent(uiState: MorningReadinessUiState) {
                 fontWeight = FontWeight.Bold
             )
         }
-        Text(
-            "Capturing orthostatic response...",
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary,
-            textAlign = TextAlign.Center
-        )
-        Text(
-            "Stay standing and still",
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary
-        )
-    }
-}
-
-@Composable
-private fun StandHrvContent(uiState: MorningReadinessUiState) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text("Recording Standing HRV", style = MaterialTheme.typography.headlineSmall, color = EcgCyan)
-        CountdownCircle(seconds = uiState.remainingSeconds, totalSeconds = com.example.wags.domain.usecase.readiness.MorningReadinessFsm.STAND_HRV_SECONDS, color = EcgCyan)
         if (uiState.liveRmssd > 0.0) {
             Text(
                 "Live RMSSD: ${String.format("%.1f", uiState.liveRmssd)} ms",

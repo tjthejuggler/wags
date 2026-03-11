@@ -6,17 +6,18 @@ import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 
 /**
- * Orchestrates the full morning readiness session across 8 states.
+ * Orchestrates the full morning readiness session across 6 states.
  * Delegates timing to [MorningReadinessTimer] and state to [MorningReadinessStateHandler].
  *
- * The ViewModel feeds RR intervals via [addRrInterval] and triggers audio/haptic
- * via the [onStandPromptReady] callback. No Android framework imports here.
+ * Flow: IDLE → INIT → SUPINE_HRV → STAND_PROMPT → STANDING → QUESTIONNAIRE → CALCULATING → COMPLETE
+ *
+ * Raw data is collected in supine and standing buffers. All metric calculations
+ * (HRV, orthostatic, respiratory rate, etc.) happen after data collection in CALCULATING.
  */
 class MorningReadinessFsm @Inject constructor(
     private val timer: MorningReadinessTimer,
     private val stateHandler: MorningReadinessStateHandler
 ) {
-    // Expose state and timer
     val state: StateFlow<MorningReadinessState> = stateHandler.state
     val remainingSeconds: StateFlow<Int> = timer.remainingSeconds
     val errorMessage: StateFlow<String?> = stateHandler.errorMessage
@@ -27,7 +28,7 @@ class MorningReadinessFsm @Inject constructor(
     val supineBuffer: List<RrInterval> get() = _supineBuffer.toList()
     val standingBuffer: List<RrInterval> get() = _standingBuffer.toList()
 
-    // Peak stand HR tracking
+    // Peak stand HR tracking (minimum RR = maximum HR during standing)
     private var _peakStandHr: Int = 0
     val peakStandHr: Int get() = _peakStandHr
 
@@ -37,17 +38,15 @@ class MorningReadinessFsm @Inject constructor(
     var onReadyToCalculate: (() -> Unit)? = null
 
     companion object {
-        const val SUPINE_HRV_SECONDS = 120   // 120s supine measurement
-        const val STAND_CAPTURE_SECONDS = 60  // 60s orthostatic capture (peak HR + 30:15)
-        const val STAND_HRV_SECONDS = 60      // 60s standing HRV → 120s total on feet
-        const val INIT_DURATION_SECONDS = 60  // 60s prep
+        const val SUPINE_HRV_SECONDS = 120    // 120s supine raw data collection
+        const val STANDING_SECONDS = 120       // 120s standing raw data collection (peak HR + all standing data)
+        const val INIT_DURATION_SECONDS = 60   // 60s prep
         private const val STAND_PROMPT_DURATION_SECONDS = 3
     }
 
     /**
      * Start the FSM. Transitions IDLE → INIT → SUPINE_HRV automatically.
      * Total timed duration: 60s prep + 120s supine + 3s prompt + 120s standing = ~303s.
-     * The ViewModel must call this after confirming BLE is connected.
      */
     fun start(scope: CoroutineScope) {
         _supineBuffer.clear()
@@ -56,7 +55,6 @@ class MorningReadinessFsm @Inject constructor(
 
         stateHandler.transitionTo(MorningReadinessState.INIT)
 
-        // INIT: 60s prep, then go directly to supine HRV recording
         timer.start(scope, durationSeconds = INIT_DURATION_SECONDS) {
             if (stateHandler.state.value == MorningReadinessState.INIT) {
                 enterSupineHrv(scope)
@@ -76,27 +74,17 @@ class MorningReadinessFsm @Inject constructor(
     private fun enterStandPrompt(scope: CoroutineScope) {
         stateHandler.transitionTo(MorningReadinessState.STAND_PROMPT)
         onStandPromptReady?.invoke()
-        // Auto-advance to STAND_CAPTURE after 3s (gives user time to read the prompt)
         timer.start(scope, durationSeconds = STAND_PROMPT_DURATION_SECONDS) {
             if (stateHandler.state.value == MorningReadinessState.STAND_PROMPT) {
-                enterStandCapture(scope)
+                enterStanding(scope)
             }
         }
     }
 
-    private fun enterStandCapture(scope: CoroutineScope) {
-        stateHandler.transitionTo(MorningReadinessState.STAND_CAPTURE)
-        timer.start(scope, durationSeconds = STAND_CAPTURE_SECONDS) {
-            if (stateHandler.state.value == MorningReadinessState.STAND_CAPTURE) {
-                enterStandHrv(scope)
-            }
-        }
-    }
-
-    private fun enterStandHrv(scope: CoroutineScope) {
-        stateHandler.transitionTo(MorningReadinessState.STAND_HRV)
-        timer.start(scope, durationSeconds = STAND_HRV_SECONDS) {
-            if (stateHandler.state.value == MorningReadinessState.STAND_HRV) {
+    private fun enterStanding(scope: CoroutineScope) {
+        stateHandler.transitionTo(MorningReadinessState.STANDING)
+        timer.start(scope, durationSeconds = STANDING_SECONDS) {
+            if (stateHandler.state.value == MorningReadinessState.STANDING) {
                 enterQuestionnaire()
             }
         }
@@ -110,7 +98,7 @@ class MorningReadinessFsm @Inject constructor(
 
     /**
      * Called by ViewModel when user submits Hooper questionnaire answers.
-     * Advances to CALCULATING state.
+     * Advances to CALCULATING state where all metrics are derived from raw buffers.
      */
     fun submitHooper() {
         if (stateHandler.state.value == MorningReadinessState.QUESTIONNAIRE) {
@@ -121,19 +109,18 @@ class MorningReadinessFsm @Inject constructor(
 
     /**
      * Called by ViewModel to feed RR intervals into the appropriate buffer.
-     * Only records during SUPINE_HRV, STAND_CAPTURE, and STAND_HRV states.
-     * Updates peak stand HR during STAND_CAPTURE.
+     * Records during SUPINE_HRV and STANDING states.
+     * Tracks peak stand HR during STANDING.
      */
     fun addRrInterval(rr: RrInterval) {
         when (stateHandler.state.value) {
             MorningReadinessState.SUPINE_HRV -> _supineBuffer.add(rr)
-            MorningReadinessState.STAND_CAPTURE -> {
+            MorningReadinessState.STANDING -> {
                 _standingBuffer.add(rr)
                 // Track peak HR (minimum RR = maximum HR)
                 val hrBpm = if (rr.intervalMs > 0) (60_000.0 / rr.intervalMs).toInt() else 0
                 if (hrBpm > _peakStandHr) _peakStandHr = hrBpm
             }
-            MorningReadinessState.STAND_HRV -> _standingBuffer.add(rr)
             else -> { /* Discard data in other states */ }
         }
     }

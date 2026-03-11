@@ -3,13 +3,11 @@ package com.example.wags.domain.usecase.readiness
 enum class MorningReadinessState {
     IDLE,           // Not started
     INIT,           // State 1: BLE validation, instruct user to lie down
-    SUPINE_REST,    // State 2: 60s stabilization (data discarded)
-    SUPINE_HRV,     // State 3: 120s supine recording
-    STAND_PROMPT,   // State 4: Audio + haptic prompt to stand
-    STAND_CAPTURE,  // State 5: 60s orthostatic capture (peak HR, beat 15/30)
-    STAND_HRV,      // State 6: 120s standing HRV recording
-    QUESTIONNAIRE,  // State 7: Hooper Index questionnaire
-    CALCULATING,    // State 8: Processing all metrics
+    SUPINE_HRV,     // State 2: 120s supine recording (raw data collection)
+    STAND_PROMPT,   // State 3: Audio + haptic prompt to stand
+    STANDING,       // State 4: 120s standing recording (peak HR + all standing data)
+    QUESTIONNAIRE,  // State 5: Hooper Index questionnaire
+    CALCULATING,    // State 6: Processing all metrics from raw data
     COMPLETE,       // Final: results ready
     ERROR           // Terminal error state
 }

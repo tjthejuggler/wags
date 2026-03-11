@@ -30,7 +30,12 @@ class ArtifactCorrectionUseCase @Inject constructor() {
         val validRr = preFiltered.filter { !it.second }.map { it.first }
 
         if (validRr.size < 10) {
-            return Result(validRr.toDoubleArray(), preFilterMask, preFilterMask.count { it })
+            // Return correctedNn and artifactMask with matching sizes (both based on validRr)
+            return Result(
+                correctedNn = validRr.toDoubleArray(),
+                artifactMask = BooleanArray(validRr.size),
+                artifactCount = preFilterMask.count { it }
+            )
         }
 
         val nn = validRr.toDoubleArray()

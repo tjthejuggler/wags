@@ -22,6 +22,7 @@ import com.example.wags.ui.breathing.BreathingScreen
 import com.example.wags.ui.dashboard.DashboardScreen
 import com.example.wags.ui.readiness.ReadinessScreen
 import com.example.wags.ui.session.SessionScreen
+import com.example.wags.ui.morning.MorningReadinessHistoryScreen
 import com.example.wags.ui.morning.MorningReadinessScreen
 import com.example.wags.ui.settings.SettingsScreen
 
@@ -34,6 +35,7 @@ object WagsRoutes {
     const val ADVANCED_APNEA = "advanced_apnea/{modality}/{length}"
     const val SESSION = "session/{sessionType}"
     const val MORNING_READINESS = "morning_readiness"
+    const val MORNING_READINESS_HISTORY = "morning_readiness_history"
     const val SETTINGS = "settings"
     const val SESSION_ANALYTICS = "session_analytics/{sessionId}"
     const val SESSION_ANALYTICS_HISTORY = "session_analytics_history"
@@ -92,7 +94,13 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             SettingsScreen(navController = navController)
         }
         composable(WagsRoutes.MORNING_READINESS) {
-            MorningReadinessScreen(onNavigateBack = { navController.popBackStack() })
+            MorningReadinessScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToHistory = { navController.navigate(WagsRoutes.MORNING_READINESS_HISTORY) }
+            )
+        }
+        composable(WagsRoutes.MORNING_READINESS_HISTORY) {
+            MorningReadinessHistoryScreen(onNavigateBack = { navController.popBackStack() })
         }
         composable(
             route = WagsRoutes.SESSION_ANALYTICS,
