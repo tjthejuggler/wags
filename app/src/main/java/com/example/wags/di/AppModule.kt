@@ -6,6 +6,7 @@ import com.example.wags.data.db.dao.ApneaRecordDao
 import com.example.wags.data.db.dao.ApneaSessionDao
 import com.example.wags.data.db.dao.ContractionDao
 import com.example.wags.data.db.dao.DailyReadingDao
+import com.example.wags.data.db.dao.FreeHoldTelemetryDao
 import com.example.wags.data.db.dao.MorningReadinessDao
 import com.example.wags.data.db.dao.SessionLogDao
 import com.example.wags.data.db.dao.TelemetryDao
@@ -34,8 +35,10 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideApneaRepository(dao: ApneaRecordDao): ApneaRepository =
-        ApneaRepository(dao)
+    fun provideApneaRepository(
+        dao: ApneaRecordDao,
+        telemetryDao: FreeHoldTelemetryDao
+    ): ApneaRepository = ApneaRepository(dao, telemetryDao)
 
     @Provides
     @Singleton

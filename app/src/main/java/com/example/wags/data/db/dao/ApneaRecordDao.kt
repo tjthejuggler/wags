@@ -15,7 +15,7 @@ interface ApneaRecordDao {
     @Query("SELECT * FROM apnea_records WHERE tableType = :type ORDER BY timestamp DESC")
     fun getByType(type: String): Flow<List<ApneaRecordEntity>>
 
-    /** Returns all free-hold records matching the given lung-volume + prep-type combination. */
+    /** Returns all records matching the given lung-volume + prep-type combination. */
     @Query("""
         SELECT * FROM apnea_records
         WHERE lungVolume = :lungVolume
@@ -32,4 +32,12 @@ interface ApneaRecordDao {
           AND tableType IS NULL
     """)
     fun getBestFreeHold(lungVolume: String, prepType: String): Flow<Long?>
+
+    /** Single record by primary key. */
+    @Query("SELECT * FROM apnea_records WHERE recordId = :recordId LIMIT 1")
+    suspend fun getById(recordId: Long): ApneaRecordEntity?
+
+    /** Permanently delete a record (CASCADE will remove its free_hold_telemetry rows). */
+    @Query("DELETE FROM apnea_records WHERE recordId = :recordId")
+    suspend fun deleteById(recordId: Long)
 }

@@ -17,9 +17,10 @@ import com.example.wags.data.db.entity.*
         MorningReadinessEntity::class,
         ApneaSessionEntity::class,
         ContractionEntity::class,
-        TelemetryEntity::class
+        TelemetryEntity::class,
+        FreeHoldTelemetryEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -32,6 +33,7 @@ abstract class WagsDatabase : RoomDatabase() {
     abstract fun apneaSessionDao(): ApneaSessionDao
     abstract fun contractionDao(): ContractionDao
     abstract fun telemetryDao(): TelemetryDao
+    abstract fun freeHoldTelemetryDao(): FreeHoldTelemetryDao
 
     companion object {
         /**
@@ -226,6 +228,25 @@ abstract class WagsDatabase : RoomDatabase() {
                 // 3. Swap tables
                 db.execSQL("DROP TABLE apnea_records")
                 db.execSQL("ALTER TABLE apnea_records_new RENAME TO apnea_records")
+            }
+        }
+
+        /**
+         * v6 → v7: Add free_hold_telemetry table for per-sample HR/SpO2 during free holds.
+         */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `free_hold_telemetry` (
+                        `id`           INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `recordId`     INTEGER NOT NULL,
+                        `timestampMs`  INTEGER NOT NULL,
+                        `heartRateBpm` INTEGER,
+                        `spO2`         INTEGER,
+                        FOREIGN KEY(`recordId`) REFERENCES `apnea_records`(`recordId`) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_free_hold_telemetry_recordId` ON `free_hold_telemetry` (`recordId`)")
             }
         }
     }

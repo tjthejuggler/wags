@@ -1,5 +1,6 @@
 package com.example.wags.ui.apnea
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -7,6 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -14,6 +16,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.ApneaSessionEntity
+import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -129,7 +132,12 @@ fun ApneaHistoryScreen(
                 }
             } else {
                 items(state.freeHoldRecords) { record ->
-                    FreeHoldHistoryRow(record = record)
+                    FreeHoldHistoryRow(
+                        record = record,
+                        onClick = {
+                            navController.navigate(WagsRoutes.apneaRecordDetail(record.recordId))
+                        }
+                    )
                 }
             }
 
@@ -162,12 +170,15 @@ fun ApneaHistoryScreen(
 }
 
 @Composable
-private fun FreeHoldHistoryRow(record: ApneaRecordEntity) {
+private fun FreeHoldHistoryRow(record: ApneaRecordEntity, onClick: () -> Unit) {
     val dateStr = remember(record.timestamp) {
         SimpleDateFormat("MMM d, yyyy  HH:mm", Locale.getDefault())
             .format(Date(record.timestamp))
     }
-    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+        modifier = Modifier.clickable(onClick = onClick)
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -187,19 +198,25 @@ private fun FreeHoldHistoryRow(record: ApneaRecordEntity) {
                     color = TextSecondary
                 )
             }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    record.lungVolume,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = TextSecondary
-                )
-                if (record.maxHrBpm > 0f) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        "HR ${record.minHrBpm.toInt()}–${record.maxHrBpm.toInt()} bpm",
-                        style = MaterialTheme.typography.labelSmall,
+                        record.lungVolume,
+                        style = MaterialTheme.typography.labelMedium,
                         color = TextSecondary
                     )
+                    if (record.maxHrBpm > 0f) {
+                        Text(
+                            "HR ${record.minHrBpm.toInt()}–${record.maxHrBpm.toInt()} bpm",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextSecondary
+                        )
+                    }
                 }
+                Text("›", style = MaterialTheme.typography.titleMedium, color = TextSecondary)
             }
         }
     }

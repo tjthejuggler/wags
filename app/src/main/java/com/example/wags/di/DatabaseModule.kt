@@ -8,6 +8,7 @@ import com.example.wags.data.db.dao.ApneaRecordDao
 import com.example.wags.data.db.dao.ApneaSessionDao
 import com.example.wags.data.db.dao.ContractionDao
 import com.example.wags.data.db.dao.DailyReadingDao
+import com.example.wags.data.db.dao.FreeHoldTelemetryDao
 import com.example.wags.data.db.dao.MorningReadinessDao
 import com.example.wags.data.db.dao.RfAssessmentDao
 import com.example.wags.data.db.dao.SessionLogDao
@@ -32,7 +33,8 @@ object DatabaseModule {
                 WagsDatabase.MIGRATION_2_3,
                 WagsDatabase.MIGRATION_3_4,
                 WagsDatabase.MIGRATION_4_5,
-                WagsDatabase.MIGRATION_5_6
+                WagsDatabase.MIGRATION_5_6,
+                WagsDatabase.MIGRATION_6_7
             )
             .build()
 
@@ -45,4 +47,5 @@ object DatabaseModule {
     @Provides fun provideApneaSessionDao(db: WagsDatabase): ApneaSessionDao = db.apneaSessionDao()
     @Provides fun provideContractionDao(db: WagsDatabase): ContractionDao = db.contractionDao()
     @Provides fun provideTelemetryDao(db: WagsDatabase): TelemetryDao = db.telemetryDao()
+    @Provides fun provideFreeHoldTelemetryDao(db: WagsDatabase): FreeHoldTelemetryDao = db.freeHoldTelemetryDao()
 }

@@ -1,5 +1,6 @@
 package com.example.wags.ui.apnea
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -16,7 +17,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.db.entity.ApneaRecordEntity
-import com.example.wags.domain.model.ApneaTableType
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TableDifficulty
 import com.example.wags.domain.model.TableLength
@@ -24,6 +24,9 @@ import com.example.wags.domain.model.TrainingModality
 import com.example.wags.ui.common.InfoHelpBubble
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
+import kotlinx.coroutines.delay
+import java.text.SimpleDateFormat
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,8 +74,8 @@ fun ApneaScreen(
                 freeHoldActive = state.freeHoldActive,
                 freeHoldDurationMs = state.freeHoldDurationMs,
                 bestTimeMs = state.bestTimeForSettingsMs,
-                showBestTime = state.showBestTime,
-                onShowBestTimeChange = { viewModel.setShowBestTime(it) },
+                showTimer = state.showTimer,
+                onShowTimerChange = { viewModel.setShowTimer(it) },
                 onStart = { viewModel.startFreeHold(deviceId) },
                 onStop = { viewModel.stopFreeHold() }
             )
@@ -106,16 +109,21 @@ fun ApneaScreen(
 
             HorizontalDivider(color = SurfaceVariant)
 
-            // ── 4. Recent Records ─────────────────────────────────────────
+            // ── 4. Recent Records (filtered by current settings) ──────────
             if (state.recentRecords.isNotEmpty()) {
-                RecentRecordsSection(records = state.recentRecords)
+                RecentRecordsSection(
+                    records = state.recentRecords,
+                    onRecordClick = { record ->
+                        navController.navigate(WagsRoutes.apneaRecordDetail(record.recordId))
+                    }
+                )
             }
         }
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Settings Section (moved to top, global for all features)
+// Settings Section (global for all features)
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -132,7 +140,7 @@ private fun ApneaSettingsSection(
         ) {
             Text("Settings", style = MaterialTheme.typography.titleLarge)
 
-            // Lung Volume — 3-chip toggle (Full / Partial / Empty)
+            // Lung Volume — 3-chip toggle
             Text("Lung Volume", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("FULL", "PARTIAL", "EMPTY").forEach { volume ->
@@ -168,11 +176,27 @@ private fun FreeHoldSection(
     freeHoldActive: Boolean,
     freeHoldDurationMs: Long,
     bestTimeMs: Long,
-    showBestTime: Boolean,
-    onShowBestTimeChange: (Boolean) -> Unit,
+    showTimer: Boolean,
+    onShowTimerChange: (Boolean) -> Unit,
     onStart: () -> Unit,
     onStop: () -> Unit
 ) {
+    // Live elapsed timer — ticks every 100ms while hold is active
+    var elapsedMs by remember { mutableLongStateOf(0L) }
+    val holdStartTime = remember { mutableLongStateOf(0L) }
+
+    LaunchedEffect(freeHoldActive) {
+        if (freeHoldActive) {
+            holdStartTime.longValue = System.currentTimeMillis()
+            while (true) {
+                elapsedMs = System.currentTimeMillis() - holdStartTime.longValue
+                delay(100L)
+            }
+        } else {
+            elapsedMs = 0L
+        }
+    }
+
     Card(colors = CardDefaults.cardColors(containerColor = SurfaceVariant)) {
         Column(
             modifier = Modifier
@@ -181,7 +205,7 @@ private fun FreeHoldSection(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Header row: "Best Time" title + "Show Time" checkbox
+            // Header row: "Best Time" title + "Show timer" checkbox
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -192,16 +216,16 @@ private fun FreeHoldSection(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text("Show time", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    Text("Show timer", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                     Checkbox(
-                        checked = showBestTime,
-                        onCheckedChange = onShowBestTimeChange
+                        checked = showTimer,
+                        onCheckedChange = onShowTimerChange
                     )
                 }
             }
 
-            // Best time display (only when showBestTime is checked and we have a value)
-            if (showBestTime && bestTimeMs > 0L) {
+            // Always show best time for current settings
+            if (bestTimeMs > 0L) {
                 Text(
                     "🏆 ${formatMs(bestTimeMs)}",
                     style = MaterialTheme.typography.headlineSmall,
@@ -211,11 +235,21 @@ private fun FreeHoldSection(
             }
 
             if (freeHoldActive) {
-                Text(
-                    "HOLD",
-                    style = MaterialTheme.typography.displayLarge,
-                    color = ApneaHold
-                )
+                // Live timer — only shown when showTimer is checked
+                if (showTimer) {
+                    Text(
+                        formatMs(elapsedMs),
+                        style = MaterialTheme.typography.displayLarge,
+                        color = ApneaHold,
+                        fontWeight = FontWeight.Bold
+                    )
+                } else {
+                    Text(
+                        "HOLD",
+                        style = MaterialTheme.typography.displayLarge,
+                        color = ApneaHold
+                    )
+                }
                 Button(
                     onClick = onStop,
                     colors = ButtonDefaults.buttonColors(
@@ -226,10 +260,8 @@ private fun FreeHoldSection(
                 ) { Text("Release") }
             } else {
                 if (freeHoldDurationMs > 0L) {
-                    val seconds = freeHoldDurationMs / 1000L
-                    val millis = (freeHoldDurationMs % 1000L) / 10L
                     Text(
-                        "Last: ${seconds}s ${millis}ms",
+                        "Last: ${formatMs(freeHoldDurationMs)}",
                         style = MaterialTheme.typography.headlineMedium,
                         color = EcgCyan
                     )
@@ -252,7 +284,7 @@ private fun formatMs(ms: Long): String {
     val minutes = totalSeconds / 60L
     val seconds = totalSeconds % 60L
     val centis = (ms % 1000L) / 10L
-    return if (minutes > 0) "${minutes}m ${seconds}s" else "${seconds}s ${centis}ms"
+    return if (minutes > 0) "${minutes}m ${seconds}s" else "${seconds}.${centis.toString().padStart(2, '0')}s"
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -382,7 +414,6 @@ private fun PersonalBestSection(
             HorizontalDivider(color = SurfaceVariant)
             Text("Advanced Modalities", style = MaterialTheme.typography.titleMedium)
 
-            // Progressive O2
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -394,7 +425,6 @@ private fun PersonalBestSection(
                 TableHelpIcon(title = PROGRESSIVE_O2_HELP_TITLE, text = PROGRESSIVE_O2_HELP_TEXT)
             }
 
-            // Min Breath
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -407,7 +437,6 @@ private fun PersonalBestSection(
                 TableHelpIcon(title = MIN_BREATH_HELP_TITLE, text = MIN_BREATH_HELP_TEXT)
             }
 
-            // Wonka: Till Contraction
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -419,7 +448,6 @@ private fun PersonalBestSection(
                 TableHelpIcon(title = WONKA_HELP_TITLE, text = WONKA_HELP_TEXT)
             }
 
-            // Wonka: Endurance
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -441,6 +469,82 @@ private fun PersonalBestSection(
             }
         }
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Recent Records Section (settings-filtered, clickable)
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun RecentRecordsSection(
+    records: List<ApneaRecordEntity>,
+    onRecordClick: (ApneaRecordEntity) -> Unit
+) {
+    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("Recent Records", style = MaterialTheme.typography.titleLarge)
+            records.take(10).forEach { record ->
+                RecentRecordRow(record = record, onClick = { onRecordClick(record) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecentRecordRow(
+    record: ApneaRecordEntity,
+    onClick: () -> Unit
+) {
+    val dateStr = remember(record.timestamp) {
+        SimpleDateFormat("MMM d  HH:mm", Locale.getDefault()).format(Date(record.timestamp))
+    }
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        color = Color.Transparent
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    formatMs(record.durationMs),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = EcgCyan,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    dateStr,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondary
+                )
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    record.tableType ?: "Free Hold",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TextSecondary
+                )
+                Text(
+                    "›",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextSecondary
+                )
+            }
+        }
+    }
+    HorizontalDivider(color = SurfaceVariant.copy(alpha = 0.5f))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -468,33 +572,5 @@ private fun TableHelpIcon(title: String, text: String) {
                 TextButton(onClick = { showDialog = false }) { Text("Got it") }
             }
         )
-    }
-}
-
-@Composable
-private fun RecentRecordsSection(records: List<ApneaRecordEntity>) {
-    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text("Recent Records", style = MaterialTheme.typography.titleLarge)
-            records.take(5).forEach { record ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        "${record.durationMs / 1000L}s — ${record.lungVolume}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        record.tableType ?: "Free",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = TextSecondary
-                    )
-                }
-            }
-        }
     }
 }

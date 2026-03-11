@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.PolarBleManager
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.ApneaSessionEntity
+import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
 import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.data.repository.ApneaSessionRepository
 import com.example.wags.domain.model.ApneaTable
@@ -40,7 +41,8 @@ data class ApneaUiState(
     val freeHoldDurationMs: Long = 0L,
     val selectedLungVolume: String = "FULL",
     val prepType: PrepType = PrepType.NO_PREP,
-    val showBestTime: Boolean = true,
+    /** When true, a live elapsed-time counter is shown during the breath hold. */
+    val showTimer: Boolean = true,
     /** Best free-hold for the current lungVolume + prepType combination (from DB). */
     val bestTimeForSettingsMs: Long = 0L,
     val selectedLength: TableLength = TableLength.MEDIUM,
@@ -69,7 +71,7 @@ class ApneaViewModel @Inject constructor(
 
     private var freeHoldStartTime = 0L
 
-    // Separate flows for the two settings that drive the best-time query
+    // Separate flows for the two settings that drive the best-time / filtered-records queries
     private val _lungVolume = MutableStateFlow("FULL")
     private val _prepType   = MutableStateFlow(PrepType.NO_PREP)
 
@@ -80,11 +82,6 @@ class ApneaViewModel @Inject constructor(
             _uiState.update { it.copy(personalBestMs = savedPb) }
         }
 
-        viewModelScope.launch {
-            apneaRepository.getLatestRecords(20).collect { records ->
-                _uiState.update { it.copy(recentRecords = records) }
-            }
-        }
         viewModelScope.launch {
             stateMachine.state.collect { state ->
                 _uiState.update { it.copy(apneaState = state) }
@@ -102,12 +99,21 @@ class ApneaViewModel @Inject constructor(
             }
         }
 
-        // Whenever lungVolume or prepType changes, re-subscribe to the best-time query
+        // Whenever lungVolume or prepType changes, re-subscribe to best-time query
         viewModelScope.launch {
             combine(_lungVolume, _prepType) { lv, pt -> lv to pt }
                 .collectLatest { (lv, pt) ->
                     apneaRepository.getBestFreeHold(lv, pt.name).collect { best ->
                         _uiState.update { it.copy(bestTimeForSettingsMs = best ?: 0L) }
+                    }
+                }
+        }
+        // Whenever lungVolume or prepType changes, re-subscribe to filtered records
+        viewModelScope.launch {
+            combine(_lungVolume, _prepType) { lv, pt -> lv to pt }
+                .collectLatest { (lv, pt) ->
+                    apneaRepository.getBySettings(lv, pt.name).collect { records ->
+                        _uiState.update { it.copy(recentRecords = records) }
                     }
                 }
         }
@@ -254,14 +260,18 @@ class ApneaViewModel @Inject constructor(
 
     private fun saveFreeHoldRecord(durationMs: Long) {
         viewModelScope.launch {
+            // Snapshot the RR buffer — each value is an RR interval in ms
             val rrSnapshot = bleManager.rrBuffer.readLast(512)
             val hrValues = rrSnapshot.map { 60_000.0 / it }
             val minHr = hrValues.minOrNull()?.toFloat() ?: 0f
             val maxHr = hrValues.maxOrNull()?.toFloat() ?: 0f
             val state = _uiState.value
-            apneaRepository.saveRecord(
+            val now = System.currentTimeMillis()
+
+            // Save the summary record and get its generated ID
+            val recordId = apneaRepository.saveRecord(
                 ApneaRecordEntity(
-                    timestamp = System.currentTimeMillis(),
+                    timestamp = now,
                     durationMs = durationMs,
                     lungVolume = state.selectedLungVolume,
                     prepType = state.prepType.name,
@@ -270,6 +280,31 @@ class ApneaViewModel @Inject constructor(
                     tableType = null
                 )
             )
+
+            // Build per-sample telemetry from the RR snapshot.
+            // We reconstruct approximate timestamps by working backwards from `now`.
+            // Each RR interval tells us how long ago the previous beat was.
+            if (rrSnapshot.isNotEmpty() && recordId > 0) {
+                val samples = mutableListOf<FreeHoldTelemetryEntity>()
+                var sampleTime = freeHoldStartTime
+                var cumulativeMs = 0L
+                for (rrMs in rrSnapshot) {
+                    cumulativeMs += rrMs.toLong()
+                    if (cumulativeMs > durationMs) break   // don't include beats after release
+                    val bpm = (60_000.0 / rrMs).toInt()
+                    samples.add(
+                        FreeHoldTelemetryEntity(
+                            recordId = recordId,
+                            timestampMs = sampleTime + cumulativeMs,
+                            heartRateBpm = bpm,
+                            spO2 = null   // SpO2 not yet wired for free holds
+                        )
+                    )
+                }
+                if (samples.isNotEmpty()) {
+                    apneaRepository.saveTelemetry(samples)
+                }
+            }
         }
     }
 
@@ -283,8 +318,8 @@ class ApneaViewModel @Inject constructor(
         _uiState.update { it.copy(prepType = type) }
     }
 
-    fun setShowBestTime(show: Boolean) {
-        _uiState.update { it.copy(showBestTime = show) }
+    fun setShowTimer(show: Boolean) {
+        _uiState.update { it.copy(showTimer = show) }
     }
 
     override fun onCleared() {
