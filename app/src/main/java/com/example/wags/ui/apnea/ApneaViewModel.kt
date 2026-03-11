@@ -3,6 +3,7 @@ package com.example.wags.ui.apnea
 import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.wags.data.ble.OximeterBleManager
 import com.example.wags.data.ble.PolarBleManager
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.ApneaSessionEntity
@@ -11,6 +12,7 @@ import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.data.repository.ApneaSessionRepository
 import com.example.wags.domain.model.ApneaTable
 import com.example.wags.domain.model.ApneaTableType
+import com.example.wags.domain.model.OximeterReading
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TableDifficulty
 import com.example.wags.domain.model.TableLength
@@ -19,6 +21,7 @@ import com.example.wags.domain.usecase.apnea.ApneaState
 import com.example.wags.domain.usecase.apnea.ApneaStateMachine
 import com.example.wags.domain.usecase.apnea.ApneaTableGenerator
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -52,12 +55,16 @@ data class ApneaUiState(
     val contractionCount: Int = 0,
     val firstContractionElapsedMs: Long? = null,
     val currentRoundStartMs: Long = 0L,
-    val lastHoldDurationMs: Long = 0L
+    val lastHoldDurationMs: Long = 0L,
+    // Live oximeter readings (null when oximeter not connected / no data yet)
+    val liveOxHr: Int? = null,
+    val liveOxSpO2: Int? = null,
 )
 
 @HiltViewModel
 class ApneaViewModel @Inject constructor(
     private val bleManager: PolarBleManager,
+    private val oximeterBleManager: OximeterBleManager,
     private val apneaRepository: ApneaRepository,
     private val sessionRepository: ApneaSessionRepository,
     private val tableGenerator: ApneaTableGenerator,
@@ -71,6 +78,13 @@ class ApneaViewModel @Inject constructor(
 
     private var freeHoldStartTime = 0L
 
+    /**
+     * Timestamped oximeter readings collected while a free hold is active.
+     * Each entry is (epochMs, OximeterReading). Cleared at the start of each hold.
+     */
+    private val oximeterSamples = mutableListOf<Pair<Long, OximeterReading>>()
+    private var oximeterCollectionJob: Job? = null
+
     // Separate flows for the two settings that drive the best-time / filtered-records queries
     private val _lungVolume = MutableStateFlow("FULL")
     private val _prepType   = MutableStateFlow(PrepType.NO_PREP)
@@ -80,6 +94,18 @@ class ApneaViewModel @Inject constructor(
         val savedPb = prefs.getLong("pb_ms", 0L)
         if (savedPb > 0L) {
             _uiState.update { it.copy(personalBestMs = savedPb) }
+        }
+
+        // Mirror live oximeter readings into UI state so the screen can show them
+        viewModelScope.launch {
+            oximeterBleManager.liveHr.collect { hr ->
+                _uiState.update { it.copy(liveOxHr = hr) }
+            }
+        }
+        viewModelScope.launch {
+            oximeterBleManager.liveSpO2.collect { spo2 ->
+                _uiState.update { it.copy(liveOxSpO2 = spo2) }
+            }
         }
 
         viewModelScope.launch {
@@ -249,26 +275,53 @@ class ApneaViewModel @Inject constructor(
         bleManager.startRrStream(deviceId)
         freeHoldStartTime = System.currentTimeMillis()
         _uiState.update { it.copy(freeHoldActive = true, freeHoldDurationMs = 0L) }
+
+        // Start collecting oximeter readings for this hold
+        oximeterSamples.clear()
+        oximeterCollectionJob?.cancel()
+        oximeterCollectionJob = viewModelScope.launch {
+            oximeterBleManager.readings.collect { reading ->
+                oximeterSamples.add(System.currentTimeMillis() to reading)
+            }
+        }
     }
 
     fun stopFreeHold() {
         val duration = System.currentTimeMillis() - freeHoldStartTime
+        // Stop collecting oximeter readings before saving so the snapshot is stable
+        oximeterCollectionJob?.cancel()
+        oximeterCollectionJob = null
         _uiState.update { it.copy(freeHoldActive = false, freeHoldDurationMs = duration) }
         audioHapticEngine.vibrateHoldEnd()
         saveFreeHoldRecord(duration)
     }
 
     private fun saveFreeHoldRecord(durationMs: Long) {
+        // Take a stable snapshot of the oximeter samples collected during this hold
+        val oxSnapshot = oximeterSamples.toList()
+        oximeterSamples.clear()
+
         viewModelScope.launch {
-            // Snapshot the RR buffer — each value is an RR interval in ms
+            // ── Polar RR-derived HR samples ───────────────────────────────────
             val rrSnapshot = bleManager.rrBuffer.readLast(512)
-            val hrValues = rrSnapshot.map { 60_000.0 / it }
-            val minHr = hrValues.minOrNull()?.toFloat() ?: 0f
-            val maxHr = hrValues.maxOrNull()?.toFloat() ?: 0f
+            val rrHrValues = rrSnapshot.map { 60_000.0 / it }
+            val minHrFromRr = rrHrValues.minOrNull()?.toFloat() ?: 0f
+            val maxHrFromRr = rrHrValues.maxOrNull()?.toFloat() ?: 0f
+
+            // ── Oximeter-derived aggregates ───────────────────────────────────
+            val oxHrValues  = oxSnapshot.map { it.second.heartRateBpm.toFloat() }
+            val oxSpO2Values = oxSnapshot.map { it.second.spO2.toFloat() }
+            val maxHrFromOx  = oxHrValues.maxOrNull() ?: 0f
+            val lowestSpO2   = oxSpO2Values.minOrNull()?.toInt()
+
+            // Prefer Polar for HR aggregates; fall back to oximeter
+            val minHr = if (minHrFromRr > 0f) minHrFromRr else oxHrValues.minOrNull() ?: 0f
+            val maxHr = if (maxHrFromRr > 0f) maxHrFromRr else maxHrFromOx
+
             val state = _uiState.value
             val now = System.currentTimeMillis()
 
-            // Save the summary record and get its generated ID
+            // ── Save summary record ───────────────────────────────────────────
             val recordId = apneaRepository.saveRecord(
                 ApneaRecordEntity(
                     timestamp = now,
@@ -277,33 +330,52 @@ class ApneaViewModel @Inject constructor(
                     prepType = state.prepType.name,
                     minHrBpm = minHr,
                     maxHrBpm = maxHr,
+                    lowestSpO2 = lowestSpO2,
                     tableType = null
                 )
             )
 
-            // Build per-sample telemetry from the RR snapshot.
-            // We reconstruct approximate timestamps by working backwards from `now`.
-            // Each RR interval tells us how long ago the previous beat was.
-            if (rrSnapshot.isNotEmpty() && recordId > 0) {
-                val samples = mutableListOf<FreeHoldTelemetryEntity>()
-                var sampleTime = freeHoldStartTime
+            if (recordId <= 0) return@launch
+
+            val samples = mutableListOf<FreeHoldTelemetryEntity>()
+
+            // ── Polar RR → per-beat HR telemetry ─────────────────────────────
+            if (rrSnapshot.isNotEmpty()) {
                 var cumulativeMs = 0L
                 for (rrMs in rrSnapshot) {
                     cumulativeMs += rrMs.toLong()
-                    if (cumulativeMs > durationMs) break   // don't include beats after release
+                    if (cumulativeMs > durationMs) break
                     val bpm = (60_000.0 / rrMs).toInt()
                     samples.add(
                         FreeHoldTelemetryEntity(
                             recordId = recordId,
-                            timestampMs = sampleTime + cumulativeMs,
+                            timestampMs = freeHoldStartTime + cumulativeMs,
                             heartRateBpm = bpm,
-                            spO2 = null   // SpO2 not yet wired for free holds
+                            spO2 = null
                         )
                     )
                 }
-                if (samples.isNotEmpty()) {
-                    apneaRepository.saveTelemetry(samples)
-                }
+            }
+
+            // ── Oximeter → HR + SpO2 telemetry ───────────────────────────────
+            // Each oximeter sample is stored as a separate row so the detail
+            // screen can plot both HR and SpO2 over time.
+            for ((timestampMs, reading) in oxSnapshot) {
+                // Only include samples that fall within the hold window
+                if (timestampMs < freeHoldStartTime) continue
+                if (timestampMs > freeHoldStartTime + durationMs) continue
+                samples.add(
+                    FreeHoldTelemetryEntity(
+                        recordId = recordId,
+                        timestampMs = timestampMs,
+                        heartRateBpm = reading.heartRateBpm,
+                        spO2 = reading.spO2
+                    )
+                )
+            }
+
+            if (samples.isNotEmpty()) {
+                apneaRepository.saveTelemetry(samples)
             }
         }
     }

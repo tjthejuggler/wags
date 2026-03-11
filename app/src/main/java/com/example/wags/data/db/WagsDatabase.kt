@@ -20,7 +20,7 @@ import com.example.wags.data.db.entity.*
         TelemetryEntity::class,
         FreeHoldTelemetryEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -247,6 +247,17 @@ abstract class WagsDatabase : RoomDatabase() {
                     )
                 """.trimIndent())
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_free_hold_telemetry_recordId` ON `free_hold_telemetry` (`recordId`)")
+            }
+        }
+
+        /**
+         * v7 → v8: Add lowestSpO2 column to apnea_records.
+         * Populated from oximeter data when a pulse oximeter is connected during a free hold.
+         * NULL for older records that pre-date oximeter support.
+         */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE apnea_records ADD COLUMN lowestSpO2 INTEGER DEFAULT NULL")
             }
         }
     }

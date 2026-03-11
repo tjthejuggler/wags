@@ -75,6 +75,8 @@ fun ApneaScreen(
                 freeHoldDurationMs = state.freeHoldDurationMs,
                 bestTimeMs = state.bestTimeForSettingsMs,
                 showTimer = state.showTimer,
+                liveOxHr = state.liveOxHr,
+                liveOxSpO2 = state.liveOxSpO2,
                 onShowTimerChange = { viewModel.setShowTimer(it) },
                 onStart = { viewModel.startFreeHold(deviceId) },
                 onStop = { viewModel.stopFreeHold() }
@@ -177,6 +179,8 @@ private fun FreeHoldSection(
     freeHoldDurationMs: Long,
     bestTimeMs: Long,
     showTimer: Boolean,
+    liveOxHr: Int?,
+    liveOxSpO2: Int?,
     onShowTimerChange: (Boolean) -> Unit,
     onStart: () -> Unit,
     onStop: () -> Unit
@@ -250,6 +254,46 @@ private fun FreeHoldSection(
                         color = ApneaHold
                     )
                 }
+
+                // Live oximeter readout — shown whenever the oximeter is streaming
+                if (liveOxHr != null || liveOxSpO2 != null) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(24.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        liveOxHr?.let { hr ->
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    "$hr",
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    color = EcgCyan,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    "bpm",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = TextSecondary
+                                )
+                            }
+                        }
+                        liveOxSpO2?.let { spo2 ->
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    "$spo2%",
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    color = Color(0xFF42A5F5),
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    "SpO₂",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = TextSecondary
+                                )
+                            }
+                        }
+                    }
+                }
+
                 Button(
                     onClick = onStop,
                     colors = ButtonDefaults.buttonColors(

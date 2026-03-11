@@ -179,6 +179,14 @@ private fun RecordDetailContent(
                         .replaceFirstChar { it.uppercase() }
                 )
                 DetailRow(label = "Type", value = record.tableType ?: "Free Hold")
+                record.lowestSpO2?.let { spo2 ->
+                    DetailRow(
+                        label = "Lowest SpO₂",
+                        value = "$spo2%",
+                        valueColor = SpO2Blue,
+                        valueBold = true
+                    )
+                }
             }
         }
 
