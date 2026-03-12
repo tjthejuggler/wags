@@ -1,26 +1,20 @@
 package com.example.wags.ui.settings
 
 import android.bluetooth.le.ScanResult
-import android.content.Context
-import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.wags.data.ble.DevicePreferencesRepository
 import com.example.wags.data.ble.OximeterBleManager
 import com.example.wags.data.ble.PolarBleManager
 import com.example.wags.domain.model.BleConnectionState
 import com.example.wags.domain.model.OximeterConnectionState
 import com.polar.sdk.api.model.PolarDeviceInfo
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
-
-private const val PREFS_NAME = "wags_device_prefs"
-private const val KEY_H10_ID = "h10_device_id"
-private const val KEY_VERITY_ID = "verity_device_id"
 
 data class SettingsUiState(
     val h10State: BleConnectionState = BleConnectionState.Disconnected,
@@ -31,18 +25,23 @@ data class SettingsUiState(
     val polarScanResults: List<PolarDeviceInfo> = emptyList(),
     val oximeterScanResults: List<ScanResult> = emptyList(),
     val savedH10Id: String = "",
-    val savedVerityId: String = ""
+    val savedVerityId: String = "",
+    // Morning default (3 am – 11 am)
+    val morningDeviceId: String = "",
+    val morningDeviceType: String = "",
+    val morningDeviceName: String = "",
+    // Day default (11 am – 3 am)
+    val dayDeviceId: String = "",
+    val dayDeviceType: String = "",
+    val dayDeviceName: String = ""
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    @ApplicationContext private val context: Context,
+    private val devicePrefs: DevicePreferencesRepository,
     private val bleManager: PolarBleManager,
     private val oximeterBleManager: OximeterBleManager
 ) : ViewModel() {
-
-    private val prefs: SharedPreferences =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     val uiState: StateFlow<SettingsUiState> = combine(
         bleManager.h10State,
@@ -50,7 +49,8 @@ class SettingsViewModel @Inject constructor(
         bleManager.isScanning,
         bleManager.scanResults,
         oximeterBleManager.connectionState,
-        oximeterBleManager.scanResults
+        oximeterBleManager.scanResults,
+        devicePrefs.snapshot
     ) { args ->
         @Suppress("UNCHECKED_CAST")
         val h10State        = args[0] as BleConnectionState
@@ -62,25 +62,38 @@ class SettingsViewModel @Inject constructor(
         val oximeterState   = args[4] as OximeterConnectionState
         @Suppress("UNCHECKED_CAST")
         val oximeterResults = args[5] as List<ScanResult>
+        val snap            = args[6] as com.example.wags.data.ble.DevicePrefsSnapshot
 
         val oximeterScanning = oximeterState is OximeterConnectionState.Scanning
 
         SettingsUiState(
-            h10State = h10State,
-            verityState = verityState,
-            oximeterState = oximeterState,
-            isScanning = polarScanning || oximeterScanning,
-            polarScanResults = polarResults,
+            h10State           = h10State,
+            verityState        = verityState,
+            oximeterState      = oximeterState,
+            isScanning         = polarScanning || oximeterScanning,
+            polarScanResults   = polarResults,
             oximeterScanResults = oximeterResults,
-            savedH10Id = prefs.getString(KEY_H10_ID, "") ?: "",
-            savedVerityId = prefs.getString(KEY_VERITY_ID, "") ?: ""
+            savedH10Id         = snap.savedH10Id,
+            savedVerityId      = snap.savedVerityId,
+            morningDeviceId    = snap.morningDeviceId,
+            morningDeviceType  = snap.morningDeviceType,
+            morningDeviceName  = snap.morningDeviceName,
+            dayDeviceId        = snap.dayDeviceId,
+            dayDeviceType      = snap.dayDeviceType,
+            dayDeviceName      = snap.dayDeviceName
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = SettingsUiState(
-            savedH10Id = prefs.getString(KEY_H10_ID, "") ?: "",
-            savedVerityId = prefs.getString(KEY_VERITY_ID, "") ?: ""
+            savedH10Id        = devicePrefs.savedH10Id,
+            savedVerityId     = devicePrefs.savedVerityId,
+            morningDeviceId   = devicePrefs.morningDeviceId,
+            morningDeviceType = devicePrefs.morningDeviceType,
+            morningDeviceName = devicePrefs.morningDeviceName,
+            dayDeviceId       = devicePrefs.dayDeviceId,
+            dayDeviceType     = devicePrefs.dayDeviceType,
+            dayDeviceName     = devicePrefs.dayDeviceName
         )
     )
 
@@ -101,40 +114,87 @@ class SettingsViewModel @Inject constructor(
     // ── Polar connections ─────────────────────────────────────────────────────
 
     fun connectH10(device: PolarDeviceInfo) {
-        // Disconnect oximeter first — only one HR source at a time
         oximeterBleManager.disconnect()
-        prefs.edit().putString(KEY_H10_ID, device.deviceId).apply()
+        devicePrefs.savedH10Id = device.deviceId
+        devicePrefs.refresh()
         bleManager.connectDevice(device.deviceId, isH10 = true)
     }
 
     fun connectVerity(device: PolarDeviceInfo) {
-        // Disconnect oximeter first — only one HR source at a time
         oximeterBleManager.disconnect()
-        prefs.edit().putString(KEY_VERITY_ID, device.deviceId).apply()
+        devicePrefs.savedVerityId = device.deviceId
+        devicePrefs.refresh()
         bleManager.connectDevice(device.deviceId, isH10 = false)
     }
 
     fun disconnectH10() {
-        val id = prefs.getString(KEY_H10_ID, "") ?: ""
+        val id = devicePrefs.savedH10Id
         if (id.isNotBlank()) bleManager.disconnectDevice(id)
     }
 
     fun disconnectVerity() {
-        val id = prefs.getString(KEY_VERITY_ID, "") ?: ""
+        val id = devicePrefs.savedVerityId
         if (id.isNotBlank()) bleManager.disconnectDevice(id)
     }
 
     // ── Oximeter connections ──────────────────────────────────────────────────
 
-    fun connectOximeter(address: String) {
+    fun connectOximeter(address: String, name: String = "") {
         stopScan()
-        // Disconnect Polar devices first — only one HR source at a time
         disconnectH10()
         disconnectVerity()
+        devicePrefs.savedOximeterAddress = address
+        devicePrefs.refresh()
         oximeterBleManager.connect(address)
     }
 
     fun disconnectOximeter() = oximeterBleManager.disconnect()
+
+    // ── Morning default ───────────────────────────────────────────────────────
+
+    fun setMorningDefaultPolar(device: PolarDeviceInfo, isH10: Boolean) {
+        devicePrefs.morningDeviceId   = device.deviceId
+        devicePrefs.morningDeviceType = if (isH10) "h10" else "verity"
+        devicePrefs.morningDeviceName = device.name.ifBlank { device.deviceId }
+        devicePrefs.refresh()
+    }
+
+    fun setMorningDefaultOximeter(address: String, name: String) {
+        devicePrefs.morningDeviceId   = address
+        devicePrefs.morningDeviceType = "oximeter"
+        devicePrefs.morningDeviceName = name.ifBlank { address }
+        devicePrefs.refresh()
+    }
+
+    fun clearMorningDefault() {
+        devicePrefs.morningDeviceId   = ""
+        devicePrefs.morningDeviceType = ""
+        devicePrefs.morningDeviceName = ""
+        devicePrefs.refresh()
+    }
+
+    // ── Day default ───────────────────────────────────────────────────────────
+
+    fun setDayDefaultPolar(device: PolarDeviceInfo, isH10: Boolean) {
+        devicePrefs.dayDeviceId   = device.deviceId
+        devicePrefs.dayDeviceType = if (isH10) "h10" else "verity"
+        devicePrefs.dayDeviceName = device.name.ifBlank { device.deviceId }
+        devicePrefs.refresh()
+    }
+
+    fun setDayDefaultOximeter(address: String, name: String) {
+        devicePrefs.dayDeviceId   = address
+        devicePrefs.dayDeviceType = "oximeter"
+        devicePrefs.dayDeviceName = name.ifBlank { address }
+        devicePrefs.refresh()
+    }
+
+    fun clearDayDefault() {
+        devicePrefs.dayDeviceId   = ""
+        devicePrefs.dayDeviceType = ""
+        devicePrefs.dayDeviceName = ""
+        devicePrefs.refresh()
+    }
 
     override fun onCleared() {
         stopScan()
