@@ -20,8 +20,11 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -46,7 +49,9 @@ data class SessionUiState(
     val monitorId: String? = null,
     /** ID of the currently connected BLE device (pre-session), null if none. */
     val connectedDeviceId: String? = null,
-    val hasHrMonitor: Boolean = false
+    val hasHrMonitor: Boolean = false,
+    val liveHr: Int? = null,
+    val liveSpO2: Int? = null
 )
 
 @HiltViewModel
@@ -63,7 +68,17 @@ class SessionViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SessionUiState())
-    val uiState: StateFlow<SessionUiState> = _uiState.asStateFlow()
+    val uiState: StateFlow<SessionUiState> = combine(
+        _uiState,
+        hrDataSource.liveHr,
+        hrDataSource.liveSpO2
+    ) { state, hr, spo2 ->
+        state.copy(liveHr = hr, liveSpO2 = spo2)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = SessionUiState()
+    )
 
     private var sessionJob: Job? = null
     private var sessionStartMs = 0L

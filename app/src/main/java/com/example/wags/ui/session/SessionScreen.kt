@@ -13,6 +13,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.domain.model.SessionType
+import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -33,11 +34,19 @@ fun SessionScreen(
         containerColor = BackgroundDark,
         topBar = {
             TopAppBar(
-                title = { Text(parsedType.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                title = {
+                    Text(
+                        parsedType.name.lowercase().replaceFirstChar { it.uppercase() },
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
                     }
+                },
+                actions = {
+                    LiveSensorActions(liveHr = state.liveHr, liveSpO2 = state.liveSpO2)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )

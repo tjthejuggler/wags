@@ -15,6 +15,7 @@ import androidx.navigation.NavController
 import com.example.wags.domain.model.HrvMetrics
 import com.example.wags.domain.model.ReadinessInterpretation
 import com.example.wags.domain.model.ReadinessScore
+import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,13 +33,14 @@ fun ReadinessScreen(
         containerColor = BackgroundDark,
         topBar = {
             TopAppBar(
-                title = { Text("HRV Readiness") },
+                title = { Text("HRV Readiness", style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
                     }
                 },
                 actions = {
+                    LiveSensorActions(liveHr = state.liveHr, liveSpO2 = state.liveSpO2)
                     TextButton(onClick = onNavigateToHistory) {
                         Text("History", color = EcgCyan)
                     }
@@ -58,8 +60,7 @@ fun ReadinessScreen(
         ) {
             when (state.sessionState) {
                 ReadinessSessionState.IDLE -> IdleContent(
-                    onStart = { viewModel.startSession(deviceId, 120L) },
-                    onHistory = onNavigateToHistory
+                    onStart = { viewModel.startSession(deviceId, 120L) }
                 )
                 ReadinessSessionState.RECORDING -> RecordingContent(
                     state = state,
@@ -68,8 +69,7 @@ fun ReadinessScreen(
                 ReadinessSessionState.PROCESSING -> ProcessingContent()
                 ReadinessSessionState.COMPLETE -> CompleteContent(
                     state = state,
-                    onReset = { viewModel.reset() },
-                    onHistory = onNavigateToHistory
+                    onReset = { viewModel.reset() }
                 )
                 ReadinessSessionState.ERROR -> ErrorContent(
                     message = state.errorMessage ?: "Unknown error",
@@ -81,7 +81,7 @@ fun ReadinessScreen(
 }
 
 @Composable
-private fun IdleContent(onStart: () -> Unit, onHistory: () -> Unit) {
+private fun IdleContent(onStart: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -94,13 +94,6 @@ private fun IdleContent(onStart: () -> Unit, onHistory: () -> Unit) {
         )
         Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
             Text("Start 2-Minute Session")
-        }
-        OutlinedButton(
-            onClick = onHistory,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = EcgCyan)
-        ) {
-            Text("View History")
         }
     }
 }
@@ -155,8 +148,7 @@ private fun ProcessingContent() {
 @Composable
 private fun CompleteContent(
     state: ReadinessUiState,
-    onReset: () -> Unit,
-    onHistory: () -> Unit
+    onReset: () -> Unit
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -170,13 +162,6 @@ private fun CompleteContent(
         }
         Button(onClick = onReset, modifier = Modifier.fillMaxWidth()) {
             Text("New Session")
-        }
-        OutlinedButton(
-            onClick = onHistory,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = EcgCyan)
-        ) {
-            Text("View History")
         }
     }
 }

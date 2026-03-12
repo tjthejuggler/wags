@@ -141,74 +141,6 @@ fun SettingsScreen(
                 )
             }
 
-            // ── Time-of-day defaults ───────────────────────────────────────
-            item {
-                TimeOfDayDefaultsCard(
-                    morningDeviceName = state.morningDeviceName,
-                    morningDeviceType = state.morningDeviceType,
-                    dayDeviceName = state.dayDeviceName,
-                    dayDeviceType = state.dayDeviceType,
-                    onAssignMorning = {
-                        assigningSlot = DefaultSlot.MORNING
-                        requestScan()
-                    },
-                    onClearMorning = { viewModel.clearMorningDefault() },
-                    onAssignDay = {
-                        assigningSlot = DefaultSlot.DAY
-                        requestScan()
-                    },
-                    onClearDay = { viewModel.clearDayDefault() }
-                )
-            }
-
-            // ── Tail App integration ───────────────────────────────────────
-            item {
-                TailAppIntegrationCard(
-                    habitList               = state.habitList,
-                    isLoading               = state.isLoadingHabits,
-                    habitAppUnavailable     = state.habitAppUnavailable,
-                    freeHoldHabit           = state.freeHoldHabit,
-                    apneaNewRecordHabit     = state.apneaNewRecordHabit,
-                    tableTrainingHabit      = state.tableTrainingHabit,
-                    morningReadinessHabit   = state.morningReadinessHabit,
-                    hrvReadinessHabit       = state.hrvReadinessHabit,
-                    resonanceBreathingHabit = state.resonanceBreathingHabit,
-                    onSelectHabit           = { slot, entry -> viewModel.selectHabit(slot, entry) },
-                    onClearHabit            = { slot -> viewModel.clearHabit(slot) },
-                    onRefresh               = { viewModel.loadHabits() }
-                )
-            }
-
-            // ── Assigning-slot banner ──────────────────────────────────────
-            if (assigningSlot != DefaultSlot.NONE) {
-                item {
-                    val slotLabel = if (assigningSlot == DefaultSlot.MORNING) "Morning (3am–11am)" else "Day (11am–3am)"
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = EcgCyan.copy(alpha = 0.15f)
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "Tap a device below to set as $slotLabel default",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = EcgCyan,
-                                modifier = Modifier.weight(1f)
-                            )
-                            TextButton(onClick = { assigningSlot = DefaultSlot.NONE }) {
-                                Text("Cancel", color = TextSecondary)
-                            }
-                        }
-                    }
-                }
-            }
-
             // ── Single unified scan button ─────────────────────────────────
             item {
                 Row(
@@ -327,6 +259,74 @@ fun SettingsScreen(
                         assigningSlot = DefaultSlot.NONE
                         viewModel.stopScan()
                     }
+                )
+            }
+
+            // ── Assigning-slot banner ──────────────────────────────────────
+            if (assigningSlot != DefaultSlot.NONE) {
+                item {
+                    val slotLabel = if (assigningSlot == DefaultSlot.MORNING) "Morning (3am–11am)" else "Day (11am–3am)"
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = EcgCyan.copy(alpha = 0.15f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Tap a device below to set as $slotLabel default",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = EcgCyan,
+                                modifier = Modifier.weight(1f)
+                            )
+                            TextButton(onClick = { assigningSlot = DefaultSlot.NONE }) {
+                                Text("Cancel", color = TextSecondary)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Time-of-day defaults ───────────────────────────────────────
+            item {
+                TimeOfDayDefaultsCard(
+                    morningDeviceName = state.morningDeviceName,
+                    morningDeviceType = state.morningDeviceType,
+                    dayDeviceName = state.dayDeviceName,
+                    dayDeviceType = state.dayDeviceType,
+                    onAssignMorning = {
+                        assigningSlot = DefaultSlot.MORNING
+                        requestScan()
+                    },
+                    onClearMorning = { viewModel.clearMorningDefault() },
+                    onAssignDay = {
+                        assigningSlot = DefaultSlot.DAY
+                        requestScan()
+                    },
+                    onClearDay = { viewModel.clearDayDefault() }
+                )
+            }
+
+            // ── Tail App integration ───────────────────────────────────────
+            item {
+                TailAppIntegrationCard(
+                    habitList               = state.habitList,
+                    isLoading               = state.isLoadingHabits,
+                    habitAppUnavailable     = state.habitAppUnavailable,
+                    freeHoldHabit           = state.freeHoldHabit,
+                    apneaNewRecordHabit     = state.apneaNewRecordHabit,
+                    tableTrainingHabit      = state.tableTrainingHabit,
+                    morningReadinessHabit   = state.morningReadinessHabit,
+                    hrvReadinessHabit       = state.hrvReadinessHabit,
+                    resonanceBreathingHabit = state.resonanceBreathingHabit,
+                    onSelectHabit           = { slot, entry -> viewModel.selectHabit(slot, entry) },
+                    onClearHabit            = { slot -> viewModel.clearHabit(slot) },
+                    onRefresh               = { viewModel.loadHabits() }
                 )
             }
         }

@@ -35,6 +35,7 @@ import com.example.wags.domain.model.WonkaConfig
 import com.example.wags.domain.usecase.apnea.AdvancedApneaPhase
 import com.example.wags.domain.usecase.apnea.AdvancedApneaState
 import com.example.wags.ui.common.InfoHelpBubble
+import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 import kotlinx.coroutines.delay
@@ -62,11 +63,14 @@ fun ApneaScreen(
         containerColor = BackgroundDark,
         topBar = {
             TopAppBar(
-                title = { Text("Apnea Training") },
+                title = { Text("Apnea Training", style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
                     }
+                },
+                actions = {
+                    LiveSensorActions(liveHr = state.liveHr, liveSpO2 = state.liveSpO2)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )

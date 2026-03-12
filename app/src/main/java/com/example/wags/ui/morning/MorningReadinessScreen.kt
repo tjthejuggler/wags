@@ -26,6 +26,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wags.domain.usecase.readiness.MorningReadinessFsm
 import com.example.wags.domain.usecase.readiness.MorningReadinessState
+import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -87,13 +88,14 @@ fun MorningReadinessScreen(
         containerColor = BackgroundDark,
         topBar = {
             TopAppBar(
-                title = { Text("Morning Readiness") },
+                title = { Text("Morning Readiness", style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
                     }
                 },
                 actions = {
+                    LiveSensorActions(liveHr = uiState.liveHr, liveSpO2 = uiState.liveSpO2)
                     TextButton(onClick = onNavigateToHistory) {
                         Text("History", color = EcgCyan)
                     }

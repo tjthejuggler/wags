@@ -3,6 +3,7 @@ package com.example.wags.ui.breathing
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.AccRespirationEngine
+import com.example.wags.data.ble.HrDataSource
 import com.example.wags.data.ble.PolarBleManager
 import com.example.wags.data.ipc.HabitIntegrationRepository
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
@@ -20,8 +21,11 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -39,12 +43,15 @@ data class BreathingUiState(
     val currentTestRateBpm: Float = 0f,
     val remainingSeconds: Long = 0L,
     val epochResults: List<RfEpochResult> = emptyList(),
-    val slidingWindowResult: SlidingWindowResult? = null
+    val slidingWindowResult: SlidingWindowResult? = null,
+    val liveHr: Int? = null,
+    val liveSpO2: Int? = null
 )
 
 @HiltViewModel
 class BreathingViewModel @Inject constructor(
     private val bleManager: PolarBleManager,
+    private val hrDataSource: HrDataSource,
     private val accEngine: AccRespirationEngine,
     private val pacerEngine: ContinuousPacerEngine,
     private val coherenceCalculator: CoherenceScoreCalculator,
@@ -54,7 +61,17 @@ class BreathingViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(BreathingUiState())
-    val uiState: StateFlow<BreathingUiState> = _uiState.asStateFlow()
+    val uiState: StateFlow<BreathingUiState> = combine(
+        _uiState,
+        hrDataSource.liveHr,
+        hrDataSource.liveSpO2
+    ) { state, hr, spo2 ->
+        state.copy(liveHr = hr, liveSpO2 = spo2)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = BreathingUiState()
+    )
 
     private var lastCoherenceScore = 0f
     private var lastCoherenceUpdateMs = 0L

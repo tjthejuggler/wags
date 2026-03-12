@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -29,11 +30,14 @@ fun BreathingScreen(
         containerColor = BackgroundDark,
         topBar = {
             TopAppBar(
-                title = { Text("Resonance Breathing") },
+                title = { Text("Resonance Breathing", style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
                     }
+                },
+                actions = {
+                    LiveSensorActions(liveHr = state.liveHr, liveSpO2 = state.liveSpO2)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )

@@ -2,6 +2,7 @@ package com.example.wags.ui.morning
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.wags.data.ble.HrDataSource
 import com.example.wags.data.ble.PolarBleManager
 import com.example.wags.data.db.entity.MorningReadinessEntity
 import com.example.wags.data.ipc.HabitIntegrationRepository
@@ -21,8 +22,11 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -43,7 +47,9 @@ data class MorningReadinessUiState(
     val errorMessage: String? = null,
     val noHrmDialogVisible: Boolean = false,
     val isCalculating: Boolean = false,
-    val triggerStandAlert: Boolean = false
+    val triggerStandAlert: Boolean = false,
+    val liveHr: Int? = null,
+    val liveSpO2: Int? = null
 )
 
 @HiltViewModel
@@ -52,13 +58,24 @@ class MorningReadinessViewModel @Inject constructor(
     private val orchestrator: MorningReadinessOrchestrator,
     private val repository: MorningReadinessRepository,
     private val bleManager: PolarBleManager,
+    private val hrDataSource: HrDataSource,
     private val habitRepo: HabitIntegrationRepository,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     @MathDispatcher private val mathDispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MorningReadinessUiState())
-    val uiState: StateFlow<MorningReadinessUiState> = _uiState.asStateFlow()
+    val uiState: StateFlow<MorningReadinessUiState> = combine(
+        _uiState,
+        hrDataSource.liveHr,
+        hrDataSource.liveSpO2
+    ) { state, hr, spo2 ->
+        state.copy(liveHr = hr, liveSpO2 = spo2)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = MorningReadinessUiState()
+    )
 
     private var rrPollingJob: Job? = null
     private var lastRrBufferSize = 0

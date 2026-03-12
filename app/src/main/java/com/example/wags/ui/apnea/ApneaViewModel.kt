@@ -3,6 +3,7 @@ package com.example.wags.ui.apnea
 import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.wags.data.ble.HrDataSource
 import com.example.wags.data.ble.OximeterBleManager
 import com.example.wags.data.ble.PolarBleManager
 import com.example.wags.data.db.entity.ApneaRecordEntity
@@ -32,10 +33,12 @@ import com.example.wags.domain.usecase.apnea.ApneaTableGenerator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -112,12 +115,16 @@ data class ApneaUiState(
      * When false it shows [filteredStats].
      */
     val showAllStats: Boolean = false,
+    // Live sensor readings for top bar
+    val liveHr: Int? = null,
+    val liveSpO2: Int? = null,
 )
 
 @HiltViewModel
 class ApneaViewModel @Inject constructor(
     private val bleManager: PolarBleManager,
     private val oximeterBleManager: OximeterBleManager,
+    private val hrDataSource: HrDataSource,
     private val apneaRepository: ApneaRepository,
     private val sessionRepository: ApneaSessionRepository,
     private val tableGenerator: ApneaTableGenerator,
@@ -129,7 +136,17 @@ class ApneaViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ApneaUiState())
-    val uiState: StateFlow<ApneaUiState> = _uiState.asStateFlow()
+    val uiState: StateFlow<ApneaUiState> = combine(
+        _uiState,
+        hrDataSource.liveHr,
+        hrDataSource.liveSpO2
+    ) { state, hr, spo2 ->
+        state.copy(liveHr = hr, liveSpO2 = spo2)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = ApneaUiState()
+    )
 
     private var freeHoldStartTime = 0L
 

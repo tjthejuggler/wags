@@ -2,6 +2,7 @@ package com.example.wags.ui.readiness
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.wags.data.ble.HrDataSource
 import com.example.wags.data.ble.PolarBleManager
 import com.example.wags.data.db.entity.DailyReadingEntity
 import com.example.wags.data.ipc.HabitIntegrationRepository
@@ -20,8 +21,11 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -38,12 +42,15 @@ data class ReadinessUiState(
     val liveRmssd: Float? = null,
     val hrvMetrics: HrvMetrics? = null,
     val readinessScore: ReadinessScore? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val liveHr: Int? = null,
+    val liveSpO2: Int? = null
 )
 
 @HiltViewModel
 class ReadinessViewModel @Inject constructor(
     private val bleManager: PolarBleManager,
+    private val hrDataSource: HrDataSource,
     private val readinessRepository: ReadinessRepository,
     private val artifactCorrection: ArtifactCorrectionUseCase,
     private val timeDomainCalculator: TimeDomainHrvCalculator,
@@ -55,7 +62,17 @@ class ReadinessViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReadinessUiState())
-    val uiState: StateFlow<ReadinessUiState> = _uiState.asStateFlow()
+    val uiState: StateFlow<ReadinessUiState> = combine(
+        _uiState,
+        hrDataSource.liveHr,
+        hrDataSource.liveSpO2
+    ) { state, hr, spo2 ->
+        state.copy(liveHr = hr, liveSpO2 = spo2)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = ReadinessUiState()
+    )
 
     private var sessionJob: Job? = null
     private val collectedRr = mutableListOf<Double>()
