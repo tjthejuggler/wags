@@ -17,6 +17,11 @@ import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.model.TableDifficulty
 import com.example.wags.domain.model.TableLength
+import com.example.wags.domain.model.TrainingModality
+import com.example.wags.domain.model.WonkaConfig
+import com.example.wags.domain.usecase.apnea.AdvancedApneaPhase
+import com.example.wags.domain.usecase.apnea.AdvancedApneaState
+import com.example.wags.domain.usecase.apnea.AdvancedApneaStateMachine
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
 import com.example.wags.domain.usecase.apnea.ApneaState
 import com.example.wags.domain.usecase.apnea.ApneaStateMachine
@@ -32,6 +37,22 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Named
+
+/**
+ * Identifies which accordion section is currently open.
+ * Settings is controlled separately (independent toggle).
+ * Only one of these can be open at a time.
+ */
+enum class ApneaSection {
+    BEST_TIME,
+    TABLE_TRAINING,   // PB + length/difficulty config + O2/CO2 launch buttons
+    PROGRESSIVE_O2,
+    MIN_BREATH,
+    WONKA_CONTRACTION,
+    WONKA_ENDURANCE,
+    RECENT_RECORDS,
+    SESSION_ANALYTICS
+}
 
 data class ApneaUiState(
     val apneaState: ApneaState = ApneaState.IDLE,
@@ -61,6 +82,22 @@ data class ApneaUiState(
     // Live oximeter readings (null when oximeter not connected / no data yet)
     val liveOxHr: Int? = null,
     val liveOxSpO2: Int? = null,
+    // ── UI layout state ───────────────────────────────────────────────────────
+    /** Settings panel is independently collapsible (not part of the accordion). */
+    val settingsExpanded: Boolean = true,
+    /**
+     * The one accordion section that is currently open.
+     * BEST_TIME is open by default; null means all accordion sections are collapsed.
+     */
+    val openSection: ApneaSection? = ApneaSection.BEST_TIME,
+    // ── New personal best dialog ──────────────────────────────────────────────
+    /** Non-null when a new personal best was just set — holds the new PB in ms for the congrats dialog. */
+    val newPersonalBestMs: Long? = null,
+    // ── Inline advanced-modality session state ────────────────────────────────
+    /** Which modality (if any) has an active inline session running. */
+    val activeModalitySession: TrainingModality? = null,
+    /** Live state from the AdvancedApneaStateMachine for the currently running inline session. */
+    val advancedSessionState: AdvancedApneaState = AdvancedApneaState(),
 )
 
 @HiltViewModel
@@ -71,6 +108,7 @@ class ApneaViewModel @Inject constructor(
     private val sessionRepository: ApneaSessionRepository,
     private val tableGenerator: ApneaTableGenerator,
     private val stateMachine: ApneaStateMachine,
+    private val advancedStateMachine: AdvancedApneaStateMachine,
     private val audioHapticEngine: ApneaAudioHapticEngine,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
@@ -86,6 +124,7 @@ class ApneaViewModel @Inject constructor(
      */
     private val oximeterSamples = mutableListOf<Pair<Long, OximeterReading>>()
     private var oximeterCollectionJob: Job? = null
+    private var advancedSessionStartMs: Long = 0L
 
     // Separate flows for the three settings that drive the best-time / filtered-records queries
     private val _lungVolume  = MutableStateFlow("FULL")
@@ -125,6 +164,16 @@ class ApneaViewModel @Inject constructor(
         viewModelScope.launch {
             stateMachine.remainingSeconds.collect { secs ->
                 _uiState.update { it.copy(remainingSeconds = secs) }
+            }
+        }
+
+        // Mirror advanced state machine into UI state
+        viewModelScope.launch {
+            advancedStateMachine.state.collect { advState ->
+                _uiState.update { it.copy(advancedSessionState = advState) }
+                if (advState.phase == AdvancedApneaPhase.COMPLETE) {
+                    saveAdvancedSession(advState)
+                }
             }
         }
 
@@ -195,6 +244,28 @@ class ApneaViewModel @Inject constructor(
         }
     }
 
+    private fun saveAdvancedSession(advState: AdvancedApneaState) {
+        viewModelScope.launch {
+            val modality = _uiState.value.activeModalitySession ?: return@launch
+            val pbMs = prefs.getLong("pb_ms", 0L)
+            val totalDurationMs = System.currentTimeMillis() - advancedSessionStartMs
+            val entity = ApneaSessionEntity(
+                timestamp = System.currentTimeMillis(),
+                tableType = modality.name,
+                tableVariant = _uiState.value.selectedLength.name,
+                tableParamsJson = "{}",
+                pbAtSessionMs = pbMs,
+                totalSessionDurationMs = totalDurationMs,
+                contractionTimestampsJson = "[]",
+                maxHrBpm = null,
+                lowestSpO2 = null,
+                roundsCompleted = advState.currentRound,
+                totalRounds = advState.totalRounds
+            )
+            sessionRepository.saveSession(entity)
+        }
+    }
+
     private fun onApneaPhaseStarted() {
         _uiState.update {
             it.copy(
@@ -221,8 +292,19 @@ class ApneaViewModel @Inject constructor(
     }
 
     fun setPersonalBest(pbMs: Long) {
-        _uiState.update { it.copy(personalBestMs = pbMs) }
+        val current = _uiState.value.personalBestMs
+        val isNewPb = pbMs > current
+        _uiState.update {
+            it.copy(
+                personalBestMs = pbMs,
+                newPersonalBestMs = if (isNewPb) pbMs else null
+            )
+        }
         prefs.edit().putLong("pb_ms", pbMs).apply()
+    }
+
+    fun dismissNewPersonalBest() {
+        _uiState.update { it.copy(newPersonalBestMs = null) }
     }
 
     fun setLength(length: TableLength) {
@@ -294,7 +376,15 @@ class ApneaViewModel @Inject constructor(
         // Stop collecting oximeter readings before saving so the snapshot is stable
         oximeterCollectionJob?.cancel()
         oximeterCollectionJob = null
-        _uiState.update { it.copy(freeHoldActive = false, freeHoldDurationMs = duration) }
+        val currentBest = _uiState.value.bestTimeForSettingsMs
+        val isNewBest = duration > currentBest && currentBest > 0L
+        _uiState.update {
+            it.copy(
+                freeHoldActive = false,
+                freeHoldDurationMs = duration,
+                newPersonalBestMs = if (isNewBest) duration else it.newPersonalBestMs
+            )
+        }
         audioHapticEngine.vibrateHoldEnd()
         saveFreeHoldRecord(duration)
     }
@@ -362,10 +452,7 @@ class ApneaViewModel @Inject constructor(
             }
 
             // ── Oximeter → HR + SpO2 telemetry ───────────────────────────────
-            // Each oximeter sample is stored as a separate row so the detail
-            // screen can plot both HR and SpO2 over time.
             for ((timestampMs, reading) in oxSnapshot) {
-                // Only include samples that fall within the hold window
                 if (timestampMs < freeHoldStartTime) continue
                 if (timestampMs > freeHoldStartTime + durationMs) continue
                 samples.add(
@@ -403,9 +490,52 @@ class ApneaViewModel @Inject constructor(
         _uiState.update { it.copy(showTimer = show) }
     }
 
+    // ── Layout / accordion ────────────────────────────────────────────────────
+
+    fun toggleSettings() {
+        _uiState.update { it.copy(settingsExpanded = !it.settingsExpanded) }
+    }
+
+    /**
+     * Opens [section] if it is currently closed; closes it if it is already open.
+     * Only one accordion section can be open at a time (settings is independent).
+     */
+    fun toggleSection(section: ApneaSection) {
+        _uiState.update { state ->
+            val newOpen = if (state.openSection == section) null else section
+            state.copy(openSection = newOpen)
+        }
+    }
+
+    // ── Inline advanced-modality sessions ────────────────────────────────────
+
+    fun startAdvancedSession(modality: TrainingModality, wonkaConfig: WonkaConfig = WonkaConfig()) {
+        val pbMs = _uiState.value.personalBestMs
+        val length = _uiState.value.selectedLength
+        advancedSessionStartMs = System.currentTimeMillis()
+        _uiState.update { it.copy(activeModalitySession = modality) }
+        advancedStateMachine.start(modality, length, pbMs, wonkaConfig, viewModelScope)
+    }
+
+    fun stopAdvancedSession() {
+        advancedStateMachine.stop()
+        _uiState.update { it.copy(activeModalitySession = null) }
+    }
+
+    fun signalBreathTaken() {
+        advancedStateMachine.signalBreathTaken()
+        audioHapticEngine.announceHoldBegin()
+    }
+
+    fun signalFirstContraction() {
+        advancedStateMachine.signalFirstContraction()
+        audioHapticEngine.vibrateContractionLogged()
+    }
+
     override fun onCleared() {
         super.onCleared()
         audioHapticEngine.shutdown()
         stateMachine.stop()
+        advancedStateMachine.stop()
     }
 }
