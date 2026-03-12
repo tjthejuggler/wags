@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.AccRespirationEngine
 import com.example.wags.data.ble.PolarBleManager
+import com.example.wags.data.ipc.HabitIntegrationRepository
+import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.di.MathDispatcher
 import com.example.wags.domain.usecase.breathing.CoherenceScoreCalculator
 import com.example.wags.domain.usecase.breathing.ContinuousPacerEngine
@@ -47,6 +49,7 @@ class BreathingViewModel @Inject constructor(
     private val pacerEngine: ContinuousPacerEngine,
     private val coherenceCalculator: CoherenceScoreCalculator,
     private val rfOrchestrator: RfAssessmentOrchestrator,
+    private val habitRepo: HabitIntegrationRepository,
     @MathDispatcher private val mathDispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
@@ -81,6 +84,8 @@ class BreathingViewModel @Inject constructor(
         pacerJob?.cancel()
         coherenceJob?.cancel()
         _uiState.update { it.copy(isSessionActive = false) }
+        // Signal the Habit app that a Resonance Breathing session was completed
+        habitRepo.sendHabitIncrement(Slot.RESONANCE_BREATHING)
     }
 
     private fun startPacerLoop() {

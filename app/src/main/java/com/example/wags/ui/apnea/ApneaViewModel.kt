@@ -8,6 +8,8 @@ import com.example.wags.data.ble.PolarBleManager
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.ApneaSessionEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
+import com.example.wags.data.ipc.HabitIntegrationRepository
+import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.data.repository.ApneaSessionRepository
 import com.example.wags.domain.model.ApneaStats
@@ -122,6 +124,7 @@ class ApneaViewModel @Inject constructor(
     private val stateMachine: ApneaStateMachine,
     private val advancedStateMachine: AdvancedApneaStateMachine,
     private val audioHapticEngine: ApneaAudioHapticEngine,
+    private val habitRepo: HabitIntegrationRepository,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
@@ -241,6 +244,8 @@ class ApneaViewModel @Inject constructor(
             ApneaState.COMPLETE -> {
                 audioHapticEngine.announceSessionComplete()
                 saveCompletedSession()
+                // Signal the Habit app that a full O2/CO2 table session was completed
+                habitRepo.sendHabitIncrement(Slot.TABLE_TRAINING)
             }
             else -> Unit
         }
@@ -328,6 +333,7 @@ class ApneaViewModel @Inject constructor(
             )
         }
         prefs.edit().putLong("pb_ms", pbMs).apply()
+        if (isNewPb) habitRepo.sendHabitIncrement(Slot.APNEA_NEW_RECORD)
     }
 
     fun dismissNewPersonalBest() {
@@ -414,6 +420,10 @@ class ApneaViewModel @Inject constructor(
         }
         audioHapticEngine.vibrateHoldEnd()
         saveFreeHoldRecord(duration)
+        // Signal the Habit app that a free breath hold was successfully completed
+        habitRepo.sendHabitIncrement(Slot.FREE_HOLD)
+        // Signal a new personal best if this hold beat the previous record
+        if (isNewBest) habitRepo.sendHabitIncrement(Slot.APNEA_NEW_RECORD)
     }
 
     private fun saveFreeHoldRecord(durationMs: Long) {

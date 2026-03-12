@@ -16,7 +16,20 @@
     <!-- Vibration -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!--
+        Tail app IPC: signature permission declared by the Tail app.
+        Required both to query the ContentProvider (readPermission) and to
+        send the increment broadcast (receiverPermission).
+    -->
+    <uses-permission android:name="com.example.tail.permission.TAIL_INTEGRATION" />
+
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+
+    <!-- Android 11+ package visibility: allow querying the Tail app -->
+    <queries>
+        <package android:name="com.example.tail" />
+        <provider android:authorities="com.example.tail.provider" />
+    </queries>
 
     <application
         android:name=".WagsApplication"

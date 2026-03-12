@@ -57,4 +57,16 @@ object AppModule {
     @Named("apnea_prefs")
     fun provideApneaPrefs(@ApplicationContext context: Context): SharedPreferences =
         context.getSharedPreferences("apnea_prefs", Context.MODE_PRIVATE)
+
+    /**
+     * Dedicated SharedPreferences file for Habit-app IPC settings
+     * (selected habit_id / habit_name).  Injected into
+     * [com.example.wags.data.ipc.HabitIntegrationRepository] via
+     * @Named("habit_prefs").
+     */
+    @Provides
+    @Singleton
+    @Named("habit_prefs")
+    fun provideHabitPrefs(@ApplicationContext context: Context): SharedPreferences =
+        context.getSharedPreferences("habit_integration_prefs", Context.MODE_PRIVATE)
 }

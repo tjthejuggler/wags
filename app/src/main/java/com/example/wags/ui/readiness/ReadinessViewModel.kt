@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.PolarBleManager
 import com.example.wags.data.db.entity.DailyReadingEntity
+import com.example.wags.data.ipc.HabitIntegrationRepository
+import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.data.repository.ReadinessRepository
 import com.example.wags.di.IoDispatcher
 import com.example.wags.di.MathDispatcher
@@ -47,6 +49,7 @@ class ReadinessViewModel @Inject constructor(
     private val timeDomainCalculator: TimeDomainHrvCalculator,
     private val freqDomainCalculator: FrequencyDomainCalculator,
     private val readinessScoreCalculator: ReadinessScoreCalculator,
+    private val habitRepo: HabitIntegrationRepository,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     @MathDispatcher private val mathDispatcher: CoroutineDispatcher
 ) : ViewModel() {
@@ -137,6 +140,8 @@ class ReadinessViewModel @Inject constructor(
                         readinessScore = score
                     )
                 }
+                // Signal the Habit app that an HRV Readiness session completed
+                habitRepo.sendHabitIncrement(Slot.HRV_READINESS)
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(

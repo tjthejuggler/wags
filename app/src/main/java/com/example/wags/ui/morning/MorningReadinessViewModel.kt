@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.PolarBleManager
 import com.example.wags.data.db.entity.MorningReadinessEntity
+import com.example.wags.data.ipc.HabitIntegrationRepository
+import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.data.repository.MorningReadinessRepository
 import com.example.wags.di.IoDispatcher
 import com.example.wags.di.MathDispatcher
@@ -50,6 +52,7 @@ class MorningReadinessViewModel @Inject constructor(
     private val orchestrator: MorningReadinessOrchestrator,
     private val repository: MorningReadinessRepository,
     private val bleManager: PolarBleManager,
+    private val habitRepo: HabitIntegrationRepository,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     @MathDispatcher private val mathDispatcher: CoroutineDispatcher
 ) : ViewModel() {
@@ -178,6 +181,8 @@ class MorningReadinessViewModel @Inject constructor(
                         isCalculating = false
                     )
                 }
+                // Signal the Habit app that a Morning Readiness assessment completed
+                habitRepo.sendHabitIncrement(Slot.MORNING_READINESS)
             } catch (e: Exception) {
                 fsm.signalError(e.message ?: "Calculation failed")
                 _uiState.update {

@@ -24,7 +24,9 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.domain.model.BleConnectionState
+import com.example.wags.domain.model.HabitEntry
 import com.example.wags.domain.model.OximeterConnectionState
 import com.example.wags.ui.theme.*
 import com.polar.sdk.api.model.PolarDeviceInfo
@@ -73,6 +75,11 @@ fun SettingsScreen(
     fun requestScan() {
         if (allGranted()) viewModel.startScan()
         else permissionLauncher.launch(blePermissions)
+    }
+
+    // Load habits once when the screen first appears
+    LaunchedEffect(Unit) {
+        viewModel.loadHabits()
     }
 
     // Stop all scans when leaving the screen
@@ -151,6 +158,24 @@ fun SettingsScreen(
                         requestScan()
                     },
                     onClearDay = { viewModel.clearDayDefault() }
+                )
+            }
+
+            // ── Tail App integration ───────────────────────────────────────
+            item {
+                TailAppIntegrationCard(
+                    habitList               = state.habitList,
+                    isLoading               = state.isLoadingHabits,
+                    habitAppUnavailable     = state.habitAppUnavailable,
+                    freeHoldHabit           = state.freeHoldHabit,
+                    apneaNewRecordHabit     = state.apneaNewRecordHabit,
+                    tableTrainingHabit      = state.tableTrainingHabit,
+                    morningReadinessHabit   = state.morningReadinessHabit,
+                    hrvReadinessHabit       = state.hrvReadinessHabit,
+                    resonanceBreathingHabit = state.resonanceBreathingHabit,
+                    onSelectHabit           = { slot, entry -> viewModel.selectHabit(slot, entry) },
+                    onClearHabit            = { slot -> viewModel.clearHabit(slot) },
+                    onRefresh               = { viewModel.loadHabits() }
                 )
             }
 
@@ -686,6 +711,241 @@ private fun OximeterDeviceResultCard(
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
                     ) { Text("Connect", style = MaterialTheme.typography.bodySmall) }
                 }
+            }
+        }
+    }
+}
+
+// ── Tail App integration card ─────────────────────────────────────────────────
+
+/**
+ * Card that lets the user map a Tail/Habit-app habit to each WAGS activity.
+ *
+ * Layout
+ * ──────
+ *  Header  : title + Refresh button
+ *  Status  : loading spinner | "app unavailable" warning | "no habits" hint
+ *  Slots   : one [HabitSlotRow] per activity, each with its own inline picker
+ */
+@Composable
+private fun TailAppIntegrationCard(
+    habitList: List<HabitEntry>,
+    isLoading: Boolean,
+    habitAppUnavailable: Boolean,
+    freeHoldHabit: HabitSlotSelection,
+    apneaNewRecordHabit: HabitSlotSelection,
+    tableTrainingHabit: HabitSlotSelection,
+    morningReadinessHabit: HabitSlotSelection,
+    hrvReadinessHabit: HabitSlotSelection,
+    resonanceBreathingHabit: HabitSlotSelection,
+    onSelectHabit: (Slot, HabitEntry) -> Unit,
+    onClearHabit: (Slot) -> Unit,
+    onRefresh: () -> Unit
+) {
+    // Which slot's picker is currently expanded (null = all collapsed)
+    var expandedSlot by remember { mutableStateOf<Slot?>(null) }
+
+    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // ── Header ────────────────────────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Tail App Integration", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Choose which habit to increment for each activity.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                }
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = EcgCyan,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    TextButton(onClick = onRefresh) {
+                        Text("Refresh", style = MaterialTheme.typography.bodySmall, color = EcgCyan)
+                    }
+                }
+            }
+
+            // ── Status banner ─────────────────────────────────────────────
+            when {
+                habitAppUnavailable ->
+                    Text(
+                        "Tail app not found. Make sure it is installed and tap Refresh.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ReadinessOrange
+                    )
+                !isLoading && habitList.isEmpty() ->
+                    Text(
+                        "No habits found. Tap Refresh to load from the Tail app.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+            }
+
+            HorizontalDivider(color = SurfaceVariant)
+
+            // ── Per-activity slots ────────────────────────────────────────
+            val slots = listOf(
+                Slot.FREE_HOLD           to freeHoldHabit,
+                Slot.APNEA_NEW_RECORD    to apneaNewRecordHabit,
+                Slot.TABLE_TRAINING      to tableTrainingHabit,
+                Slot.MORNING_READINESS   to morningReadinessHabit,
+                Slot.HRV_READINESS       to hrvReadinessHabit,
+                Slot.RESONANCE_BREATHING to resonanceBreathingHabit
+            )
+
+            slots.forEachIndexed { index, (slot, selection) ->
+                HabitSlotRow(
+                    slot        = slot,
+                    selection   = selection,
+                    habitList   = habitList,
+                    isExpanded  = expandedSlot == slot,
+                    onToggle    = {
+                        expandedSlot = if (expandedSlot == slot) null else slot
+                    },
+                    onSelect    = { entry ->
+                        onSelectHabit(slot, entry)
+                        expandedSlot = null
+                    },
+                    onClear     = { onClearHabit(slot) }
+                )
+                if (index < slots.lastIndex) {
+                    HorizontalDivider(color = SurfaceVariant)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * A single row for one activity slot. Shows the activity label, the currently
+ * selected habit name (or "Not set"), and a toggle button to expand/collapse
+ * the inline habit picker.
+ */
+@Composable
+private fun HabitSlotRow(
+    slot: Slot,
+    selection: HabitSlotSelection,
+    habitList: List<HabitEntry>,
+    isExpanded: Boolean,
+    onToggle: () -> Unit,
+    onSelect: (HabitEntry) -> Unit,
+    onClear: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // ── Summary row ───────────────────────────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(slot.label, style = MaterialTheme.typography.bodyMedium)
+                if (selection.isSet) {
+                    Text(
+                        selection.displayName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ReadinessGreen
+                    )
+                } else {
+                    Text(
+                        "Not set",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                }
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (selection.isSet) {
+                    IconButton(onClick = onClear, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            Icons.Default.Clear,
+                            contentDescription = "Clear",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+                OutlinedButton(
+                    onClick = onToggle,
+                    modifier = Modifier.height(32.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                ) {
+                    Text(
+                        if (selection.isSet) "Change" else "Set",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        }
+
+        // ── Inline picker (expanded) ──────────────────────────────────────
+        if (isExpanded) {
+            Spacer(Modifier.height(8.dp))
+            if (habitList.isEmpty()) {
+                Text(
+                    "No habits available. Tap Refresh above.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    modifier = Modifier.padding(start = 4.dp)
+                )
+            } else {
+                habitList.forEach { entry ->
+                    HabitPickerRow(
+                        entry      = entry,
+                        isSelected = entry.habitId == selection.habitId,
+                        onClick    = { onSelect(entry) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HabitPickerRow(
+    entry: HabitEntry,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        color = if (isSelected) EcgCyan.copy(alpha = 0.12f) else Color.Transparent,
+        shape = MaterialTheme.shapes.small,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = entry.habitName,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (isSelected) EcgCyan else Color.White,
+                modifier = Modifier.weight(1f)
+            )
+            if (isSelected) {
+                Text("✓", style = MaterialTheme.typography.bodyMedium, color = EcgCyan)
             }
         }
     }
