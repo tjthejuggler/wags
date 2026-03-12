@@ -23,6 +23,7 @@ import com.example.wags.ui.breathing.AssessmentResultScreen
 import com.example.wags.ui.breathing.AssessmentRunScreen
 import com.example.wags.ui.breathing.BreathingScreen
 import com.example.wags.ui.dashboard.DashboardScreen
+import com.example.wags.ui.readiness.HrvReadinessHistoryScreen
 import com.example.wags.ui.readiness.ReadinessScreen
 import com.example.wags.ui.session.SessionScreen
 import com.example.wags.ui.morning.MorningReadinessHistoryScreen
@@ -39,6 +40,7 @@ object WagsRoutes {
     const val SESSION = "session/{sessionType}"
     const val MORNING_READINESS = "morning_readiness"
     const val MORNING_READINESS_HISTORY = "morning_readiness_history"
+    const val READINESS_HISTORY = "readiness_history"
     const val SETTINGS = "settings"
     const val SESSION_ANALYTICS = "session_analytics/{sessionId}"
     const val SESSION_ANALYTICS_HISTORY = "session_analytics_history"
@@ -67,7 +69,13 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             DashboardScreen(navController = navController)
         }
         composable(WagsRoutes.READINESS) {
-            ReadinessScreen(navController = navController)
+            ReadinessScreen(
+                navController = navController,
+                onNavigateToHistory = { navController.navigate(WagsRoutes.READINESS_HISTORY) }
+            )
+        }
+        composable(WagsRoutes.READINESS_HISTORY) {
+            HrvReadinessHistoryScreen(onNavigateBack = { navController.popBackStack() })
         }
         composable(WagsRoutes.BREATHING) {
             BreathingScreen(

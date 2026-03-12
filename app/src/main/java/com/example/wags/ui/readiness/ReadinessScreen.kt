@@ -15,13 +15,13 @@ import androidx.navigation.NavController
 import com.example.wags.domain.model.HrvMetrics
 import com.example.wags.domain.model.ReadinessInterpretation
 import com.example.wags.domain.model.ReadinessScore
-import com.example.wags.ui.realtime.TachogramView
 import com.example.wags.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReadinessScreen(
     navController: NavController,
+    onNavigateToHistory: () -> Unit,
     viewModel: ReadinessViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -36,6 +36,11 @@ fun ReadinessScreen(
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                    }
+                },
+                actions = {
+                    TextButton(onClick = onNavigateToHistory) {
+                        Text("History", color = EcgCyan)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
@@ -53,7 +58,8 @@ fun ReadinessScreen(
         ) {
             when (state.sessionState) {
                 ReadinessSessionState.IDLE -> IdleContent(
-                    onStart = { viewModel.startSession(deviceId, 120L) }
+                    onStart = { viewModel.startSession(deviceId, 120L) },
+                    onHistory = onNavigateToHistory
                 )
                 ReadinessSessionState.RECORDING -> RecordingContent(
                     state = state,
@@ -62,7 +68,8 @@ fun ReadinessScreen(
                 ReadinessSessionState.PROCESSING -> ProcessingContent()
                 ReadinessSessionState.COMPLETE -> CompleteContent(
                     state = state,
-                    onReset = { viewModel.reset() }
+                    onReset = { viewModel.reset() },
+                    onHistory = onNavigateToHistory
                 )
                 ReadinessSessionState.ERROR -> ErrorContent(
                     message = state.errorMessage ?: "Unknown error",
@@ -74,7 +81,7 @@ fun ReadinessScreen(
 }
 
 @Composable
-private fun IdleContent(onStart: () -> Unit) {
+private fun IdleContent(onStart: () -> Unit, onHistory: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -87,6 +94,13 @@ private fun IdleContent(onStart: () -> Unit) {
         )
         Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
             Text("Start 2-Minute Session")
+        }
+        OutlinedButton(
+            onClick = onHistory,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = EcgCyan)
+        ) {
+            Text("View History")
         }
     }
 }
@@ -139,7 +153,11 @@ private fun ProcessingContent() {
 }
 
 @Composable
-private fun CompleteContent(state: ReadinessUiState, onReset: () -> Unit) {
+private fun CompleteContent(
+    state: ReadinessUiState,
+    onReset: () -> Unit,
+    onHistory: () -> Unit
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -152,6 +170,13 @@ private fun CompleteContent(state: ReadinessUiState, onReset: () -> Unit) {
         }
         Button(onClick = onReset, modifier = Modifier.fillMaxWidth()) {
             Text("New Session")
+        }
+        OutlinedButton(
+            onClick = onHistory,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = EcgCyan)
+        ) {
+            Text("View History")
         }
     }
 }
@@ -230,9 +255,9 @@ private fun ErrorContent(message: String, onReset: () -> Unit) {
 }
 
 private fun interpretationColor(interpretation: ReadinessInterpretation) = when (interpretation) {
-    ReadinessInterpretation.OPTIMAL -> ReadinessGreen
-    ReadinessInterpretation.ELEVATED -> ReadinessBlue
-    ReadinessInterpretation.REDUCED -> ReadinessOrange
-    ReadinessInterpretation.LOW -> ReadinessRed
+    ReadinessInterpretation.OPTIMAL     -> ReadinessGreen
+    ReadinessInterpretation.ELEVATED    -> ReadinessBlue
+    ReadinessInterpretation.REDUCED     -> ReadinessOrange
+    ReadinessInterpretation.LOW         -> ReadinessRed
     ReadinessInterpretation.OVERREACHING -> ReadinessRed
 }

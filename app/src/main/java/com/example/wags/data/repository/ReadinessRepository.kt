@@ -11,6 +11,9 @@ class ReadinessRepository @Inject constructor(
     fun getLatestReadings(limit: Int = 14): Flow<List<DailyReadingEntity>> =
         dao.getLatest(limit)
 
+    fun observeAll(): Flow<List<DailyReadingEntity>> =
+        dao.observeAll()
+
     suspend fun getLast14ForBaseline(): List<DailyReadingEntity> =
         dao.getLast14()
 
