@@ -10,12 +10,19 @@ import javax.inject.Inject
  * 4. Phase3Classification + correction
  *
  * Returns corrected NN intervals in milliseconds AND an artifact mask.
+ *
+ * IMPORTANT: artifactMask is always sized to match correctedNn exactly.
+ * Phase3 correction can change the array length (MISSED beats expand it,
+ * EXTRA beats shrink it), so we cannot reuse the pre-filter mask — which
+ * is sized to the raw input — as the final artifact mask. The corrected
+ * array is already clean, so the returned mask is all-false with size
+ * equal to correctedNn.size.
  */
 class ArtifactCorrectionUseCase @Inject constructor() {
 
     data class Result(
         val correctedNn: DoubleArray,
-        val artifactMask: BooleanArray,  // true = was artifact at original index
+        val artifactMask: BooleanArray,  // always same size as correctedNn; all-false (beats are clean)
         val artifactCount: Int
     )
 
@@ -30,7 +37,7 @@ class ArtifactCorrectionUseCase @Inject constructor() {
         val validRr = preFiltered.filter { !it.second }.map { it.first }
 
         if (validRr.size < 10) {
-            // Return correctedNn and artifactMask with matching sizes (both based on validRr)
+            // validRr is already clean; mask matches its size
             return Result(
                 correctedNn = validRr.toDoubleArray(),
                 artifactMask = BooleanArray(validRr.size),
@@ -53,6 +60,13 @@ class ArtifactCorrectionUseCase @Inject constructor() {
         val lipponenArtifactCount = types.count { it != Phase3Classification.BeatType.NORMAL }
         val totalArtifacts = preFilterMask.count { it } + lipponenArtifactCount
 
-        return Result(corrected, preFilterMask, totalArtifacts)
+        // The corrected array may be a different length than nn (and therefore
+        // a different length than preFilterMask) because Phase3 can insert or
+        // remove beats. Build a fresh all-false mask sized to corrected.size so
+        // that TimeDomainHrvCalculator's require(nn.size == artifactMask.size)
+        // is always satisfied.
+        val correctedMask = BooleanArray(corrected.size)
+
+        return Result(corrected, correctedMask, totalArtifacts)
     }
 }

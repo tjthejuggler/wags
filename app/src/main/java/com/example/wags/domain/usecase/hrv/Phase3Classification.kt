@@ -48,28 +48,38 @@ object Phase3Classification {
         for (i in 1 until nn.size) cumTime[i] = cumTime[i - 1] + nn[i - 1]
 
         val corrected = mutableListOf<Double>()
-
-        for (i in nn.indices) {
+        var i = 0
+        while (i < nn.size) {
             when (types[i]) {
-                BeatType.NORMAL -> corrected.add(nn[i])
+                BeatType.NORMAL -> {
+                    corrected.add(nn[i])
+                    i++
+                }
 
                 BeatType.MISSED -> {
                     // Interval too long — split into two equal halves
                     val half = nn[i] / 2.0
                     corrected.add(half)
                     corrected.add(half)
+                    i++
                 }
 
                 BeatType.EXTRA -> {
-                    // Two short intervals — merge with next if available
+                    // Two short intervals — merge with next beat and skip it.
+                    // Without explicitly advancing past i+1 the for-loop would
+                    // visit it again and emit it a second time as NORMAL.
                     if (i + 1 < nn.size) {
                         corrected.add(nn[i] + nn[i + 1])
+                        i += 2  // consume both beats
+                    } else {
+                        // Last beat with no partner — drop it (it's an extra)
+                        i++
                     }
-                    // Next beat was consumed by the merge; loop continues past it
                 }
 
                 BeatType.ECTOPIC -> {
                     corrected.add(interpolateEctopic(nn, types, cumTime, i))
+                    i++
                 }
             }
         }
