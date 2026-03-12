@@ -20,7 +20,7 @@ import com.example.wags.data.db.entity.*
         TelemetryEntity::class,
         FreeHoldTelemetryEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -258,6 +258,16 @@ abstract class WagsDatabase : RoomDatabase() {
         val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE apnea_records ADD COLUMN lowestSpO2 INTEGER DEFAULT NULL")
+            }
+        }
+
+        /**
+         * v8 → v9: Add timeOfDay column to apnea_records.
+         * Existing records default to 'DAY' so they remain accessible under the Day setting.
+         */
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE apnea_records ADD COLUMN timeOfDay TEXT NOT NULL DEFAULT 'DAY'")
             }
         }
     }

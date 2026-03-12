@@ -44,7 +44,7 @@ object WagsRoutes {
     const val RF_ASSESSMENT_PICKER = "rf_assessment_picker"
     const val RF_ASSESSMENT_RUN = "rf_assessment_run/{protocol}"
     const val RF_ASSESSMENT_RESULT = "rf_assessment_result/{sessionTimestamp}"
-    const val APNEA_HISTORY = "apnea_history/{lungVolume}/{prepType}"
+    const val APNEA_HISTORY = "apnea_history/{lungVolume}/{prepType}/{timeOfDay}"
     const val APNEA_RECORD_DETAIL = "apnea_record_detail/{recordId}"
 
     fun apneaTable(type: String) = "apnea_table/$type"
@@ -53,7 +53,8 @@ object WagsRoutes {
     fun sessionAnalytics(sessionId: Long) = "session_analytics/$sessionId"
     fun rfAssessmentRun(protocol: String) = "rf_assessment_run/$protocol"
     fun rfAssessmentResult(sessionTimestamp: Long) = "rf_assessment_result/$sessionTimestamp"
-    fun apneaHistory(lungVolume: String, prepType: String) = "apnea_history/$lungVolume/$prepType"
+    fun apneaHistory(lungVolume: String, prepType: String, timeOfDay: String) =
+        "apnea_history/$lungVolume/$prepType/$timeOfDay"
     fun apneaRecordDetail(recordId: Long) = "apnea_record_detail/$recordId"
 }
 
@@ -122,7 +123,8 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             route = WagsRoutes.APNEA_HISTORY,
             arguments = listOf(
                 navArgument("lungVolume") { type = NavType.StringType },
-                navArgument("prepType")   { type = NavType.StringType }
+                navArgument("prepType")   { type = NavType.StringType },
+                navArgument("timeOfDay")  { type = NavType.StringType }
             )
         ) {
             ApneaHistoryScreen(navController = navController)

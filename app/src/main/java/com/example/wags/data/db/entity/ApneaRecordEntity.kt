@@ -17,5 +17,8 @@ data class ApneaRecordEntity(
     val tableType: String?,
     /** Lowest SpO₂ percentage recorded during this hold (null if no oximeter was connected). */
     @ColumnInfo(defaultValue = "NULL")
-    val lowestSpO2: Int? = null
+    val lowestSpO2: Int? = null,
+    /** One of TimeOfDay enum names: MORNING, DAY, NIGHT */
+    @ColumnInfo(defaultValue = "DAY")
+    val timeOfDay: String = "DAY"
 )

@@ -15,23 +15,25 @@ interface ApneaRecordDao {
     @Query("SELECT * FROM apnea_records WHERE tableType = :type ORDER BY timestamp DESC")
     fun getByType(type: String): Flow<List<ApneaRecordEntity>>
 
-    /** Returns all records matching the given lung-volume + prep-type combination. */
+    /** Returns all records matching the given lung-volume + prep-type + time-of-day combination. */
     @Query("""
         SELECT * FROM apnea_records
         WHERE lungVolume = :lungVolume
           AND prepType   = :prepType
+          AND timeOfDay  = :timeOfDay
         ORDER BY timestamp DESC
     """)
-    fun getBySettings(lungVolume: String, prepType: String): Flow<List<ApneaRecordEntity>>
+    fun getBySettings(lungVolume: String, prepType: String, timeOfDay: String): Flow<List<ApneaRecordEntity>>
 
     /** Best (longest) free-hold for a given settings combination. */
     @Query("""
         SELECT MAX(durationMs) FROM apnea_records
         WHERE lungVolume = :lungVolume
           AND prepType   = :prepType
+          AND timeOfDay  = :timeOfDay
           AND tableType IS NULL
     """)
-    fun getBestFreeHold(lungVolume: String, prepType: String): Flow<Long?>
+    fun getBestFreeHold(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
 
     /** Single record by primary key. */
     @Query("SELECT * FROM apnea_records WHERE recordId = :recordId LIMIT 1")

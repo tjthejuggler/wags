@@ -18,6 +18,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.domain.model.PrepType
+import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.model.TableDifficulty
 import com.example.wags.domain.model.TableLength
 import com.example.wags.domain.model.TrainingModality
@@ -63,8 +64,10 @@ fun ApneaScreen(
             ApneaSettingsSection(
                 selectedLungVolume = state.selectedLungVolume,
                 prepType = state.prepType,
+                timeOfDay = state.timeOfDay,
                 onLungVolumeChange = { viewModel.setLungVolume(it) },
-                onPrepTypeChange = { viewModel.setPrepType(it) }
+                onPrepTypeChange = { viewModel.setPrepType(it) },
+                onTimeOfDayChange = { viewModel.setTimeOfDay(it) }
             )
 
             HorizontalDivider(color = SurfaceVariant)
@@ -104,7 +107,11 @@ fun ApneaScreen(
                 },
                 onNavigateHistory = {
                     navController.navigate(
-                        WagsRoutes.apneaHistory(state.selectedLungVolume, state.prepType.name)
+                        WagsRoutes.apneaHistory(
+                            state.selectedLungVolume,
+                            state.prepType.name,
+                            state.timeOfDay.name
+                        )
                     )
                 }
             )
@@ -132,8 +139,10 @@ fun ApneaScreen(
 private fun ApneaSettingsSection(
     selectedLungVolume: String,
     prepType: PrepType,
+    timeOfDay: TimeOfDay,
     onLungVolumeChange: (String) -> Unit,
-    onPrepTypeChange: (PrepType) -> Unit
+    onPrepTypeChange: (PrepType) -> Unit,
+    onTimeOfDayChange: (TimeOfDay) -> Unit
 ) {
     Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
         Column(
@@ -162,6 +171,18 @@ private fun ApneaSettingsSection(
                         selected = prepType == type,
                         onClick = { onPrepTypeChange(type) },
                         label = { Text(type.displayName()) }
+                    )
+                }
+            }
+
+            // Time of Day — 3-chip toggle (Morning / Day / Night)
+            Text("Time of Day", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TimeOfDay.entries.forEach { tod ->
+                    FilterChip(
+                        selected = timeOfDay == tod,
+                        onClick = { onTimeOfDayChange(tod) },
+                        label = { Text(tod.displayName()) }
                     )
                 }
             }

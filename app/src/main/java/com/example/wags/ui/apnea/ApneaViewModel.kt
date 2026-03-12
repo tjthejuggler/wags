@@ -14,6 +14,7 @@ import com.example.wags.domain.model.ApneaTable
 import com.example.wags.domain.model.ApneaTableType
 import com.example.wags.domain.model.OximeterReading
 import com.example.wags.domain.model.PrepType
+import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.model.TableDifficulty
 import com.example.wags.domain.model.TableLength
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
@@ -44,6 +45,7 @@ data class ApneaUiState(
     val freeHoldDurationMs: Long = 0L,
     val selectedLungVolume: String = "FULL",
     val prepType: PrepType = PrepType.NO_PREP,
+    val timeOfDay: TimeOfDay = TimeOfDay.fromCurrentTime(),
     /** When true, a live elapsed-time counter is shown during the breath hold. */
     val showTimer: Boolean = true,
     /** Best free-hold for the current lungVolume + prepType combination (from DB). */
@@ -85,9 +87,10 @@ class ApneaViewModel @Inject constructor(
     private val oximeterSamples = mutableListOf<Pair<Long, OximeterReading>>()
     private var oximeterCollectionJob: Job? = null
 
-    // Separate flows for the two settings that drive the best-time / filtered-records queries
-    private val _lungVolume = MutableStateFlow("FULL")
-    private val _prepType   = MutableStateFlow(PrepType.NO_PREP)
+    // Separate flows for the three settings that drive the best-time / filtered-records queries
+    private val _lungVolume  = MutableStateFlow("FULL")
+    private val _prepType    = MutableStateFlow(PrepType.NO_PREP)
+    private val _timeOfDay   = MutableStateFlow(TimeOfDay.fromCurrentTime())
 
     init {
         // Load persisted PB on startup
@@ -125,20 +128,20 @@ class ApneaViewModel @Inject constructor(
             }
         }
 
-        // Whenever lungVolume or prepType changes, re-subscribe to best-time query
+        // Whenever any setting changes, re-subscribe to best-time query
         viewModelScope.launch {
-            combine(_lungVolume, _prepType) { lv, pt -> lv to pt }
-                .collectLatest { (lv, pt) ->
-                    apneaRepository.getBestFreeHold(lv, pt.name).collect { best ->
+            combine(_lungVolume, _prepType, _timeOfDay) { lv, pt, tod -> Triple(lv, pt, tod) }
+                .collectLatest { (lv, pt, tod) ->
+                    apneaRepository.getBestFreeHold(lv, pt.name, tod.name).collect { best ->
                         _uiState.update { it.copy(bestTimeForSettingsMs = best ?: 0L) }
                     }
                 }
         }
-        // Whenever lungVolume or prepType changes, re-subscribe to filtered records
+        // Whenever any setting changes, re-subscribe to filtered records
         viewModelScope.launch {
-            combine(_lungVolume, _prepType) { lv, pt -> lv to pt }
-                .collectLatest { (lv, pt) ->
-                    apneaRepository.getBySettings(lv, pt.name).collect { records ->
+            combine(_lungVolume, _prepType, _timeOfDay) { lv, pt, tod -> Triple(lv, pt, tod) }
+                .collectLatest { (lv, pt, tod) ->
+                    apneaRepository.getBySettings(lv, pt.name, tod.name).collect { records ->
                         _uiState.update { it.copy(recentRecords = records) }
                     }
                 }
@@ -328,6 +331,7 @@ class ApneaViewModel @Inject constructor(
                     durationMs = durationMs,
                     lungVolume = state.selectedLungVolume,
                     prepType = state.prepType.name,
+                    timeOfDay = state.timeOfDay.name,
                     minHrBpm = minHr,
                     maxHrBpm = maxHr,
                     lowestSpO2 = lowestSpO2,
@@ -388,6 +392,11 @@ class ApneaViewModel @Inject constructor(
     fun setPrepType(type: PrepType) {
         _prepType.value = type
         _uiState.update { it.copy(prepType = type) }
+    }
+
+    fun setTimeOfDay(tod: TimeOfDay) {
+        _timeOfDay.value = tod
+        _uiState.update { it.copy(timeOfDay = tod) }
     }
 
     fun setShowTimer(show: Boolean) {
