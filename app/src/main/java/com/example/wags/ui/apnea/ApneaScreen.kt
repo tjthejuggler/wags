@@ -25,6 +25,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.db.entity.ApneaRecordEntity
+import com.example.wags.domain.model.ApneaStats
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.model.TableDifficulty
@@ -287,6 +288,26 @@ fun ApneaScreen(
                             }
                         )
                     }
+                }
+
+                // ── Stats ─────────────────────────────────────────────────────
+                val statsOpen = state.openSection == ApneaSection.STATS
+                CollapsibleCard(
+                    title = "Stats",
+                    expanded = statsOpen,
+                    onToggle = { viewModel.toggleSection(ApneaSection.STATS) }
+                ) {
+                    StatsContent(
+                        stats = if (state.showAllStats) state.allStats else state.filteredStats,
+                        showAll = state.showAllStats,
+                        onToggleShowAll = { viewModel.toggleShowAllStats() },
+                        lungVolume = state.selectedLungVolume,
+                        prepType = state.prepType,
+                        timeOfDay = state.timeOfDay,
+                        onRecordClick = { recordId ->
+                            navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
+                        }
+                    )
                 }
             }
         }
@@ -937,6 +958,239 @@ private fun RecentRecordRow(
         }
     }
     HorizontalDivider(color = SurfaceVariant.copy(alpha = 0.5f))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Stats Content
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun StatsContent(
+    stats: ApneaStats,
+    showAll: Boolean,
+    onToggleShowAll: () -> Unit,
+    lungVolume: String,
+    prepType: com.example.wags.domain.model.PrepType,
+    timeOfDay: com.example.wags.domain.model.TimeOfDay,
+    onRecordClick: (Long) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+
+        // ── All-settings toggle ───────────────────────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    if (showAll) "All settings" else "Current settings",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (showAll) EcgCyan else TextSecondary
+                )
+                if (!showAll) {
+                    Text(
+                        "${lungVolume.lowercase().replaceFirstChar { it.uppercase() }}  ·  ${prepType.displayName()}  ·  ${timeOfDay.displayName()}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextSecondary
+                    )
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("All", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                Switch(
+                    checked = showAll,
+                    onCheckedChange = { onToggleShowAll() },
+                    modifier = Modifier.padding(start = 6.dp)
+                )
+            }
+        }
+
+        HorizontalDivider(color = SurfaceVariant)
+
+        // ── Activity counts ───────────────────────────────────────────────────
+        Text(
+            "Activity Counts",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = EcgCyan
+        )
+        val activities = listOf(
+            "Free Hold"           to stats.freeHoldCount,
+            "O₂ Table"            to stats.o2TableCount,
+            "CO₂ Table"           to stats.co2TableCount,
+            "Progressive O₂"      to stats.progressiveO2Count,
+            "Min Breath"          to stats.minBreathCount,
+            "Wonka: Contraction"  to stats.wonkaContractionCount,
+            "Wonka: Endurance"    to stats.wonkaEnduranceCount,
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            activities.forEach { (label, count) ->
+                StatsRow(label = label, value = count.toString())
+            }
+        }
+
+        HorizontalDivider(color = SurfaceVariant)
+
+        // ── Overall HR / SpO2 extremes ────────────────────────────────────────
+        Text(
+            "Overall Session Extremes",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = EcgCyan
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            ExtremeRow(
+                label = "Highest HR",
+                value = stats.maxHrEver?.let { "%.0f bpm".format(it) } ?: "—",
+                recordId = stats.maxHrEverRecordId,
+                onRecordClick = onRecordClick
+            )
+            ExtremeRow(
+                label = "Lowest HR",
+                value = stats.minHrEver?.let { "%.0f bpm".format(it) } ?: "—",
+                recordId = stats.minHrEverRecordId,
+                onRecordClick = onRecordClick
+            )
+            ExtremeRow(
+                label = "Lowest SpO₂",
+                value = stats.lowestSpO2Ever?.let { "$it%" } ?: "—",
+                recordId = stats.lowestSpO2EverRecordId,
+                onRecordClick = onRecordClick
+            )
+        }
+
+        HorizontalDivider(color = SurfaceVariant)
+
+        // ── Session-start extremes ────────────────────────────────────────────
+        Text(
+            "Session Start Extremes",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = EcgCyan
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            ExtremeRow(
+                label = "Highest HR at start",
+                value = stats.maxStartHr?.let { "$it bpm" } ?: "—",
+                recordId = stats.maxStartHrRecordId,
+                onRecordClick = onRecordClick
+            )
+            ExtremeRow(
+                label = "Lowest HR at start",
+                value = stats.minStartHr?.let { "$it bpm" } ?: "—",
+                recordId = stats.minStartHrRecordId,
+                onRecordClick = onRecordClick
+            )
+            ExtremeRow(
+                label = "Highest SpO₂ at start",
+                value = stats.maxStartSpO2?.let { "$it%" } ?: "—",
+                recordId = stats.maxStartSpO2RecordId,
+                onRecordClick = onRecordClick
+            )
+            ExtremeRow(
+                label = "Lowest SpO₂ at start",
+                value = stats.minStartSpO2?.let { "$it%" } ?: "—",
+                recordId = stats.minStartSpO2RecordId,
+                onRecordClick = onRecordClick
+            )
+        }
+
+        HorizontalDivider(color = SurfaceVariant)
+
+        // ── Session-end extremes ──────────────────────────────────────────────
+        Text(
+            "Session End Extremes",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = EcgCyan
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            ExtremeRow(
+                label = "Highest HR at end",
+                value = stats.maxEndHr?.let { "$it bpm" } ?: "—",
+                recordId = stats.maxEndHrRecordId,
+                onRecordClick = onRecordClick
+            )
+            ExtremeRow(
+                label = "Lowest HR at end",
+                value = stats.minEndHr?.let { "$it bpm" } ?: "—",
+                recordId = stats.minEndHrRecordId,
+                onRecordClick = onRecordClick
+            )
+            ExtremeRow(
+                label = "Highest SpO₂ at end",
+                value = stats.maxEndSpO2?.let { "$it%" } ?: "—",
+                recordId = stats.maxEndSpO2RecordId,
+                onRecordClick = onRecordClick
+            )
+            ExtremeRow(
+                label = "Lowest SpO₂ at end",
+                value = stats.minEndSpO2?.let { "$it%" } ?: "—",
+                recordId = stats.minEndSpO2RecordId,
+                onRecordClick = onRecordClick
+            )
+        }
+    }
+}
+
+/**
+ * A stat row for an extreme value. When [recordId] is non-null the row is
+ * tappable and shows a `›` chevron; tapping navigates to that record's detail.
+ */
+@Composable
+private fun ExtremeRow(
+    label: String,
+    value: String,
+    recordId: Long?,
+    onRecordClick: (Long) -> Unit,
+) {
+    val clickable = recordId != null
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (clickable) Modifier.clickable { onRecordClick(recordId!!) }
+                else Modifier
+            ),
+        color = Color.Transparent
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(label, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    value,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (clickable) EcgCyan else Color.White,
+                    fontWeight = FontWeight.Medium
+                )
+                if (clickable) {
+                    Text("›", style = MaterialTheme.typography.titleMedium, color = TextSecondary)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatsRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+        Text(value, style = MaterialTheme.typography.bodySmall, color = Color.White, fontWeight = FontWeight.Medium)
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -42,4 +42,97 @@ interface ApneaRecordDao {
     /** Permanently delete a record (CASCADE will remove its free_hold_telemetry rows). */
     @Query("DELETE FROM apnea_records WHERE recordId = :recordId")
     suspend fun deleteById(recordId: Long)
+
+    // ── Stats queries (filtered by settings) ─────────────────────────────────
+
+    /** Count of free-hold records for a given settings combination. */
+    @Query("""
+        SELECT COUNT(*) FROM apnea_records
+        WHERE lungVolume = :lungVolume AND prepType = :prepType AND timeOfDay = :timeOfDay
+          AND tableType IS NULL
+    """)
+    fun countFreeHolds(lungVolume: String, prepType: String, timeOfDay: String): Flow<Int>
+
+    /** Count of records for a specific tableType and settings combination. */
+    @Query("""
+        SELECT COUNT(*) FROM apnea_records
+        WHERE lungVolume = :lungVolume AND prepType = :prepType AND timeOfDay = :timeOfDay
+          AND tableType = :tableType
+    """)
+    fun countByTableType(lungVolume: String, prepType: String, timeOfDay: String, tableType: String): Flow<Int>
+
+    /** Overall highest HR ever recorded during a session (filtered by settings). */
+    @Query("""
+        SELECT MAX(maxHrBpm) FROM apnea_records
+        WHERE lungVolume = :lungVolume AND prepType = :prepType AND timeOfDay = :timeOfDay
+    """)
+    fun getMaxHrEver(lungVolume: String, prepType: String, timeOfDay: String): Flow<Float?>
+
+    /** recordId of the record that holds the highest HR (filtered by settings). */
+    @Query("""
+        SELECT recordId FROM apnea_records
+        WHERE lungVolume = :lungVolume AND prepType = :prepType AND timeOfDay = :timeOfDay
+        ORDER BY maxHrBpm DESC LIMIT 1
+    """)
+    fun getMaxHrRecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
+
+    /** Overall lowest HR ever recorded during a session (filtered by settings). */
+    @Query("""
+        SELECT MIN(minHrBpm) FROM apnea_records
+        WHERE lungVolume = :lungVolume AND prepType = :prepType AND timeOfDay = :timeOfDay
+          AND minHrBpm > 0
+    """)
+    fun getMinHrEver(lungVolume: String, prepType: String, timeOfDay: String): Flow<Float?>
+
+    /** recordId of the record that holds the lowest HR (filtered by settings). */
+    @Query("""
+        SELECT recordId FROM apnea_records
+        WHERE lungVolume = :lungVolume AND prepType = :prepType AND timeOfDay = :timeOfDay
+          AND minHrBpm > 0
+        ORDER BY minHrBpm ASC LIMIT 1
+    """)
+    fun getMinHrRecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
+
+    /** Overall lowest SpO2 ever recorded during a session (filtered by settings). */
+    @Query("""
+        SELECT MIN(lowestSpO2) FROM apnea_records
+        WHERE lungVolume = :lungVolume AND prepType = :prepType AND timeOfDay = :timeOfDay
+          AND lowestSpO2 IS NOT NULL
+    """)
+    fun getLowestSpO2Ever(lungVolume: String, prepType: String, timeOfDay: String): Flow<Int?>
+
+    /** recordId of the record that holds the lowest SpO2 (filtered by settings). */
+    @Query("""
+        SELECT recordId FROM apnea_records
+        WHERE lungVolume = :lungVolume AND prepType = :prepType AND timeOfDay = :timeOfDay
+          AND lowestSpO2 IS NOT NULL
+        ORDER BY lowestSpO2 ASC LIMIT 1
+    """)
+    fun getLowestSpO2RecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
+
+    // ── Stats queries (all settings combined) ────────────────────────────────
+
+    @Query("SELECT COUNT(*) FROM apnea_records WHERE tableType IS NULL")
+    fun countFreeHoldsAll(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM apnea_records WHERE tableType = :tableType")
+    fun countByTableTypeAll(tableType: String): Flow<Int>
+
+    @Query("SELECT MAX(maxHrBpm) FROM apnea_records")
+    fun getMaxHrEverAll(): Flow<Float?>
+
+    @Query("SELECT recordId FROM apnea_records ORDER BY maxHrBpm DESC LIMIT 1")
+    fun getMaxHrRecordIdAll(): Flow<Long?>
+
+    @Query("SELECT MIN(minHrBpm) FROM apnea_records WHERE minHrBpm > 0")
+    fun getMinHrEverAll(): Flow<Float?>
+
+    @Query("SELECT recordId FROM apnea_records WHERE minHrBpm > 0 ORDER BY minHrBpm ASC LIMIT 1")
+    fun getMinHrRecordIdAll(): Flow<Long?>
+
+    @Query("SELECT MIN(lowestSpO2) FROM apnea_records WHERE lowestSpO2 IS NOT NULL")
+    fun getLowestSpO2EverAll(): Flow<Int?>
+
+    @Query("SELECT recordId FROM apnea_records WHERE lowestSpO2 IS NOT NULL ORDER BY lowestSpO2 ASC LIMIT 1")
+    fun getLowestSpO2RecordIdAll(): Flow<Long?>
 }

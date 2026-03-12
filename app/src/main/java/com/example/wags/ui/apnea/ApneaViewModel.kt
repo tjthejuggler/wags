@@ -10,6 +10,7 @@ import com.example.wags.data.db.entity.ApneaSessionEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
 import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.data.repository.ApneaSessionRepository
+import com.example.wags.domain.model.ApneaStats
 import com.example.wags.domain.model.ApneaTable
 import com.example.wags.domain.model.ApneaTableType
 import com.example.wags.domain.model.OximeterReading
@@ -51,7 +52,8 @@ enum class ApneaSection {
     WONKA_CONTRACTION,
     WONKA_ENDURANCE,
     RECENT_RECORDS,
-    SESSION_ANALYTICS
+    SESSION_ANALYTICS,
+    STATS
 }
 
 data class ApneaUiState(
@@ -98,6 +100,16 @@ data class ApneaUiState(
     val activeModalitySession: TrainingModality? = null,
     /** Live state from the AdvancedApneaStateMachine for the currently running inline session. */
     val advancedSessionState: AdvancedApneaState = AdvancedApneaState(),
+    // ── Stats ─────────────────────────────────────────────────────────────────
+    /** Stats filtered by the current settings (lungVolume + prepType + timeOfDay). */
+    val filteredStats: ApneaStats = ApneaStats(),
+    /** Stats aggregated across ALL settings combinations. */
+    val allStats: ApneaStats = ApneaStats(),
+    /**
+     * When true the stats section ignores the global settings and shows [allStats].
+     * When false it shows [filteredStats].
+     */
+    val showAllStats: Boolean = false,
 )
 
 @HiltViewModel
@@ -194,6 +206,21 @@ class ApneaViewModel @Inject constructor(
                         _uiState.update { it.copy(recentRecords = records) }
                     }
                 }
+        }
+        // Whenever any setting changes, re-subscribe to filtered stats
+        viewModelScope.launch {
+            combine(_lungVolume, _prepType, _timeOfDay) { lv, pt, tod -> Triple(lv, pt, tod) }
+                .collectLatest { (lv, pt, tod) ->
+                    apneaRepository.getStats(lv, pt.name, tod.name).collect { stats ->
+                        _uiState.update { it.copy(filteredStats = stats) }
+                    }
+                }
+        }
+        // All-settings stats (independent of settings changes)
+        viewModelScope.launch {
+            apneaRepository.getStatsAll().collect { stats ->
+                _uiState.update { it.copy(allStats = stats) }
+            }
         }
     }
 
@@ -494,6 +521,10 @@ class ApneaViewModel @Inject constructor(
 
     fun toggleSettings() {
         _uiState.update { it.copy(settingsExpanded = !it.settingsExpanded) }
+    }
+
+    fun toggleShowAllStats() {
+        _uiState.update { it.copy(showAllStats = !it.showAllStats) }
     }
 
     /**
