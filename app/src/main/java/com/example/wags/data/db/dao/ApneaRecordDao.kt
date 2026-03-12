@@ -110,6 +110,92 @@ interface ApneaRecordDao {
     """)
     fun getLowestSpO2RecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
 
+    // ── Recent records (all types, filtered by settings) ─────────────────────
+
+    /**
+     * Returns the [limit] most recent records for a given settings combination,
+     * regardless of tableType (free holds + all table types).
+     */
+    @Query("""
+        SELECT * FROM apnea_records
+        WHERE lungVolume = :lungVolume
+          AND prepType   = :prepType
+          AND timeOfDay  = :timeOfDay
+        ORDER BY timestamp DESC
+        LIMIT :limit
+    """)
+    fun getRecentBySettings(
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        limit: Int
+    ): Flow<List<ApneaRecordEntity>>
+
+    // ── Paginated all-records (for the All Records screen) ───────────────────
+
+    /**
+     * Returns a page of records with optional filters.
+     * Pass empty string "" for any filter to match all values.
+     * [tableTypes] is a comma-separated list of tableType values; pass "FREE_HOLD" to match NULL.
+     */
+    @Query("""
+        SELECT * FROM apnea_records
+        WHERE (:lungVolume = '' OR lungVolume = :lungVolume)
+          AND (:prepType   = '' OR prepType   = :prepType)
+          AND (:timeOfDay  = '' OR timeOfDay  = :timeOfDay)
+        ORDER BY timestamp DESC
+        LIMIT :limit OFFSET :offset
+    """)
+    suspend fun getPagedAll(
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        limit: Int,
+        offset: Int
+    ): List<ApneaRecordEntity>
+
+    /**
+     * Same as [getPagedAll] but also filters by a specific tableType.
+     * Pass NULL for [tableType] to get only free holds.
+     */
+    @Query("""
+        SELECT * FROM apnea_records
+        WHERE (:lungVolume = '' OR lungVolume = :lungVolume)
+          AND (:prepType   = '' OR prepType   = :prepType)
+          AND (:timeOfDay  = '' OR timeOfDay  = :timeOfDay)
+          AND tableType = :tableType
+        ORDER BY timestamp DESC
+        LIMIT :limit OFFSET :offset
+    """)
+    suspend fun getPagedByTableType(
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        tableType: String,
+        limit: Int,
+        offset: Int
+    ): List<ApneaRecordEntity>
+
+    /**
+     * Free holds only (tableType IS NULL) with optional settings filter.
+     */
+    @Query("""
+        SELECT * FROM apnea_records
+        WHERE (:lungVolume = '' OR lungVolume = :lungVolume)
+          AND (:prepType   = '' OR prepType   = :prepType)
+          AND (:timeOfDay  = '' OR timeOfDay  = :timeOfDay)
+          AND tableType IS NULL
+        ORDER BY timestamp DESC
+        LIMIT :limit OFFSET :offset
+    """)
+    suspend fun getPagedFreeHolds(
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        limit: Int,
+        offset: Int
+    ): List<ApneaRecordEntity>
+
     // ── Stats queries (all settings combined) ────────────────────────────────
 
     @Query("SELECT COUNT(*) FROM apnea_records WHERE tableType IS NULL")

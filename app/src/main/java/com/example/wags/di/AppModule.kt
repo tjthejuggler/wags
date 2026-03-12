@@ -2,15 +2,12 @@ package com.example.wags.di
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.example.wags.data.db.dao.ApneaRecordDao
 import com.example.wags.data.db.dao.ApneaSessionDao
 import com.example.wags.data.db.dao.ContractionDao
 import com.example.wags.data.db.dao.DailyReadingDao
-import com.example.wags.data.db.dao.FreeHoldTelemetryDao
 import com.example.wags.data.db.dao.MorningReadinessDao
 import com.example.wags.data.db.dao.SessionLogDao
 import com.example.wags.data.db.dao.TelemetryDao
-import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.data.repository.ApneaSessionRepository
 import com.example.wags.data.repository.MorningReadinessRepository
 import com.example.wags.data.repository.ReadinessRepository
@@ -33,12 +30,7 @@ object AppModule {
     fun provideReadinessRepository(dao: DailyReadingDao): ReadinessRepository =
         ReadinessRepository(dao)
 
-    @Provides
-    @Singleton
-    fun provideApneaRepository(
-        dao: ApneaRecordDao,
-        telemetryDao: FreeHoldTelemetryDao
-    ): ApneaRepository = ApneaRepository(dao, telemetryDao)
+    // ApneaRepository is @Singleton + @Inject constructor — Hilt injects it automatically.
 
     @Provides
     @Singleton

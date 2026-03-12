@@ -110,3 +110,29 @@ Mode 2 — Endurance (+X seconds):
 Variables:
 • T_cruise = Time from start to first contraction
 • ΔT_endurance = User-defined endurance delta (default 45s)"""
+
+internal const val TABLE_TRAINING_HELP_TITLE = "Table Training"
+internal const val TABLE_TRAINING_HELP_TEXT = """Tables are structured breath-hold protocols that systematically stress either your CO₂ tolerance or O₂ capacity.
+
+WHY TABLES?
+Unstructured free holds improve willpower but plateau quickly. Tables apply progressive overload — the same principle used in strength training — to drive measurable physiological adaptation.
+
+CO₂ TABLES (Hypercapnia):
+• Fixed hold time, progressively shorter rests
+• Forces your body to clear CO₂ less efficiently each round
+• Builds tolerance to the urge-to-breathe signal
+• Best for: extending your comfortable hold time
+
+O₂ TABLES (Hypoxia):
+• Fixed long rest, progressively longer holds
+• Pushes your oxygen depletion limits safely
+• Stimulates erythropoietin (EPO) production over time
+• Best for: extending your maximum hold time
+
+HOW TO USE:
+1. Set your Personal Best (PB) — your longest comfortable hold
+2. Choose Session Length (4 / 8 / 12 rounds)
+3. Choose Difficulty (Easy / Medium / Hard)
+4. All hold and rest durations are auto-calculated as % of your PB
+
+Consistency over intensity: 3–4 table sessions per week outperforms occasional maximal efforts."""

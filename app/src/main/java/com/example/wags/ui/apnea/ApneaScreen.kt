@@ -144,20 +144,10 @@ fun ApneaScreen(
                     expanded = tableTrainingOpen,
                     onToggle = { viewModel.toggleSection(ApneaSection.TABLE_TRAINING) },
                     headerExtra = {
-                        OutlinedButton(
-                            onClick = {
-                                navController.navigate(
-                                    WagsRoutes.apneaHistory(
-                                        state.selectedLungVolume,
-                                        state.prepType.name,
-                                        state.timeOfDay.name
-                                    )
-                                )
-                            },
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-                        ) {
-                            Text("📋 History", style = MaterialTheme.typography.labelMedium)
-                        }
+                        TableHelpIcon(
+                            title = TABLE_TRAINING_HELP_TITLE,
+                            text = TABLE_TRAINING_HELP_TEXT
+                        )
                     }
                 ) {
                     TableTrainingConfigContent(
@@ -274,20 +264,21 @@ fun ApneaScreen(
                 }
 
                 // ── Recent Records ────────────────────────────────────────────
-                if (state.recentRecords.isNotEmpty()) {
-                    val recentOpen = state.openSection == ApneaSection.RECENT_RECORDS
-                    CollapsibleCard(
-                        title = "Recent Records",
-                        expanded = recentOpen,
-                        onToggle = { viewModel.toggleSection(ApneaSection.RECENT_RECORDS) }
-                    ) {
-                        RecentRecordsContent(
-                            records = state.recentRecords,
-                            onRecordClick = { record ->
-                                navController.navigate(WagsRoutes.apneaRecordDetail(record.recordId))
-                            }
-                        )
-                    }
+                val recentOpen = state.openSection == ApneaSection.RECENT_RECORDS
+                CollapsibleCard(
+                    title = "Recent Records",
+                    expanded = recentOpen,
+                    onToggle = { viewModel.toggleSection(ApneaSection.RECENT_RECORDS) }
+                ) {
+                    RecentRecordsContent(
+                        records = state.recentRecords,
+                        onAllRecordsClick = {
+                            navController.navigate(WagsRoutes.APNEA_ALL_RECORDS)
+                        },
+                        onRecordClick = { record ->
+                            navController.navigate(WagsRoutes.apneaRecordDetail(record.recordId))
+                        }
+                    )
                 }
 
                 // ── Stats ─────────────────────────────────────────────────────
@@ -921,11 +912,30 @@ private fun AdvancedSessionRunningContent(
 @Composable
 private fun RecentRecordsContent(
     records: List<ApneaRecordEntity>,
+    onAllRecordsClick: () -> Unit,
     onRecordClick: (ApneaRecordEntity) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        records.take(10).forEach { record ->
-            RecentRecordRow(record = record, onClick = { onRecordClick(record) })
+        // "All Records" button always at the top
+        OutlinedButton(
+            onClick = onAllRecordsClick,
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            Text("📋 All Records", style = MaterialTheme.typography.labelLarge)
+        }
+
+        if (records.isEmpty()) {
+            Text(
+                "No records yet. Complete a session to see it here.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+        } else {
+            records.take(10).forEach { record ->
+                RecentRecordRow(record = record, onClick = { onRecordClick(record) })
+            }
         }
     }
 }

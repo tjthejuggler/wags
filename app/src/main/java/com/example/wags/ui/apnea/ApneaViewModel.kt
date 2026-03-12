@@ -198,11 +198,11 @@ class ApneaViewModel @Inject constructor(
                     }
                 }
         }
-        // Whenever any setting changes, re-subscribe to filtered records
+        // Recent records: 10 most recent across ALL event types, filtered by current settings
         viewModelScope.launch {
             combine(_lungVolume, _prepType, _timeOfDay) { lv, pt, tod -> Triple(lv, pt, tod) }
                 .collectLatest { (lv, pt, tod) ->
-                    apneaRepository.getBySettings(lv, pt.name, tod.name).collect { records ->
+                    apneaRepository.getRecentBySettings(lv, pt.name, tod.name, limit = 10).collect { records ->
                         _uiState.update { it.copy(recentRecords = records) }
                     }
                 }

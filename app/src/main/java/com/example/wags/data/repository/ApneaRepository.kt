@@ -5,13 +5,19 @@ import com.example.wags.data.db.dao.FreeHoldTelemetryDao
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
 import com.example.wags.domain.model.ApneaStats
+import com.example.wags.di.IoDispatcher
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
+import javax.inject.Singleton
 
+@Singleton
 class ApneaRepository @Inject constructor(
     private val dao: ApneaRecordDao,
-    private val telemetryDao: FreeHoldTelemetryDao
+    private val telemetryDao: FreeHoldTelemetryDao,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) {
     fun getLatestRecords(limit: Int = 20): Flow<List<ApneaRecordEntity>> =
         dao.getLatest(limit)
@@ -23,9 +29,69 @@ class ApneaRepository @Inject constructor(
     fun getBySettings(lungVolume: String, prepType: String, timeOfDay: String): Flow<List<ApneaRecordEntity>> =
         dao.getBySettings(lungVolume, prepType, timeOfDay)
 
+    /**
+     * The [limit] most recent records for a given settings combination, across ALL event types.
+     * Used by the Recent Records section on the main Apnea screen.
+     */
+    fun getRecentBySettings(
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        limit: Int = 10
+    ): Flow<List<ApneaRecordEntity>> =
+        dao.getRecentBySettings(lungVolume, prepType, timeOfDay, limit)
+
     /** Best free-hold duration for the current settings combination. */
     fun getBestFreeHold(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?> =
         dao.getBestFreeHold(lungVolume, prepType, timeOfDay)
+
+    // ── Paginated all-records (for the All Records screen) ───────────────────
+
+    /**
+     * Fetches a page of records with optional settings filters and an optional list of
+     * event types to include. Pass empty [eventTypes] to include everything.
+     *
+     * [lungVolume], [prepType], [timeOfDay] — pass "" to skip that filter.
+     * [eventTypes] — list of tableType strings to include; null entry means "Free Hold" (tableType IS NULL).
+     *   Pass null or empty list to include all types.
+     */
+    suspend fun getPagedRecords(
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        eventTypes: List<String?>,   // null element = free hold
+        pageSize: Int,
+        offset: Int
+    ): List<ApneaRecordEntity> = withContext(ioDispatcher) {
+        val includeAll = eventTypes.isEmpty()
+        val includeNullType = includeAll || eventTypes.contains(null)
+        val namedTypes = if (includeAll) emptyList() else eventTypes.filterNotNull()
+
+        when {
+            includeAll -> {
+                // No type filter — just settings filter
+                dao.getPagedAll(lungVolume, prepType, timeOfDay, pageSize, offset)
+            }
+            includeNullType && namedTypes.isEmpty() -> {
+                // Only free holds
+                dao.getPagedFreeHolds(lungVolume, prepType, timeOfDay, pageSize, offset)
+            }
+            includeNullType -> {
+                // Free holds + specific named types — fetch both and merge
+                val freeHolds = dao.getPagedFreeHolds(lungVolume, prepType, timeOfDay, pageSize, offset)
+                val named = namedTypes.flatMap { type ->
+                    dao.getPagedByTableType(lungVolume, prepType, timeOfDay, type, pageSize, offset)
+                }
+                (freeHolds + named).sortedByDescending { it.timestamp }.take(pageSize)
+            }
+            else -> {
+                // Only named types (no free holds)
+                namedTypes.flatMap { type ->
+                    dao.getPagedByTableType(lungVolume, prepType, timeOfDay, type, pageSize, offset)
+                }.sortedByDescending { it.timestamp }.take(pageSize)
+            }
+        }
+    }
 
     suspend fun getById(recordId: Long): ApneaRecordEntity? =
         dao.getById(recordId)
