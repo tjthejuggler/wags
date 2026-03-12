@@ -90,6 +90,7 @@ fun ApneaScreen(
             // ── 3. Table Training & Advanced ──────────────────────────────
             PersonalBestSection(
                 personalBestMs = state.personalBestMs,
+                bestTimeForSettingsMs = state.bestTimeForSettingsMs,
                 selectedLength = state.selectedLength,
                 selectedDifficulty = state.selectedDifficulty,
                 onSetPersonalBest = { viewModel.setPersonalBest(it) },
@@ -359,6 +360,7 @@ private fun formatMs(ms: Long): String {
 @Composable
 private fun PersonalBestSection(
     personalBestMs: Long,
+    bestTimeForSettingsMs: Long,
     selectedLength: TableLength,
     selectedDifficulty: TableDifficulty,
     onSetPersonalBest: (Long) -> Unit,
@@ -371,6 +373,13 @@ private fun PersonalBestSection(
     onNavigateHistory: () -> Unit
 ) {
     var pbInput by remember { mutableStateOf("") }
+
+    // Auto-fill the PB input with the best time for the current settings combination
+    LaunchedEffect(bestTimeForSettingsMs) {
+        if (bestTimeForSettingsMs > 0L) {
+            pbInput = (bestTimeForSettingsMs / 1000L).toString()
+        }
+    }
 
     Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
         Column(
