@@ -198,13 +198,20 @@ private fun EditRecordSheet(
                 Text("Lung Volume", style = MaterialTheme.typography.labelLarge, color = TextSecondary)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("FULL", "HALF", "EMPTY").forEach { vol ->
+                        val isSelected = lungVolume == vol
                         FilterChip(
-                            selected = lungVolume == vol,
+                            selected = isSelected,
                             onClick  = { onLungVolumeChange(vol) },
-                            label    = { Text(vol.lowercase().replaceFirstChar { it.uppercase() }) },
+                            label    = {
+                                Text(
+                                    vol.lowercase().replaceFirstChar { it.uppercase() },
+                                    color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurface
+                                )
+                            },
                             colors   = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = EcgCyan,
-                                selectedLabelColor     = BackgroundDark
+                                selectedLabelColor     = Color.Black,
+                                labelColor             = MaterialTheme.colorScheme.onSurface
                             )
                         )
                     }
@@ -216,13 +223,20 @@ private fun EditRecordSheet(
                 Text("Prep Type", style = MaterialTheme.typography.labelLarge, color = TextSecondary)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     PrepType.entries.forEach { pt ->
+                        val isSelected = prepType == pt
                         FilterChip(
-                            selected = prepType == pt,
+                            selected = isSelected,
                             onClick  = { onPrepTypeChange(pt) },
-                            label    = { Text(pt.displayName()) },
+                            label    = {
+                                Text(
+                                    pt.displayName(),
+                                    color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurface
+                                )
+                            },
                             colors   = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = EcgCyan,
-                                selectedLabelColor     = BackgroundDark
+                                selectedLabelColor     = Color.Black,
+                                labelColor             = MaterialTheme.colorScheme.onSurface
                             )
                         )
                     }
@@ -234,13 +248,20 @@ private fun EditRecordSheet(
                 Text("Time of Day", style = MaterialTheme.typography.labelLarge, color = TextSecondary)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TimeOfDay.entries.forEach { tod ->
+                        val isSelected = timeOfDay == tod
                         FilterChip(
-                            selected = timeOfDay == tod,
+                            selected = isSelected,
                             onClick  = { onTimeOfDayChange(tod) },
-                            label    = { Text(tod.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                            label    = {
+                                Text(
+                                    tod.name.lowercase().replaceFirstChar { it.uppercase() },
+                                    color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurface
+                                )
+                            },
                             colors   = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = EcgCyan,
-                                selectedLabelColor     = BackgroundDark
+                                selectedLabelColor     = Color.Black,
+                                labelColor             = MaterialTheme.colorScheme.onSurface
                             )
                         )
                     }
@@ -330,14 +351,6 @@ private fun RecordDetailContent(
                         label = "First Contraction",
                         value = formatMsDetail(fcMs),
                         valueColor = Color(0xFFFF9800),
-                        valueBold = true
-                    )
-                }
-                record.lowestSpO2?.let { spo2 ->
-                    DetailRow(
-                        label = "Lowest SpO₂",
-                        value = "$spo2%",
-                        valueColor = SpO2Blue,
                         valueBold = true
                     )
                 }
