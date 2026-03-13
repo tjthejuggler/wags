@@ -132,12 +132,16 @@ fun ApneaScreen(
                         freeHoldActive = state.freeHoldActive,
                         freeHoldDurationMs = state.freeHoldDurationMs,
                         bestTimeMs = state.bestTimeForSettingsMs,
+                        bestTimeRecordId = state.bestTimeForSettingsRecordId,
                         showTimer = state.showTimer,
                         liveOxHr = state.liveOxHr,
                         liveOxSpO2 = state.liveOxSpO2,
                         onShowTimerChange = { viewModel.setShowTimer(it) },
                         onStart = { viewModel.startFreeHold(deviceId) },
-                        onStop = { viewModel.stopFreeHold() }
+                        onStop = { viewModel.stopFreeHold() },
+                        onBestTimeClick = { recordId ->
+                            navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
+                        }
                     )
                 }
 
@@ -507,12 +511,14 @@ private fun FreeHoldContent(
     freeHoldActive: Boolean,
     freeHoldDurationMs: Long,
     bestTimeMs: Long,
+    bestTimeRecordId: Long?,
     showTimer: Boolean,
     liveOxHr: Int?,
     liveOxSpO2: Int?,
     onShowTimerChange: (Boolean) -> Unit,
     onStart: () -> Unit,
-    onStop: () -> Unit
+    onStop: () -> Unit,
+    onBestTimeClick: (Long) -> Unit = {}
 ) {
     var elapsedMs by remember { mutableLongStateOf(0L) }
     val holdStartTime = remember { mutableLongStateOf(0L) }
@@ -548,7 +554,11 @@ private fun FreeHoldContent(
                 "🏆 ${formatMs(bestTimeMs)}",
                 style = MaterialTheme.typography.headlineSmall,
                 color = EcgCyan,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                modifier = if (bestTimeRecordId != null)
+                    Modifier.clickable { onBestTimeClick(bestTimeRecordId) }
+                else
+                    Modifier
             )
         }
 

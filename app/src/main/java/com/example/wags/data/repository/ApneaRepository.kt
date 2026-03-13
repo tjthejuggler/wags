@@ -45,6 +45,10 @@ class ApneaRepository @Inject constructor(
     fun getBestFreeHold(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?> =
         dao.getBestFreeHold(lungVolume, prepType, timeOfDay)
 
+    /** recordId of the best free-hold for the current settings combination. */
+    fun getBestFreeHoldRecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?> =
+        dao.getBestFreeHoldRecordId(lungVolume, prepType, timeOfDay)
+
     // ── Paginated all-records (for the All Records screen) ───────────────────
 
     /**

@@ -78,6 +78,8 @@ data class ApneaUiState(
     val showTimer: Boolean = true,
     /** Best free-hold for the current lungVolume + prepType combination (from DB). */
     val bestTimeForSettingsMs: Long = 0L,
+    /** recordId of the best free-hold record for the current settings combination (null if none). */
+    val bestTimeForSettingsRecordId: Long? = null,
     val selectedLength: TableLength = TableLength.MEDIUM,
     val selectedDifficulty: TableDifficulty = TableDifficulty.MEDIUM,
     // Contraction tracking
@@ -215,6 +217,15 @@ class ApneaViewModel @Inject constructor(
                 .collectLatest { (lv, pt, tod) ->
                     apneaRepository.getBestFreeHold(lv, pt.name, tod.name).collect { best ->
                         _uiState.update { it.copy(bestTimeForSettingsMs = best ?: 0L) }
+                    }
+                }
+        }
+        // Whenever any setting changes, re-subscribe to best-time record-id query
+        viewModelScope.launch {
+            combine(_lungVolume, _prepType, _timeOfDay) { lv, pt, tod -> Triple(lv, pt, tod) }
+                .collectLatest { (lv, pt, tod) ->
+                    apneaRepository.getBestFreeHoldRecordId(lv, pt.name, tod.name).collect { id ->
+                        _uiState.update { it.copy(bestTimeForSettingsRecordId = id) }
                     }
                 }
         }
