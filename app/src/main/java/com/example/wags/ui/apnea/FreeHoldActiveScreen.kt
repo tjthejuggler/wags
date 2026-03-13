@@ -42,6 +42,36 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Physiological sanity bounds
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Any HR or SpO2 value outside these ranges is a sensor glitch and must be
+ * discarded before it reaches the database or any aggregate calculation.
+ *
+ * HR  : 20–250 bpm
+ *   Lower bound: extreme diving bradycardia can reach ~20 bpm; anything below
+ *   is a BLE dropout artefact (device reports 0 when signal is lost).
+ *
+ * SpO2: 1–100 %
+ *   Lower bound is intentionally 1, NOT 50.  Elite freedivers have documented
+ *   SpO2 readings in the 25–40 % range during competitive dives, so any
+ *   physiologically plausible non-zero value must be preserved.
+ *   Zero is the only value that is unambiguously a "no signal" artefact.
+ */
+internal object PhysiologicalBounds {
+    const val HR_MIN   = 20
+    const val HR_MAX   = 250
+    const val SPO2_MIN = 1      // reject 0 only — real extreme dives can go very low
+    const val SPO2_MAX = 100
+
+    fun isValidHr(bpm: Int): Boolean    = bpm in HR_MIN..HR_MAX
+    fun isValidHr(bpm: Float): Boolean  = bpm >= HR_MIN && bpm <= HR_MAX
+    fun isValidSpO2(pct: Int): Boolean  = pct in SPO2_MIN..SPO2_MAX
+    fun isValidSpO2(pct: Float): Boolean = pct >= SPO2_MIN && pct <= SPO2_MAX
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ViewModel
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -142,16 +172,27 @@ class FreeHoldActiveViewModel @Inject constructor(
 
         viewModelScope.launch {
             val rrSnapshot = bleManager.rrBuffer.readLast(512)
-            val rrHrValues = rrSnapshot.map { 60_000.0 / it }
+
+            // ── RR-derived HR — discard physiologically impossible beats ──────
+            val rrHrValues = rrSnapshot
+                .map { 60_000.0 / it }
+                .filter { PhysiologicalBounds.isValidHr(it.toFloat()) }
             val minHrFromRr = rrHrValues.minOrNull()?.toFloat() ?: 0f
             val maxHrFromRr = rrHrValues.maxOrNull()?.toFloat() ?: 0f
 
-            val oxHrValues   = oxSnapshot.map { it.second.heartRateBpm.toFloat() }
-            val oxSpO2Values = oxSnapshot.map { it.second.spO2.toFloat() }
-            val maxHrFromOx  = oxHrValues.maxOrNull() ?: 0f
-            val lowestSpO2   = oxSpO2Values.minOrNull()?.toInt()
+            // ── Oximeter samples — discard glitch readings (0 bpm, 0 SpO2, etc.) ──
+            val validOxHr   = oxSnapshot
+                .map { it.second.heartRateBpm.toFloat() }
+                .filter { PhysiologicalBounds.isValidHr(it) }
+            val validOxSpO2 = oxSnapshot
+                .map { it.second.spO2.toFloat() }
+                .filter { PhysiologicalBounds.isValidSpO2(it) }
 
-            val minHr = if (minHrFromRr > 0f) minHrFromRr else oxHrValues.minOrNull() ?: 0f
+            val maxHrFromOx = validOxHr.maxOrNull() ?: 0f
+            val lowestSpO2  = validOxSpO2.minOrNull()?.toInt()
+
+            // Prefer Polar for HR aggregates; fall back to oximeter
+            val minHr = if (minHrFromRr > 0f) minHrFromRr else validOxHr.minOrNull() ?: 0f
             val maxHr = if (maxHrFromRr > 0f) maxHrFromRr else maxHrFromOx
 
             val now = System.currentTimeMillis()
@@ -159,15 +200,15 @@ class FreeHoldActiveViewModel @Inject constructor(
             // Use the settings that were baked in at navigation time — guaranteed correct
             val recordId = apneaRepository.saveRecord(
                 ApneaRecordEntity(
-                    timestamp        = now,
-                    durationMs       = durationMs,
-                    lungVolume       = lungVolume,
-                    prepType         = prepType,
-                    timeOfDay        = timeOfDay,
-                    minHrBpm         = minHr,
-                    maxHrBpm         = maxHr,
-                    lowestSpO2       = lowestSpO2,
-                    tableType        = null,
+                    timestamp          = now,
+                    durationMs         = durationMs,
+                    lungVolume         = lungVolume,
+                    prepType           = prepType,
+                    timeOfDay          = timeOfDay,
+                    minHrBpm           = minHr,
+                    maxHrBpm           = maxHr,
+                    lowestSpO2         = lowestSpO2,
+                    tableType          = null,
                     firstContractionMs = firstContractionMs
                 )
             )
@@ -176,34 +217,42 @@ class FreeHoldActiveViewModel @Inject constructor(
 
             val samples = mutableListOf<FreeHoldTelemetryEntity>()
 
+            // ── Polar RR → per-beat HR telemetry (only valid beats) ──────────
             if (rrSnapshot.isNotEmpty()) {
                 var cumulativeMs = 0L
                 for (rrMs in rrSnapshot) {
                     cumulativeMs += rrMs.toLong()
                     if (cumulativeMs > durationMs) break
                     val bpm = (60_000.0 / rrMs).toInt()
+                    if (!PhysiologicalBounds.isValidHr(bpm)) continue   // skip glitch beat
                     samples.add(
                         FreeHoldTelemetryEntity(
-                            recordId      = recordId,
-                            timestampMs   = freeHoldStartTime + cumulativeMs,
-                            heartRateBpm  = bpm,
-                            spO2          = null
+                            recordId     = recordId,
+                            timestampMs  = freeHoldStartTime + cumulativeMs,
+                            heartRateBpm = bpm,
+                            spO2         = null
                         )
                     )
                 }
             }
 
+            // ── Oximeter → HR + SpO2 telemetry (only valid readings) ─────────
             for ((timestampMs, reading) in oxSnapshot) {
                 if (timestampMs < freeHoldStartTime) continue
                 if (timestampMs > freeHoldStartTime + durationMs) continue
-                samples.add(
-                    FreeHoldTelemetryEntity(
-                        recordId     = recordId,
-                        timestampMs  = timestampMs,
-                        heartRateBpm = reading.heartRateBpm,
-                        spO2         = reading.spO2
+                val validHr   = reading.heartRateBpm.takeIf { PhysiologicalBounds.isValidHr(it) }
+                val validSpO2 = reading.spO2.takeIf { PhysiologicalBounds.isValidSpO2(it) }
+                // Only save the row if at least one field is valid
+                if (validHr != null || validSpO2 != null) {
+                    samples.add(
+                        FreeHoldTelemetryEntity(
+                            recordId     = recordId,
+                            timestampMs  = timestampMs,
+                            heartRateBpm = validHr,
+                            spO2         = validSpO2
+                        )
                     )
-                )
+                }
             }
 
             if (samples.isNotEmpty()) {

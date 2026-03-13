@@ -79,6 +79,7 @@ interface ApneaRecordDao {
     @Query("""
         SELECT MAX(maxHrBpm) FROM apnea_records
         WHERE lungVolume = :lungVolume AND prepType = :prepType AND timeOfDay = :timeOfDay
+          AND maxHrBpm BETWEEN 20 AND 250
     """)
     fun getMaxHrEver(lungVolume: String, prepType: String, timeOfDay: String): Flow<Float?>
 
@@ -86,6 +87,7 @@ interface ApneaRecordDao {
     @Query("""
         SELECT recordId FROM apnea_records
         WHERE lungVolume = :lungVolume AND prepType = :prepType AND timeOfDay = :timeOfDay
+          AND maxHrBpm BETWEEN 20 AND 250
         ORDER BY maxHrBpm DESC LIMIT 1
     """)
     fun getMaxHrRecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
@@ -94,7 +96,7 @@ interface ApneaRecordDao {
     @Query("""
         SELECT MIN(minHrBpm) FROM apnea_records
         WHERE lungVolume = :lungVolume AND prepType = :prepType AND timeOfDay = :timeOfDay
-          AND minHrBpm > 0
+          AND minHrBpm BETWEEN 20 AND 250
     """)
     fun getMinHrEver(lungVolume: String, prepType: String, timeOfDay: String): Flow<Float?>
 
@@ -102,7 +104,7 @@ interface ApneaRecordDao {
     @Query("""
         SELECT recordId FROM apnea_records
         WHERE lungVolume = :lungVolume AND prepType = :prepType AND timeOfDay = :timeOfDay
-          AND minHrBpm > 0
+          AND minHrBpm BETWEEN 20 AND 250
         ORDER BY minHrBpm ASC LIMIT 1
     """)
     fun getMinHrRecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
@@ -112,6 +114,7 @@ interface ApneaRecordDao {
         SELECT MIN(lowestSpO2) FROM apnea_records
         WHERE lungVolume = :lungVolume AND prepType = :prepType AND timeOfDay = :timeOfDay
           AND lowestSpO2 IS NOT NULL
+          AND lowestSpO2 BETWEEN 1 AND 100
     """)
     fun getLowestSpO2Ever(lungVolume: String, prepType: String, timeOfDay: String): Flow<Int?>
 
@@ -120,6 +123,7 @@ interface ApneaRecordDao {
         SELECT recordId FROM apnea_records
         WHERE lungVolume = :lungVolume AND prepType = :prepType AND timeOfDay = :timeOfDay
           AND lowestSpO2 IS NOT NULL
+          AND lowestSpO2 BETWEEN 1 AND 100
         ORDER BY lowestSpO2 ASC LIMIT 1
     """)
     fun getLowestSpO2RecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
@@ -218,21 +222,21 @@ interface ApneaRecordDao {
     @Query("SELECT COUNT(*) FROM apnea_records WHERE tableType = :tableType")
     fun countByTableTypeAll(tableType: String): Flow<Int>
 
-    @Query("SELECT MAX(maxHrBpm) FROM apnea_records")
+    @Query("SELECT MAX(maxHrBpm) FROM apnea_records WHERE maxHrBpm BETWEEN 20 AND 250")
     fun getMaxHrEverAll(): Flow<Float?>
 
-    @Query("SELECT recordId FROM apnea_records ORDER BY maxHrBpm DESC LIMIT 1")
+    @Query("SELECT recordId FROM apnea_records WHERE maxHrBpm BETWEEN 20 AND 250 ORDER BY maxHrBpm DESC LIMIT 1")
     fun getMaxHrRecordIdAll(): Flow<Long?>
 
-    @Query("SELECT MIN(minHrBpm) FROM apnea_records WHERE minHrBpm > 0")
+    @Query("SELECT MIN(minHrBpm) FROM apnea_records WHERE minHrBpm BETWEEN 20 AND 250")
     fun getMinHrEverAll(): Flow<Float?>
 
-    @Query("SELECT recordId FROM apnea_records WHERE minHrBpm > 0 ORDER BY minHrBpm ASC LIMIT 1")
+    @Query("SELECT recordId FROM apnea_records WHERE minHrBpm BETWEEN 20 AND 250 ORDER BY minHrBpm ASC LIMIT 1")
     fun getMinHrRecordIdAll(): Flow<Long?>
 
-    @Query("SELECT MIN(lowestSpO2) FROM apnea_records WHERE lowestSpO2 IS NOT NULL")
+    @Query("SELECT MIN(lowestSpO2) FROM apnea_records WHERE lowestSpO2 IS NOT NULL AND lowestSpO2 BETWEEN 1 AND 100")
     fun getLowestSpO2EverAll(): Flow<Int?>
 
-    @Query("SELECT recordId FROM apnea_records WHERE lowestSpO2 IS NOT NULL ORDER BY lowestSpO2 ASC LIMIT 1")
+    @Query("SELECT recordId FROM apnea_records WHERE lowestSpO2 IS NOT NULL AND lowestSpO2 BETWEEN 1 AND 100 ORDER BY lowestSpO2 ASC LIMIT 1")
     fun getLowestSpO2RecordIdAll(): Flow<Long?>
 }

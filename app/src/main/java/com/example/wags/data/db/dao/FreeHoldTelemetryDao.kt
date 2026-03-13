@@ -23,10 +23,16 @@ interface FreeHoldTelemetryDao {
     // ── Session-start / session-end aggregate stats ───────────────────────────
     // "Start" = the first telemetry sample for each record; "End" = the last.
     // We join to apnea_records to apply settings filters.
+    //
+    // Physiological bounds applied to every HR/SpO2 predicate:
+    //   HR   : 20–250 bpm
+    //   SpO2 : 1–100 %  (0 = no-signal artefact; real extreme dives can go very low)
+    // This ensures sensor glitches (e.g. 0 bpm / 0 % during a BLE dropout) never
+    // corrupt aggregate stats, even for records that were saved before the
+    // ingestion-layer filter was added.
 
     /**
      * Highest HR seen in the FIRST sample of each session (filtered by settings).
-     * Uses a subquery to find the min timestampMs per recordId, then aggregates.
      */
     @Query("""
         SELECT MAX(t.heartRateBpm)
@@ -39,6 +45,7 @@ interface FreeHoldTelemetryDao {
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
         WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
           AND t.heartRateBpm IS NOT NULL
+          AND t.heartRateBpm BETWEEN 20 AND 250
     """)
     fun getMaxStartHr(lungVolume: String, prepType: String, timeOfDay: String): Flow<Int?>
 
@@ -53,6 +60,7 @@ interface FreeHoldTelemetryDao {
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
         WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
           AND t.heartRateBpm IS NOT NULL
+          AND t.heartRateBpm BETWEEN 20 AND 250
         ORDER BY t.heartRateBpm DESC LIMIT 1
     """)
     fun getMaxStartHrRecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
@@ -67,7 +75,8 @@ interface FreeHoldTelemetryDao {
             GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
         WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
-          AND t.heartRateBpm IS NOT NULL AND t.heartRateBpm > 0
+          AND t.heartRateBpm IS NOT NULL
+          AND t.heartRateBpm BETWEEN 20 AND 250
     """)
     fun getMinStartHr(lungVolume: String, prepType: String, timeOfDay: String): Flow<Int?>
 
@@ -81,7 +90,8 @@ interface FreeHoldTelemetryDao {
             GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
         WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
-          AND t.heartRateBpm IS NOT NULL AND t.heartRateBpm > 0
+          AND t.heartRateBpm IS NOT NULL
+          AND t.heartRateBpm BETWEEN 20 AND 250
         ORDER BY t.heartRateBpm ASC LIMIT 1
     """)
     fun getMinStartHrRecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
@@ -97,6 +107,7 @@ interface FreeHoldTelemetryDao {
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
         WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
           AND t.spO2 IS NOT NULL
+          AND t.spO2 BETWEEN 1 AND 100
     """)
     fun getMaxStartSpO2(lungVolume: String, prepType: String, timeOfDay: String): Flow<Int?>
 
@@ -111,6 +122,7 @@ interface FreeHoldTelemetryDao {
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
         WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
           AND t.spO2 IS NOT NULL
+          AND t.spO2 BETWEEN 1 AND 100
         ORDER BY t.spO2 DESC LIMIT 1
     """)
     fun getMaxStartSpO2RecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
@@ -126,6 +138,7 @@ interface FreeHoldTelemetryDao {
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
         WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
           AND t.spO2 IS NOT NULL
+          AND t.spO2 BETWEEN 1 AND 100
     """)
     fun getMinStartSpO2(lungVolume: String, prepType: String, timeOfDay: String): Flow<Int?>
 
@@ -140,6 +153,7 @@ interface FreeHoldTelemetryDao {
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
         WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
           AND t.spO2 IS NOT NULL
+          AND t.spO2 BETWEEN 1 AND 100
         ORDER BY t.spO2 ASC LIMIT 1
     """)
     fun getMinStartSpO2RecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
@@ -155,6 +169,7 @@ interface FreeHoldTelemetryDao {
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
         WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
           AND t.heartRateBpm IS NOT NULL
+          AND t.heartRateBpm BETWEEN 20 AND 250
     """)
     fun getMaxEndHr(lungVolume: String, prepType: String, timeOfDay: String): Flow<Int?>
 
@@ -169,6 +184,7 @@ interface FreeHoldTelemetryDao {
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
         WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
           AND t.heartRateBpm IS NOT NULL
+          AND t.heartRateBpm BETWEEN 20 AND 250
         ORDER BY t.heartRateBpm DESC LIMIT 1
     """)
     fun getMaxEndHrRecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
@@ -183,7 +199,8 @@ interface FreeHoldTelemetryDao {
             GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
         WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
-          AND t.heartRateBpm IS NOT NULL AND t.heartRateBpm > 0
+          AND t.heartRateBpm IS NOT NULL
+          AND t.heartRateBpm BETWEEN 20 AND 250
     """)
     fun getMinEndHr(lungVolume: String, prepType: String, timeOfDay: String): Flow<Int?>
 
@@ -197,7 +214,8 @@ interface FreeHoldTelemetryDao {
             GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
         WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
-          AND t.heartRateBpm IS NOT NULL AND t.heartRateBpm > 0
+          AND t.heartRateBpm IS NOT NULL
+          AND t.heartRateBpm BETWEEN 20 AND 250
         ORDER BY t.heartRateBpm ASC LIMIT 1
     """)
     fun getMinEndHrRecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
@@ -213,6 +231,7 @@ interface FreeHoldTelemetryDao {
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
         WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
           AND t.spO2 IS NOT NULL
+          AND t.spO2 BETWEEN 1 AND 100
     """)
     fun getMaxEndSpO2(lungVolume: String, prepType: String, timeOfDay: String): Flow<Int?>
 
@@ -227,6 +246,7 @@ interface FreeHoldTelemetryDao {
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
         WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
           AND t.spO2 IS NOT NULL
+          AND t.spO2 BETWEEN 1 AND 100
         ORDER BY t.spO2 DESC LIMIT 1
     """)
     fun getMaxEndSpO2RecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
@@ -242,6 +262,7 @@ interface FreeHoldTelemetryDao {
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
         WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
           AND t.spO2 IS NOT NULL
+          AND t.spO2 BETWEEN 1 AND 100
     """)
     fun getMinEndSpO2(lungVolume: String, prepType: String, timeOfDay: String): Flow<Int?>
 
@@ -256,6 +277,7 @@ interface FreeHoldTelemetryDao {
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
         WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
           AND t.spO2 IS NOT NULL
+          AND t.spO2 BETWEEN 1 AND 100
         ORDER BY t.spO2 ASC LIMIT 1
     """)
     fun getMinEndSpO2RecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
@@ -269,6 +291,7 @@ interface FreeHoldTelemetryDao {
             SELECT recordId, MIN(timestampMs) AS firstTs FROM free_hold_telemetry GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
         WHERE t.heartRateBpm IS NOT NULL
+          AND t.heartRateBpm BETWEEN 20 AND 250
     """)
     fun getMaxStartHrAll(): Flow<Int?>
 
@@ -279,6 +302,7 @@ interface FreeHoldTelemetryDao {
             SELECT recordId, MIN(timestampMs) AS firstTs FROM free_hold_telemetry GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
         WHERE t.heartRateBpm IS NOT NULL
+          AND t.heartRateBpm BETWEEN 20 AND 250
         ORDER BY t.heartRateBpm DESC LIMIT 1
     """)
     fun getMaxStartHrRecordIdAll(): Flow<Long?>
@@ -289,7 +313,8 @@ interface FreeHoldTelemetryDao {
         INNER JOIN (
             SELECT recordId, MIN(timestampMs) AS firstTs FROM free_hold_telemetry GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
-        WHERE t.heartRateBpm IS NOT NULL AND t.heartRateBpm > 0
+        WHERE t.heartRateBpm IS NOT NULL
+          AND t.heartRateBpm BETWEEN 20 AND 250
     """)
     fun getMinStartHrAll(): Flow<Int?>
 
@@ -299,7 +324,8 @@ interface FreeHoldTelemetryDao {
         INNER JOIN (
             SELECT recordId, MIN(timestampMs) AS firstTs FROM free_hold_telemetry GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
-        WHERE t.heartRateBpm IS NOT NULL AND t.heartRateBpm > 0
+        WHERE t.heartRateBpm IS NOT NULL
+          AND t.heartRateBpm BETWEEN 20 AND 250
         ORDER BY t.heartRateBpm ASC LIMIT 1
     """)
     fun getMinStartHrRecordIdAll(): Flow<Long?>
@@ -311,6 +337,7 @@ interface FreeHoldTelemetryDao {
             SELECT recordId, MIN(timestampMs) AS firstTs FROM free_hold_telemetry GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
         WHERE t.spO2 IS NOT NULL
+          AND t.spO2 BETWEEN 1 AND 100
     """)
     fun getMaxStartSpO2All(): Flow<Int?>
 
@@ -321,6 +348,7 @@ interface FreeHoldTelemetryDao {
             SELECT recordId, MIN(timestampMs) AS firstTs FROM free_hold_telemetry GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
         WHERE t.spO2 IS NOT NULL
+          AND t.spO2 BETWEEN 1 AND 100
         ORDER BY t.spO2 DESC LIMIT 1
     """)
     fun getMaxStartSpO2RecordIdAll(): Flow<Long?>
@@ -332,6 +360,7 @@ interface FreeHoldTelemetryDao {
             SELECT recordId, MIN(timestampMs) AS firstTs FROM free_hold_telemetry GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
         WHERE t.spO2 IS NOT NULL
+          AND t.spO2 BETWEEN 1 AND 100
     """)
     fun getMinStartSpO2All(): Flow<Int?>
 
@@ -342,6 +371,7 @@ interface FreeHoldTelemetryDao {
             SELECT recordId, MIN(timestampMs) AS firstTs FROM free_hold_telemetry GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
         WHERE t.spO2 IS NOT NULL
+          AND t.spO2 BETWEEN 1 AND 100
         ORDER BY t.spO2 ASC LIMIT 1
     """)
     fun getMinStartSpO2RecordIdAll(): Flow<Long?>
@@ -353,6 +383,7 @@ interface FreeHoldTelemetryDao {
             SELECT recordId, MAX(timestampMs) AS lastTs FROM free_hold_telemetry GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
         WHERE t.heartRateBpm IS NOT NULL
+          AND t.heartRateBpm BETWEEN 20 AND 250
     """)
     fun getMaxEndHrAll(): Flow<Int?>
 
@@ -363,6 +394,7 @@ interface FreeHoldTelemetryDao {
             SELECT recordId, MAX(timestampMs) AS lastTs FROM free_hold_telemetry GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
         WHERE t.heartRateBpm IS NOT NULL
+          AND t.heartRateBpm BETWEEN 20 AND 250
         ORDER BY t.heartRateBpm DESC LIMIT 1
     """)
     fun getMaxEndHrRecordIdAll(): Flow<Long?>
@@ -373,7 +405,8 @@ interface FreeHoldTelemetryDao {
         INNER JOIN (
             SELECT recordId, MAX(timestampMs) AS lastTs FROM free_hold_telemetry GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
-        WHERE t.heartRateBpm IS NOT NULL AND t.heartRateBpm > 0
+        WHERE t.heartRateBpm IS NOT NULL
+          AND t.heartRateBpm BETWEEN 20 AND 250
     """)
     fun getMinEndHrAll(): Flow<Int?>
 
@@ -383,7 +416,8 @@ interface FreeHoldTelemetryDao {
         INNER JOIN (
             SELECT recordId, MAX(timestampMs) AS lastTs FROM free_hold_telemetry GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
-        WHERE t.heartRateBpm IS NOT NULL AND t.heartRateBpm > 0
+        WHERE t.heartRateBpm IS NOT NULL
+          AND t.heartRateBpm BETWEEN 20 AND 250
         ORDER BY t.heartRateBpm ASC LIMIT 1
     """)
     fun getMinEndHrRecordIdAll(): Flow<Long?>
@@ -395,6 +429,7 @@ interface FreeHoldTelemetryDao {
             SELECT recordId, MAX(timestampMs) AS lastTs FROM free_hold_telemetry GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
         WHERE t.spO2 IS NOT NULL
+          AND t.spO2 BETWEEN 1 AND 100
     """)
     fun getMaxEndSpO2All(): Flow<Int?>
 
@@ -405,6 +440,7 @@ interface FreeHoldTelemetryDao {
             SELECT recordId, MAX(timestampMs) AS lastTs FROM free_hold_telemetry GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
         WHERE t.spO2 IS NOT NULL
+          AND t.spO2 BETWEEN 1 AND 100
         ORDER BY t.spO2 DESC LIMIT 1
     """)
     fun getMaxEndSpO2RecordIdAll(): Flow<Long?>
@@ -416,6 +452,7 @@ interface FreeHoldTelemetryDao {
             SELECT recordId, MAX(timestampMs) AS lastTs FROM free_hold_telemetry GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
         WHERE t.spO2 IS NOT NULL
+          AND t.spO2 BETWEEN 1 AND 100
     """)
     fun getMinEndSpO2All(): Flow<Int?>
 
@@ -426,6 +463,7 @@ interface FreeHoldTelemetryDao {
             SELECT recordId, MAX(timestampMs) AS lastTs FROM free_hold_telemetry GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
         WHERE t.spO2 IS NOT NULL
+          AND t.spO2 BETWEEN 1 AND 100
         ORDER BY t.spO2 ASC LIMIT 1
     """)
     fun getMinEndSpO2RecordIdAll(): Flow<Long?>

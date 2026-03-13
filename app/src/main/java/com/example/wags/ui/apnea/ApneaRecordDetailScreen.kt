@@ -32,6 +32,13 @@ import java.util.*
 
 private val SpO2Blue = Color(0xFF42A5F5)
 
+// Physiological bounds for display-layer filtering (mirrors PhysiologicalBounds in FreeHoldActiveScreen)
+// HR: 20–250 bpm | SpO2: 1–100% (0 = no-signal glitch; real extreme dives can go very low)
+private const val DISPLAY_HR_MIN   = 20f
+private const val DISPLAY_HR_MAX   = 250f
+private const val DISPLAY_SPO2_MIN = 1f
+private const val DISPLAY_SPO2_MAX = 100f
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ApneaRecordDetailScreen(
@@ -277,9 +284,11 @@ private fun RecordDetailContent(
 
     val hrSamples = remember(telemetry) {
         telemetry.mapNotNull { it.heartRateBpm?.toFloat() }
+            .filter { it in DISPLAY_HR_MIN.toFloat()..DISPLAY_HR_MAX.toFloat() }
     }
     val spO2Samples = remember(telemetry) {
         telemetry.mapNotNull { it.spO2?.toFloat() }
+            .filter { it in DISPLAY_SPO2_MIN.toFloat()..DISPLAY_SPO2_MAX.toFloat() }
     }
 
     Column(
