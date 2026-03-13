@@ -179,6 +179,14 @@ private fun RecordDetailContent(
                         .replaceFirstChar { it.uppercase() }
                 )
                 DetailRow(label = "Type", value = record.tableType ?: "Free Hold")
+                record.firstContractionMs?.let { fcMs ->
+                    DetailRow(
+                        label = "First Contraction",
+                        value = formatMsDetail(fcMs),
+                        valueColor = Color(0xFFFF9800),
+                        valueBold = true
+                    )
+                }
                 record.lowestSpO2?.let { spo2 ->
                     DetailRow(
                         label = "Lowest SpO₂",

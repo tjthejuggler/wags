@@ -20,7 +20,7 @@ import com.example.wags.data.db.entity.*
         TelemetryEntity::class,
         FreeHoldTelemetryEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -268,6 +268,17 @@ abstract class WagsDatabase : RoomDatabase() {
         val MIGRATION_8_9 = object : Migration(8, 9) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE apnea_records ADD COLUMN timeOfDay TEXT NOT NULL DEFAULT 'DAY'")
+            }
+        }
+
+        /**
+         * v9 → v10: Add firstContractionMs column to apnea_records.
+         * Stores the elapsed milliseconds from hold start to the user's first diaphragm
+         * contraction tap. NULL for older records and holds where the button was never tapped.
+         */
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE apnea_records ADD COLUMN firstContractionMs INTEGER DEFAULT NULL")
             }
         }
     }

@@ -38,7 +38,6 @@ import com.example.wags.ui.common.InfoHelpBubble
 import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
-import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -129,16 +128,14 @@ fun ApneaScreen(
                     onToggle = { viewModel.toggleSection(ApneaSection.BEST_TIME) }
                 ) {
                     FreeHoldContent(
-                        freeHoldActive = state.freeHoldActive,
                         freeHoldDurationMs = state.freeHoldDurationMs,
                         bestTimeMs = state.bestTimeForSettingsMs,
                         bestTimeRecordId = state.bestTimeForSettingsRecordId,
                         showTimer = state.showTimer,
-                        liveOxHr = state.liveOxHr,
-                        liveOxSpO2 = state.liveOxSpO2,
                         onShowTimerChange = { viewModel.setShowTimer(it) },
-                        onStart = { viewModel.startFreeHold(deviceId) },
-                        onStop = { viewModel.stopFreeHold() },
+                        onStartHold = {
+                            navController.navigate(WagsRoutes.FREE_HOLD_ACTIVE)
+                        },
                         onBestTimeClick = { recordId ->
                             navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
                         }
@@ -503,43 +500,25 @@ private fun ApneaSettingsContent(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Free Hold Content
+// Free Hold Content  (summary card — no inline hold UI; hold runs on its own screen)
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun FreeHoldContent(
-    freeHoldActive: Boolean,
     freeHoldDurationMs: Long,
     bestTimeMs: Long,
     bestTimeRecordId: Long?,
     showTimer: Boolean,
-    liveOxHr: Int?,
-    liveOxSpO2: Int?,
     onShowTimerChange: (Boolean) -> Unit,
-    onStart: () -> Unit,
-    onStop: () -> Unit,
+    onStartHold: () -> Unit,
     onBestTimeClick: (Long) -> Unit = {}
 ) {
-    var elapsedMs by remember { mutableLongStateOf(0L) }
-    val holdStartTime = remember { mutableLongStateOf(0L) }
-
-    LaunchedEffect(freeHoldActive) {
-        if (freeHoldActive) {
-            holdStartTime.longValue = System.currentTimeMillis()
-            while (true) {
-                elapsedMs = System.currentTimeMillis() - holdStartTime.longValue
-                delay(100L)
-            }
-        } else {
-            elapsedMs = 0L
-        }
-    }
-
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // Show-timer toggle (persisted preference, used on the active-hold screen)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End,
@@ -549,6 +528,7 @@ private fun FreeHoldContent(
             Checkbox(checked = showTimer, onCheckedChange = onShowTimerChange)
         }
 
+        // Personal best for current settings
         if (bestTimeMs > 0L) {
             Text(
                 "🏆 ${formatMs(bestTimeMs)}",
@@ -562,53 +542,20 @@ private fun FreeHoldContent(
             )
         }
 
-        if (freeHoldActive) {
-            if (showTimer) {
-                Text(
-                    formatMs(elapsedMs),
-                    style = MaterialTheme.typography.displayLarge,
-                    color = ApneaHold,
-                    fontWeight = FontWeight.Bold
-                )
-            } else {
-                Text("HOLD", style = MaterialTheme.typography.displayLarge, color = ApneaHold)
-            }
-
-            if (liveOxHr != null || liveOxSpO2 != null) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(24.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    liveOxHr?.let { hr ->
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("$hr", style = MaterialTheme.typography.headlineMedium, color = EcgCyan, fontWeight = FontWeight.Bold)
-                            Text("bpm", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
-                        }
-                    }
-                    liveOxSpO2?.let { spo2 ->
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("$spo2%", style = MaterialTheme.typography.headlineMedium, color = Color(0xFF42A5F5), fontWeight = FontWeight.Bold)
-                            Text("SpO₂", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
-                        }
-                    }
-                }
-            }
-
-            Button(
-                onClick = onStop,
-                colors = ButtonDefaults.buttonColors(containerColor = ButtonDanger, contentColor = Color.White),
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("Release") }
-        } else {
-            if (freeHoldDurationMs > 0L) {
-                Text("Last: ${formatMs(freeHoldDurationMs)}", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
-            }
-            Button(
-                onClick = onStart,
-                colors = ButtonDefaults.buttonColors(containerColor = ButtonSuccess, contentColor = Color.White),
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("Start Hold") }
+        // Last hold result (shown after returning from the active-hold screen)
+        if (freeHoldDurationMs > 0L) {
+            Text(
+                "Last: ${formatMs(freeHoldDurationMs)}",
+                style = MaterialTheme.typography.headlineMedium,
+                color = EcgCyan
+            )
         }
+
+        Button(
+            onClick = onStartHold,
+            colors = ButtonDefaults.buttonColors(containerColor = ButtonSuccess, contentColor = Color.White),
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Start Hold") }
     }
 }
 

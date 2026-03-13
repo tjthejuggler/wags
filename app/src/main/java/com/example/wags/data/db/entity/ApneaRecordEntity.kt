@@ -20,5 +20,11 @@ data class ApneaRecordEntity(
     val lowestSpO2: Int? = null,
     /** One of TimeOfDay enum names: MORNING, DAY, NIGHT */
     @ColumnInfo(defaultValue = "DAY")
-    val timeOfDay: String = "DAY"
+    val timeOfDay: String = "DAY",
+    /**
+     * Elapsed milliseconds from hold start to the user's first diaphragm contraction.
+     * Null when the user did not tap the First Contraction button (or for older records).
+     */
+    @ColumnInfo(defaultValue = "NULL")
+    val firstContractionMs: Long? = null
 )

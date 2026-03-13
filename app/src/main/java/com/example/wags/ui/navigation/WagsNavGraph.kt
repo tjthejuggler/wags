@@ -16,6 +16,7 @@ import com.example.wags.ui.apnea.ApneaHistoryScreen
 import com.example.wags.ui.apnea.ApneaRecordDetailScreen
 import com.example.wags.ui.apnea.ApneaScreen
 import com.example.wags.ui.apnea.ApneaTableScreen
+import com.example.wags.ui.apnea.FreeHoldActiveScreen
 import com.example.wags.ui.apnea.SessionAnalyticsHistoryScreen
 import com.example.wags.ui.apnea.SessionAnalyticsScreen
 import com.example.wags.ui.breathing.AssessmentPickerScreen
@@ -50,6 +51,7 @@ object WagsRoutes {
     const val APNEA_HISTORY = "apnea_history/{lungVolume}/{prepType}/{timeOfDay}"
     const val APNEA_RECORD_DETAIL = "apnea_record_detail/{recordId}"
     const val APNEA_ALL_RECORDS = "apnea_all_records"
+    const val FREE_HOLD_ACTIVE = "free_hold_active"
 
     fun apneaTable(type: String) = "apnea_table/$type"
     fun advancedApnea(modality: String, length: String) = "advanced_apnea/$modality/$length"
@@ -85,6 +87,9 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
         }
         composable(WagsRoutes.APNEA_FREE) {
             ApneaScreen(navController = navController)
+        }
+        composable(WagsRoutes.FREE_HOLD_ACTIVE) {
+            FreeHoldActiveScreen(navController = navController)
         }
         composable(WagsRoutes.APNEA_TABLE) { backStackEntry ->
             val tableType = backStackEntry.arguments?.getString("tableType") ?: "O2"

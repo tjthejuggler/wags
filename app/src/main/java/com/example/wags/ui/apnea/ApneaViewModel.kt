@@ -32,9 +32,12 @@ import com.example.wags.domain.usecase.apnea.ApneaStateMachine
 import com.example.wags.domain.usecase.apnea.ApneaTableGenerator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
@@ -120,6 +123,12 @@ data class ApneaUiState(
     // Live sensor readings for top bar
     val liveHr: Int? = null,
     val liveSpO2: Int? = null,
+    // ── Free-hold active screen ───────────────────────────────────────────────
+    /**
+     * Elapsed ms from hold start to the first contraction tap on the active-hold screen.
+     * Null until the user taps "First Contraction" (or if they never tap it).
+     */
+    val freeHoldFirstContractionMs: Long? = null,
 )
 
 @HiltViewModel
@@ -138,6 +147,14 @@ class ApneaViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ApneaUiState())
+
+    /**
+     * One-shot event fired when the user taps "Start Hold" on the Best Time card.
+     * The nav graph observes this and navigates to the FreeHoldActiveScreen.
+     */
+    private val _navigateToFreeHoldActive = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val navigateToFreeHoldActive: SharedFlow<Unit> = _navigateToFreeHoldActive.asSharedFlow()
+
     val uiState: StateFlow<ApneaUiState> = combine(
         _uiState,
         hrDataSource.liveHr,
@@ -417,10 +434,21 @@ class ApneaViewModel @Inject constructor(
 
     // ── Free Hold ────────────────────────────────────────────────────────────
 
+    /** Called from the Best Time card — fires navigation event; actual hold starts on the new screen. */
+    fun requestStartFreeHold() {
+        _navigateToFreeHoldActive.tryEmit(Unit)
+    }
+
     fun startFreeHold(deviceId: String) {
         bleManager.startRrStream(deviceId)
         freeHoldStartTime = System.currentTimeMillis()
-        _uiState.update { it.copy(freeHoldActive = true, freeHoldDurationMs = 0L) }
+        _uiState.update {
+            it.copy(
+                freeHoldActive = true,
+                freeHoldDurationMs = 0L,
+                freeHoldFirstContractionMs = null
+            )
+        }
 
         // Start collecting oximeter readings for this hold
         oximeterSamples.clear()
@@ -432,6 +460,31 @@ class ApneaViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Cancels an in-progress free hold without saving any record.
+     * Called when the user taps the back arrow while the hold is running.
+     */
+    fun cancelFreeHold() {
+        oximeterCollectionJob?.cancel()
+        oximeterCollectionJob = null
+        oximeterSamples.clear()
+        _uiState.update {
+            it.copy(
+                freeHoldActive = false,
+                freeHoldDurationMs = it.freeHoldDurationMs, // keep last completed hold duration
+                freeHoldFirstContractionMs = null
+            )
+        }
+    }
+
+    /** Record the first contraction time during an active free hold. */
+    fun recordFreeHoldFirstContraction() {
+        if (_uiState.value.freeHoldFirstContractionMs != null) return // already recorded
+        val elapsed = System.currentTimeMillis() - freeHoldStartTime
+        _uiState.update { it.copy(freeHoldFirstContractionMs = elapsed) }
+        audioHapticEngine.vibrateContractionLogged()
+    }
+
     fun stopFreeHold() {
         val duration = System.currentTimeMillis() - freeHoldStartTime
         // Stop collecting oximeter readings before saving so the snapshot is stable
@@ -439,22 +492,24 @@ class ApneaViewModel @Inject constructor(
         oximeterCollectionJob = null
         val currentBest = _uiState.value.bestTimeForSettingsMs
         val isNewBest = duration > currentBest && currentBest > 0L
+        val firstContractionMs = _uiState.value.freeHoldFirstContractionMs
         _uiState.update {
             it.copy(
                 freeHoldActive = false,
                 freeHoldDurationMs = duration,
+                freeHoldFirstContractionMs = null,
                 newPersonalBestMs = if (isNewBest) duration else it.newPersonalBestMs
             )
         }
         audioHapticEngine.vibrateHoldEnd()
-        saveFreeHoldRecord(duration)
+        saveFreeHoldRecord(duration, firstContractionMs)
         // Signal the Habit app that a free breath hold was successfully completed
         habitRepo.sendHabitIncrement(Slot.FREE_HOLD)
         // Signal a new personal best if this hold beat the previous record
         if (isNewBest) habitRepo.sendHabitIncrement(Slot.APNEA_NEW_RECORD)
     }
 
-    private fun saveFreeHoldRecord(durationMs: Long) {
+    private fun saveFreeHoldRecord(durationMs: Long, firstContractionMs: Long? = null) {
         // Take a stable snapshot of the oximeter samples collected during this hold
         val oxSnapshot = oximeterSamples.toList()
         oximeterSamples.clear()
@@ -490,7 +545,8 @@ class ApneaViewModel @Inject constructor(
                     minHrBpm = minHr,
                     maxHrBpm = maxHr,
                     lowestSpO2 = lowestSpO2,
-                    tableType = null
+                    tableType = null,
+                    firstContractionMs = firstContractionMs
                 )
             )
 
