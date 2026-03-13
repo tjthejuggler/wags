@@ -51,7 +51,7 @@ object WagsRoutes {
     const val APNEA_HISTORY = "apnea_history/{lungVolume}/{prepType}/{timeOfDay}"
     const val APNEA_RECORD_DETAIL = "apnea_record_detail/{recordId}"
     const val APNEA_ALL_RECORDS = "apnea_all_records"
-    const val FREE_HOLD_ACTIVE = "free_hold_active"
+    const val FREE_HOLD_ACTIVE = "free_hold_active/{lungVolume}/{prepType}/{timeOfDay}/{showTimer}"
 
     fun apneaTable(type: String) = "apnea_table/$type"
     fun advancedApnea(modality: String, length: String) = "advanced_apnea/$modality/$length"
@@ -62,6 +62,8 @@ object WagsRoutes {
     fun apneaHistory(lungVolume: String, prepType: String, timeOfDay: String) =
         "apnea_history/$lungVolume/$prepType/$timeOfDay"
     fun apneaRecordDetail(recordId: Long) = "apnea_record_detail/$recordId"
+    fun freeHoldActive(lungVolume: String, prepType: String, timeOfDay: String, showTimer: Boolean) =
+        "free_hold_active/$lungVolume/$prepType/$timeOfDay/$showTimer"
 }
 
 @Composable
@@ -88,8 +90,26 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
         composable(WagsRoutes.APNEA_FREE) {
             ApneaScreen(navController = navController)
         }
-        composable(WagsRoutes.FREE_HOLD_ACTIVE) {
-            FreeHoldActiveScreen(navController = navController)
+        composable(
+            route = WagsRoutes.FREE_HOLD_ACTIVE,
+            arguments = listOf(
+                navArgument("lungVolume") { type = NavType.StringType },
+                navArgument("prepType")   { type = NavType.StringType },
+                navArgument("timeOfDay")  { type = NavType.StringType },
+                navArgument("showTimer")  { type = NavType.BoolType }
+            )
+        ) { backStackEntry ->
+            val lungVolume = backStackEntry.arguments?.getString("lungVolume") ?: "FULL"
+            val prepType   = backStackEntry.arguments?.getString("prepType")   ?: "NO_PREP"
+            val timeOfDay  = backStackEntry.arguments?.getString("timeOfDay")  ?: "DAY"
+            val showTimer  = backStackEntry.arguments?.getBoolean("showTimer") ?: true
+            FreeHoldActiveScreen(
+                navController = navController,
+                lungVolume = lungVolume,
+                prepType   = prepType,
+                timeOfDay  = timeOfDay,
+                showTimer  = showTimer
+            )
         }
         composable(WagsRoutes.APNEA_TABLE) { backStackEntry ->
             val tableType = backStackEntry.arguments?.getString("tableType") ?: "O2"

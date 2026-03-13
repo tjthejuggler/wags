@@ -6,6 +6,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,6 +24,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
+import com.example.wags.domain.model.PrepType
+import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -57,6 +60,15 @@ fun ApneaRecordDetailScreen(
                 },
                 actions = {
                     if (!state.isLoading && !state.notFound) {
+                        // Edit button
+                        IconButton(onClick = { viewModel.openEditSheet() }) {
+                            Icon(
+                                imageVector = Icons.Outlined.Edit,
+                                contentDescription = "Edit record settings",
+                                tint = EcgCyan
+                            )
+                        }
+                        // Delete button
                         IconButton(onClick = { showDeleteDialog = true }) {
                             Icon(
                                 imageVector = Icons.Outlined.Delete,
@@ -99,7 +111,7 @@ fun ApneaRecordDetailScreen(
         }
     }
 
-    // Delete confirmation dialog
+    // ── Delete confirmation dialog ─────────────────────────────────────────────
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -123,6 +135,128 @@ fun ApneaRecordDetailScreen(
                 TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") }
             }
         )
+    }
+
+    // ── Edit bottom sheet ──────────────────────────────────────────────────────
+    if (state.showEditSheet) {
+        EditRecordSheet(
+            lungVolume  = state.editLungVolume,
+            prepType    = state.editPrepType,
+            timeOfDay   = state.editTimeOfDay,
+            onLungVolumeChange = { viewModel.setEditLungVolume(it) },
+            onPrepTypeChange   = { viewModel.setEditPrepType(it) },
+            onTimeOfDayChange  = { viewModel.setEditTimeOfDay(it) },
+            onSave    = { viewModel.saveEdits() },
+            onDismiss = { viewModel.closeEditSheet() }
+        )
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Edit bottom sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditRecordSheet(
+    lungVolume: String,
+    prepType: PrepType,
+    timeOfDay: TimeOfDay,
+    onLungVolumeChange: (String) -> Unit,
+    onPrepTypeChange: (PrepType) -> Unit,
+    onTimeOfDayChange: (TimeOfDay) -> Unit,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceDark,
+        tonalElevation = 4.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            Text(
+                "Edit Record Settings",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            // ── Lung Volume ───────────────────────────────────────────────────
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Lung Volume", style = MaterialTheme.typography.labelLarge, color = TextSecondary)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("FULL", "HALF", "EMPTY").forEach { vol ->
+                        FilterChip(
+                            selected = lungVolume == vol,
+                            onClick  = { onLungVolumeChange(vol) },
+                            label    = { Text(vol.lowercase().replaceFirstChar { it.uppercase() }) },
+                            colors   = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = EcgCyan,
+                                selectedLabelColor     = BackgroundDark
+                            )
+                        )
+                    }
+                }
+            }
+
+            // ── Prep Type ─────────────────────────────────────────────────────
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Prep Type", style = MaterialTheme.typography.labelLarge, color = TextSecondary)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PrepType.entries.forEach { pt ->
+                        FilterChip(
+                            selected = prepType == pt,
+                            onClick  = { onPrepTypeChange(pt) },
+                            label    = { Text(pt.displayName()) },
+                            colors   = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = EcgCyan,
+                                selectedLabelColor     = BackgroundDark
+                            )
+                        )
+                    }
+                }
+            }
+
+            // ── Time of Day ───────────────────────────────────────────────────
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Time of Day", style = MaterialTheme.typography.labelLarge, color = TextSecondary)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TimeOfDay.entries.forEach { tod ->
+                        FilterChip(
+                            selected = timeOfDay == tod,
+                            onClick  = { onTimeOfDayChange(tod) },
+                            label    = { Text(tod.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                            colors   = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = EcgCyan,
+                                selectedLabelColor     = BackgroundDark
+                            )
+                        )
+                    }
+                }
+            }
+
+            // ── Action buttons ────────────────────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f)
+                ) { Text("Cancel") }
+
+                Button(
+                    onClick = onSave,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = EcgCyan, contentColor = BackgroundDark)
+                ) { Text("Save", fontWeight = FontWeight.Bold) }
+            }
+        }
     }
 }
 
@@ -178,6 +312,9 @@ private fun RecordDetailContent(
                     value = record.prepType.lowercase().replace('_', ' ')
                         .replaceFirstChar { it.uppercase() }
                 )
+                DetailRow(label = "Time of Day",
+                    value = record.timeOfDay.lowercase().replaceFirstChar { it.uppercase() }
+                )
                 DetailRow(label = "Type", value = record.tableType ?: "Free Hold")
                 record.firstContractionMs?.let { fcMs ->
                     DetailRow(
@@ -207,7 +344,6 @@ private fun RecordDetailContent(
                 Text("Heart Rate", style = MaterialTheme.typography.titleLarge)
 
                 if (hrSamples.isNotEmpty()) {
-                    // Stat row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
@@ -228,7 +364,6 @@ private fun RecordDetailContent(
                             color = ApneaHold
                         )
                     }
-                    // Line chart
                     LineChart(
                         samples = hrSamples,
                         lineColor = EcgCyan,
@@ -242,7 +377,6 @@ private fun RecordDetailContent(
                         color = TextSecondary
                     )
                 } else if (record.minHrBpm > 0f || record.maxHrBpm > 0f) {
-                    // Fallback: only aggregates available (old records)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
@@ -341,7 +475,6 @@ private fun LineChart(
         val h = size.height
         val stepX = w / (samples.size - 1).toFloat()
 
-        // Faint horizontal grid lines at 25%, 50%, 75%
         listOf(0.25f, 0.5f, 0.75f).forEach { frac ->
             val y = h * (1f - frac)
             drawLine(
@@ -352,7 +485,6 @@ private fun LineChart(
             )
         }
 
-        // Build path
         val path = Path()
         samples.forEachIndexed { i, value ->
             val x = i * stepX
@@ -370,7 +502,6 @@ private fun LineChart(
             )
         )
 
-        // Dot at first and last sample
         val firstY = h * (1f - ((samples.first() - yMin) / yRange).coerceIn(0f, 1f))
         val lastY  = h * (1f - ((samples.last()  - yMin) / yRange).coerceIn(0f, 1f))
         drawCircle(color = lineColor, radius = 5f, center = Offset(0f, firstY))

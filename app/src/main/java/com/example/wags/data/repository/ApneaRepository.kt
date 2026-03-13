@@ -103,6 +103,10 @@ class ApneaRepository @Inject constructor(
     suspend fun saveRecord(entity: ApneaRecordEntity): Long =
         dao.insert(entity)
 
+    /** Update an existing record (e.g. after the user edits its settings). */
+    suspend fun updateRecord(entity: ApneaRecordEntity) =
+        dao.update(entity)
+
     /** Permanently delete a record; CASCADE removes its telemetry automatically. */
     suspend fun deleteRecord(recordId: Long) =
         dao.deleteById(recordId)

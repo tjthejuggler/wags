@@ -9,6 +9,9 @@ interface ApneaRecordDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: ApneaRecordEntity): Long
 
+    @Update
+    suspend fun update(entity: ApneaRecordEntity)
+
     @Query("SELECT * FROM apnea_records ORDER BY timestamp DESC LIMIT :limit")
     fun getLatest(limit: Int): Flow<List<ApneaRecordEntity>>
 

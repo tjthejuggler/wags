@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
 import com.example.wags.data.repository.ApneaRepository
+import com.example.wags.domain.model.PrepType
+import com.example.wags.domain.model.TimeOfDay
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,7 +23,13 @@ data class ApneaRecordDetailUiState(
     val record: ApneaRecordEntity? = null,
     val telemetry: List<FreeHoldTelemetryEntity> = emptyList(),
     val isLoading: Boolean = true,
-    val notFound: Boolean = false
+    val notFound: Boolean = false,
+    /** True while the edit bottom-sheet is open. */
+    val showEditSheet: Boolean = false,
+    /** Editable copies of the three settings fields — initialised from the record when sheet opens. */
+    val editLungVolume: String = "FULL",
+    val editPrepType: PrepType = PrepType.NO_PREP,
+    val editTimeOfDay: TimeOfDay = TimeOfDay.DAY
 )
 
 @HiltViewModel
@@ -57,6 +65,54 @@ class ApneaRecordDetailViewModel @Inject constructor(
         viewModelScope.launch {
             apneaRepository.deleteRecord(recordId)
             _deleted.emit(Unit)
+        }
+    }
+
+    // ── Edit sheet ────────────────────────────────────────────────────────────
+
+    /** Opens the edit sheet, pre-populating fields from the current record. */
+    fun openEditSheet() {
+        val record = _uiState.value.record ?: return
+        val prepType = runCatching { PrepType.valueOf(record.prepType) }.getOrDefault(PrepType.NO_PREP)
+        val timeOfDay = runCatching { TimeOfDay.valueOf(record.timeOfDay) }.getOrDefault(TimeOfDay.DAY)
+        _uiState.update {
+            it.copy(
+                showEditSheet  = true,
+                editLungVolume = record.lungVolume,
+                editPrepType   = prepType,
+                editTimeOfDay  = timeOfDay
+            )
+        }
+    }
+
+    fun closeEditSheet() {
+        _uiState.update { it.copy(showEditSheet = false) }
+    }
+
+    fun setEditLungVolume(volume: String) {
+        _uiState.update { it.copy(editLungVolume = volume) }
+    }
+
+    fun setEditPrepType(type: PrepType) {
+        _uiState.update { it.copy(editPrepType = type) }
+    }
+
+    fun setEditTimeOfDay(tod: TimeOfDay) {
+        _uiState.update { it.copy(editTimeOfDay = tod) }
+    }
+
+    /** Persists the edited settings to the DB and refreshes the displayed record. */
+    fun saveEdits() {
+        val record = _uiState.value.record ?: return
+        val state  = _uiState.value
+        viewModelScope.launch {
+            val updated = record.copy(
+                lungVolume = state.editLungVolume,
+                prepType   = state.editPrepType.name,
+                timeOfDay  = state.editTimeOfDay.name
+            )
+            apneaRepository.updateRecord(updated)
+            _uiState.update { it.copy(record = updated, showEditSheet = false) }
         }
     }
 }

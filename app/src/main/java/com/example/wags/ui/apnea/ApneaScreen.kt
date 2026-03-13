@@ -134,7 +134,14 @@ fun ApneaScreen(
                         showTimer = state.showTimer,
                         onShowTimerChange = { viewModel.setShowTimer(it) },
                         onStartHold = {
-                            navController.navigate(WagsRoutes.FREE_HOLD_ACTIVE)
+                            navController.navigate(
+                                WagsRoutes.freeHoldActive(
+                                    lungVolume = state.selectedLungVolume,
+                                    prepType   = state.prepType.name,
+                                    timeOfDay  = state.timeOfDay.name,
+                                    showTimer  = state.showTimer
+                                )
+                            )
                         },
                         onBestTimeClick = { recordId ->
                             navController.navigate(WagsRoutes.apneaRecordDetail(recordId))

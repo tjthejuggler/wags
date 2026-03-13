@@ -10,39 +10,237 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavController
+import com.example.wags.data.ble.HrDataSource
+import com.example.wags.data.ble.OximeterBleManager
+import com.example.wags.data.ble.PolarBleManager
+import com.example.wags.data.db.entity.ApneaRecordEntity
+import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
+import com.example.wags.data.ipc.HabitIntegrationRepository
+import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
+import com.example.wags.data.repository.ApneaRepository
+import com.example.wags.domain.model.OximeterReading
+import com.example.wags.domain.model.PrepType
+import com.example.wags.domain.model.TimeOfDay
+import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
 import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.theme.*
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ViewModel
+// ─────────────────────────────────────────────────────────────────────────────
+
+data class FreeHoldActiveUiState(
+    val freeHoldActive: Boolean = false,
+    val showTimer: Boolean = true,
+    val freeHoldFirstContractionMs: Long? = null,
+    val liveHr: Int? = null,
+    val liveSpO2: Int? = null
+)
+
+@HiltViewModel
+class FreeHoldActiveViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
+    private val bleManager: PolarBleManager,
+    private val oximeterBleManager: OximeterBleManager,
+    private val hrDataSource: HrDataSource,
+    private val apneaRepository: ApneaRepository,
+    private val audioHapticEngine: ApneaAudioHapticEngine,
+    private val habitRepo: HabitIntegrationRepository
+) : ViewModel() {
+
+    // Settings passed in via nav arguments — these are the source of truth for what gets saved
+    val lungVolume: String = savedStateHandle.get<String>("lungVolume") ?: "FULL"
+    val prepType: String   = savedStateHandle.get<String>("prepType")   ?: "NO_PREP"
+    val timeOfDay: String  = savedStateHandle.get<String>("timeOfDay")  ?: "DAY"
+
+    private val _uiState = MutableStateFlow(
+        FreeHoldActiveUiState(
+            showTimer = savedStateHandle.get<Boolean>("showTimer") ?: true
+        )
+    )
+
+    val uiState: StateFlow<FreeHoldActiveUiState> = combine(
+        _uiState,
+        hrDataSource.liveHr,
+        hrDataSource.liveSpO2
+    ) { state, hr, spo2 ->
+        state.copy(liveHr = hr, liveSpO2 = spo2)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = FreeHoldActiveUiState(
+            showTimer = savedStateHandle.get<Boolean>("showTimer") ?: true
+        )
+    )
+
+    private var freeHoldStartTime = 0L
+    private val oximeterSamples = mutableListOf<Pair<Long, OximeterReading>>()
+    private var oximeterCollectionJob: Job? = null
+
+    fun startFreeHold(deviceId: String) {
+        bleManager.startRrStream(deviceId)
+        freeHoldStartTime = System.currentTimeMillis()
+        _uiState.update {
+            it.copy(
+                freeHoldActive = true,
+                freeHoldFirstContractionMs = null
+            )
+        }
+        oximeterSamples.clear()
+        oximeterCollectionJob?.cancel()
+        oximeterCollectionJob = viewModelScope.launch {
+            oximeterBleManager.readings.collect { reading ->
+                oximeterSamples.add(System.currentTimeMillis() to reading)
+            }
+        }
+    }
+
+    fun cancelFreeHold() {
+        oximeterCollectionJob?.cancel()
+        oximeterCollectionJob = null
+        oximeterSamples.clear()
+        _uiState.update { it.copy(freeHoldActive = false, freeHoldFirstContractionMs = null) }
+    }
+
+    fun recordFreeHoldFirstContraction() {
+        if (_uiState.value.freeHoldFirstContractionMs != null) return
+        val elapsed = System.currentTimeMillis() - freeHoldStartTime
+        _uiState.update { it.copy(freeHoldFirstContractionMs = elapsed) }
+        audioHapticEngine.vibrateContractionLogged()
+    }
+
+    fun stopFreeHold() {
+        val duration = System.currentTimeMillis() - freeHoldStartTime
+        oximeterCollectionJob?.cancel()
+        oximeterCollectionJob = null
+        val firstContractionMs = _uiState.value.freeHoldFirstContractionMs
+        _uiState.update { it.copy(freeHoldActive = false, freeHoldFirstContractionMs = null) }
+        audioHapticEngine.vibrateHoldEnd()
+        saveFreeHoldRecord(duration, firstContractionMs)
+        habitRepo.sendHabitIncrement(Slot.FREE_HOLD)
+    }
+
+    private fun saveFreeHoldRecord(durationMs: Long, firstContractionMs: Long? = null) {
+        val oxSnapshot = oximeterSamples.toList()
+        oximeterSamples.clear()
+
+        viewModelScope.launch {
+            val rrSnapshot = bleManager.rrBuffer.readLast(512)
+            val rrHrValues = rrSnapshot.map { 60_000.0 / it }
+            val minHrFromRr = rrHrValues.minOrNull()?.toFloat() ?: 0f
+            val maxHrFromRr = rrHrValues.maxOrNull()?.toFloat() ?: 0f
+
+            val oxHrValues   = oxSnapshot.map { it.second.heartRateBpm.toFloat() }
+            val oxSpO2Values = oxSnapshot.map { it.second.spO2.toFloat() }
+            val maxHrFromOx  = oxHrValues.maxOrNull() ?: 0f
+            val lowestSpO2   = oxSpO2Values.minOrNull()?.toInt()
+
+            val minHr = if (minHrFromRr > 0f) minHrFromRr else oxHrValues.minOrNull() ?: 0f
+            val maxHr = if (maxHrFromRr > 0f) maxHrFromRr else maxHrFromOx
+
+            val now = System.currentTimeMillis()
+
+            // Use the settings that were baked in at navigation time — guaranteed correct
+            val recordId = apneaRepository.saveRecord(
+                ApneaRecordEntity(
+                    timestamp        = now,
+                    durationMs       = durationMs,
+                    lungVolume       = lungVolume,
+                    prepType         = prepType,
+                    timeOfDay        = timeOfDay,
+                    minHrBpm         = minHr,
+                    maxHrBpm         = maxHr,
+                    lowestSpO2       = lowestSpO2,
+                    tableType        = null,
+                    firstContractionMs = firstContractionMs
+                )
+            )
+
+            if (recordId <= 0) return@launch
+
+            val samples = mutableListOf<FreeHoldTelemetryEntity>()
+
+            if (rrSnapshot.isNotEmpty()) {
+                var cumulativeMs = 0L
+                for (rrMs in rrSnapshot) {
+                    cumulativeMs += rrMs.toLong()
+                    if (cumulativeMs > durationMs) break
+                    val bpm = (60_000.0 / rrMs).toInt()
+                    samples.add(
+                        FreeHoldTelemetryEntity(
+                            recordId      = recordId,
+                            timestampMs   = freeHoldStartTime + cumulativeMs,
+                            heartRateBpm  = bpm,
+                            spO2          = null
+                        )
+                    )
+                }
+            }
+
+            for ((timestampMs, reading) in oxSnapshot) {
+                if (timestampMs < freeHoldStartTime) continue
+                if (timestampMs > freeHoldStartTime + durationMs) continue
+                samples.add(
+                    FreeHoldTelemetryEntity(
+                        recordId     = recordId,
+                        timestampMs  = timestampMs,
+                        heartRateBpm = reading.heartRateBpm,
+                        spO2         = reading.spO2
+                    )
+                )
+            }
+
+            if (samples.isNotEmpty()) {
+                apneaRepository.saveTelemetry(samples)
+            }
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        audioHapticEngine.shutdown()
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Screen
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Full-screen breath-hold active screen.
  *
- * Layout (top → bottom):
- *  • TopAppBar  — back arrow + live HR/SpO₂ sensor strip
- *  • Timer      — large elapsed-time display (shown when showTimer is true)
- *  • Large button area:
- *      – Before start: single "START" button (nearly full-screen)
- *      – After start, before first contraction: "First Contraction" + "Stop" side-by-side
- *      – After first contraction tapped: single "Stop" button
+ * Settings (lungVolume, prepType, timeOfDay, showTimer) are passed as nav
+ * arguments so the correct values are always saved — regardless of which
+ * ViewModel instance is alive.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FreeHoldActiveScreen(
     navController: NavController,
-    viewModel: ApneaViewModel = hiltViewModel()
+    lungVolume: String,
+    prepType: String,
+    timeOfDay: String,
+    showTimer: Boolean,
+    viewModel: FreeHoldActiveViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val deviceId = "PLACEHOLDER_H10_ID"
-
-    // Navigate back automatically when the hold is stopped
-    LaunchedEffect(state.freeHoldActive) {
-        // If we arrive here and the hold is already inactive (e.g. user pressed back
-        // then re-entered), just pop back so we don't get stuck.
-        // The real "stop → pop" is handled by the Stop button calling stopFreeHold()
-        // and then navController.popBackStack().
-    }
 
     Scaffold(
         containerColor = BackgroundDark,
@@ -51,7 +249,6 @@ fun FreeHoldActiveScreen(
                 title = { Text("Breath Hold", style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = {
-                        // Cancel (not save) if a hold is in progress
                         if (state.freeHoldActive) viewModel.cancelFreeHold()
                         navController.popBackStack()
                     }) {
@@ -72,12 +269,8 @@ fun FreeHoldActiveScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            onStart = {
-                viewModel.startFreeHold(deviceId)
-            },
-            onFirstContraction = {
-                viewModel.recordFreeHoldFirstContraction()
-            },
+            onStart = { viewModel.startFreeHold(deviceId) },
+            onFirstContraction = { viewModel.recordFreeHoldFirstContraction() },
             onStop = {
                 viewModel.stopFreeHold()
                 navController.popBackStack()
@@ -100,7 +293,6 @@ private fun FreeHoldActiveContent(
     onFirstContraction: () -> Unit,
     onStop: () -> Unit
 ) {
-    // Local elapsed-time ticker — runs only while the hold is active
     var elapsedMs by remember { mutableLongStateOf(0L) }
     val holdStartWallClock = remember { mutableLongStateOf(0L) }
 
@@ -142,7 +334,6 @@ private fun FreeHoldActiveContent(
             }
             Spacer(modifier = Modifier.height(16.dp))
         } else if (freeHoldActive) {
-            // Timer hidden — show "HOLD" label so the user knows it's running
             Spacer(modifier = Modifier.height(24.dp))
             Text(
                 text = "HOLD",
@@ -165,7 +356,7 @@ private fun FreeHoldActiveContent(
             Spacer(modifier = Modifier.height(24.dp))
         }
 
-        // ── Main button area (fills remaining space) ──────────────────────────
+        // ── Main button area ──────────────────────────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -173,7 +364,6 @@ private fun FreeHoldActiveContent(
             contentAlignment = Alignment.Center
         ) {
             when {
-                // ── Not yet started ───────────────────────────────────────────
                 !freeHoldActive -> {
                     Button(
                         onClick = onStart,
@@ -195,7 +385,6 @@ private fun FreeHoldActiveContent(
                     }
                 }
 
-                // ── Active, first contraction not yet recorded ────────────────
                 freeHoldActive && firstContractionMs == null -> {
                     Row(
                         modifier = Modifier
@@ -203,7 +392,6 @@ private fun FreeHoldActiveContent(
                             .fillMaxHeight(0.85f),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // First Contraction button
                         Button(
                             onClick = onFirstContraction,
                             modifier = Modifier
@@ -223,7 +411,6 @@ private fun FreeHoldActiveContent(
                             )
                         }
 
-                        // Stop button
                         Button(
                             onClick = onStop,
                             modifier = Modifier
@@ -245,7 +432,6 @@ private fun FreeHoldActiveContent(
                     }
                 }
 
-                // ── Active, first contraction already recorded ────────────────
                 else -> {
                     Button(
                         onClick = onStop,
