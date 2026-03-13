@@ -1,5 +1,6 @@
 package com.example.wags.ui.apnea
 
+import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -17,8 +18,12 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -303,14 +308,27 @@ private fun RecordDetailContent(
             .format(Date(record.timestamp))
     }
 
+    // Build indexed samples paired with elapsed-ms so the chart can place time markers correctly.
+    // We use the record's own timestamp as t=0 and map each telemetry row to elapsed ms.
+    val recordStartMs = record.timestamp
+
     val hrSamples = remember(telemetry) {
-        telemetry.mapNotNull { it.heartRateBpm?.toFloat() }
-            .filter { it in DISPLAY_HR_MIN.toFloat()..DISPLAY_HR_MAX.toFloat() }
+        telemetry.mapNotNull { row ->
+            val hr = row.heartRateBpm?.toFloat() ?: return@mapNotNull null
+            if (hr !in DISPLAY_HR_MIN..DISPLAY_HR_MAX) return@mapNotNull null
+            Pair(hr, row.timestampMs - recordStartMs)
+        }
     }
     val spO2Samples = remember(telemetry) {
-        telemetry.mapNotNull { it.spO2?.toFloat() }
-            .filter { it in DISPLAY_SPO2_MIN.toFloat()..DISPLAY_SPO2_MAX.toFloat() }
+        telemetry.mapNotNull { row ->
+            val spo2 = row.spO2?.toFloat() ?: return@mapNotNull null
+            if (spo2 !in DISPLAY_SPO2_MIN..DISPLAY_SPO2_MAX) return@mapNotNull null
+            Pair(spo2, row.timestampMs - recordStartMs)
+        }
     }
+
+    val hrValues   = remember(hrSamples)   { hrSamples.map   { it.first } }
+    val spO2Values = remember(spO2Samples) { spO2Samples.map { it.first } }
 
     Column(
         modifier = modifier
@@ -365,36 +383,39 @@ private fun RecordDetailContent(
             ) {
                 Text("Heart Rate", style = MaterialTheme.typography.titleLarge)
 
-                if (hrSamples.isNotEmpty()) {
+                if (hrValues.isNotEmpty()) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
                         StatBox(
                             label = "Min",
-                            value = "${hrSamples.min().toInt()} bpm",
+                            value = "${hrValues.min().toInt()} bpm",
                             color = EcgCyan
                         )
                         StatBox(
                             label = "Avg",
-                            value = "${hrSamples.average().toInt()} bpm",
+                            value = "${hrValues.average().toInt()} bpm",
                             color = Color.White
                         )
                         StatBox(
                             label = "Max",
-                            value = "${hrSamples.max().toInt()} bpm",
+                            value = "${hrValues.max().toInt()} bpm",
                             color = ApneaHold
                         )
                     }
                     LineChart(
-                        samples = hrSamples,
+                        samples = hrValues,
                         lineColor = EcgCyan,
+                        durationMs = record.durationMs,
+                        firstContractionMs = record.firstContractionMs,
+                        showYLabels = true,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(180.dp)
                     )
                     Text(
-                        "HR over the hold (${hrSamples.size} beats)",
+                        "HR over the hold (${hrValues.size} beats)",
                         style = MaterialTheme.typography.labelSmall,
                         color = TextSecondary
                     )
@@ -429,38 +450,41 @@ private fun RecordDetailContent(
             ) {
                 Text("SpO₂", style = MaterialTheme.typography.titleLarge)
 
-                if (spO2Samples.isNotEmpty()) {
+                if (spO2Values.isNotEmpty()) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
                         StatBox(
                             label = "Min",
-                            value = "${spO2Samples.min().toInt()}%",
+                            value = "${spO2Values.min().toInt()}%",
                             color = SpO2Blue
                         )
                         StatBox(
                             label = "Avg",
-                            value = "${spO2Samples.average().toInt()}%",
+                            value = "${spO2Values.average().toInt()}%",
                             color = Color.White
                         )
                         StatBox(
                             label = "Max",
-                            value = "${spO2Samples.max().toInt()}%",
+                            value = "${spO2Values.max().toInt()}%",
                             color = Color.White
                         )
                     }
                     LineChart(
-                        samples = spO2Samples,
+                        samples = spO2Values,
                         lineColor = SpO2Blue,
                         yMin = 70f,
                         yMax = 100f,
+                        durationMs = record.durationMs,
+                        firstContractionMs = record.firstContractionMs,
+                        showYLabels = false,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(160.dp)
                     )
                     Text(
-                        "SpO₂ over the hold (${spO2Samples.size} samples)",
+                        "SpO₂ over the hold (${spO2Values.size} samples)",
                         style = MaterialTheme.typography.labelSmall,
                         color = TextSecondary
                     )
@@ -486,48 +510,135 @@ private fun LineChart(
     lineColor: Color,
     modifier: Modifier = Modifier,
     yMin: Float = samples.minOrNull() ?: 0f,
-    yMax: Float = samples.maxOrNull() ?: 1f
+    yMax: Float = samples.maxOrNull() ?: 1f,
+    /** Total hold duration in ms — used to place time-axis markers. */
+    durationMs: Long = 0L,
+    /** Elapsed ms of first contraction — draws a dim vertical line when non-null. */
+    firstContractionMs: Long? = null,
+    /** When true, draws 4 evenly-spaced HR value labels on the left Y-axis. */
+    showYLabels: Boolean = false
 ) {
     if (samples.size < 2) return
 
+    val density = LocalDensity.current
+    // Reserve left margin for Y labels, bottom margin for time labels
+    val leftPadPx  = if (showYLabels) with(density) { 34.dp.toPx() } else with(density) { 4.dp.toPx() }
+    val bottomPadPx = with(density) { 16.dp.toPx() }
+    val topPadPx    = with(density) { 4.dp.toPx() }
+    val rightPadPx  = with(density) { 4.dp.toPx() }
+
+    val labelTextSizePx = with(density) { 9.sp.toPx() }
+    val labelColor      = Color.White.copy(alpha = 0.45f)
+    val labelArgb       = labelColor.toArgb()
+
     val yRange = (yMax - yMin).coerceAtLeast(1f)
 
-    Canvas(modifier = modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
-        val w = size.width
-        val h = size.height
-        val stepX = w / (samples.size - 1).toFloat()
+    Canvas(modifier = modifier) {
+        val totalW = size.width
+        val totalH = size.height
 
+        // Plot area bounds
+        val plotLeft   = leftPadPx
+        val plotRight  = totalW - rightPadPx
+        val plotTop    = topPadPx
+        val plotBottom = totalH - bottomPadPx
+        val plotW      = (plotRight - plotLeft).coerceAtLeast(1f)
+        val plotH      = (plotBottom - plotTop).coerceAtLeast(1f)
+
+        val stepX = plotW / (samples.size - 1).toFloat()
+
+        // ── Subtle horizontal grid lines ──────────────────────────────────
         listOf(0.25f, 0.5f, 0.75f).forEach { frac ->
-            val y = h * (1f - frac)
+            val y = plotTop + plotH * (1f - frac)
             drawLine(
                 color = Color.White.copy(alpha = 0.07f),
-                start = Offset(0f, y),
-                end = Offset(w, y),
+                start = Offset(plotLeft, y),
+                end   = Offset(plotRight, y),
                 strokeWidth = 1f
             )
         }
 
-        val path = Path()
-        samples.forEachIndexed { i, value ->
-            val x = i * stepX
-            val y = h * (1f - ((value - yMin) / yRange).coerceIn(0f, 1f))
-            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        // ── First-contraction vertical line ───────────────────────────────
+        if (firstContractionMs != null && durationMs > 0L) {
+            val fcFrac = (firstContractionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+            val fcX    = plotLeft + fcFrac * plotW
+            drawLine(
+                color       = lineColor.copy(alpha = 0.30f),
+                start       = Offset(fcX, plotTop),
+                end         = Offset(fcX, plotBottom),
+                strokeWidth = 1.5f
+            )
         }
 
+        // ── Main data line ────────────────────────────────────────────────
+        val path = Path()
+        samples.forEachIndexed { i, value ->
+            val x = plotLeft + i * stepX
+            val y = plotTop + plotH * (1f - ((value - yMin) / yRange).coerceIn(0f, 1f))
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
         drawPath(
-            path = path,
+            path  = path,
             color = lineColor,
-            style = Stroke(
-                width = 2.5f,
-                cap = StrokeCap.Round,
-                join = StrokeJoin.Round
-            )
+            style = Stroke(width = 2.5f, cap = StrokeCap.Round, join = StrokeJoin.Round)
         )
 
-        val firstY = h * (1f - ((samples.first() - yMin) / yRange).coerceIn(0f, 1f))
-        val lastY  = h * (1f - ((samples.last()  - yMin) / yRange).coerceIn(0f, 1f))
-        drawCircle(color = lineColor, radius = 5f, center = Offset(0f, firstY))
-        drawCircle(color = lineColor, radius = 5f, center = Offset(w, lastY))
+        // End-point dots
+        val firstY = plotTop + plotH * (1f - ((samples.first() - yMin) / yRange).coerceIn(0f, 1f))
+        val lastY  = plotTop + plotH * (1f - ((samples.last()  - yMin) / yRange).coerceIn(0f, 1f))
+        drawCircle(color = lineColor, radius = 5f, center = Offset(plotLeft,  firstY))
+        drawCircle(color = lineColor, radius = 5f, center = Offset(plotRight, lastY))
+
+        // ── Y-axis labels (HR only) ───────────────────────────────────────
+        if (showYLabels) {
+            val paint = Paint().apply {
+                isAntiAlias = true
+                textSize    = labelTextSizePx
+                color       = labelArgb
+                textAlign   = Paint.Align.RIGHT
+            }
+            // 4 evenly spaced labels: 0%, 33%, 66%, 100% of range
+            for (step in 0..3) {
+                val frac  = step / 3f
+                val value = yMin + frac * yRange
+                val y     = plotTop + plotH * (1f - frac)
+                drawContext.canvas.nativeCanvas.drawText(
+                    "${value.toInt()}",
+                    plotLeft - with(density) { 3.dp.toPx() },
+                    y + labelTextSizePx / 2f,
+                    paint
+                )
+            }
+        }
+
+        // ── X-axis time labels ────────────────────────────────────────────
+        if (durationMs > 0L) {
+            val paint = Paint().apply {
+                isAntiAlias = true
+                textSize    = labelTextSizePx
+                color       = labelArgb
+                textAlign   = Paint.Align.CENTER
+            }
+            val totalMinutes = (durationMs / 60_000L).toInt()
+            for (min in 1..totalMinutes) {
+                val frac = (min * 60_000L).toFloat() / durationMs.toFloat()
+                if (frac > 1f) break
+                val x = plotLeft + frac * plotW
+                // Tiny tick
+                drawLine(
+                    color       = labelColor,
+                    start       = Offset(x, plotBottom),
+                    end         = Offset(x, plotBottom + with(density) { 3.dp.toPx() }),
+                    strokeWidth = 1f
+                )
+                drawContext.canvas.nativeCanvas.drawText(
+                    "${min}m",
+                    x,
+                    totalH - with(density) { 1.dp.toPx() },
+                    paint
+                )
+            }
+        }
     }
 }
 
