@@ -18,6 +18,9 @@ interface DailyReadingDao {
     @Query("SELECT * FROM daily_readings ORDER BY timestamp DESC LIMIT 14")
     suspend fun getLast14(): List<DailyReadingEntity>
 
+    @Query("SELECT * FROM daily_readings WHERE readingId = :id LIMIT 1")
+    suspend fun getById(id: Long): DailyReadingEntity?
+
     @Query("DELETE FROM daily_readings WHERE timestamp < :beforeTimestamp")
     suspend fun deleteOlderThan(beforeTimestamp: Long)
 }

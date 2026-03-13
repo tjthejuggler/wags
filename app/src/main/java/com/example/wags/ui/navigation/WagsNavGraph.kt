@@ -24,6 +24,7 @@ import com.example.wags.ui.breathing.AssessmentResultScreen
 import com.example.wags.ui.breathing.AssessmentRunScreen
 import com.example.wags.ui.breathing.BreathingScreen
 import com.example.wags.ui.dashboard.DashboardScreen
+import com.example.wags.ui.readiness.HrvReadinessDetailScreen
 import com.example.wags.ui.readiness.HrvReadinessHistoryScreen
 import com.example.wags.ui.readiness.ReadinessScreen
 import com.example.wags.ui.session.SessionScreen
@@ -42,6 +43,7 @@ object WagsRoutes {
     const val MORNING_READINESS = "morning_readiness"
     const val MORNING_READINESS_HISTORY = "morning_readiness_history"
     const val READINESS_HISTORY = "readiness_history"
+    const val HRV_READINESS_DETAIL = "hrv_readiness_detail/{readingId}"
     const val SETTINGS = "settings"
     const val SESSION_ANALYTICS = "session_analytics/{sessionId}"
     const val SESSION_ANALYTICS_HISTORY = "session_analytics_history"
@@ -62,6 +64,7 @@ object WagsRoutes {
     fun apneaHistory(lungVolume: String, prepType: String, timeOfDay: String) =
         "apnea_history/$lungVolume/$prepType/$timeOfDay"
     fun apneaRecordDetail(recordId: Long) = "apnea_record_detail/$recordId"
+    fun hrvReadinessDetail(readingId: Long) = "hrv_readiness_detail/$readingId"
     fun freeHoldActive(lungVolume: String, prepType: String, timeOfDay: String, showTimer: Boolean) =
         "free_hold_active/$lungVolume/$prepType/$timeOfDay/$showTimer"
 }
@@ -79,7 +82,18 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             )
         }
         composable(WagsRoutes.READINESS_HISTORY) {
-            HrvReadinessHistoryScreen(onNavigateBack = { navController.popBackStack() })
+            HrvReadinessHistoryScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToDetail = { readingId ->
+                    navController.navigate(WagsRoutes.hrvReadinessDetail(readingId))
+                }
+            )
+        }
+        composable(
+            route = WagsRoutes.HRV_READINESS_DETAIL,
+            arguments = listOf(navArgument("readingId") { type = NavType.LongType })
+        ) {
+            HrvReadinessDetailScreen(onNavigateBack = { navController.popBackStack() })
         }
         composable(WagsRoutes.BREATHING) {
             BreathingScreen(
