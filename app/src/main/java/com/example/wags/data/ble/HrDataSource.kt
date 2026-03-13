@@ -55,4 +55,37 @@ class HrDataSource @Inject constructor(
      */
     val liveSpO2: StateFlow<Int?> = oximeterBleManager.liveSpO2
         .stateIn(scope, SharingStarted.Eagerly, null)
+
+    /**
+     * Returns a human-readable label for the currently connected HR/SpO₂ device,
+     * suitable for storing alongside recorded data so the source is always known.
+     *
+     * Priority: Polar H10 → Polar Verity Sense → Oximeter → null (none connected).
+     *
+     * Examples:
+     *   "Polar H10 · ABC123"
+     *   "Polar Verity · XYZ456"
+     *   "Oximeter · AA:BB:CC:DD:EE:FF"
+     */
+    fun activeHrDeviceLabel(): String? {
+        val h10 = polarBleManager.h10State.value
+        if (h10 is BleConnectionState.Connected) {
+            val name = h10.deviceName.ifBlank { h10.deviceId }
+            return "Polar H10 · $name"
+        }
+
+        val verity = polarBleManager.verityState.value
+        if (verity is BleConnectionState.Connected) {
+            val name = verity.deviceName.ifBlank { verity.deviceId }
+            return "Polar Verity · $name"
+        }
+
+        val oxy = oximeterBleManager.connectionState.value
+        if (oxy is OximeterConnectionState.Connected) {
+            val name = oxy.deviceName.ifBlank { oxy.deviceAddress }
+            return "Oximeter · $name"
+        }
+
+        return null
+    }
 }

@@ -315,7 +315,8 @@ class ApneaViewModel @Inject constructor(
                 maxHrBpm = null,
                 lowestSpO2 = null,
                 roundsCompleted = state.currentRound,
-                totalRounds = state.totalRounds
+                totalRounds = state.totalRounds,
+                hrDeviceId = hrDataSource.activeHrDeviceLabel()
             )
             sessionRepository.saveSession(entity)
         }
@@ -337,7 +338,8 @@ class ApneaViewModel @Inject constructor(
                 maxHrBpm = null,
                 lowestSpO2 = null,
                 roundsCompleted = advState.currentRound,
-                totalRounds = advState.totalRounds
+                totalRounds = advState.totalRounds,
+                hrDeviceId = hrDataSource.activeHrDeviceLabel()
             )
             sessionRepository.saveSession(entity)
         }
@@ -513,6 +515,8 @@ class ApneaViewModel @Inject constructor(
         // Take a stable snapshot of the oximeter samples collected during this hold
         val oxSnapshot = oximeterSamples.toList()
         oximeterSamples.clear()
+        // Capture device label at the moment the hold ends (before any disconnect)
+        val deviceLabel = hrDataSource.activeHrDeviceLabel()
 
         viewModelScope.launch {
             // ── Polar RR-derived HR samples ───────────────────────────────────
@@ -546,7 +550,8 @@ class ApneaViewModel @Inject constructor(
                     maxHrBpm = maxHr,
                     lowestSpO2 = lowestSpO2,
                     tableType = null,
-                    firstContractionMs = firstContractionMs
+                    firstContractionMs = firstContractionMs,
+                    hrDeviceId = deviceLabel
                 )
             )
 

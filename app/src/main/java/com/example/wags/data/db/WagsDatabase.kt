@@ -20,7 +20,7 @@ import com.example.wags.data.db.entity.*
         TelemetryEntity::class,
         FreeHoldTelemetryEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -279,6 +279,28 @@ abstract class WagsDatabase : RoomDatabase() {
         val MIGRATION_9_10 = object : Migration(9, 10) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE apnea_records ADD COLUMN firstContractionMs INTEGER DEFAULT NULL")
+            }
+        }
+
+        /**
+         * v10 → v11: Add hrDeviceId column to every table that records HR or SpO₂ data.
+         * Stores a human-readable label for the device used (e.g. "Polar H10 · ABC123").
+         * NULL for older records where no device info was captured.
+         *
+         * Tables updated:
+         *   - apnea_records
+         *   - apnea_sessions
+         *   - morning_readiness
+         *   - daily_readings
+         *   - rf_assessments
+         */
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE apnea_records      ADD COLUMN hrDeviceId TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE apnea_sessions     ADD COLUMN hrDeviceId TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE morning_readiness  ADD COLUMN hrDeviceId TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE daily_readings     ADD COLUMN hrDeviceId TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE rf_assessments     ADD COLUMN hrDeviceId TEXT DEFAULT NULL")
             }
         }
     }

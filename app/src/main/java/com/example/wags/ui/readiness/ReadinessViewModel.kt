@@ -76,10 +76,13 @@ class ReadinessViewModel @Inject constructor(
 
     private var sessionJob: Job? = null
     private val collectedRr = mutableListOf<Double>()
+    // Captured at session-start so the device label is recorded even if it disconnects before save
+    private var sessionHrDeviceLabel: String? = null
 
     fun startSession(deviceId: String, durationSeconds: Long = 120L) {
         if (_uiState.value.sessionState == ReadinessSessionState.RECORDING) return
         collectedRr.clear()
+        sessionHrDeviceLabel = hrDataSource.activeHrDeviceLabel()
         bleManager.startRrStream(deviceId)
         _uiState.update {
             it.copy(
@@ -145,7 +148,8 @@ class ReadinessViewModel @Inject constructor(
                             lnRmssd = hrv.lnRmssd.toFloat(),
                             hfPowerMs2 = freq.hfPowerMs2.toFloat(),
                             sdnnMs = hrv.sdnnMs.toFloat(),
-                            readinessScore = score.score
+                            readinessScore = score.score,
+                            hrDeviceId = sessionHrDeviceLabel
                         )
                     )
                 }

@@ -64,6 +64,10 @@ class MorningReadinessViewModel @Inject constructor(
     @MathDispatcher private val mathDispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
+    // Captured at session-start so we record the device that was connected when the
+    // assessment began, even if it disconnects before the result is saved.
+    private var sessionHrDeviceLabel: String? = null
+
     private val _uiState = MutableStateFlow(MorningReadinessUiState())
     val uiState: StateFlow<MorningReadinessUiState> = combine(
         _uiState,
@@ -121,6 +125,7 @@ class MorningReadinessViewModel @Inject constructor(
             return
         }
 
+        sessionHrDeviceLabel = hrDataSource.activeHrDeviceLabel()
         lastRrBufferSize = 0
         fsm.start(viewModelScope)
         startRrPolling()
@@ -188,7 +193,7 @@ class MorningReadinessViewModel @Inject constructor(
                 }
 
                 withContext(ioDispatcher) {
-                    repository.save(result.toEntity())
+                    repository.save(result.toEntity(sessionHrDeviceLabel))
                 }
 
                 fsm.markComplete()
@@ -254,7 +259,7 @@ class MorningReadinessViewModel @Inject constructor(
 }
 
 // Extension to map MorningReadinessResult → MorningReadinessEntity for persistence
-private fun MorningReadinessResult.toEntity() = MorningReadinessEntity(
+private fun MorningReadinessResult.toEntity(hrDeviceId: String?) = MorningReadinessEntity(
     timestamp = timestamp,
     supineRmssdMs = supineHrvMetrics.rmssdMs,
     supineLnRmssd = supineHrvMetrics.lnRmssd,
@@ -281,5 +286,6 @@ private fun MorningReadinessResult.toEntity() = MorningReadinessEntity(
     hrvBaseScore = hvBaseScore,
     orthoMultiplier = orthoMultiplier,
     cvPenaltyApplied = cvPenaltyApplied,
-    rhrLimiterApplied = rhrLimiterApplied
+    rhrLimiterApplied = rhrLimiterApplied,
+    hrDeviceId = hrDeviceId
 )

@@ -3,6 +3,7 @@ package com.example.wags.ui.breathing
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.wags.data.ble.HrDataSource
 import com.example.wags.data.ble.PolarBleManager
 import com.example.wags.data.db.entity.RfAssessmentEntity
 import com.example.wags.data.repository.RfAssessmentRepository
@@ -28,6 +29,7 @@ class AssessmentRunViewModel @Inject constructor(
     private val repository: RfAssessmentRepository,
     private val bleManager: PolarBleManager,
     private val pacerEngine: ContinuousPacerEngine,
+    private val hrDataSource: HrDataSource,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -58,6 +60,9 @@ class AssessmentRunViewModel @Inject constructor(
     @Volatile private var pacerRateBpm: Float = 5.5f
     @Volatile private var pacerIeRatio: Float = 1.0f
     @Volatile private var pacerActive: Boolean = false
+
+    // Captured when the session starts so the device label is stored even if it disconnects
+    private val sessionHrDeviceLabel: String? = hrDataSource.activeHrDeviceLabel()
 
     init {
         pacerEngine.reset()
@@ -131,7 +136,8 @@ class AssessmentRunViewModel @Inject constructor(
                             optimalIeRatio  = 1.0f,
                             compositeScore  = result.peakResonanceIndex,
                             isValid         = result.isValid,
-                            leaderboardJson = buildSlidingLeaderboardJson(result)
+                            leaderboardJson = buildSlidingLeaderboardJson(result),
+                            hrDeviceId      = sessionHrDeviceLabel
                         )
                         val id = saveEntity(entity)
                         _uiState.value = _uiState.value.copy(
@@ -159,7 +165,8 @@ class AssessmentRunViewModel @Inject constructor(
             optimalIeRatio  = best?.ieRatio ?: 1.0f,
             compositeScore  = best?.compositeScore ?: 0f,
             isValid         = best?.isValid ?: false,
-            leaderboardJson = buildSteppedLeaderboardJson(epochs)
+            leaderboardJson = buildSteppedLeaderboardJson(epochs),
+            hrDeviceId      = sessionHrDeviceLabel
         )
         val id = saveEntity(entity)
         _uiState.value = _uiState.value.copy(

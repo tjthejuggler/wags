@@ -3,6 +3,7 @@ package com.example.wags.ui.apnea
 import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.wags.data.ble.HrDataSource
 import com.example.wags.data.db.entity.ApneaSessionEntity
 import com.example.wags.data.repository.ApneaSessionRepository
 import com.example.wags.domain.model.TableLength
@@ -25,6 +26,7 @@ class AdvancedApneaViewModel @Inject constructor(
     private val audioHapticEngine: ApneaAudioHapticEngine,
     private val stateMachine: AdvancedApneaStateMachine,
     private val sessionRepository: ApneaSessionRepository,
+    private val hrDataSource: HrDataSource,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
@@ -85,7 +87,8 @@ class AdvancedApneaViewModel @Inject constructor(
                 maxHrBpm = null,
                 lowestSpO2 = null,
                 roundsCompleted = advancedState.currentRound,
-                totalRounds = advancedState.totalRounds
+                totalRounds = advancedState.totalRounds,
+                hrDeviceId = hrDataSource.activeHrDeviceLabel()
             )
             sessionRepository.saveSession(entity)
         }

@@ -767,6 +767,10 @@ private fun ReadingDetailCard(
             }
 
             HorizontalDivider(color = SurfaceDark)
+            Text("Recording", style = MaterialTheme.typography.labelLarge, color = TextSecondary)
+            DetailRow("HR Device", reading.hrDeviceId ?: "None recorded")
+
+            HorizontalDivider(color = SurfaceDark)
             Text("Data Quality", style = MaterialTheme.typography.labelLarge, color = TextSecondary)
             DetailRow("Artifact % (Supine)", "${String.format("%.1f", reading.artifactPercentSupine)} %")
             DetailRow("Artifact % (Standing)", "${String.format("%.1f", reading.artifactPercentStanding)} %")

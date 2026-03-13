@@ -26,5 +26,12 @@ data class ApneaRecordEntity(
      * Null when the user did not tap the First Contraction button (or for older records).
      */
     @ColumnInfo(defaultValue = "NULL")
-    val firstContractionMs: Long? = null
+    val firstContractionMs: Long? = null,
+    /**
+     * Human-readable identifier of the HR/SpO₂ device used during this hold
+     * (e.g. "Polar H10 (ABC123)", "Polar Verity (XYZ)", "Oximeter (AA:BB:CC:DD:EE:FF)").
+     * Null when no device was connected.
+     */
+    @ColumnInfo(defaultValue = "NULL")
+    val hrDeviceId: String? = null
 )

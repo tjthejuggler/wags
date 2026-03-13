@@ -46,5 +46,13 @@ data class MorningReadinessEntity(
     val hrvBaseScore: Int,
     val orthoMultiplier: Float,
     val cvPenaltyApplied: Boolean,
-    val rhrLimiterApplied: Boolean
+    val rhrLimiterApplied: Boolean,
+
+    /**
+     * Human-readable identifier of the HR device used during this assessment
+     * (e.g. "Polar H10 (ABC123)", "Polar Verity (XYZ)").
+     * Null when no device was connected.
+     */
+    @androidx.room.ColumnInfo(defaultValue = "NULL")
+    val hrDeviceId: String? = null
 )

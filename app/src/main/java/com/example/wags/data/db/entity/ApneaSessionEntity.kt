@@ -1,5 +1,6 @@
 package com.example.wags.data.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -16,5 +17,12 @@ data class ApneaSessionEntity(
     val maxHrBpm: Int?,
     val lowestSpO2: Int?,
     val roundsCompleted: Int,
-    val totalRounds: Int
+    val totalRounds: Int,
+    /**
+     * Human-readable identifier of the HR/SpO₂ device used during this session
+     * (e.g. "Polar H10 (ABC123)", "Polar Verity (XYZ)", "Oximeter (AA:BB:CC:DD:EE:FF)").
+     * Null when no device was connected.
+     */
+    @ColumnInfo(defaultValue = "NULL")
+    val hrDeviceId: String? = null
 )

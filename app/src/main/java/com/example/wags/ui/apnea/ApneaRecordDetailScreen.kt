@@ -364,6 +364,10 @@ private fun RecordDetailContent(
                     value = record.timeOfDay.lowercase().replaceFirstChar { it.uppercase() }
                 )
                 DetailRow(label = "Type", value = record.tableType ?: "Free Hold")
+                DetailRow(
+                    label = "HR/SpO₂ Device",
+                    value = record.hrDeviceId ?: "None recorded"
+                )
                 record.firstContractionMs?.let { fcMs ->
                     DetailRow(
                         label = "First Contraction",
