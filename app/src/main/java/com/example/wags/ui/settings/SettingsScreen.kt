@@ -2,6 +2,7 @@ package com.example.wags.ui.settings
 
 import android.Manifest
 import android.bluetooth.le.ScanResult
+import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -45,6 +46,20 @@ fun SettingsScreen(
     var permissionDenied by remember { mutableStateOf(false) }
     // Which slot the user is currently assigning (NONE = normal connect mode)
     var assigningSlot by remember { mutableStateOf(DefaultSlot.NONE) }
+
+    // SAF directory picker for meditation audio folder
+    val meditationDirLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            // Persist read permission across reboots
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+            viewModel.setMeditationAudioDir(uri.toString())
+        }
+    }
 
     val blePermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         arrayOf(
@@ -309,6 +324,15 @@ fun SettingsScreen(
                         requestScan()
                     },
                     onClearDay = { viewModel.clearDayDefault() }
+                )
+            }
+
+            // ── Meditation audio directory ─────────────────────────────────
+            item {
+                MeditationAudioDirectoryCard(
+                    dirUri = state.meditationAudioDirUri,
+                    onChooseDirectory = { meditationDirLauncher.launch(null) },
+                    onClearDirectory = { viewModel.clearMeditationAudioDir() }
                 )
             }
 
@@ -710,6 +734,83 @@ private fun OximeterDeviceResultCard(
                         modifier = Modifier.height(32.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
                     ) { Text("Connect", style = MaterialTheme.typography.bodySmall) }
+                }
+            }
+        }
+    }
+}
+
+// ── Meditation audio directory card ──────────────────────────────────────────
+
+@Composable
+private fun MeditationAudioDirectoryCard(
+    dirUri: String,
+    onChooseDirectory: () -> Unit,
+    onClearDirectory: () -> Unit
+) {
+    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Meditation Audio Directory", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Choose the folder that contains your meditation / NSDR audio files. " +
+                    "The app will scan this folder and list all audio files in the Meditation screen.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
+
+            HorizontalDivider(color = SurfaceVariant)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    if (dirUri.isNotBlank()) {
+                        // Show a friendly path fragment from the URI
+                        val displayPath = try {
+                            Uri.parse(dirUri).lastPathSegment ?: dirUri
+                        } catch (_: Exception) { dirUri }
+                        Text(
+                            displayPath,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ReadinessGreen
+                        )
+                    } else {
+                        Text(
+                            "No folder selected",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (dirUri.isNotBlank()) {
+                        IconButton(onClick = onClearDirectory, modifier = Modifier.size(32.dp)) {
+                            Icon(
+                                Icons.Default.Clear,
+                                contentDescription = "Clear directory",
+                                tint = TextSecondary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = onChooseDirectory,
+                        modifier = Modifier.height(32.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                    ) {
+                        Text(
+                            if (dirUri.isNotBlank()) "Change" else "Choose Folder",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
             }
         }

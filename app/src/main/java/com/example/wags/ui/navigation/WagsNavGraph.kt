@@ -24,6 +24,9 @@ import com.example.wags.ui.breathing.AssessmentResultScreen
 import com.example.wags.ui.breathing.AssessmentRunScreen
 import com.example.wags.ui.breathing.BreathingScreen
 import com.example.wags.ui.dashboard.DashboardScreen
+import com.example.wags.ui.meditation.MeditationHistoryScreen
+import com.example.wags.ui.meditation.MeditationScreen
+import com.example.wags.ui.meditation.MeditationSessionDetailScreen
 import com.example.wags.ui.readiness.HrvReadinessDetailScreen
 import com.example.wags.ui.readiness.HrvReadinessHistoryScreen
 import com.example.wags.ui.readiness.ReadinessScreen
@@ -54,6 +57,10 @@ object WagsRoutes {
     const val APNEA_RECORD_DETAIL = "apnea_record_detail/{recordId}"
     const val APNEA_ALL_RECORDS = "apnea_all_records"
     const val FREE_HOLD_ACTIVE = "free_hold_active/{lungVolume}/{prepType}/{timeOfDay}/{showTimer}"
+    // ── Meditation / NSDR ──────────────────────────────────────────────────────
+    const val MEDITATION = "meditation"
+    const val MEDITATION_HISTORY = "meditation_history"
+    const val MEDITATION_SESSION_DETAIL = "meditation_session_detail/{sessionId}"
 
     fun apneaTable(type: String) = "apnea_table/$type"
     fun advancedApnea(modality: String, length: String) = "advanced_apnea/$modality/$length"
@@ -67,6 +74,7 @@ object WagsRoutes {
     fun hrvReadinessDetail(readingId: Long) = "hrv_readiness_detail/$readingId"
     fun freeHoldActive(lungVolume: String, prepType: String, timeOfDay: String, showTimer: Boolean) =
         "free_hold_active/$lungVolume/$prepType/$timeOfDay/$showTimer"
+    fun meditationSessionDetail(sessionId: Long) = "meditation_session_detail/$sessionId"
 }
 
 @Composable
@@ -228,6 +236,19 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
                     }
                 }
             )
+        }
+        // ── Meditation / NSDR ──────────────────────────────────────────────────
+        composable(WagsRoutes.MEDITATION) {
+            MeditationScreen(navController = navController)
+        }
+        composable(WagsRoutes.MEDITATION_HISTORY) {
+            MeditationHistoryScreen(navController = navController)
+        }
+        composable(
+            route = WagsRoutes.MEDITATION_SESSION_DETAIL,
+            arguments = listOf(navArgument("sessionId") { type = NavType.LongType })
+        ) {
+            MeditationSessionDetailScreen(navController = navController)
         }
     }
 }

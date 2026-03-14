@@ -52,6 +52,9 @@ data class SettingsUiState(
     val dayDeviceId: String = "",
     val dayDeviceType: String = "",
     val dayDeviceName: String = "",
+    // ── Meditation audio directory ─────────────────────────────────────────────
+    /** SAF URI string of the chosen meditation audio folder, or "" if not set. */
+    val meditationAudioDirUri: String = "",
     // ── Tail / Habit app integration ──────────────────────────────────────────
     /** Habits fetched from the Habit app's Content Provider. Empty until loaded. */
     val habitList: List<HabitEntry> = emptyList(),
@@ -75,7 +78,8 @@ class SettingsViewModel @Inject constructor(
     private val devicePrefs: DevicePreferencesRepository,
     private val bleManager: PolarBleManager,
     private val oximeterBleManager: OximeterBleManager,
-    private val habitRepo: HabitIntegrationRepository
+    private val habitRepo: HabitIntegrationRepository,
+    private val meditationRepository: com.example.wags.data.repository.MeditationRepository
 ) : ViewModel() {
 
     // Separate MutableStateFlow for habit-specific state so it doesn't need to
@@ -106,20 +110,21 @@ class SettingsViewModel @Inject constructor(
         val oximeterScanning = oximeterState is OximeterConnectionState.Scanning
 
         SettingsUiState(
-            h10State            = h10State,
-            verityState         = verityState,
-            oximeterState       = oximeterState,
-            isScanning          = polarScanning || oximeterScanning,
-            polarScanResults    = polarResults,
-            oximeterScanResults = oximeterResults,
-            savedH10Id          = snap.savedH10Id,
-            savedVerityId       = snap.savedVerityId,
-            morningDeviceId     = snap.morningDeviceId,
-            morningDeviceType   = snap.morningDeviceType,
-            morningDeviceName   = snap.morningDeviceName,
-            dayDeviceId         = snap.dayDeviceId,
-            dayDeviceType       = snap.dayDeviceType,
-            dayDeviceName       = snap.dayDeviceName
+            h10State              = h10State,
+            verityState           = verityState,
+            oximeterState         = oximeterState,
+            isScanning            = polarScanning || oximeterScanning,
+            polarScanResults      = polarResults,
+            oximeterScanResults   = oximeterResults,
+            savedH10Id            = snap.savedH10Id,
+            savedVerityId         = snap.savedVerityId,
+            morningDeviceId       = snap.morningDeviceId,
+            morningDeviceType     = snap.morningDeviceType,
+            morningDeviceName     = snap.morningDeviceName,
+            dayDeviceId           = snap.dayDeviceId,
+            dayDeviceType         = snap.dayDeviceType,
+            dayDeviceName         = snap.dayDeviceName,
+            meditationAudioDirUri = snap.meditationAudioDirUri
         )
     }.combine(_habitState) { bleState, habit ->
         // Merge the habit sub-state into the BLE-derived state
@@ -146,6 +151,7 @@ class SettingsViewModel @Inject constructor(
             dayDeviceId             = devicePrefs.dayDeviceId,
             dayDeviceType           = devicePrefs.dayDeviceType,
             dayDeviceName           = devicePrefs.dayDeviceName,
+            meditationAudioDirUri   = devicePrefs.meditationAudioDirUri,
             freeHoldHabit           = slotSelection(Slot.FREE_HOLD),
             apneaNewRecordHabit     = slotSelection(Slot.APNEA_NEW_RECORD),
             tableTrainingHabit      = slotSelection(Slot.TABLE_TRAINING),
@@ -252,6 +258,16 @@ class SettingsViewModel @Inject constructor(
         devicePrefs.dayDeviceType = ""
         devicePrefs.dayDeviceName = ""
         devicePrefs.refresh()
+    }
+
+    // ── Meditation audio directory ────────────────────────────────────────────
+
+    fun setMeditationAudioDir(uriString: String) {
+        meditationRepository.setAudioDirUri(uriString)
+    }
+
+    fun clearMeditationAudioDir() {
+        meditationRepository.setAudioDirUri("")
     }
 
     // ── Habit / Tail integration ──────────────────────────────────────────────

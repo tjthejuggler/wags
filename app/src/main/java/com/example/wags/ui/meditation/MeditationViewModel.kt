@@ -1,0 +1,341 @@
+package com.example.wags.ui.meditation
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.wags.data.ble.HrDataSource
+import com.example.wags.data.ble.OximeterBleManager
+import com.example.wags.data.ble.PolarBleManager
+import com.example.wags.data.db.entity.MeditationAudioEntity
+import com.example.wags.data.db.entity.MeditationSessionEntity
+import com.example.wags.data.repository.MeditationRepository
+import com.example.wags.di.IoDispatcher
+import com.example.wags.di.MathDispatcher
+import com.example.wags.domain.model.BleConnectionState
+import com.example.wags.domain.model.OximeterConnectionState
+import com.example.wags.domain.usecase.hrv.ArtifactCorrectionUseCase
+import com.example.wags.domain.usecase.session.HrSonificationEngine
+import com.example.wags.domain.usecase.session.NsdrAnalyticsCalculator
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import javax.inject.Inject
+
+// ── Session state machine ──────────────────────────────────────────────────────
+
+enum class MeditationSessionState { IDLE, ACTIVE, PROCESSING, COMPLETE }
+
+// ── UI state ──────────────────────────────────────────────────────────────────
+
+data class MeditationUiState(
+    // Audio list
+    val audios: List<MeditationAudioEntity> = emptyList(),
+    val selectedAudio: MeditationAudioEntity? = null,
+    val isLoadingAudios: Boolean = false,
+    val audioDirUri: String = "",
+    // Session
+    val sessionState: MeditationSessionState = MeditationSessionState.IDLE,
+    val elapsedSeconds: Long = 0L,
+    val currentHrBpm: Float? = null,
+    val currentRmssd: Float? = null,
+    val sonificationEnabled: Boolean = false,
+    // Post-session analytics
+    val avgHrBpm: Float? = null,
+    val hrSlopeBpmPerMin: Float? = null,
+    val startRmssdMs: Float? = null,
+    val endRmssdMs: Float? = null,
+    val lnRmssdSlope: Float? = null,
+    val monitorId: String? = null,
+    val durationMs: Long = 0L,
+    // Device
+    val hasHrMonitor: Boolean = false,
+    val connectedDeviceId: String? = null,
+    val liveHr: Int? = null,
+    val liveSpO2: Int? = null,
+    // URL edit dialog
+    val editingAudio: MeditationAudioEntity? = null,
+    // Saved session id (for navigation after complete)
+    val savedSessionId: Long? = null
+)
+
+// ── ViewModel ─────────────────────────────────────────────────────────────────
+
+@HiltViewModel
+class MeditationViewModel @Inject constructor(
+    private val repository: MeditationRepository,
+    private val bleManager: PolarBleManager,
+    private val oximeterBleManager: OximeterBleManager,
+    private val hrDataSource: HrDataSource,
+    private val analyticsCalculator: NsdrAnalyticsCalculator,
+    private val artifactCorrection: ArtifactCorrectionUseCase,
+    private val sonificationEngine: HrSonificationEngine,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    @MathDispatcher private val mathDispatcher: CoroutineDispatcher
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(MeditationUiState())
+    val uiState: StateFlow<MeditationUiState> = combine(
+        _uiState,
+        hrDataSource.liveHr,
+        hrDataSource.liveSpO2
+    ) { state, hr, spo2 ->
+        state.copy(liveHr = hr, liveSpO2 = spo2)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = MeditationUiState()
+    )
+
+    private var sessionJob: Job? = null
+    private var sessionStartMs = 0L
+    private val hrTimeSeries = mutableListOf<Float>()
+
+    init {
+        // Observe HR device connection
+        viewModelScope.launch {
+            hrDataSource.isAnyHrDeviceConnected.collect { anyConnected ->
+                val h10Id = (bleManager.h10State.value as? BleConnectionState.Connected)?.deviceId
+                val verityId = (bleManager.verityState.value as? BleConnectionState.Connected)?.deviceId
+                val oxyAddr = (oximeterBleManager.connectionState.value as? OximeterConnectionState.Connected)?.deviceAddress
+                val activeId = h10Id ?: verityId ?: oxyAddr
+                _uiState.update {
+                    it.copy(hasHrMonitor = anyConnected, connectedDeviceId = activeId)
+                }
+            }
+        }
+
+        // Load audio list
+        viewModelScope.launch {
+            repository.observeAudios().collect { audios ->
+                _uiState.update { state ->
+                    // Keep selected audio in sync; default to None if nothing selected
+                    val currentSelected = state.selectedAudio
+                    val newSelected = when {
+                        currentSelected == null -> audios.firstOrNull { it.isNone }
+                        else -> audios.firstOrNull { it.audioId == currentSelected.audioId }
+                            ?: audios.firstOrNull { it.isNone }
+                    }
+                    state.copy(audios = audios, selectedAudio = newSelected)
+                }
+            }
+        }
+
+        // Initial sync of audio directory
+        viewModelScope.launch(ioDispatcher) {
+            val dirUri = repository.getAudioDirUri()
+            _uiState.update { it.copy(audioDirUri = dirUri, isLoadingAudios = true) }
+            repository.syncAudioDirectory(dirUri)
+            _uiState.update { it.copy(isLoadingAudios = false) }
+        }
+    }
+
+    // ── Audio selection ────────────────────────────────────────────────────────
+
+    fun selectAudio(audio: MeditationAudioEntity) {
+        if (_uiState.value.sessionState == MeditationSessionState.IDLE) {
+            _uiState.update { it.copy(selectedAudio = audio) }
+        }
+    }
+
+    fun refreshAudios() {
+        viewModelScope.launch(ioDispatcher) {
+            val dirUri = repository.getAudioDirUri()
+            _uiState.update { it.copy(isLoadingAudios = true) }
+            repository.syncAudioDirectory(dirUri)
+            _uiState.update { it.copy(isLoadingAudios = false) }
+        }
+    }
+
+    // ── URL edit dialog ────────────────────────────────────────────────────────
+
+    fun openUrlEditor(audio: MeditationAudioEntity) {
+        _uiState.update { it.copy(editingAudio = audio) }
+    }
+
+    fun dismissUrlEditor() {
+        _uiState.update { it.copy(editingAudio = null) }
+    }
+
+    fun saveAudioUrl(audioId: Long, url: String) {
+        viewModelScope.launch(ioDispatcher) {
+            repository.updateAudioUrl(audioId, url.trim())
+        }
+        _uiState.update { it.copy(editingAudio = null) }
+    }
+
+    // ── Sonification ───────────────────────────────────────────────────────────
+
+    fun setSonificationEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(sonificationEnabled = enabled) }
+    }
+
+    // ── Session lifecycle ──────────────────────────────────────────────────────
+
+    fun startSession() {
+        if (_uiState.value.sessionState == MeditationSessionState.ACTIVE) return
+
+        val activeMonitorId = _uiState.value.connectedDeviceId?.takeIf { it.isNotBlank() }
+        if (activeMonitorId != null) {
+            bleManager.startRrStream(activeMonitorId)
+        }
+
+        hrTimeSeries.clear()
+        sessionStartMs = System.currentTimeMillis()
+
+        _uiState.update {
+            it.copy(
+                sessionState      = MeditationSessionState.ACTIVE,
+                elapsedSeconds    = 0L,
+                currentHrBpm      = null,
+                currentRmssd      = null,
+                avgHrBpm          = null,
+                hrSlopeBpmPerMin  = null,
+                startRmssdMs      = null,
+                endRmssdMs        = null,
+                lnRmssdSlope      = null,
+                monitorId         = activeMonitorId,
+                savedSessionId    = null
+            )
+        }
+
+        if (_uiState.value.sonificationEnabled && activeMonitorId != null) {
+            sonificationEngine.start(viewModelScope)
+        }
+
+        sessionJob = viewModelScope.launch {
+            while (isActive) {
+                delay(1_000L)
+                val elapsed = (System.currentTimeMillis() - sessionStartMs) / 1_000L
+
+                if (activeMonitorId != null) {
+                    val rrSnapshot = bleManager.rrBuffer.readLast(64)
+                    val polarHr = if (rrSnapshot.isNotEmpty())
+                        (60_000.0 / rrSnapshot.last()).toFloat() else null
+                    val currentHr = polarHr ?: hrDataSource.liveHr.value?.toFloat()
+                    val liveRmssd = computeLiveRmssd(rrSnapshot)
+
+                    if (currentHr != null) {
+                        hrTimeSeries.add(currentHr)
+                        if (_uiState.value.sonificationEnabled) {
+                            sonificationEngine.updateHr(currentHr)
+                        }
+                    }
+
+                    _uiState.update {
+                        it.copy(
+                            elapsedSeconds = elapsed,
+                            currentHrBpm   = currentHr,
+                            currentRmssd   = liveRmssd
+                        )
+                    }
+                } else {
+                    _uiState.update { it.copy(elapsedSeconds = elapsed) }
+                }
+            }
+        }
+    }
+
+    fun stopSession() {
+        sessionJob?.cancel()
+        sonificationEngine.stop()
+        val durationMs = System.currentTimeMillis() - sessionStartMs
+        processSession(durationMs)
+    }
+
+    fun reset() {
+        _uiState.update {
+            it.copy(
+                sessionState     = MeditationSessionState.IDLE,
+                elapsedSeconds   = 0L,
+                currentHrBpm     = null,
+                currentRmssd     = null,
+                avgHrBpm         = null,
+                hrSlopeBpmPerMin = null,
+                startRmssdMs     = null,
+                endRmssdMs       = null,
+                lnRmssdSlope     = null,
+                monitorId        = null,
+                durationMs       = 0L,
+                savedSessionId   = null
+            )
+        }
+    }
+
+    // ── Private helpers ────────────────────────────────────────────────────────
+
+    private fun computeLiveRmssd(rr: List<Double>): Float? {
+        if (rr.size < 2) return null
+        val diffs = (1 until rr.size).map { rr[it] - rr[it - 1] }
+        return Math.sqrt(diffs.sumOf { it * it } / diffs.size).toFloat()
+    }
+
+    private fun processSession(durationMs: Long) {
+        _uiState.update { it.copy(sessionState = MeditationSessionState.PROCESSING, durationMs = durationMs) }
+
+        viewModelScope.launch {
+            val monitorId = _uiState.value.monitorId
+            val audioId   = _uiState.value.selectedAudio?.audioId
+
+            var avgHr: Float? = null
+            var hrSlope: Float? = null
+            var startRmssd: Float? = null
+            var endRmssd: Float? = null
+            var lnSlope: Float? = null
+
+            try {
+                if (monitorId != null && hrTimeSeries.isNotEmpty()) {
+                    val analytics = withContext(mathDispatcher) {
+                        val rrSnapshot = bleManager.rrBuffer.readLast(1024)
+                        val corrected  = artifactCorrection.execute(rrSnapshot)
+                        analyticsCalculator.calculate(
+                            hrTimeSeries = hrTimeSeries.toList(),
+                            nnIntervals  = corrected.correctedNn
+                        )
+                    }
+                    avgHr      = analytics.avgHrBpm
+                    hrSlope    = analytics.hrSlopeBpmPerMin
+                    startRmssd = analytics.startRmssdMs
+                    endRmssd   = analytics.endRmssdMs
+                    lnSlope    = analytics.lnRmssdSlope
+                }
+            } catch (_: Exception) {
+                // Analytics failure — still save the session
+            }
+
+            val entity = MeditationSessionEntity(
+                audioId          = audioId,
+                timestamp        = sessionStartMs,
+                durationMs       = durationMs,
+                monitorId        = monitorId,
+                avgHrBpm         = avgHr,
+                hrSlopeBpmPerMin = hrSlope,
+                startRmssdMs     = startRmssd,
+                endRmssdMs       = endRmssd,
+                lnRmssdSlope     = lnSlope
+            )
+
+            val savedId = withContext(ioDispatcher) { repository.insertSession(entity) }
+
+            _uiState.update {
+                it.copy(
+                    sessionState     = MeditationSessionState.COMPLETE,
+                    avgHrBpm         = avgHr,
+                    hrSlopeBpmPerMin = hrSlope,
+                    startRmssdMs     = startRmssd,
+                    endRmssdMs       = endRmssd,
+                    lnRmssdSlope     = lnSlope,
+                    savedSessionId   = savedId
+                )
+            }
+        }
+    }
+}

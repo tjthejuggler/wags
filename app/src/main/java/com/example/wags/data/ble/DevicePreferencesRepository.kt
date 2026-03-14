@@ -68,6 +68,13 @@ class DevicePreferencesRepository @Inject constructor(
         get() = prefs.getString(KEY_DAY_NAME, "") ?: ""
         set(value) = prefs.edit().putString(KEY_DAY_NAME, value).apply()
 
+    // ── Meditation audio directory ─────────────────────────────────────────────
+
+    /** URI string of the user-chosen meditation audio folder (SAF persistent URI), or "". */
+    var meditationAudioDirUri: String
+        get() = prefs.getString(KEY_MEDITATION_DIR_URI, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_MEDITATION_DIR_URI, value).apply()
+
     // ── Reactive snapshot for UI ───────────────────────────────────────────────
 
     private val _snapshot = MutableStateFlow(buildSnapshot())
@@ -86,20 +93,22 @@ class DevicePreferencesRepository @Inject constructor(
         morningDeviceName    = morningDeviceName,
         dayDeviceId          = dayDeviceId,
         dayDeviceType        = dayDeviceType,
-        dayDeviceName        = dayDeviceName
+        dayDeviceName        = dayDeviceName,
+        meditationAudioDirUri = meditationAudioDirUri
     )
 
     companion object {
-        const val PREFS_NAME        = "wags_device_prefs"
-        const val KEY_H10_ID        = "h10_device_id"
-        const val KEY_VERITY_ID     = "verity_device_id"
-        const val KEY_OXIMETER_ADDR = "oximeter_address"
-        const val KEY_MORNING_ID    = "morning_device_id"
-        const val KEY_MORNING_TYPE  = "morning_device_type"
-        const val KEY_MORNING_NAME  = "morning_device_name"
-        const val KEY_DAY_ID        = "day_device_id"
-        const val KEY_DAY_TYPE      = "day_device_type"
-        const val KEY_DAY_NAME      = "day_device_name"
+        const val PREFS_NAME              = "wags_device_prefs"
+        const val KEY_H10_ID              = "h10_device_id"
+        const val KEY_VERITY_ID           = "verity_device_id"
+        const val KEY_OXIMETER_ADDR       = "oximeter_address"
+        const val KEY_MORNING_ID          = "morning_device_id"
+        const val KEY_MORNING_TYPE        = "morning_device_type"
+        const val KEY_MORNING_NAME        = "morning_device_name"
+        const val KEY_DAY_ID              = "day_device_id"
+        const val KEY_DAY_TYPE            = "day_device_type"
+        const val KEY_DAY_NAME            = "day_device_name"
+        const val KEY_MEDITATION_DIR_URI  = "meditation_audio_dir_uri"
 
         /** Returns true if the current hour falls in the morning window (3–10 inclusive). */
         fun isMorningWindow(): Boolean {
@@ -118,5 +127,6 @@ data class DevicePrefsSnapshot(
     val morningDeviceName: String,
     val dayDeviceId: String,
     val dayDeviceType: String,
-    val dayDeviceName: String
+    val dayDeviceName: String,
+    val meditationAudioDirUri: String = ""
 )

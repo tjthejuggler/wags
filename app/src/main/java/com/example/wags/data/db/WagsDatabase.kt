@@ -18,9 +18,11 @@ import com.example.wags.data.db.entity.*
         ApneaSessionEntity::class,
         ContractionEntity::class,
         TelemetryEntity::class,
-        FreeHoldTelemetryEntity::class
+        FreeHoldTelemetryEntity::class,
+        MeditationAudioEntity::class,
+        MeditationSessionEntity::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -34,6 +36,8 @@ abstract class WagsDatabase : RoomDatabase() {
     abstract fun contractionDao(): ContractionDao
     abstract fun telemetryDao(): TelemetryDao
     abstract fun freeHoldTelemetryDao(): FreeHoldTelemetryDao
+    abstract fun meditationAudioDao(): MeditationAudioDao
+    abstract fun meditationSessionDao(): MeditationSessionDao
 
     companion object {
         /**
@@ -301,6 +305,45 @@ abstract class WagsDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE morning_readiness  ADD COLUMN hrDeviceId TEXT DEFAULT NULL")
                 db.execSQL("ALTER TABLE daily_readings     ADD COLUMN hrDeviceId TEXT DEFAULT NULL")
                 db.execSQL("ALTER TABLE rf_assessments     ADD COLUMN hrDeviceId TEXT DEFAULT NULL")
+            }
+        }
+
+        /**
+         * v11 → v12: Add meditation_audios and meditation_sessions tables.
+         */
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `meditation_audios` (
+                        `audioId`   INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `fileName`  TEXT NOT NULL,
+                        `sourceUrl` TEXT NOT NULL DEFAULT '',
+                        `isNone`    INTEGER NOT NULL DEFAULT 0
+                    )
+                """.trimIndent())
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `meditation_sessions` (
+                        `sessionId`         INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `audioId`           INTEGER,
+                        `timestamp`         INTEGER NOT NULL,
+                        `durationMs`        INTEGER NOT NULL,
+                        `monitorId`         TEXT,
+                        `avgHrBpm`          REAL,
+                        `hrSlopeBpmPerMin`  REAL,
+                        `startRmssdMs`      REAL,
+                        `endRmssdMs`        REAL,
+                        `lnRmssdSlope`      REAL,
+                        FOREIGN KEY(`audioId`) REFERENCES `meditation_audios`(`audioId`) ON DELETE SET NULL
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_meditation_sessions_audioId` ON `meditation_sessions` (`audioId`)")
+
+                // Insert the permanent "None" sentinel row
+                db.execSQL("""
+                    INSERT INTO meditation_audios (fileName, sourceUrl, isNone)
+                    VALUES ('None', '', 1)
+                """.trimIndent())
             }
         }
     }

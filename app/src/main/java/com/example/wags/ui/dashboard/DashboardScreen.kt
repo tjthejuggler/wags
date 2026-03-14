@@ -130,8 +130,8 @@ fun DashboardScreen(
                 }
             }
             item {
-                NavigationCard("Meditation / NSDR", "Session analytics") {
-                    navController.navigate(WagsRoutes.session("MEDITATION"))
+                NavigationCard("Meditation / NSDR", "Audio-guided sessions with HR tracking") {
+                    navController.navigate(WagsRoutes.MEDITATION)
                 }
             }
         }
