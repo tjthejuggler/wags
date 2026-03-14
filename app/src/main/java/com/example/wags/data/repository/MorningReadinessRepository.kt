@@ -3,6 +3,8 @@ package com.example.wags.data.repository
 import com.example.wags.data.db.dao.MorningReadinessDao
 import com.example.wags.data.db.entity.MorningReadinessEntity
 import kotlinx.coroutines.flow.Flow
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -15,7 +17,18 @@ class MorningReadinessRepository @Inject constructor(
 
     suspend fun getLatest(): MorningReadinessEntity? = dao.getLatest()
 
+    suspend fun getById(id: Long): MorningReadinessEntity? = dao.getById(id)
+
     fun observeAll(): Flow<List<MorningReadinessEntity>> = dao.observeAll()
+
+    /** Emits the most recent morning readiness reading taken today, or null if none. */
+    fun observeTodayReading(): Flow<MorningReadinessEntity?> {
+        val startOfDay = LocalDate.now()
+            .atStartOfDay(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+        return dao.observeTodayLatest(startOfDay)
+    }
 
     // 7-day acute baseline: ln(RMSSD) values
     suspend fun getAcuteBaselineLnRmssd(): List<Double> {

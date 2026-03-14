@@ -3,6 +3,8 @@ package com.example.wags.data.repository
 import com.example.wags.data.db.dao.DailyReadingDao
 import com.example.wags.data.db.entity.DailyReadingEntity
 import kotlinx.coroutines.flow.Flow
+import java.time.LocalDate
+import java.time.ZoneId
 import javax.inject.Inject
 
 class ReadinessRepository @Inject constructor(
@@ -13,6 +15,15 @@ class ReadinessRepository @Inject constructor(
 
     fun observeAll(): Flow<List<DailyReadingEntity>> =
         dao.observeAll()
+
+    /** Emits the most recent HRV readiness reading taken today, or null if none. */
+    fun observeTodayReading(): Flow<DailyReadingEntity?> {
+        val startOfDay = LocalDate.now()
+            .atStartOfDay(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+        return dao.observeTodayLatest(startOfDay)
+    }
 
     suspend fun getLast14ForBaseline(): List<DailyReadingEntity> =
         dao.getLast14()

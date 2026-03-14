@@ -31,6 +31,7 @@ import com.example.wags.ui.readiness.HrvReadinessDetailScreen
 import com.example.wags.ui.readiness.HrvReadinessHistoryScreen
 import com.example.wags.ui.readiness.ReadinessScreen
 import com.example.wags.ui.session.SessionScreen
+import com.example.wags.ui.morning.MorningReadinessDetailScreen
 import com.example.wags.ui.morning.MorningReadinessHistoryScreen
 import com.example.wags.ui.morning.MorningReadinessScreen
 import com.example.wags.ui.settings.SettingsScreen
@@ -45,6 +46,7 @@ object WagsRoutes {
     const val SESSION = "session/{sessionType}"
     const val MORNING_READINESS = "morning_readiness"
     const val MORNING_READINESS_HISTORY = "morning_readiness_history"
+    const val MORNING_READINESS_DETAIL = "morning_readiness_detail/{readingId}"
     const val READINESS_HISTORY = "readiness_history"
     const val HRV_READINESS_DETAIL = "hrv_readiness_detail/{readingId}"
     const val SETTINGS = "settings"
@@ -72,6 +74,7 @@ object WagsRoutes {
         "apnea_history/$lungVolume/$prepType/$timeOfDay"
     fun apneaRecordDetail(recordId: Long) = "apnea_record_detail/$recordId"
     fun hrvReadinessDetail(readingId: Long) = "hrv_readiness_detail/$readingId"
+    fun morningReadinessDetail(readingId: Long) = "morning_readiness_detail/$readingId"
     fun freeHoldActive(lungVolume: String, prepType: String, timeOfDay: String, showTimer: Boolean) =
         "free_hold_active/$lungVolume/$prepType/$timeOfDay/$showTimer"
     fun meditationSessionDetail(sessionId: Long) = "meditation_session_detail/$sessionId"
@@ -165,6 +168,12 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
         }
         composable(WagsRoutes.MORNING_READINESS_HISTORY) {
             MorningReadinessHistoryScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        composable(
+            route = WagsRoutes.MORNING_READINESS_DETAIL,
+            arguments = listOf(navArgument("readingId") { type = NavType.LongType })
+        ) {
+            MorningReadinessDetailScreen(onNavigateBack = { navController.popBackStack() })
         }
         composable(
             route = WagsRoutes.SESSION_ANALYTICS,

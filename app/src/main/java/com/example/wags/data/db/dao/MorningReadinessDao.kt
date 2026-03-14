@@ -12,6 +12,12 @@ interface MorningReadinessDao {
     @Query("SELECT * FROM morning_readiness ORDER BY timestamp DESC LIMIT 1")
     suspend fun getLatest(): MorningReadinessEntity?
 
+    @Query("SELECT * FROM morning_readiness WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Long): MorningReadinessEntity?
+
+    @Query("SELECT * FROM morning_readiness WHERE timestamp >= :startOfDayMs ORDER BY timestamp DESC LIMIT 1")
+    fun observeTodayLatest(startOfDayMs: Long): Flow<MorningReadinessEntity?>
+
     @Query("SELECT * FROM morning_readiness ORDER BY timestamp DESC LIMIT :limit")
     suspend fun getLastN(limit: Int): List<MorningReadinessEntity>
 

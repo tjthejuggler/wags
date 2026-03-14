@@ -9,13 +9,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.example.wags.data.db.entity.DailyReadingEntity
+import com.example.wags.data.db.entity.MorningReadinessEntity
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
-import androidx.compose.ui.text.font.FontWeight
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,11 +99,30 @@ fun DashboardScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // ── Today's HRV Readiness card (only shown if done today) ─────────
             item {
-                state.lastReadinessScore?.let { score ->
-                    ReadinessScoreCard(score = score, lnRmssd = state.lastLnRmssd)
-                }
+                TodayHrvReadinessCard(
+                    reading = state.todayHrvReading,
+                    onClick = {
+                        state.todayHrvReading?.let { reading ->
+                            navController.navigate(WagsRoutes.hrvReadinessDetail(reading.readingId))
+                        }
+                    }
+                )
             }
+
+            // ── Today's Morning Readiness card (always shown) ─────────────────
+            item {
+                TodayMorningReadinessCard(
+                    reading = state.todayMorningReading,
+                    onClick = {
+                        state.todayMorningReading?.let { reading ->
+                            navController.navigate(WagsRoutes.morningReadinessDetail(reading.id))
+                        }
+                    }
+                )
+            }
+
             item {
                 Text(
                     "Sessions",
@@ -138,9 +159,23 @@ fun DashboardScreen(
     }
 }
 
+// ── Today's HRV Readiness card ────────────────────────────────────────────────
+
 @Composable
-private fun ReadinessScoreCard(score: Int, lnRmssd: Float?) {
-    Card(colors = CardDefaults.cardColors(containerColor = SurfaceVariant)) {
+private fun TodayHrvReadinessCard(
+    reading: DailyReadingEntity?,
+    onClick: () -> Unit
+) {
+    if (reading == null) {
+        // No HRV readiness done today — don't show anything
+        return
+    }
+
+    Card(
+        onClick = onClick,
+        colors = CardDefaults.cardColors(containerColor = SurfaceVariant),
+        modifier = Modifier.fillMaxWidth()
+    ) {
         Row(
             modifier = Modifier
                 .padding(16.dp)
@@ -149,30 +184,125 @@ private fun ReadinessScoreCard(score: Int, lnRmssd: Float?) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text("Today's Readiness", style = MaterialTheme.typography.bodyMedium)
                 Text(
-                    text = score.toString(),
+                    "Today's HRV Readiness",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary
+                )
+                Text(
+                    text = reading.readinessScore.toString(),
                     style = MaterialTheme.typography.displayLarge,
                     color = when {
-                        score >= 80 -> ReadinessGreen
-                        score >= 60 -> ReadinessOrange
-                        else -> ReadinessRed
+                        reading.readinessScore >= 80 -> ReadinessGreen
+                        reading.readinessScore >= 60 -> ReadinessOrange
+                        else                         -> ReadinessRed
                     }
                 )
             }
-            lnRmssd?.let {
-                Column(horizontalAlignment = Alignment.End) {
-                    Text("ln(RMSSD)", style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        String.format("%.2f", it),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = EcgCyan
-                    )
-                }
+            Column(horizontalAlignment = Alignment.End) {
+                Text("ln(RMSSD)", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                Text(
+                    String.format("%.2f", reading.lnRmssd),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = EcgCyan
+                )
+                Spacer(Modifier.height(4.dp))
+                Text("Tap for details →", style = MaterialTheme.typography.labelSmall, color = EcgCyanDim)
             }
         }
     }
 }
+
+// ── Today's Morning Readiness card ───────────────────────────────────────────
+
+@Composable
+private fun TodayMorningReadinessCard(
+    reading: MorningReadinessEntity?,
+    onClick: () -> Unit
+) {
+    if (reading == null) {
+        // No morning readiness done today — show a placeholder card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = SurfaceVariant),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        "Today's Morning Readiness",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "No morning readiness done today",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = TextDisabled
+                    )
+                }
+                Text("—", style = MaterialTheme.typography.headlineLarge, color = TextDisabled)
+            }
+        }
+        return
+    }
+
+    val scoreColor = when (reading.readinessColor) {
+        "GREEN" -> ReadinessGreen
+        "RED"   -> ReadinessRed
+        else    -> ReadinessOrange
+    }
+
+    Card(
+        onClick = onClick,
+        colors = CardDefaults.cardColors(containerColor = SurfaceVariant),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    "Today's Morning Readiness",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary
+                )
+                Text(
+                    text = reading.readinessScore.toString(),
+                    style = MaterialTheme.typography.displayLarge,
+                    color = scoreColor
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    reading.readinessColor,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = scoreColor,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "RHR ${reading.supineRhr} bpm",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+                Spacer(Modifier.height(4.dp))
+                Text("Tap for details →", style = MaterialTheme.typography.labelSmall, color = EcgCyanDim)
+            }
+        }
+    }
+}
+
+// ── Navigation card ───────────────────────────────────────────────────────────
 
 @Composable
 private fun NavigationCard(title: String, subtitle: String, onClick: () -> Unit) {
