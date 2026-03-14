@@ -22,7 +22,7 @@ import com.example.wags.data.db.entity.*
         MeditationAudioEntity::class,
         MeditationSessionEntity::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -344,6 +344,17 @@ abstract class WagsDatabase : RoomDatabase() {
                     INSERT INTO meditation_audios (fileName, sourceUrl, isNone)
                     VALUES ('None', '', 1)
                 """.trimIndent())
+            }
+        }
+
+        /**
+         * v12 → v13: Add youtubeTitle and youtubeChannel columns to meditation_audios.
+         * Both default to NULL so existing rows are unaffected until the user re-saves a URL.
+         */
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE meditation_audios ADD COLUMN youtubeTitle TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE meditation_audios ADD COLUMN youtubeChannel TEXT DEFAULT NULL")
             }
         }
     }

@@ -3,6 +3,7 @@ package com.example.wags.ui.meditation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -39,13 +40,6 @@ fun MeditationScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // Navigate to detail when session is saved
-    LaunchedEffect(state.savedSessionId, state.sessionState) {
-        if (state.sessionState == MeditationSessionState.COMPLETE && state.savedSessionId != null) {
-            // Stay on screen to show summary; user taps "Done" to reset
-        }
-    }
-
     Scaffold(
         containerColor = BackgroundDark,
         topBar = {
@@ -79,6 +73,7 @@ fun MeditationScreen(
                 onEditAudioUrl = { viewModel.openUrlEditor(it) },
                 onRefreshAudios = { viewModel.refreshAudios() },
                 onSonificationToggle = { viewModel.setSonificationEnabled(!state.sonificationEnabled) },
+                onChannelFilterSelected = { viewModel.setChannelFilter(it) },
                 onStart = { viewModel.startSession() },
                 modifier = Modifier.padding(padding)
             )
@@ -105,6 +100,9 @@ fun MeditationScreen(
     state.editingAudio?.let { audio ->
         AudioUrlEditDialog(
             audio = audio,
+            isFetching = state.isFetchingMetadata,
+            fetchedMetadata = state.fetchedMetadata,
+            onFetchPreview = { url -> viewModel.fetchMetadataPreview(url) },
             onDismiss = { viewModel.dismissUrlEditor() },
             onSave = { url -> viewModel.saveAudioUrl(audio.audioId, url) }
         )
@@ -120,6 +118,7 @@ private fun IdleContent(
     onEditAudioUrl: (MeditationAudioEntity) -> Unit,
     onRefreshAudios: () -> Unit,
     onSonificationToggle: () -> Unit,
+    onChannelFilterSelected: (String?) -> Unit,
     onStart: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -187,20 +186,36 @@ private fun IdleContent(
             }
         }
 
-        // ── Audio list ──────────────────────────────────────────────────────
-        if (state.audios.isEmpty() && !state.isLoadingAudios) {
+        // ── Channel filter chips ────────────────────────────────────────────
+        if (state.availableChannels.isNotEmpty()) {
             item {
-                Text(
-                    "No audio files found. Add audio files to your chosen folder and tap Refresh.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextDisabled,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)
+                ChannelFilterRow(
+                    channels = state.availableChannels,
+                    selectedChannel = state.selectedChannelFilter,
+                    onChannelSelected = onChannelFilterSelected
                 )
             }
         }
 
-        items(state.audios, key = { it.audioId }) { audio ->
+        // ── Audio list ──────────────────────────────────────────────────────
+        if (state.filteredAudios.isEmpty() && !state.isLoadingAudios) {
+            item {
+                Text(
+                    if (state.audios.isEmpty())
+                        "No audio files found. Add audio files to your chosen folder and tap Refresh."
+                    else
+                        "No audios match the selected filter.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextDisabled,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp)
+                )
+            }
+        }
+
+        items(state.filteredAudios, key = { it.audioId }) { audio ->
             AudioListItem(
                 audio = audio,
                 isSelected = state.selectedAudio?.audioId == audio.audioId,
@@ -262,6 +277,72 @@ private fun IdleContent(
     }
 }
 
+// ── Channel filter chip row ────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ChannelFilterRow(
+    channels: List<String>,
+    selectedChannel: String?,
+    onChannelSelected: (String?) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            "Filter by channel",
+            style = MaterialTheme.typography.labelMedium,
+            color = TextSecondary
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // "All" chip
+            FilterChip(
+                selected = selectedChannel == null,
+                onClick = { onChannelSelected(null) },
+                label = { Text("All") },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = EcgCyan.copy(alpha = 0.2f),
+                    selectedLabelColor = EcgCyan
+                ),
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = selectedChannel == null,
+                    selectedBorderColor = EcgCyan,
+                    borderColor = SurfaceVariant
+                )
+            )
+            // One chip per channel
+            channels.forEach { channel ->
+                FilterChip(
+                    selected = selectedChannel == channel,
+                    onClick = { onChannelSelected(if (selectedChannel == channel) null else channel) },
+                    label = {
+                        Text(
+                            channel,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = EcgCyan.copy(alpha = 0.2f),
+                        selectedLabelColor = EcgCyan
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = selectedChannel == channel,
+                        selectedBorderColor = EcgCyan,
+                        borderColor = SurfaceVariant
+                    )
+                )
+            }
+        }
+    }
+}
+
 // ── Audio list item ────────────────────────────────────────────────────────────
 
 @Composable
@@ -293,7 +374,8 @@ private fun AudioListItem(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                // Title row: checkmark + display name
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -302,15 +384,41 @@ private fun AudioListItem(
                         Text("✓", color = EcgCyan, style = MaterialTheme.typography.bodyMedium)
                     }
                     Text(
-                        text = if (audio.isNone) "None  (silent meditation)" else audio.fileName,
+                        text = when {
+                            audio.isNone -> "None  (silent meditation)"
+                            else -> audio.displayName
+                        },
                         style = MaterialTheme.typography.bodyLarge,
                         color = if (isSelected) EcgCyan else TextPrimary,
                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                if (audio.sourceUrl.isNotBlank()) {
+
+                // Channel badge (YouTube audios only)
+                if (!audio.isNone && !audio.youtubeChannel.isNullOrBlank()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            "▶",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFFFF0000) // YouTube red
+                        )
+                        Text(
+                            text = audio.youtubeChannel,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                // For non-YouTube audios that have a URL, show the URL as a hint
+                if (!audio.isNone && audio.youtubeChannel.isNullOrBlank() && audio.sourceUrl.isNotBlank()) {
                     Text(
                         text = audio.sourceUrl,
                         style = MaterialTheme.typography.labelSmall,
@@ -319,7 +427,20 @@ private fun AudioListItem(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+
+                // For non-YouTube audios, show the filename as a subtitle when the display name
+                // is the YouTube title (i.e. they differ)
+                if (!audio.isNone && audio.youtubeTitle != null && audio.fileName.isNotBlank()) {
+                    Text(
+                        text = audio.fileName,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextDisabled,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
+
             // Edit URL button (not shown for None)
             if (!audio.isNone) {
                 IconButton(
@@ -352,7 +473,9 @@ private fun MonitorStatusBanner(hasHrMonitor: Boolean, deviceId: String?) {
     }
     Card(colors = CardDefaults.cardColors(containerColor = bgColor)) {
         Row(
-            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+            modifier = Modifier
+                .padding(12.dp)
+                .fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -382,12 +505,22 @@ private fun ActiveContent(
 
         // Selected audio label
         state.selectedAudio?.let { audio ->
-            Text(
-                if (audio.isNone) "Silent Meditation" else audio.fileName,
-                style = MaterialTheme.typography.bodyLarge,
-                color = TextSecondary,
-                textAlign = TextAlign.Center
-            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    if (audio.isNone) "Silent Meditation" else audio.displayName,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = TextSecondary,
+                    textAlign = TextAlign.Center
+                )
+                if (!audio.isNone && !audio.youtubeChannel.isNullOrBlank()) {
+                    Text(
+                        audio.youtubeChannel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextDisabled,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
         }
 
         // Timer
@@ -443,7 +576,9 @@ private fun LiveMetricCard(label: String, value: String, modifier: Modifier = Mo
         modifier = modifier
     ) {
         Column(
-            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+            modifier = Modifier
+                .padding(12.dp)
+                .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
@@ -489,11 +624,22 @@ private fun CompleteContent(
 
         // Audio used
         state.selectedAudio?.let { audio ->
-            Text(
-                if (audio.isNone) "Silent Meditation" else audio.fileName,
-                style = MaterialTheme.typography.bodyLarge,
-                color = TextSecondary
-            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    if (audio.isNone) "Silent Meditation" else audio.displayName,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = TextSecondary,
+                    textAlign = TextAlign.Center
+                )
+                if (!audio.isNone && !audio.youtubeChannel.isNullOrBlank()) {
+                    Text(
+                        audio.youtubeChannel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextDisabled,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
         }
 
         Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
@@ -566,6 +712,9 @@ private fun SummaryRow(label: String, value: String) {
 @Composable
 fun AudioUrlEditDialog(
     audio: MeditationAudioEntity,
+    isFetching: Boolean,
+    fetchedMetadata: com.example.wags.data.repository.YouTubeMetadataFetcher.YoutubeMetadata?,
+    onFetchPreview: (String) -> Unit,
     onDismiss: () -> Unit,
     onSave: (String) -> Unit
 ) {
@@ -582,12 +731,15 @@ fun AudioUrlEditDialog(
             )
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // File name subtitle
                 Text(
                     audio.fileName,
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary
                 )
+
+                // URL input
                 OutlinedTextField(
                     value = urlText,
                     onValueChange = { urlText = it },
@@ -602,6 +754,134 @@ fun AudioUrlEditDialog(
                         cursorColor = EcgCyan
                     )
                 )
+
+                // Fetch button (only shown when URL looks like YouTube)
+                val looksLikeYouTube = urlText.contains("youtube.com") || urlText.contains("youtu.be")
+                if (looksLikeYouTube) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { onFetchPreview(urlText) },
+                            enabled = !isFetching && urlText.isNotBlank(),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = EcgCyan)
+                        ) {
+                            if (isFetching) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(14.dp),
+                                    color = EcgCyan,
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text("Fetching…", style = MaterialTheme.typography.labelMedium)
+                            } else {
+                                Text("Fetch YouTube Info", style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                    }
+                }
+
+                // Preview of fetched metadata
+                when {
+                    fetchedMetadata != null -> {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = EcgCyan.copy(alpha = 0.08f)
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        "✓",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = ReadinessGreen
+                                    )
+                                    Text(
+                                        "YouTube info found",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = ReadinessGreen
+                                    )
+                                }
+                                Text(
+                                    fetchedMetadata.title,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = TextPrimary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        "▶",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFFFF0000)
+                                    )
+                                    Text(
+                                        fetchedMetadata.channel,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = TextSecondary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    !isFetching && looksLikeYouTube && audio.youtubeTitle != null -> {
+                        // Show existing stored metadata
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = SurfaceVariant),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    "Stored info",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = TextDisabled
+                                )
+                                Text(
+                                    audio.youtubeTitle,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = TextPrimary
+                                )
+                                if (!audio.youtubeChannel.isNullOrBlank()) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Text(
+                                            "▶",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color(0xFFFF0000)
+                                        )
+                                        Text(
+                                            audio.youtubeChannel,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = TextSecondary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    !isFetching && looksLikeYouTube && audio.youtubeTitle == null -> {
+                        Text(
+                            "Tap \"Fetch YouTube Info\" to auto-fill the title and channel.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextDisabled
+                        )
+                    }
+                }
             }
         },
         confirmButton = {

@@ -18,7 +18,8 @@ class MeditationRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val audioDao: MeditationAudioDao,
     private val sessionDao: MeditationSessionDao,
-    private val devicePrefs: DevicePreferencesRepository
+    private val devicePrefs: DevicePreferencesRepository,
+    private val youtubeFetcher: YouTubeMetadataFetcher
 ) {
 
     // ── Audio directory preference ─────────────────────────────────────────────
@@ -35,6 +36,12 @@ class MeditationRepository @Inject constructor(
     fun observeAudios(): Flow<List<MeditationAudioEntity>> = audioDao.observeAll()
 
     suspend fun getAudioById(id: Long): MeditationAudioEntity? = audioDao.getById(id)
+
+    /**
+     * Returns all distinct YouTube channel names present in the DB, sorted alphabetically.
+     * Used to populate the filter chip row.
+     */
+    suspend fun getDistinctChannels(): List<String> = audioDao.getDistinctChannels()
 
     /**
      * Scans the SAF directory at [dirUriString], syncs the DB:
@@ -95,11 +102,41 @@ class MeditationRepository @Inject constructor(
         return audioDao.getAll()
     }
 
-    /** Update the source URL for an audio entry. */
+    /**
+     * Updates the source URL for an audio entry.
+     * If the URL is a YouTube link, automatically fetches the video title and channel name
+     * via the oEmbed API and stores them alongside the URL.
+     * If the URL is cleared or is not a YouTube URL, clears any previously stored metadata.
+     *
+     * NOTE: This performs a network call — must be called from an IO coroutine.
+     */
     suspend fun updateAudioUrl(audioId: Long, url: String) {
         val entity = audioDao.getById(audioId) ?: return
-        audioDao.update(entity.copy(sourceUrl = url))
+        val trimmed = url.trim()
+
+        val (title, channel) = if (trimmed.isNotBlank() && youtubeFetcher.isYouTubeUrl(trimmed)) {
+            val meta = youtubeFetcher.fetch(trimmed)
+            Pair(meta?.title, meta?.channel)
+        } else {
+            Pair(null, null)
+        }
+
+        audioDao.update(
+            entity.copy(
+                sourceUrl      = trimmed,
+                youtubeTitle   = title,
+                youtubeChannel = channel
+            )
+        )
     }
+
+    /**
+     * Fetches YouTube metadata for the given URL without persisting anything.
+     * Returns null if the URL is not a YouTube URL or the fetch fails.
+     * Must be called from an IO coroutine.
+     */
+    suspend fun fetchYouTubeMetadata(url: String): YouTubeMetadataFetcher.YoutubeMetadata? =
+        if (youtubeFetcher.isYouTubeUrl(url)) youtubeFetcher.fetch(url) else null
 
     // ── Sessions ───────────────────────────────────────────────────────────────
 

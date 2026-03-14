@@ -8,6 +8,7 @@ import com.example.wags.data.ble.PolarBleManager
 import com.example.wags.data.db.entity.MeditationAudioEntity
 import com.example.wags.data.db.entity.MeditationSessionEntity
 import com.example.wags.data.repository.MeditationRepository
+import com.example.wags.data.repository.YouTubeMetadataFetcher
 import com.example.wags.di.IoDispatcher
 import com.example.wags.di.MathDispatcher
 import com.example.wags.domain.model.BleConnectionState
@@ -37,11 +38,14 @@ enum class MeditationSessionState { IDLE, ACTIVE, PROCESSING, COMPLETE }
 // ── UI state ──────────────────────────────────────────────────────────────────
 
 data class MeditationUiState(
-    // Audio list
+    // Audio list (all)
     val audios: List<MeditationAudioEntity> = emptyList(),
     val selectedAudio: MeditationAudioEntity? = null,
     val isLoadingAudios: Boolean = false,
     val audioDirUri: String = "",
+    // Channel filter
+    val availableChannels: List<String> = emptyList(),
+    val selectedChannelFilter: String? = null,   // null = "All"
     // Session
     val sessionState: MeditationSessionState = MeditationSessionState.IDLE,
     val elapsedSeconds: Long = 0L,
@@ -63,9 +67,20 @@ data class MeditationUiState(
     val liveSpO2: Int? = null,
     // URL edit dialog
     val editingAudio: MeditationAudioEntity? = null,
+    val isFetchingMetadata: Boolean = false,
+    val fetchedMetadata: YouTubeMetadataFetcher.YoutubeMetadata? = null,
     // Saved session id (for navigation after complete)
     val savedSessionId: Long? = null
-)
+) {
+    /** The filtered audio list shown in the UI. */
+    val filteredAudios: List<MeditationAudioEntity>
+        get() = when {
+            selectedChannelFilter == null -> audios
+            else -> audios.filter { audio ->
+                audio.isNone || audio.youtubeChannel == selectedChannelFilter
+            }
+        }
+}
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
 
@@ -113,18 +128,29 @@ class MeditationViewModel @Inject constructor(
             }
         }
 
-        // Load audio list
+        // Load audio list and refresh available channels whenever the list changes
         viewModelScope.launch {
             repository.observeAudios().collect { audios ->
                 _uiState.update { state ->
-                    // Keep selected audio in sync; default to None if nothing selected
                     val currentSelected = state.selectedAudio
                     val newSelected = when {
                         currentSelected == null -> audios.firstOrNull { it.isNone }
                         else -> audios.firstOrNull { it.audioId == currentSelected.audioId }
                             ?: audios.firstOrNull { it.isNone }
                     }
-                    state.copy(audios = audios, selectedAudio = newSelected)
+                    // Rebuild channel list from the fresh audio list
+                    val channels = audios
+                        .mapNotNull { it.youtubeChannel?.takeIf { c -> c.isNotBlank() } }
+                        .distinct()
+                        .sorted()
+                    // If the currently selected filter no longer exists, reset to "All"
+                    val validFilter = state.selectedChannelFilter?.takeIf { it in channels }
+                    state.copy(
+                        audios = audios,
+                        selectedAudio = newSelected,
+                        availableChannels = channels,
+                        selectedChannelFilter = validFilter
+                    )
                 }
             }
         }
@@ -155,21 +181,61 @@ class MeditationViewModel @Inject constructor(
         }
     }
 
+    // ── Channel filter ─────────────────────────────────────────────────────────
+
+    /** Pass null to clear the filter (show all). */
+    fun setChannelFilter(channel: String?) {
+        _uiState.update { it.copy(selectedChannelFilter = channel) }
+    }
+
     // ── URL edit dialog ────────────────────────────────────────────────────────
 
     fun openUrlEditor(audio: MeditationAudioEntity) {
-        _uiState.update { it.copy(editingAudio = audio) }
+        _uiState.update {
+            it.copy(
+                editingAudio     = audio,
+                fetchedMetadata  = null,
+                isFetchingMetadata = false
+            )
+        }
     }
 
     fun dismissUrlEditor() {
-        _uiState.update { it.copy(editingAudio = null) }
+        _uiState.update {
+            it.copy(
+                editingAudio       = null,
+                fetchedMetadata    = null,
+                isFetchingMetadata = false
+            )
+        }
     }
 
+    /**
+     * Fetches YouTube metadata for [url] and stores it in [MeditationUiState.fetchedMetadata]
+     * so the dialog can preview it before the user confirms.
+     */
+    fun fetchMetadataPreview(url: String) {
+        viewModelScope.launch(ioDispatcher) {
+            _uiState.update { it.copy(isFetchingMetadata = true, fetchedMetadata = null) }
+            val meta = repository.fetchYouTubeMetadata(url)
+            _uiState.update { it.copy(isFetchingMetadata = false, fetchedMetadata = meta) }
+        }
+    }
+
+    /**
+     * Saves the URL (and auto-fetches YouTube metadata if applicable) then closes the dialog.
+     */
     fun saveAudioUrl(audioId: Long, url: String) {
         viewModelScope.launch(ioDispatcher) {
             repository.updateAudioUrl(audioId, url.trim())
         }
-        _uiState.update { it.copy(editingAudio = null) }
+        _uiState.update {
+            it.copy(
+                editingAudio       = null,
+                fetchedMetadata    = null,
+                isFetchingMetadata = false
+            )
+        }
     }
 
     // ── Sonification ───────────────────────────────────────────────────────────
