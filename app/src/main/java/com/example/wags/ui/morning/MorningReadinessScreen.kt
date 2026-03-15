@@ -128,11 +128,19 @@ fun MorningReadinessScreen(
                     QuestionnaireContent(uiState, viewModel)
                 MorningReadinessState.CALCULATING ->
                     CalculatingContent()
-                MorningReadinessState.COMPLETE ->
-                    MorningReadinessResultScreen(
-                        result = uiState.result!!,
-                        onReset = { viewModel.reset() }
-                    )
+                MorningReadinessState.COMPLETE -> {
+                    val result = uiState.result
+                    if (result != null) {
+                        MorningReadinessResultScreen(
+                            result = result,
+                            onReset = { viewModel.reset() }
+                        )
+                    } else {
+                        // Result not yet populated — stay on calculating screen
+                        // (the state update with the result arrives momentarily)
+                        CalculatingContent()
+                    }
+                }
                 MorningReadinessState.ERROR ->
                     ErrorContent(
                         errorMessage = uiState.errorMessage,

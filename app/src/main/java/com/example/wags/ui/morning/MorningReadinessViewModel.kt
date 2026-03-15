@@ -196,13 +196,15 @@ class MorningReadinessViewModel @Inject constructor(
                     repository.save(result.toEntity(sessionHrDeviceLabel))
                 }
 
-                fsm.markComplete()
+                // Update result in UI state BEFORE transitioning FSM to COMPLETE,
+                // so the COMPLETE branch in the screen always finds a non-null result.
                 _uiState.update {
                     it.copy(
                         result = result,
                         isCalculating = false
                     )
                 }
+                fsm.markComplete()
                 // Signal the Habit app that a Morning Readiness assessment completed
                 habitRepo.sendHabitIncrement(Slot.MORNING_READINESS)
             } catch (e: Exception) {

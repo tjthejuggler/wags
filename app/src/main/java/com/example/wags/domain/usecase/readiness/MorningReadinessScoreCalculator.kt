@@ -169,6 +169,19 @@ class MorningReadinessScoreCalculator @Inject constructor() {
 
     // -------------------------------------------------------------------------
     // Step 2: Orthostatic Multiplier
+    //
+    // The multiplier modulates the HRV base score based on how well the ANS
+    // handles the gravitational stress of standing. Thresholds are age-adjusted.
+    //
+    // Multiplier table (revised — less aggressive on first readings):
+    //   NORMAL  + GOOD    → 1.05  (bonus: excellent orthostatic response)
+    //   NORMAL  + UNKNOWN → 1.0   (ratio good, OHRR not measurable)
+    //   UNKNOWN + GOOD    → 1.0   (OHRR good, ratio not measurable)
+    //   BORDERLINE (either) → 0.95 (mild penalty)
+    //   ABNORMAL + POOR   → 0.80  (both bad — clear orthostatic stress)
+    //   ABNORMAL only     → 0.88  (ratio bad but OHRR ok/unknown)
+    //   POOR only         → 0.88  (OHRR bad but ratio ok/unknown)
+    //   else (mixed unknown) → 0.95
     // -------------------------------------------------------------------------
     private fun computeOrthoMultiplier(ortho: OrthostasisMetrics?, ageYears: Int): Float {
         if (ortho == null) return 1.0f
@@ -177,32 +190,40 @@ class MorningReadinessScoreCalculator @Inject constructor() {
         val ohrr60  = ortho.ohrrAt60sPercent
 
         val (normalThreshold, borderlineThreshold) = when {
-            ageYears < 40 -> Pair(1.15f, 1.10f)
+            ageYears < 40 -> Pair(1.15f, 1.08f)
             ageYears < 50 -> Pair(1.10f, 1.05f)
             else          -> Pair(1.05f, 1.02f)
         }
 
         val ratioStatus = when {
-            ratio == null              -> RatioStatus.UNKNOWN
-            ratio >= normalThreshold   -> RatioStatus.NORMAL
+            ratio == null                -> RatioStatus.UNKNOWN
+            ratio >= normalThreshold     -> RatioStatus.NORMAL
             ratio >= borderlineThreshold -> RatioStatus.BORDERLINE
-            else                       -> RatioStatus.ABNORMAL
+            else                         -> RatioStatus.ABNORMAL
         }
 
         val ohrrStatus = when {
-            ohrr60 == null   -> OhrrStatus.UNKNOWN
-            ohrr60 > 25f     -> OhrrStatus.GOOD
-            ohrr60 >= 15f    -> OhrrStatus.BORDERLINE
-            else             -> OhrrStatus.POOR
+            ohrr60 == null  -> OhrrStatus.UNKNOWN
+            ohrr60 > 20f    -> OhrrStatus.GOOD
+            ohrr60 >= 10f   -> OhrrStatus.BORDERLINE
+            else            -> OhrrStatus.POOR
         }
 
         return when {
-            ratioStatus == RatioStatus.ABNORMAL || ohrrStatus == OhrrStatus.POOR       -> 0.70f
-            ratioStatus == RatioStatus.BORDERLINE || ohrrStatus == OhrrStatus.BORDERLINE -> 0.90f
-            ratioStatus == RatioStatus.NORMAL && ohrrStatus == OhrrStatus.GOOD         -> 1.0f
-            ratioStatus == RatioStatus.UNKNOWN && ohrrStatus == OhrrStatus.GOOD        -> 1.0f
+            // Both signals clearly good → small bonus
+            ratioStatus == RatioStatus.NORMAL && ohrrStatus == OhrrStatus.GOOD         -> 1.05f
+            // One signal good, other unknown → neutral
             ratioStatus == RatioStatus.NORMAL && ohrrStatus == OhrrStatus.UNKNOWN      -> 1.0f
-            else -> 0.90f  // Mixed unknown/borderline → mild penalty
+            ratioStatus == RatioStatus.UNKNOWN && ohrrStatus == OhrrStatus.GOOD        -> 1.0f
+            // Both signals clearly bad → moderate penalty
+            ratioStatus == RatioStatus.ABNORMAL && ohrrStatus == OhrrStatus.POOR       -> 0.80f
+            // One signal bad, other ok/unknown → mild penalty
+            ratioStatus == RatioStatus.ABNORMAL                                        -> 0.88f
+            ohrrStatus == OhrrStatus.POOR                                              -> 0.88f
+            // Either borderline → very mild penalty
+            ratioStatus == RatioStatus.BORDERLINE || ohrrStatus == OhrrStatus.BORDERLINE -> 0.95f
+            // Mixed unknown → neutral
+            else -> 1.0f
         }
     }
 
@@ -234,15 +255,33 @@ class MorningReadinessScoreCalculator @Inject constructor() {
 
     // -------------------------------------------------------------------------
     // Step 5: Hooper Index Gating
+    //
+    // The Hooper scale is 1–5 per item where 5 = best (no fatigue/stress/soreness,
+    // excellent sleep). Total range: 4 (worst) to 20 (best).
+    //   isLow  = total ≤ 10  → poor subjective state
+    //   isHigh = total ≥ 16  → good subjective state
+    //
+    // Gating rules:
+    //   A. HRV already low (cvBase < 50) AND Hooper is also low → no double penalty,
+    //      trust the HRV math.
+    //   B. HRV looks good (cvBase ≥ 70) BUT Hooper is very bad (total ≤ 8) → apply
+    //      a penalty because subjective state is severely poor (likely illness/overreach).
+    //   C. HRV looks good (cvBase ≥ 70) AND Hooper is moderately bad (isLow) → mild
+    //      penalty; subjective state suggests more fatigue than HRV shows.
+    //   D. HRV is low (cvBase < 50) AND Hooper is high → no bonus; trust the HRV math
+    //      (HRV is the more objective signal).
+    //   E. Everything else → no adjustment.
+    //
+    // NOTE: "isHigh" (good wellness) should NEVER penalize a good HRV score.
     // -------------------------------------------------------------------------
     private fun applyHooperGating(cvBase: Float, hooper: HooperIndex?): Float {
         if (hooper == null) return cvBase
         return when {
-            cvBase < 50f && hooper.isLow          -> cvBase           // A: no double penalty
-            cvBase >= 70f && hooper.total <= 8f   -> cvBase - 15f     // B severe
-            cvBase >= 70f && hooper.isLow         -> cvBase - 10f     // B moderate
-            cvBase < 50f && hooper.isHigh         -> cvBase           // C: trust the math
-            else                                  -> cvBase
+            cvBase < 50f && hooper.isLow   -> cvBase           // A: already low, no double penalty
+            cvBase >= 70f && hooper.total <= 8f -> cvBase - 15f // B: HRV good but severely poor wellness
+            cvBase >= 70f && hooper.isLow  -> cvBase - 10f     // C: HRV good but moderately poor wellness
+            cvBase < 50f && hooper.isHigh  -> cvBase           // D: HRV low despite good wellness — trust HRV
+            else                           -> cvBase           // E: no adjustment needed
         }
     }
 
