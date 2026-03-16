@@ -219,6 +219,17 @@ class MorningReadinessViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isCalculating = true) }
             try {
+                // Cancel polling jobs BEFORE snapshotting the FSM buffers.
+                // The rrPollingJob runs on the main dispatcher and calls fsm.addRrInterval()
+                // which mutates _supineBuffer/_standingBuffer. If we don't stop it first,
+                // we get a ConcurrentModificationException when the orchestrator iterates
+                // those lists on the math dispatcher.
+                rrPollingJob?.cancel()
+                rrPollingJob = null
+                accPollingJob?.cancel()
+                accPollingJob = null
+
+                // Snapshot the buffers now that no writer can mutate them.
                 val supineBuffer   = fsm.supineBuffer
                 val standingBuffer = fsm.standingBuffer
                 val standTs        = fsm.standTimestampMs
@@ -248,15 +259,28 @@ class MorningReadinessViewModel @Inject constructor(
                     repository.saveTelemetry(telemetryRows)
                 }
 
-                // Update result in UI state BEFORE transitioning FSM to COMPLETE,
-                // so the COMPLETE branch in the screen always finds a non-null result.
+                // Transition the FSM to COMPLETE and set the result in _uiState
+                // atomically in a single update so the screen never sees fsmState=COMPLETE
+                // with result=null.
+                //
+                // Background: uiState is a combine() of _uiState + liveHr + liveSpO2.
+                // If we called fsm.markComplete() first, the FSM state collector in init{}
+                // would update _uiState.fsmState=COMPLETE in a separate coroutine, and the
+                // combine() emission the screen observes could arrive before the result
+                // update — causing the screen to briefly show CalculatingContent() or crash
+                // on a null result dereference.
+                //
+                // By calling fsm.markComplete() (which only updates the FSM's own StateFlow)
+                // and then immediately setting both result AND fsmState=COMPLETE in one
+                // _uiState.update, we guarantee the screen always sees them together.
+                fsm.markComplete()
                 _uiState.update {
                     it.copy(
+                        fsmState = MorningReadinessState.COMPLETE,
                         result = result,
                         isCalculating = false
                     )
                 }
-                fsm.markComplete()
                 // Signal the Habit app that a Morning Readiness assessment completed
                 habitRepo.sendHabitIncrement(Slot.MORNING_READINESS)
             } catch (e: Exception) {

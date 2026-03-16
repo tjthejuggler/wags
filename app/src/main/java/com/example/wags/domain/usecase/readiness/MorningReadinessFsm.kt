@@ -22,11 +22,13 @@ class MorningReadinessFsm @Inject constructor(
     val remainingSeconds: StateFlow<Int> = timer.remainingSeconds
     val errorMessage: StateFlow<String?> = stateHandler.errorMessage
 
-    // Data buffers — ViewModel reads these after CALCULATING
+    // Data buffers — ViewModel reads these after CALCULATING.
+    // Access is synchronized because addRrInterval() is called from the RR polling
+    // coroutine while supineBuffer/standingBuffer snapshots are taken in launchCalculation().
     private val _supineBuffer = mutableListOf<RrInterval>()
     private val _standingBuffer = mutableListOf<RrInterval>()
-    val supineBuffer: List<RrInterval> get() = _supineBuffer.toList()
-    val standingBuffer: List<RrInterval> get() = _standingBuffer.toList()
+    val supineBuffer: List<RrInterval> get() = synchronized(this) { _supineBuffer.toList() }
+    val standingBuffer: List<RrInterval> get() = synchronized(this) { _standingBuffer.toList() }
 
     // Peak stand HR tracking (minimum RR = maximum HR during standing)
     private var _peakStandHr: Int = 0
@@ -53,9 +55,11 @@ class MorningReadinessFsm @Inject constructor(
      * Total timed duration: 60s prep + 120s supine + 3s prompt + 120s standing = ~303s.
      */
     fun start(scope: CoroutineScope) {
-        _supineBuffer.clear()
-        _standingBuffer.clear()
-        _peakStandHr = 0
+        synchronized(this) {
+            _supineBuffer.clear()
+            _standingBuffer.clear()
+            _peakStandHr = 0
+        }
         _standTimestampMs = null
 
         stateHandler.transitionTo(MorningReadinessState.INIT)
@@ -132,15 +136,17 @@ class MorningReadinessFsm @Inject constructor(
      * Tracks peak stand HR during STANDING.
      */
     fun addRrInterval(rr: RrInterval) {
-        when (stateHandler.state.value) {
-            MorningReadinessState.SUPINE_HRV -> _supineBuffer.add(rr)
-            MorningReadinessState.STANDING -> {
-                _standingBuffer.add(rr)
-                // Track peak HR (minimum RR = maximum HR)
-                val hrBpm = if (rr.intervalMs > 0) (60_000.0 / rr.intervalMs).toInt() else 0
-                if (hrBpm > _peakStandHr) _peakStandHr = hrBpm
+        synchronized(this) {
+            when (stateHandler.state.value) {
+                MorningReadinessState.SUPINE_HRV -> _supineBuffer.add(rr)
+                MorningReadinessState.STANDING -> {
+                    _standingBuffer.add(rr)
+                    // Track peak HR (minimum RR = maximum HR)
+                    val hrBpm = if (rr.intervalMs > 0) (60_000.0 / rr.intervalMs).toInt() else 0
+                    if (hrBpm > _peakStandHr) _peakStandHr = hrBpm
+                }
+                else -> { /* Discard data in other states */ }
             }
-            else -> { /* Discard data in other states */ }
         }
     }
 
@@ -166,9 +172,11 @@ class MorningReadinessFsm @Inject constructor(
      */
     fun reset() {
         timer.cancel()
-        _supineBuffer.clear()
-        _standingBuffer.clear()
-        _peakStandHr = 0
+        synchronized(this) {
+            _supineBuffer.clear()
+            _standingBuffer.clear()
+            _peakStandHr = 0
+        }
         _standTimestampMs = null
         stateHandler.reset()
     }
