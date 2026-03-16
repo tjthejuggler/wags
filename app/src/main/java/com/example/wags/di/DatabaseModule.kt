@@ -12,6 +12,7 @@ import com.example.wags.data.db.dao.FreeHoldTelemetryDao
 import com.example.wags.data.db.dao.MeditationAudioDao
 import com.example.wags.data.db.dao.MeditationSessionDao
 import com.example.wags.data.db.dao.MorningReadinessDao
+import com.example.wags.data.db.dao.MorningReadinessTelemetryDao
 import com.example.wags.data.db.dao.RfAssessmentDao
 import com.example.wags.data.db.dao.SessionLogDao
 import com.example.wags.data.db.dao.TelemetryDao
@@ -42,7 +43,8 @@ object DatabaseModule {
                 WagsDatabase.MIGRATION_9_10,
                 WagsDatabase.MIGRATION_10_11,
                 WagsDatabase.MIGRATION_11_12,
-                WagsDatabase.MIGRATION_12_13
+                WagsDatabase.MIGRATION_12_13,
+                WagsDatabase.MIGRATION_13_14
             )
             .build()
 
@@ -58,4 +60,5 @@ object DatabaseModule {
     @Provides fun provideFreeHoldTelemetryDao(db: WagsDatabase): FreeHoldTelemetryDao = db.freeHoldTelemetryDao()
     @Provides fun provideMeditationAudioDao(db: WagsDatabase): MeditationAudioDao = db.meditationAudioDao()
     @Provides fun provideMeditationSessionDao(db: WagsDatabase): MeditationSessionDao = db.meditationSessionDao()
+    @Provides fun provideMorningReadinessTelemetryDao(db: WagsDatabase): MorningReadinessTelemetryDao = db.morningReadinessTelemetryDao()
 }

@@ -20,9 +20,10 @@ import com.example.wags.data.db.entity.*
         TelemetryEntity::class,
         FreeHoldTelemetryEntity::class,
         MeditationAudioEntity::class,
-        MeditationSessionEntity::class
+        MeditationSessionEntity::class,
+        MorningReadinessTelemetryEntity::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -38,6 +39,7 @@ abstract class WagsDatabase : RoomDatabase() {
     abstract fun freeHoldTelemetryDao(): FreeHoldTelemetryDao
     abstract fun meditationAudioDao(): MeditationAudioDao
     abstract fun meditationSessionDao(): MeditationSessionDao
+    abstract fun morningReadinessTelemetryDao(): MorningReadinessTelemetryDao
 
     companion object {
         /**
@@ -355,6 +357,35 @@ abstract class WagsDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE meditation_audios ADD COLUMN youtubeTitle TEXT DEFAULT NULL")
                 db.execSQL("ALTER TABLE meditation_audios ADD COLUMN youtubeChannel TEXT DEFAULT NULL")
+            }
+        }
+
+        /**
+         * v13 → v14: Add morning readiness telemetry support.
+         *
+         * Changes:
+         *  1. Add `standTimestampMs` (nullable INTEGER) to morning_readiness.
+         *     Stores the Unix epoch ms when the user was told to stand (orthostatic marker).
+         *     NULL for all pre-existing rows.
+         *  2. Create `morning_readiness_telemetry` table for per-beat HR/HRV data.
+         *     Rows are cascade-deleted when the parent morning_readiness row is deleted.
+         */
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE morning_readiness ADD COLUMN standTimestampMs INTEGER DEFAULT NULL")
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `morning_readiness_telemetry` (
+                        `id`              INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `readingId`       INTEGER NOT NULL,
+                        `timestampMs`     INTEGER NOT NULL,
+                        `hrBpm`           INTEGER NOT NULL,
+                        `rollingRmssdMs`  REAL    NOT NULL,
+                        `phase`           TEXT    NOT NULL,
+                        FOREIGN KEY(`readingId`) REFERENCES `morning_readiness`(`id`) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_morning_readiness_telemetry_readingId` ON `morning_readiness_telemetry` (`readingId`)")
             }
         }
     }

@@ -54,5 +54,13 @@ data class MorningReadinessEntity(
      * Null when no device was connected.
      */
     @androidx.room.ColumnInfo(defaultValue = "NULL")
-    val hrDeviceId: String? = null
+    val hrDeviceId: String? = null,
+
+    /**
+     * Unix epoch ms when the user was instructed to stand (STAND_PROMPT → STANDING transition).
+     * Used to draw the orthostatic marker on HR/HRV charts in the history detail view.
+     * Null for readings recorded before this column was added (migration 13→14).
+     */
+    @androidx.room.ColumnInfo(defaultValue = "NULL")
+    val standTimestampMs: Long? = null
 )

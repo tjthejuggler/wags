@@ -44,6 +44,7 @@ private enum class HistoryTab(val label: String) {
 @Composable
 fun MorningReadinessHistoryScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToDetail: (Long) -> Unit = {},
     viewModel: MorningReadinessHistoryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -102,8 +103,13 @@ fun MorningReadinessHistoryScreen(
                         displayedMonth = displayedMonth,
                         onDayClick = { date ->
                             if (date in uiState.datesWithReadings) {
-                                if (uiState.selectedDate == date) viewModel.clearSelection()
-                                else viewModel.selectDate(date)
+                                // Find the reading for this date and navigate to its detail screen
+                                val zone = ZoneId.systemDefault()
+                                val reading = uiState.allReadings.firstOrNull { entity ->
+                                    Instant.ofEpochMilli(entity.timestamp)
+                                        .atZone(zone).toLocalDate() == date
+                                }
+                                reading?.let { onNavigateToDetail(it.id) }
                             }
                         },
                         onPreviousMonth = { displayedMonth = displayedMonth.minusMonths(1) },
@@ -513,15 +519,11 @@ private fun CalendarContent(
         ReadinessCalendar(
             displayedMonth = displayedMonth,
             datesWithReadings = uiState.datesWithReadings,
-            selectedDate = uiState.selectedDate,
+            selectedDate = null,   // no inline selection — tapping navigates away
             onDayClick = onDayClick,
             onPreviousMonth = onPreviousMonth,
             onNextMonth = onNextMonth
         )
-
-        uiState.selectedReading?.let { reading ->
-            ReadingDetailCard(reading = reading, onDismiss = onDismissDetail)
-        }
     }
 }
 

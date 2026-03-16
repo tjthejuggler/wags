@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface MorningReadinessDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(entity: MorningReadinessEntity)
+    suspend fun insert(entity: MorningReadinessEntity): Long
 
     @Query("SELECT * FROM morning_readiness ORDER BY timestamp DESC LIMIT 1")
     suspend fun getLatest(): MorningReadinessEntity?
@@ -48,6 +48,9 @@ interface MorningReadinessDao {
 
     @Query("SELECT supineLnRmssd FROM morning_readiness WHERE timestamp >= :sinceMs ORDER BY timestamp DESC")
     suspend fun getSupineLnRmssdSince(sinceMs: Long): List<Double>
+
+    @Query("DELETE FROM morning_readiness WHERE id = :id")
+    suspend fun deleteById(id: Long)
 
     // Cleanup: delete records older than retention period
     @Query("DELETE FROM morning_readiness WHERE timestamp < :cutoffMs")

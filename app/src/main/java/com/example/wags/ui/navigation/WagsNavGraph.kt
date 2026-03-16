@@ -167,7 +167,12 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             )
         }
         composable(WagsRoutes.MORNING_READINESS_HISTORY) {
-            MorningReadinessHistoryScreen(onNavigateBack = { navController.popBackStack() })
+            MorningReadinessHistoryScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToDetail = { readingId ->
+                    navController.navigate(WagsRoutes.morningReadinessDetail(readingId))
+                }
+            )
         }
         composable(
             route = WagsRoutes.MORNING_READINESS_DETAIL,

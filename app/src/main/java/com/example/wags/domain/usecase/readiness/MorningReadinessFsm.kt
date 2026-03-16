@@ -32,6 +32,10 @@ class MorningReadinessFsm @Inject constructor(
     private var _peakStandHr: Int = 0
     val peakStandHr: Int get() = _peakStandHr
 
+    /** Wall-clock ms when the STANDING phase began (stand cue was given). Null until that transition. */
+    private var _standTimestampMs: Long? = null
+    val standTimestampMs: Long? get() = _standTimestampMs
+
     // Callbacks set by ViewModel
     var onStandPromptReady: (() -> Unit)? = null
     var onQuestionnaireRequired: (() -> Unit)? = null
@@ -52,6 +56,7 @@ class MorningReadinessFsm @Inject constructor(
         _supineBuffer.clear()
         _standingBuffer.clear()
         _peakStandHr = 0
+        _standTimestampMs = null
 
         stateHandler.transitionTo(MorningReadinessState.INIT)
 
@@ -82,6 +87,7 @@ class MorningReadinessFsm @Inject constructor(
     }
 
     private fun enterStanding(scope: CoroutineScope) {
+        _standTimestampMs = System.currentTimeMillis()
         stateHandler.transitionTo(MorningReadinessState.STANDING)
         timer.start(scope, durationSeconds = STANDING_SECONDS) {
             if (stateHandler.state.value == MorningReadinessState.STANDING) {
@@ -150,6 +156,7 @@ class MorningReadinessFsm @Inject constructor(
         _supineBuffer.clear()
         _standingBuffer.clear()
         _peakStandHr = 0
+        _standTimestampMs = null
         stateHandler.reset()
     }
 }

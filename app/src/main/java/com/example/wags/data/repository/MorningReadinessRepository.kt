@@ -1,7 +1,9 @@
 package com.example.wags.data.repository
 
 import com.example.wags.data.db.dao.MorningReadinessDao
+import com.example.wags.data.db.dao.MorningReadinessTelemetryDao
 import com.example.wags.data.db.entity.MorningReadinessEntity
+import com.example.wags.data.db.entity.MorningReadinessTelemetryEntity
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 import java.time.ZoneId
@@ -11,9 +13,26 @@ import javax.inject.Singleton
 
 @Singleton
 class MorningReadinessRepository @Inject constructor(
-    private val dao: MorningReadinessDao
+    private val dao: MorningReadinessDao,
+    private val telemetryDao: MorningReadinessTelemetryDao
 ) {
-    suspend fun save(entity: MorningReadinessEntity) = dao.insert(entity)
+    /** Inserts the entity and returns the auto-generated row id. */
+    suspend fun save(entity: MorningReadinessEntity): Long = dao.insert(entity)
+
+    /**
+     * Save per-beat telemetry rows for a reading.
+     * The readingId must already exist in morning_readiness (insert the entity first).
+     */
+    suspend fun saveTelemetry(rows: List<MorningReadinessTelemetryEntity>) {
+        if (rows.isNotEmpty()) telemetryDao.insertAll(rows)
+    }
+
+    /** Load all telemetry rows for a given reading, ordered by timestamp ascending. */
+    suspend fun getTelemetry(readingId: Long): List<MorningReadinessTelemetryEntity> =
+        telemetryDao.getByReadingId(readingId)
+
+    /** Deletes the reading with the given id (telemetry rows cascade-deleted by FK). */
+    suspend fun deleteById(id: Long) = dao.deleteById(id)
 
     suspend fun getLatest(): MorningReadinessEntity? = dao.getLatest()
 

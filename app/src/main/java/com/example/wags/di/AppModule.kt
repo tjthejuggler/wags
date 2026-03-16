@@ -5,11 +5,9 @@ import android.content.SharedPreferences
 import com.example.wags.data.db.dao.ApneaSessionDao
 import com.example.wags.data.db.dao.ContractionDao
 import com.example.wags.data.db.dao.DailyReadingDao
-import com.example.wags.data.db.dao.MorningReadinessDao
 import com.example.wags.data.db.dao.SessionLogDao
 import com.example.wags.data.db.dao.TelemetryDao
 import com.example.wags.data.repository.ApneaSessionRepository
-import com.example.wags.data.repository.MorningReadinessRepository
 import com.example.wags.data.repository.ReadinessRepository
 import com.example.wags.data.repository.SessionRepository
 import dagger.Module
@@ -37,10 +35,7 @@ object AppModule {
     fun provideSessionRepository(dao: SessionLogDao): SessionRepository =
         SessionRepository(dao)
 
-    @Provides
-    @Singleton
-    fun provideMorningReadinessRepository(dao: MorningReadinessDao): MorningReadinessRepository =
-        MorningReadinessRepository(dao)
+    // MorningReadinessRepository is @Singleton + @Inject constructor — Hilt injects it automatically.
 
     @Provides
     @Singleton

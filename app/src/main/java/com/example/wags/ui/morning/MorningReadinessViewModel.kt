@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.HrDataSource
 import com.example.wags.data.ble.PolarBleManager
 import com.example.wags.data.db.entity.MorningReadinessEntity
+import com.example.wags.data.db.entity.MorningReadinessTelemetryEntity
 import com.example.wags.data.ipc.HabitIntegrationRepository
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.data.repository.MorningReadinessRepository
@@ -17,6 +18,8 @@ import com.example.wags.domain.model.RrInterval
 import com.example.wags.domain.usecase.readiness.MorningReadinessFsm
 import com.example.wags.domain.usecase.readiness.MorningReadinessOrchestrator
 import com.example.wags.domain.usecase.readiness.MorningReadinessState
+import kotlin.math.roundToInt
+import kotlin.math.sqrt
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
@@ -181,11 +184,15 @@ class MorningReadinessViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isCalculating = true) }
             try {
+                val supineBuffer   = fsm.supineBuffer
+                val standingBuffer = fsm.standingBuffer
+                val standTs        = fsm.standTimestampMs
+
                 val input = MorningReadinessOrchestrator.Input(
-                    supineBuffer = fsm.supineBuffer,
-                    standingBuffer = fsm.standingBuffer,
-                    peakStandHr = fsm.peakStandHr,
-                    hooperIndex = storedHooper
+                    supineBuffer   = supineBuffer,
+                    standingBuffer = standingBuffer,
+                    peakStandHr    = fsm.peakStandHr,
+                    hooperIndex    = storedHooper
                 )
 
                 val result = withContext(mathDispatcher) {
@@ -193,7 +200,17 @@ class MorningReadinessViewModel @Inject constructor(
                 }
 
                 withContext(ioDispatcher) {
-                    repository.save(result.toEntity(sessionHrDeviceLabel))
+                    // Save the main entity first to get its auto-generated id
+                    val savedId = repository.save(
+                        result.toEntity(sessionHrDeviceLabel, standTs)
+                    )
+                    // Build and save per-beat telemetry rows
+                    val telemetryRows = buildTelemetryRows(
+                        readingId      = savedId,
+                        supineBuffer   = supineBuffer,
+                        standingBuffer = standingBuffer
+                    )
+                    repository.saveTelemetry(telemetryRows)
                 }
 
                 // Update result in UI state BEFORE transitioning FSM to COMPLETE,
@@ -261,7 +278,10 @@ class MorningReadinessViewModel @Inject constructor(
 }
 
 // Extension to map MorningReadinessResult → MorningReadinessEntity for persistence
-private fun MorningReadinessResult.toEntity(hrDeviceId: String?) = MorningReadinessEntity(
+private fun MorningReadinessResult.toEntity(
+    hrDeviceId: String?,
+    standTimestampMs: Long? = null
+) = MorningReadinessEntity(
     timestamp = timestamp,
     supineRmssdMs = supineHrvMetrics.rmssdMs,
     supineLnRmssd = supineHrvMetrics.lnRmssd,
@@ -289,5 +309,52 @@ private fun MorningReadinessResult.toEntity(hrDeviceId: String?) = MorningReadin
     orthoMultiplier = orthoMultiplier,
     cvPenaltyApplied = cvPenaltyApplied,
     rhrLimiterApplied = rhrLimiterApplied,
-    hrDeviceId = hrDeviceId
+    hrDeviceId = hrDeviceId,
+    standTimestampMs = standTimestampMs
 )
+
+/**
+ * Converts the raw supine + standing RR buffers into per-beat telemetry rows.
+ *
+ * For each beat we record:
+ *  - timestampMs  : from the RrInterval
+ *  - hrBpm        : 60_000 / rrMs
+ *  - rollingRmssdMs: RMSSD over the preceding 20-beat sliding window
+ *  - phase        : "SUPINE" or "STANDING"
+ */
+private fun buildTelemetryRows(
+    readingId: Long,
+    supineBuffer: List<RrInterval>,
+    standingBuffer: List<RrInterval>
+): List<MorningReadinessTelemetryEntity> {
+    val windowSize = 20
+    val result = mutableListOf<MorningReadinessTelemetryEntity>()
+
+    // Combine both phases into a single ordered list with phase tags
+    val combined: List<Pair<RrInterval, String>> =
+        supineBuffer.map { it to "SUPINE" } + standingBuffer.map { it to "STANDING" }
+
+    // Sliding-window RMSSD over the combined stream
+    combined.forEachIndexed { idx, (rr, phase) ->
+        val hrBpm = if (rr.intervalMs > 0)
+            (60_000.0 / rr.intervalMs).roundToInt().coerceIn(20, 250)
+        else 0
+
+        // Build window of up to `windowSize` preceding intervals (including current)
+        val windowStart = (idx - windowSize + 1).coerceAtLeast(0)
+        val window = combined.subList(windowStart, idx + 1).map { it.first.intervalMs }
+        val rollingRmssd = if (window.size >= 2) {
+            val diffs = (1 until window.size).map { window[it] - window[it - 1] }
+            sqrt(diffs.sumOf { it * it } / diffs.size)
+        } else 0.0
+
+        result += MorningReadinessTelemetryEntity(
+            readingId      = readingId,
+            timestampMs    = rr.timestampMs,
+            hrBpm          = hrBpm,
+            rollingRmssdMs = rollingRmssd,
+            phase          = phase
+        )
+    }
+    return result
+}
