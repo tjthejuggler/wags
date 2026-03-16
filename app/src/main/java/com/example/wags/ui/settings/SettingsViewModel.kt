@@ -44,14 +44,6 @@ data class SettingsUiState(
     val oximeterScanResults: List<ScanResult> = emptyList(),
     val savedH10Id: String = "",
     val savedVerityId: String = "",
-    // Morning default (3 am – 11 am)
-    val morningDeviceId: String = "",
-    val morningDeviceType: String = "",
-    val morningDeviceName: String = "",
-    // Day default (11 am – 3 am)
-    val dayDeviceId: String = "",
-    val dayDeviceType: String = "",
-    val dayDeviceName: String = "",
     // ── Meditation audio directory ─────────────────────────────────────────────
     /** SAF URI string of the chosen meditation audio folder, or "" if not set. */
     val meditationAudioDirUri: String = "",
@@ -83,7 +75,7 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
 
     // Separate MutableStateFlow for habit-specific state so it doesn't need to
-    // be folded into the 7-way BLE combine below.
+    // be folded into the BLE combine below.
     private val _habitState = MutableStateFlow(buildInitialHabitState())
 
     val uiState: StateFlow<SettingsUiState> = combine(
@@ -118,16 +110,9 @@ class SettingsViewModel @Inject constructor(
             oximeterScanResults   = oximeterResults,
             savedH10Id            = snap.savedH10Id,
             savedVerityId         = snap.savedVerityId,
-            morningDeviceId       = snap.morningDeviceId,
-            morningDeviceType     = snap.morningDeviceType,
-            morningDeviceName     = snap.morningDeviceName,
-            dayDeviceId           = snap.dayDeviceId,
-            dayDeviceType         = snap.dayDeviceType,
-            dayDeviceName         = snap.dayDeviceName,
             meditationAudioDirUri = snap.meditationAudioDirUri
         )
     }.combine(_habitState) { bleState, habit ->
-        // Merge the habit sub-state into the BLE-derived state
         bleState.copy(
             habitList               = habit.habitList,
             isLoadingHabits         = habit.isLoadingHabits,
@@ -145,12 +130,6 @@ class SettingsViewModel @Inject constructor(
         initialValue = SettingsUiState(
             savedH10Id              = devicePrefs.savedH10Id,
             savedVerityId           = devicePrefs.savedVerityId,
-            morningDeviceId         = devicePrefs.morningDeviceId,
-            morningDeviceType       = devicePrefs.morningDeviceType,
-            morningDeviceName       = devicePrefs.morningDeviceName,
-            dayDeviceId             = devicePrefs.dayDeviceId,
-            dayDeviceType           = devicePrefs.dayDeviceType,
-            dayDeviceName           = devicePrefs.dayDeviceName,
             meditationAudioDirUri   = devicePrefs.meditationAudioDirUri,
             freeHoldHabit           = slotSelection(Slot.FREE_HOLD),
             apneaNewRecordHabit     = slotSelection(Slot.APNEA_NEW_RECORD),
@@ -178,14 +157,12 @@ class SettingsViewModel @Inject constructor(
     // ── Polar connections ─────────────────────────────────────────────────────
 
     fun connectH10(device: PolarDeviceInfo) {
-        oximeterBleManager.disconnect()
         devicePrefs.savedH10Id = device.deviceId
         devicePrefs.refresh()
         bleManager.connectDevice(device.deviceId, isH10 = true)
     }
 
     fun connectVerity(device: PolarDeviceInfo) {
-        oximeterBleManager.disconnect()
         devicePrefs.savedVerityId = device.deviceId
         devicePrefs.refresh()
         bleManager.connectDevice(device.deviceId, isH10 = false)
@@ -203,62 +180,14 @@ class SettingsViewModel @Inject constructor(
 
     // ── Oximeter connections ──────────────────────────────────────────────────
 
-    fun connectOximeter(address: String, name: String = "") {
+    fun connectOximeter(address: String) {
         stopScan()
-        disconnectH10()
-        disconnectVerity()
         devicePrefs.savedOximeterAddress = address
         devicePrefs.refresh()
         oximeterBleManager.connect(address)
     }
 
     fun disconnectOximeter() = oximeterBleManager.disconnect()
-
-    // ── Morning default ───────────────────────────────────────────────────────
-
-    fun setMorningDefaultPolar(device: PolarDeviceInfo, isH10: Boolean) {
-        devicePrefs.morningDeviceId   = device.deviceId
-        devicePrefs.morningDeviceType = if (isH10) "h10" else "verity"
-        devicePrefs.morningDeviceName = device.name.ifBlank { device.deviceId }
-        devicePrefs.refresh()
-    }
-
-    fun setMorningDefaultOximeter(address: String, name: String) {
-        devicePrefs.morningDeviceId   = address
-        devicePrefs.morningDeviceType = "oximeter"
-        devicePrefs.morningDeviceName = name.ifBlank { address }
-        devicePrefs.refresh()
-    }
-
-    fun clearMorningDefault() {
-        devicePrefs.morningDeviceId   = ""
-        devicePrefs.morningDeviceType = ""
-        devicePrefs.morningDeviceName = ""
-        devicePrefs.refresh()
-    }
-
-    // ── Day default ───────────────────────────────────────────────────────────
-
-    fun setDayDefaultPolar(device: PolarDeviceInfo, isH10: Boolean) {
-        devicePrefs.dayDeviceId   = device.deviceId
-        devicePrefs.dayDeviceType = if (isH10) "h10" else "verity"
-        devicePrefs.dayDeviceName = device.name.ifBlank { device.deviceId }
-        devicePrefs.refresh()
-    }
-
-    fun setDayDefaultOximeter(address: String, name: String) {
-        devicePrefs.dayDeviceId   = address
-        devicePrefs.dayDeviceType = "oximeter"
-        devicePrefs.dayDeviceName = name.ifBlank { address }
-        devicePrefs.refresh()
-    }
-
-    fun clearDayDefault() {
-        devicePrefs.dayDeviceId   = ""
-        devicePrefs.dayDeviceType = ""
-        devicePrefs.dayDeviceName = ""
-        devicePrefs.refresh()
-    }
 
     // ── Meditation audio directory ────────────────────────────────────────────
 

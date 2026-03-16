@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestMultiplePermissions()
     ) { results ->
         if (results.values.all { it }) {
-            autoConnectManager.attemptAutoConnect()
+            autoConnectManager.start()
         }
         // If denied, user can still connect manually from Settings
     }
@@ -58,7 +58,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Kick off auto-connect as soon as the activity is created.
+        // Start the persistent auto-connect loop.
         // If permissions are already granted this is instant; otherwise we request them.
         triggerAutoConnect()
     }
@@ -68,10 +68,22 @@ class MainActivity : ComponentActivity() {
             ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
         }
         if (allGranted) {
-            autoConnectManager.attemptAutoConnect()
+            autoConnectManager.start()
         } else {
             permissionLauncher.launch(blePermissions)
         }
+    }
+
+    /**
+     * Call this from any ViewModel / screen to pause the background auto-connect
+     * loop while a session is running, and resume it when the session ends.
+     *
+     * Example (in a ViewModel):
+     *   (context as? MainActivity)?.setSessionActive(true)   // session start
+     *   (context as? MainActivity)?.setSessionActive(false)  // session end
+     */
+    fun setSessionActive(active: Boolean) {
+        autoConnectManager.setSessionActive(active)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {

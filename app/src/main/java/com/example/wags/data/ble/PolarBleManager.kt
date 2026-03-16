@@ -16,6 +16,9 @@ import javax.inject.Singleton
 class PolarBleManager @Inject constructor(
     private val polarApi: PolarBleApi
 ) {
+    /** Invoked whenever a Polar device disconnects. Set by AutoConnectManager. */
+    var onDisconnected: (() -> Unit)? = null
+
     companion object {
         const val RR_BUFFER_SIZE = 1024
         const val ECG_BUFFER_SIZE = 8192
@@ -103,6 +106,8 @@ class PolarBleManager @Inject constructor(
                 val anyConnected = _h10State.value is BleConnectionState.Connected ||
                     _verityState.value is BleConnectionState.Connected
                 if (!anyConnected) _liveHr.value = null
+                // Notify AutoConnectManager so it can re-arm immediately
+                onDisconnected?.invoke()
             }
 
             override fun disInformationReceived(identifier: String, uuid: UUID, value: String) {

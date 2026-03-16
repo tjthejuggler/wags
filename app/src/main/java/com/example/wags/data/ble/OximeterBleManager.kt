@@ -3,7 +3,9 @@ package com.example.wags.data.ble
 import android.bluetooth.*
 import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
+import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.os.Build
 import android.util.Log
@@ -33,6 +35,9 @@ private const val TAG = "OximeterBLE"
 class OximeterBleManager @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
+    /** Invoked whenever the oximeter disconnects. Set by AutoConnectManager. */
+    var onDisconnected: (() -> Unit)? = null
+
     private val bluetoothManager =
         context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
     private val bluetoothAdapter: BluetoothAdapter? = bluetoothManager.adapter
@@ -56,7 +61,10 @@ class OximeterBleManager @Inject constructor(
     val scanResults: StateFlow<List<ScanResult>> = _scanResults.asStateFlow()
 
     private var bluetoothGatt: BluetoothGatt? = null
+    /** Job for the UI-initiated scan (startScan / stopScan). */
     private var scanJob: Job? = null
+    /** Job for the auto-connect scan-then-connect sequence. Never cancelled by stopScan(). */
+    private var autoConnectJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     // Queue of characteristics still needing CCCD writes (BLE requires sequential descriptor writes)
@@ -110,8 +118,20 @@ class OximeterBleManager @Inject constructor(
 
     // ── Connect / Disconnect ─────────────────────────────────────────────────
 
+    /**
+     * Direct GATT connect — works reliably for bonded devices or when the BLE
+     * radio has recently seen the device (e.g. after a manual scan).
+     * Only cancels the UI scan job, never the auto-connect job.
+     */
     fun connect(deviceAddress: String) {
-        stopScan()
+        // Stop UI scan only — do NOT cancel autoConnectJob
+        scanJob?.cancel()
+        scanJob = null
+        bluetoothAdapter?.bluetoothLeScanner?.stopScan(scanCallback)
+        if (_connectionState.value is OximeterConnectionState.Scanning) {
+            _connectionState.value = OximeterConnectionState.Disconnected
+        }
+
         val device = bluetoothAdapter?.getRemoteDevice(deviceAddress) ?: run {
             _connectionState.value = OximeterConnectionState.Error("Invalid address: $deviceAddress")
             return
@@ -121,12 +141,66 @@ class OximeterBleManager @Inject constructor(
         bluetoothGatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
     }
 
+    /**
+     * Scan-then-connect for the auto-connect loop.
+     *
+     * Runs a brief BLE scan filtered to [deviceAddress] using a **separate job**
+     * that is never cancelled by [stopScan] (which only affects the UI scan).
+     * As soon as the device is seen, stops the scan and calls [connect].
+     * If the device is not seen within [AUTO_SCAN_TIMEOUT_MS], falls back to a
+     * direct [connect] call anyway (works for bonded/cached devices).
+     */
+    fun connectWithScan(deviceAddress: String) {
+        val scanner: BluetoothLeScanner = bluetoothAdapter?.bluetoothLeScanner ?: run {
+            connect(deviceAddress)
+            return
+        }
+
+        // Cancel any previous auto-connect attempt (not the UI scan)
+        autoConnectJob?.cancel()
+        Log.d(TAG, "Auto-scan for $deviceAddress …")
+
+        autoConnectJob = scope.launch {
+            val targetCallback = object : ScanCallback() {
+                override fun onScanResult(callbackType: Int, result: ScanResult) {
+                    if (result.device.address.equals(deviceAddress, ignoreCase = true)) {
+                        Log.d(TAG, "Auto-scan found $deviceAddress — cancelling scan")
+                        autoConnectJob?.cancel()   // wake the delay early
+                    }
+                }
+                override fun onScanFailed(errorCode: Int) {
+                    Log.e(TAG, "Auto-scan failed: $errorCode — will fall back to direct connect")
+                    autoConnectJob?.cancel()
+                }
+            }
+
+            val filters = listOf(ScanFilter.Builder().setDeviceAddress(deviceAddress).build())
+            val settings = ScanSettings.Builder()
+                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                .build()
+
+            scanner.startScan(filters, settings, targetCallback)
+            try {
+                delay(AUTO_SCAN_TIMEOUT_MS)
+            } catch (_: CancellationException) {
+                // Device found early or scan failed — proceed to connect
+            } finally {
+                scanner.stopScan(targetCallback)
+            }
+
+            // Connect regardless of whether we found it via scan or timed out
+            Log.d(TAG, "Auto-scan done — connecting to $deviceAddress")
+            connect(deviceAddress)
+        }
+    }
+
     fun disconnect() {
         bluetoothGatt?.disconnect()
     }
 
     fun release() {
         scanJob?.cancel()
+        autoConnectJob?.cancel()
         bluetoothGatt?.close()
         bluetoothGatt = null
         scope.cancel()
@@ -150,6 +224,8 @@ class OximeterBleManager @Inject constructor(
                     _liveSpO2.value = null
                     bluetoothGatt?.close()
                     bluetoothGatt = null
+                    // Notify AutoConnectManager so it can re-arm immediately
+                    onDisconnected?.invoke()
                 }
             }
         }
@@ -297,7 +373,9 @@ class OximeterBleManager @Inject constructor(
     }
 
     companion object {
-        private const val SCAN_TIMEOUT_MS = 30_000L
+        private const val SCAN_TIMEOUT_MS      = 30_000L
+        /** How long to scan for the target device before falling back to direct connect. */
+        private const val AUTO_SCAN_TIMEOUT_MS = 8_000L
         private val CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
     }
 }

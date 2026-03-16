@@ -12,8 +12,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,9 +30,6 @@ import com.example.wags.domain.model.OximeterConnectionState
 import com.example.wags.ui.theme.*
 import com.polar.sdk.api.model.PolarDeviceInfo
 
-// Which default slot is being assigned from the scan list
-private enum class DefaultSlot { NONE, MORNING, DAY }
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -44,15 +39,12 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var permissionDenied by remember { mutableStateOf(false) }
-    // Which slot the user is currently assigning (NONE = normal connect mode)
-    var assigningSlot by remember { mutableStateOf(DefaultSlot.NONE) }
 
     // SAF directory picker for meditation audio folder
     val meditationDirLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
         if (uri != null) {
-            // Persist read permission across reboots
             context.contentResolver.takePersistableUriPermission(
                 uri,
                 android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
@@ -217,7 +209,6 @@ fun SettingsScreen(
                     device = device,
                     h10State = state.h10State,
                     verityState = state.verityState,
-                    assigningSlot = assigningSlot,
                     onConnectH10 = {
                         viewModel.stopScan()
                         viewModel.connectH10(device)
@@ -225,24 +216,6 @@ fun SettingsScreen(
                     onConnectVerity = {
                         viewModel.stopScan()
                         viewModel.connectVerity(device)
-                    },
-                    onSetAsH10Default = {
-                        when (assigningSlot) {
-                            DefaultSlot.MORNING -> viewModel.setMorningDefaultPolar(device, isH10 = true)
-                            DefaultSlot.DAY     -> viewModel.setDayDefaultPolar(device, isH10 = true)
-                            DefaultSlot.NONE    -> {}
-                        }
-                        assigningSlot = DefaultSlot.NONE
-                        viewModel.stopScan()
-                    },
-                    onSetAsVerityDefault = {
-                        when (assigningSlot) {
-                            DefaultSlot.MORNING -> viewModel.setMorningDefaultPolar(device, isH10 = false)
-                            DefaultSlot.DAY     -> viewModel.setDayDefaultPolar(device, isH10 = false)
-                            DefaultSlot.NONE    -> {}
-                        }
-                        assigningSlot = DefaultSlot.NONE
-                        viewModel.stopScan()
                     }
                 )
             }
@@ -262,68 +235,7 @@ fun SettingsScreen(
                 OximeterDeviceResultCard(
                     result = result,
                     oximeterState = state.oximeterState,
-                    assigningSlot = assigningSlot,
-                    onConnect = { viewModel.connectOximeter(result.device.address) },
-                    onSetAsDefault = {
-                        val name = result.device.name ?: result.device.address
-                        when (assigningSlot) {
-                            DefaultSlot.MORNING -> viewModel.setMorningDefaultOximeter(result.device.address, name)
-                            DefaultSlot.DAY     -> viewModel.setDayDefaultOximeter(result.device.address, name)
-                            DefaultSlot.NONE    -> {}
-                        }
-                        assigningSlot = DefaultSlot.NONE
-                        viewModel.stopScan()
-                    }
-                )
-            }
-
-            // ── Assigning-slot banner ──────────────────────────────────────
-            if (assigningSlot != DefaultSlot.NONE) {
-                item {
-                    val slotLabel = if (assigningSlot == DefaultSlot.MORNING) "Morning (3am–11am)" else "Day (11am–3am)"
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = EcgCyan.copy(alpha = 0.15f)
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "Tap a device below to set as $slotLabel default",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = EcgCyan,
-                                modifier = Modifier.weight(1f)
-                            )
-                            TextButton(onClick = { assigningSlot = DefaultSlot.NONE }) {
-                                Text("Cancel", color = TextSecondary)
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ── Time-of-day defaults ───────────────────────────────────────
-            item {
-                TimeOfDayDefaultsCard(
-                    morningDeviceName = state.morningDeviceName,
-                    morningDeviceType = state.morningDeviceType,
-                    dayDeviceName = state.dayDeviceName,
-                    dayDeviceType = state.dayDeviceType,
-                    onAssignMorning = {
-                        assigningSlot = DefaultSlot.MORNING
-                        requestScan()
-                    },
-                    onClearMorning = { viewModel.clearMorningDefault() },
-                    onAssignDay = {
-                        assigningSlot = DefaultSlot.DAY
-                        requestScan()
-                    },
-                    onClearDay = { viewModel.clearDayDefault() }
+                    onConnect = { viewModel.connectOximeter(result.device.address) }
                 )
             }
 
@@ -351,125 +263,6 @@ fun SettingsScreen(
                     onSelectHabit           = { slot, entry -> viewModel.selectHabit(slot, entry) },
                     onClearHabit            = { slot -> viewModel.clearHabit(slot) },
                     onRefresh               = { viewModel.loadHabits() }
-                )
-            }
-        }
-    }
-}
-
-// ── Time-of-day defaults card ─────────────────────────────────────────────────
-
-@Composable
-private fun TimeOfDayDefaultsCard(
-    morningDeviceName: String,
-    morningDeviceType: String,
-    dayDeviceName: String,
-    dayDeviceType: String,
-    onAssignMorning: () -> Unit,
-    onClearMorning: () -> Unit,
-    onAssignDay: () -> Unit,
-    onClearDay: () -> Unit
-) {
-    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text("Auto-Connect Defaults", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "The app will automatically connect to the appropriate device when it opens.",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary
-            )
-
-            HorizontalDivider(color = SurfaceVariant)
-
-            // Morning slot
-            DefaultSlotRow(
-                icon = { Icon(Icons.Default.Star, contentDescription = null, tint = EcgCyan, modifier = Modifier.size(18.dp)) },
-                label = "Morning  (3 am – 11 am)",
-                deviceName = morningDeviceName,
-                deviceType = morningDeviceType,
-                onAssign = onAssignMorning,
-                onClear = onClearMorning
-            )
-
-            HorizontalDivider(color = SurfaceVariant)
-
-            // Day slot
-            DefaultSlotRow(
-                icon = { Icon(Icons.Default.Favorite, contentDescription = null, tint = ReadinessOrange, modifier = Modifier.size(18.dp)) },
-                label = "Day  (11 am – 3 am)",
-                deviceName = dayDeviceName,
-                deviceType = dayDeviceType,
-                onAssign = onAssignDay,
-                onClear = onClearDay
-            )
-        }
-    }
-}
-
-@Composable
-private fun DefaultSlotRow(
-    icon: @Composable () -> Unit,
-    label: String,
-    deviceName: String,
-    deviceType: String,
-    onAssign: () -> Unit,
-    onClear: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.weight(1f)
-        ) {
-            icon()
-            Column {
-                Text(label, style = MaterialTheme.typography.bodyMedium)
-                if (deviceName.isNotBlank()) {
-                    val typeLabel = when (deviceType) {
-                        "h10"      -> "H10"
-                        "verity"   -> "Verity Sense"
-                        "oximeter" -> "Oximeter"
-                        else       -> deviceType
-                    }
-                    Text(
-                        "$typeLabel · $deviceName",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = ReadinessGreen
-                    )
-                } else {
-                    Text("Not set", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                }
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (deviceName.isNotBlank()) {
-                IconButton(onClick = onClear, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        Icons.Default.Clear,
-                        contentDescription = "Clear default",
-                        tint = TextSecondary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-            OutlinedButton(
-                onClick = onAssign,
-                modifier = Modifier.height(32.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
-            ) {
-                Text(
-                    if (deviceName.isNotBlank()) "Change" else "Set",
-                    style = MaterialTheme.typography.bodySmall
                 )
             }
         }
@@ -589,19 +382,14 @@ private fun PolarDeviceResultCard(
     device: PolarDeviceInfo,
     h10State: BleConnectionState,
     verityState: BleConnectionState,
-    assigningSlot: DefaultSlot,
     onConnectH10: () -> Unit,
-    onConnectVerity: () -> Unit,
-    onSetAsH10Default: () -> Unit,
-    onSetAsVerityDefault: () -> Unit
+    onConnectVerity: () -> Unit
 ) {
     val h10Connected = h10State is BleConnectionState.Connected &&
         (h10State as BleConnectionState.Connected).deviceId == device.deviceId
     val verityConnected = verityState is BleConnectionState.Connected &&
         (verityState as BleConnectionState.Connected).deviceId == device.deviceId
     val alreadyConnected = h10Connected || verityConnected
-
-    val isAssigning = assigningSlot != DefaultSlot.NONE
 
     Card(
         colors = CardDefaults.cardColors(
@@ -629,25 +417,11 @@ private fun PolarDeviceResultCard(
                     Text("Connected", style = MaterialTheme.typography.bodySmall, color = ReadinessGreen)
                 }
             }
-            Column(
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                horizontalAlignment = Alignment.End
-            ) {
-                if (isAssigning) {
-                    // In "assign default" mode — show Set as H10 / Set as Verity
-                    Button(
-                        onClick = onSetAsH10Default,
-                        modifier = Modifier.height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                    ) { Text("Set H10", style = MaterialTheme.typography.bodySmall) }
-                    OutlinedButton(
-                        onClick = onSetAsVerityDefault,
-                        modifier = Modifier.height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
-                    ) { Text("Set Verity", style = MaterialTheme.typography.bodySmall) }
-                } else if (!alreadyConnected) {
-                    // Normal connect mode
+            if (!alreadyConnected) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalAlignment = Alignment.End
+                ) {
                     Button(
                         onClick = onConnectH10,
                         modifier = Modifier.height(32.dp),
@@ -671,9 +445,7 @@ private fun PolarDeviceResultCard(
 private fun OximeterDeviceResultCard(
     result: ScanResult,
     oximeterState: OximeterConnectionState,
-    assigningSlot: DefaultSlot,
-    onConnect: () -> Unit,
-    onSetAsDefault: () -> Unit
+    onConnect: () -> Unit
 ) {
     val address = result.device.address
     val name = result.device.name ?: address
@@ -681,8 +453,6 @@ private fun OximeterDeviceResultCard(
         oximeterState.deviceAddress == address
     val isConnecting = oximeterState is OximeterConnectionState.Connecting &&
         oximeterState.deviceAddress == address
-
-    val isAssigning = assigningSlot != DefaultSlot.NONE
 
     Card(
         colors = CardDefaults.cardColors(
@@ -713,13 +483,6 @@ private fun OximeterDeviceResultCard(
                 }
             }
             when {
-                isAssigning -> {
-                    Button(
-                        onClick = onSetAsDefault,
-                        modifier = Modifier.height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                    ) { Text("Set Default", style = MaterialTheme.typography.bodySmall) }
-                }
                 isConnected -> { /* no button — disconnect from the top card */ }
                 isConnecting -> {
                     CircularProgressIndicator(
@@ -772,7 +535,6 @@ private fun MeditationAudioDirectoryCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     if (dirUri.isNotBlank()) {
-                        // Show a friendly path fragment from the URI
                         val displayPath = try {
                             Uri.parse(dirUri).lastPathSegment ?: dirUri
                         } catch (_: Exception) { dirUri }
@@ -819,15 +581,6 @@ private fun MeditationAudioDirectoryCard(
 
 // ── Tail App integration card ─────────────────────────────────────────────────
 
-/**
- * Card that lets the user map a Tail/Habit-app habit to each WAGS activity.
- *
- * Layout
- * ──────
- *  Header  : title + Refresh button
- *  Status  : loading spinner | "app unavailable" warning | "no habits" hint
- *  Slots   : one [HabitSlotRow] per activity, each with its own inline picker
- */
 @Composable
 private fun TailAppIntegrationCard(
     habitList: List<HabitEntry>,
@@ -843,7 +596,6 @@ private fun TailAppIntegrationCard(
     onClearHabit: (Slot) -> Unit,
     onRefresh: () -> Unit
 ) {
-    // Which slot's picker is currently expanded (null = all collapsed)
     var expandedSlot by remember { mutableStateOf<Slot?>(null) }
 
     Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
@@ -853,7 +605,6 @@ private fun TailAppIntegrationCard(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // ── Header ────────────────────────────────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -880,7 +631,6 @@ private fun TailAppIntegrationCard(
                 }
             }
 
-            // ── Status banner ─────────────────────────────────────────────
             when {
                 habitAppUnavailable ->
                     Text(
@@ -898,7 +648,6 @@ private fun TailAppIntegrationCard(
 
             HorizontalDivider(color = SurfaceVariant)
 
-            // ── Per-activity slots ────────────────────────────────────────
             val slots = listOf(
                 Slot.FREE_HOLD           to freeHoldHabit,
                 Slot.APNEA_NEW_RECORD    to apneaNewRecordHabit,
@@ -910,18 +659,16 @@ private fun TailAppIntegrationCard(
 
             slots.forEachIndexed { index, (slot, selection) ->
                 HabitSlotRow(
-                    slot        = slot,
-                    selection   = selection,
-                    habitList   = habitList,
-                    isExpanded  = expandedSlot == slot,
-                    onToggle    = {
-                        expandedSlot = if (expandedSlot == slot) null else slot
-                    },
-                    onSelect    = { entry ->
+                    slot       = slot,
+                    selection  = selection,
+                    habitList  = habitList,
+                    isExpanded = expandedSlot == slot,
+                    onToggle   = { expandedSlot = if (expandedSlot == slot) null else slot },
+                    onSelect   = { entry ->
                         onSelectHabit(slot, entry)
                         expandedSlot = null
                     },
-                    onClear     = { onClearHabit(slot) }
+                    onClear    = { onClearHabit(slot) }
                 )
                 if (index < slots.lastIndex) {
                     HorizontalDivider(color = SurfaceVariant)
@@ -931,11 +678,6 @@ private fun TailAppIntegrationCard(
     }
 }
 
-/**
- * A single row for one activity slot. Shows the activity label, the currently
- * selected habit name (or "Not set"), and a toggle button to expand/collapse
- * the inline habit picker.
- */
 @Composable
 private fun HabitSlotRow(
     slot: Slot,
@@ -947,7 +689,6 @@ private fun HabitSlotRow(
     onClear: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        // ── Summary row ───────────────────────────────────────────────────
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -997,7 +738,6 @@ private fun HabitSlotRow(
             }
         }
 
-        // ── Inline picker (expanded) ──────────────────────────────────────
         if (isExpanded) {
             Spacer(Modifier.height(8.dp))
             if (habitList.isEmpty()) {
