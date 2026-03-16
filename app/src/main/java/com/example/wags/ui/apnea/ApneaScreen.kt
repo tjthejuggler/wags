@@ -1,8 +1,14 @@
 package com.example.wags.ui.apnea
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -16,11 +22,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -318,7 +327,7 @@ fun ApneaScreen(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// New Personal Best Dialog
+// New Personal Best Dialog — with confetti celebration
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -326,50 +335,89 @@ private fun NewPersonalBestDialog(
     newPbMs: Long,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        containerColor = SurfaceDark,
-        title = {
-            Text(
-                "🏆 New Personal Best!",
-                style = MaterialTheme.typography.headlineSmall,
-                color = EcgCyan,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            // Semi-transparent scrim
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.6f))
+                    .clickable(onClick = onDismiss)
             )
-        },
-        text = {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
+
+            // Confetti rains over the entire screen
+            ConfettiOverlay(
+                modifier = Modifier.fillMaxSize(),
+                particleCount = 45,
+                durationMs = 3_500
+            )
+
+            // Card content with scale-in entrance
+            AnimatedVisibility(
+                visible = true,
+                enter = scaleIn(
+                    initialScale = 0.8f,
+                    animationSpec = tween(durationMillis = 350)
+                ) + fadeIn(animationSpec = tween(durationMillis = 350))
             ) {
-                Text(
-                    formatMs(newPbMs),
-                    style = MaterialTheme.typography.displaySmall,
-                    color = EcgCyan,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    "Incredible work! You've set a new personal best. Keep pushing your limits!",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary,
-                    textAlign = TextAlign.Center
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = EcgCyan),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("🎉 Awesome!", color = BackgroundDark, fontWeight = FontWeight.Bold)
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth(0.85f)
+                        .padding(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                    shape = MaterialTheme.shapes.extraLarge
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            "🏆",
+                            style = MaterialTheme.typography.displayMedium,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            "New Personal Best!",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = EcgCyan,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            formatMs(newPbMs),
+                            style = MaterialTheme.typography.displaySmall,
+                            color = EcgCyan,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            "Congratulations! You've beaten your previous record. Keep it up!",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextSecondary,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Button(
+                            onClick = onDismiss,
+                            colors = ButtonDefaults.buttonColors(containerColor = EcgCyan),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("🎉 Awesome!", color = BackgroundDark, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             }
         }
-    )
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
