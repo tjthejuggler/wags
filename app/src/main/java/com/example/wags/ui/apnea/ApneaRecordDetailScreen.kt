@@ -393,19 +393,29 @@ private fun RecordDetailContent(
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
                         StatBox(
+                            label = "Start",
+                            value = "${hrValues.first().toInt()}",
+                            color = Color.White
+                        )
+                        StatBox(
                             label = "Min",
-                            value = "${hrValues.min().toInt()} bpm",
+                            value = "${hrValues.min().toInt()}",
                             color = EcgCyan
                         )
                         StatBox(
                             label = "Avg",
-                            value = "${hrValues.average().toInt()} bpm",
+                            value = "${hrValues.average().toInt()}",
                             color = Color.White
                         )
                         StatBox(
                             label = "Max",
-                            value = "${hrValues.max().toInt()} bpm",
+                            value = "${hrValues.max().toInt()}",
                             color = ApneaHold
+                        )
+                        StatBox(
+                            label = "End",
+                            value = "${hrValues.last().toInt()}",
+                            color = Color.White
                         )
                     }
                     LineChart(
@@ -460,18 +470,28 @@ private fun RecordDetailContent(
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
                         StatBox(
+                            label = "Start",
+                            value = "${spO2Values.first().toInt()}",
+                            color = Color.White
+                        )
+                        StatBox(
                             label = "Min",
-                            value = "${spO2Values.min().toInt()}%",
+                            value = "${spO2Values.min().toInt()}",
                             color = SpO2Blue
                         )
                         StatBox(
                             label = "Avg",
-                            value = "${spO2Values.average().toInt()}%",
+                            value = "${spO2Values.average().toInt()}",
                             color = Color.White
                         )
                         StatBox(
                             label = "Max",
-                            value = "${spO2Values.max().toInt()}%",
+                            value = "${spO2Values.max().toInt()}",
+                            color = Color.White
+                        )
+                        StatBox(
+                            label = "End",
+                            value = "${spO2Values.last().toInt()}",
                             color = Color.White
                         )
                     }
