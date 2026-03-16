@@ -13,13 +13,17 @@ import javax.inject.Singleton
  * Persists BLE device identifiers so the auto-connect loop can reconnect to
  * previously-used devices without any manual intervention.
  *
- * Three device slots are tracked:
+ * Three device types are tracked:
  *   - H10 chest strap (Polar device ID)
  *   - Verity Sense optical HR (Polar device ID)
  *   - Oximeter / SpO₂ sensor (BLE MAC address)
  *
- * Any device that has ever been manually connected from Settings is saved here
- * and will be auto-connected on subsequent app launches.
+ * For each type we keep an **ordered history list** (most-recently-connected
+ * first, capped at [MAX_HISTORY]) so the auto-connect loop can cycle through
+ * every device the user has ever paired, not just the last one.
+ *
+ * Convenience single-value accessors ([savedH10Id], [savedVerityId],
+ * [savedOximeterAddress]) still work — they return the head of the list.
  */
 @Singleton
 class DevicePreferencesRepository @Inject constructor(
@@ -28,19 +32,53 @@ class DevicePreferencesRepository @Inject constructor(
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    // ── Last-connected device IDs ──────────────────────────────────────────────
+    // ── History lists ──────────────────────────────────────────────────────────
 
+    /**
+     * Returns the full history for [key], most-recently-connected first.
+     * Stored as a pipe-separated string: "ID1|ID2|ID3".
+     */
+    fun getHistory(key: String): List<String> {
+        val raw = prefs.getString(key, "") ?: ""
+        return if (raw.isBlank()) emptyList()
+        else raw.split(SEPARATOR).filter { it.isNotBlank() }
+    }
+
+    /**
+     * Prepends [id] to the history for [key], deduplicates, and caps at
+     * [MAX_HISTORY] entries. The most-recently-connected device is always first.
+     */
+    fun addToHistory(key: String, id: String) {
+        if (id.isBlank()) return
+        val updated = (listOf(id) + getHistory(key))
+            .distinct()
+            .take(MAX_HISTORY)
+        prefs.edit().putString(key, updated.joinToString(SEPARATOR)).apply()
+        refresh()
+    }
+
+    // ── Convenience single-value accessors (head of each history list) ─────────
+
+    /** The most-recently-connected H10 device ID, or "" if none. */
     var savedH10Id: String
-        get() = prefs.getString(KEY_H10_ID, "") ?: ""
-        set(value) = prefs.edit().putString(KEY_H10_ID, value).apply()
+        get() = getHistory(KEY_H10_HISTORY).firstOrNull() ?: ""
+        set(value) = addToHistory(KEY_H10_HISTORY, value)
 
+    /** The most-recently-connected Verity Sense device ID, or "" if none. */
     var savedVerityId: String
-        get() = prefs.getString(KEY_VERITY_ID, "") ?: ""
-        set(value) = prefs.edit().putString(KEY_VERITY_ID, value).apply()
+        get() = getHistory(KEY_VERITY_HISTORY).firstOrNull() ?: ""
+        set(value) = addToHistory(KEY_VERITY_HISTORY, value)
 
+    /** The most-recently-connected oximeter MAC address, or "" if none. */
     var savedOximeterAddress: String
-        get() = prefs.getString(KEY_OXIMETER_ADDR, "") ?: ""
-        set(value) = prefs.edit().putString(KEY_OXIMETER_ADDR, value).apply()
+        get() = getHistory(KEY_OXIMETER_HISTORY).firstOrNull() ?: ""
+        set(value) = addToHistory(KEY_OXIMETER_HISTORY, value)
+
+    // ── History list accessors used by AutoConnectManager ─────────────────────
+
+    val h10History: List<String>        get() = getHistory(KEY_H10_HISTORY)
+    val verityHistory: List<String>     get() = getHistory(KEY_VERITY_HISTORY)
+    val oximeterHistory: List<String>   get() = getHistory(KEY_OXIMETER_HISTORY)
 
     // ── Meditation audio directory ─────────────────────────────────────────────
 
@@ -67,10 +105,51 @@ class DevicePreferencesRepository @Inject constructor(
 
     companion object {
         const val PREFS_NAME             = "wags_device_prefs"
-        const val KEY_H10_ID             = "h10_device_id"
-        const val KEY_VERITY_ID          = "verity_device_id"
-        const val KEY_OXIMETER_ADDR      = "oximeter_address"
+
+        // History list keys (replacing the old single-value keys)
+        const val KEY_H10_HISTORY        = "h10_device_history"
+        const val KEY_VERITY_HISTORY     = "verity_device_history"
+        const val KEY_OXIMETER_HISTORY   = "oximeter_address_history"
+
+        // Legacy single-value keys — kept so we can migrate on first run
+        private const val KEY_H10_ID_LEGACY       = "h10_device_id"
+        private const val KEY_VERITY_ID_LEGACY    = "verity_device_id"
+        private const val KEY_OXIMETER_ADDR_LEGACY = "oximeter_address"
+
         const val KEY_MEDITATION_DIR_URI = "meditation_audio_dir_uri"
+
+        /** Maximum number of devices remembered per type. */
+        const val MAX_HISTORY = 10
+
+        private const val SEPARATOR = "|"
+    }
+
+    // ── One-time migration from legacy single-value keys ──────────────────────
+
+    init {
+        migrateLegacyKeys()
+    }
+
+    /**
+     * If the app was previously installed with the old single-value keys, migrate
+     * those values into the new history lists so existing users don't lose their
+     * saved devices on upgrade.
+     */
+    private fun migrateLegacyKeys() {
+        val legacyH10 = prefs.getString(KEY_H10_ID_LEGACY, "") ?: ""
+        val legacyVerity = prefs.getString(KEY_VERITY_ID_LEGACY, "") ?: ""
+        val legacyOximeter = prefs.getString(KEY_OXIMETER_ADDR_LEGACY, "") ?: ""
+
+        // Only migrate if the new history key doesn't exist yet
+        if (legacyH10.isNotBlank() && getHistory(KEY_H10_HISTORY).isEmpty()) {
+            addToHistory(KEY_H10_HISTORY, legacyH10)
+        }
+        if (legacyVerity.isNotBlank() && getHistory(KEY_VERITY_HISTORY).isEmpty()) {
+            addToHistory(KEY_VERITY_HISTORY, legacyVerity)
+        }
+        if (legacyOximeter.isNotBlank() && getHistory(KEY_OXIMETER_HISTORY).isEmpty()) {
+            addToHistory(KEY_OXIMETER_HISTORY, legacyOximeter)
+        }
     }
 }
 

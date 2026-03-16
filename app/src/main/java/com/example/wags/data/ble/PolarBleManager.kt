@@ -54,6 +54,18 @@ class PolarBleManager @Inject constructor(
 
     private var scanJob: Job? = null
 
+    /**
+     * Explicit slot registry: maps a Polar deviceId → which slot ("h10" or "verity")
+     * it was assigned to when [connectDevice] was called.
+     *
+     * This is the authoritative source for routing SDK callbacks to the correct
+     * StateFlow.  Without it, [updateState] had to infer the slot from the
+     * *current* state value — which breaks after a disconnect because the state
+     * reverts to [BleConnectionState.Disconnected] (no deviceId), causing the
+     * next Connecting callback for the H10 to be misrouted to verityState.
+     */
+    private val deviceSlotRegistry = mutableMapOf<String, String>()   // deviceId → "h10"|"verity"
+
     fun startScan() {
         scanJob?.cancel()
         _scanResults.value = emptyList()
@@ -120,19 +132,32 @@ class PolarBleManager @Inject constructor(
         })
     }
 
+    /**
+     * Routes a state update to the correct StateFlow using [deviceSlotRegistry].
+     *
+     * Falls back to the old heuristic (check current state value) only if the
+     * device was never registered — e.g. a spontaneous SDK callback for a device
+     * we didn't initiate a connect for.
+     */
     private fun updateState(deviceId: String, state: BleConnectionState) {
-        val h10Matches = _h10State.value.let {
-            (it is BleConnectionState.Connecting && it.deviceId == deviceId) ||
-            (it is BleConnectionState.Connected && it.deviceId == deviceId)
-        }
-        if (h10Matches) {
-            _h10State.value = state
-        } else {
-            _verityState.value = state
+        val slot = deviceSlotRegistry[deviceId]
+        when {
+            slot == "h10"   -> _h10State.value = state
+            slot == "verity" -> _verityState.value = state
+            else -> {
+                // Fallback: infer from current state (legacy path, should rarely hit)
+                val h10Matches = _h10State.value.let {
+                    (it is BleConnectionState.Connecting && it.deviceId == deviceId) ||
+                    (it is BleConnectionState.Connected  && it.deviceId == deviceId)
+                }
+                if (h10Matches) _h10State.value = state else _verityState.value = state
+            }
         }
     }
 
     fun connectDevice(deviceId: String, isH10: Boolean) {
+        // Register the slot BEFORE setting state so the SDK callback is always routed correctly.
+        deviceSlotRegistry[deviceId] = if (isH10) "h10" else "verity"
         if (isH10) _h10State.value = BleConnectionState.Connecting(deviceId)
         else _verityState.value = BleConnectionState.Connecting(deviceId)
         try {

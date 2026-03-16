@@ -4,6 +4,7 @@ import android.util.Log
 import com.example.wags.domain.model.BleConnectionState
 import com.example.wags.domain.model.OximeterConnectionState
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
@@ -13,24 +14,34 @@ import kotlin.coroutines.coroutineContext
 private const val TAG = "AutoConnect"
 
 /**
- * Orchestrates automatic BLE connection whenever the app is running but no session
- * is active.
+ * Orchestrates automatic BLE reconnection whenever the app is running but no
+ * session is active.
  *
- * Strategy:
- * 1. Build the list of all previously-used devices from saved preferences
- *    (H10, Verity Sense, Oximeter — whichever have been connected before).
- * 2. For every candidate that is NOT already connected, attempt to connect it.
- *    All candidates are tried every round — so if the H10 AND the Verity are both
- *    powered on, both will be connected in the same pass.
- * 3. After the round, if any candidate is still disconnected, wait [retryDelay]
- *    (exponential backoff, capped at [MAX_RETRY_DELAY_MS]) then try again — forever.
- * 4. The loop is suspended while [sessionActive] is true so it never interferes
- *    with an in-progress readiness test, meditation, apnea session, etc.
- * 5. Call [onDeviceDisconnected] from BLE managers whenever a device drops so the
- *    loop re-arms immediately instead of waiting for the next scheduled retry.
+ * ## Strategy (v3 — background-scan driven)
+ *
+ * The previous approach was poll-and-retry with exponential backoff: try to
+ * connect, fail, wait 10s → 15s → 22s → … → 120s, try again.  This meant the
+ * user could wait up to **2 minutes** after turning on a device before the app
+ * noticed.
+ *
+ * The new approach:
+ *
+ * 1. **Immediate first attempt** — On start (and after every disconnect) we do
+ *    one quick connect attempt for each saved device.
+ *
+ * 2. **Background BLE scan** — For the oximeter (non-Polar devices), we run a
+ *    continuous low-power BLE scan filtered to known MAC addresses.  The moment
+ *    the device is detected by the radio, we connect immediately.  This gives
+ *    sub-second response time.
+ *
+ * 3. **Polar auto-connect** — The Polar SDK has its own internal reconnection
+ *    mechanism.  Once we call `connectToDevice()`, the SDK keeps trying in the
+ *    background.  We just need to call it once and monitor the state.
+ *
+ * 4. **Session guard** — The loop suspends while [sessionActive] is true.
  *
  * Call [start] once after Bluetooth permissions are granted.
- * Call [setSessionActive] to pause / resume the loop around active sessions.
+ * Call [setSessionActive] to pause/resume around sessions.
  */
 @Singleton
 class AutoConnectManager @Inject constructor(
@@ -43,7 +54,10 @@ class AutoConnectManager @Inject constructor(
     /** True while a session (readiness, meditation, apnea, breathing, …) is running. */
     private val sessionActive = AtomicBoolean(false)
 
-    /** Set to true to wake the retry-delay early when a disconnect is detected. */
+    /**
+     * Flipped to true by [onDeviceDisconnected] or [setSessionActive] to wake
+     * the main loop immediately.
+     */
     @Volatile private var reconnectNow = false
 
     private var loopJob: Job? = null
@@ -52,37 +66,33 @@ class AutoConnectManager @Inject constructor(
 
     /**
      * Start the persistent auto-connect loop.
-     * Safe to call multiple times; a running loop is cancelled and restarted.
-     * Also wires disconnect callbacks on the BLE managers so the loop wakes
-     * immediately when a device drops rather than waiting for the next retry.
+     * Safe to call multiple times — a running loop is cancelled and restarted.
      */
     fun start() {
-        // Wire disconnect callbacks (avoids circular DI — set lazily here instead)
+        // Wire disconnect callbacks
         polarBleManager.onDisconnected = { onDeviceDisconnected() }
         oximeterBleManager.onDisconnected = { onDeviceDisconnected() }
 
+        // Wire background scan callback — when the oximeter is detected nearby,
+        // immediately trigger a connect.
+        oximeterBleManager.onKnownDeviceFound = { address ->
+            Log.d(TAG, "Background scan found oximeter $address — triggering connect")
+            scope.launch { connectOximeterNow(address) }
+        }
+
         loopJob?.cancel()
-        loopJob = scope.launch { reconnectLoop() }
+        loopJob = scope.launch { mainLoop() }
+        Log.d(TAG, "AutoConnectManager started")
     }
 
-    /**
-     * Pause or resume the auto-connect loop around active sessions.
-     * When [active] transitions false → true the loop is suspended.
-     * When [active] transitions true → false the loop immediately retries.
-     */
     fun setSessionActive(active: Boolean) {
         val wasActive = sessionActive.getAndSet(active)
         if (wasActive && !active) {
-            // Session just ended — kick the loop immediately
             Log.d(TAG, "Session ended — triggering immediate reconnect check")
             reconnectNow = true
         }
     }
 
-    /**
-     * Called by BLE managers when a device disconnects unexpectedly.
-     * Wakes the retry-delay early so we reconnect as fast as possible.
-     */
     fun onDeviceDisconnected() {
         if (!sessionActive.get()) {
             Log.d(TAG, "Device disconnected — waking reconnect loop")
@@ -90,199 +100,180 @@ class AutoConnectManager @Inject constructor(
         }
     }
 
-    /** Permanently stop the loop (e.g. app teardown). */
     fun cancel() {
         loopJob?.cancel()
+        oximeterBleManager.stopBackgroundScan()
     }
 
-    // ── Internal loop ─────────────────────────────────────────────────────────
+    // ── Main loop ─────────────────────────────────────────────────────────────
 
-    private suspend fun reconnectLoop() {
-        var retryDelay = INITIAL_RETRY_DELAY_MS
-        Log.d(TAG, "Reconnect loop started")
+    private suspend fun mainLoop() {
+        Log.d(TAG, "Main loop started")
 
         while (coroutineContext.isActive) {
+
             // ── 1. Wait while a session is running ────────────────────────────
             if (sessionActive.get()) {
-                Log.d(TAG, "Session active — loop suspended")
+                Log.d(TAG, "Session active — pausing auto-connect + background scan")
+                oximeterBleManager.stopBackgroundScan()
                 while (sessionActive.get() && coroutineContext.isActive) delay(SESSION_POLL_MS)
-                Log.d(TAG, "Session ended — resuming loop")
-                retryDelay = INITIAL_RETRY_DELAY_MS
+                Log.d(TAG, "Session ended — resuming")
             }
 
-            // ── 2. Build the full candidate list ──────────────────────────────
-            val candidates = buildCandidateList()
-            if (candidates.isEmpty()) {
-                Log.d(TAG, "No saved devices — waiting ${NO_DEVICE_WAIT_MS}ms before recheck")
+            // ── 2. Build candidate lists ──────────────────────────────────────
+            val h10History      = prefs.h10History
+            val verityHistory   = prefs.verityHistory
+            val oximeterHistory = prefs.oximeterHistory
+
+            Log.d(TAG, "History — H10=$h10History Verity=$verityHistory Oximeter=$oximeterHistory")
+
+            val hasAnySaved = h10History.isNotEmpty() || verityHistory.isNotEmpty() || oximeterHistory.isNotEmpty()
+            if (!hasAnySaved) {
+                Log.d(TAG, "No saved devices — waiting ${NO_DEVICE_WAIT_MS}ms")
                 delay(NO_DEVICE_WAIT_MS)
                 continue
             }
 
-            // ── 3. Try every candidate that isn't already connected ───────────
-            // We do NOT stop after the first success — we want ALL saved devices
-            // connected if they are powered on and in range.
-            Log.d(TAG, "Scanning ${candidates.size} candidate(s) …")
-            var anyFailed = false
-            for (candidate in candidates) {
-                if (sessionActive.get()) break          // session started mid-round
-                if (isCandidateConnected(candidate)) {
-                    Log.d(TAG, "  ✓ already connected: ${candidate.label}")
-                    continue
-                }
-                Log.d(TAG, "  → trying: ${candidate.label} (${candidate.deviceId})")
-                val ok = tryConnect(candidate)
-                if (ok) {
-                    Log.d(TAG, "  ✓ connected: ${candidate.label}")
-                    retryDelay = INITIAL_RETRY_DELAY_MS
-                } else {
-                    Log.d(TAG, "  ✗ failed: ${candidate.label}")
-                    anyFailed = true
+            // ── 3. Attempt Polar connections ──────────────────────────────────
+            // The Polar SDK has built-in reconnection: once we call connectToDevice(),
+            // it keeps trying internally.  We just need to issue the call once for
+            // each device that isn't already connected/connecting.
+
+            if (!sessionActive.get()) {
+                for (deviceId in h10History) {
+                    val state = polarBleManager.h10State.value
+                    if (state is BleConnectionState.Connected || state is BleConnectionState.Connecting) break
+                    Log.d(TAG, "Issuing Polar connect for H10: $deviceId")
+                    polarBleManager.connectDevice(deviceId, isH10 = true)
+                    // Give the SDK a moment to start its internal reconnection
+                    delay(POLAR_CONNECT_SETTLE_MS)
+                    // Check if it connected
+                    if (polarBleManager.h10State.value is BleConnectionState.Connected) break
                 }
             }
 
-            // ── 4. If everything is connected, park until a disconnect ─────────
-            if (!anyFailed && !sessionActive.get()) {
-                Log.d(TAG, "All saved devices connected — parking until disconnect")
-                while (!anyDeviceDisconnectedFrom(candidates) &&
-                    !sessionActive.get() &&
-                    coroutineContext.isActive
-                ) {
-                    delay(CONNECTED_POLL_MS)
+            if (!sessionActive.get()) {
+                for (deviceId in verityHistory) {
+                    val state = polarBleManager.verityState.value
+                    if (state is BleConnectionState.Connected || state is BleConnectionState.Connecting) break
+                    Log.d(TAG, "Issuing Polar connect for Verity: $deviceId")
+                    polarBleManager.connectDevice(deviceId, isH10 = false)
+                    delay(POLAR_CONNECT_SETTLE_MS)
+                    if (polarBleManager.verityState.value is BleConnectionState.Connected) break
                 }
-                retryDelay = INITIAL_RETRY_DELAY_MS
-                continue
             }
 
-            // ── 5. Some candidates failed — back-off and retry ────────────────
-            if (anyFailed) {
-                Log.d(TAG, "Some devices unreachable — retrying in ${retryDelay}ms")
-                reconnectNow = false
-                val deadline = System.currentTimeMillis() + retryDelay
-                while (System.currentTimeMillis() < deadline && coroutineContext.isActive) {
-                    if (reconnectNow || sessionActive.get()) break
-                    delay(WAKE_CHECK_INTERVAL_MS)
+            // ── 4. Attempt oximeter connection ────────────────────────────────
+            // Try a direct connect for each known oximeter.  If none succeeds,
+            // start the background scan so we detect it the moment it turns on.
+
+            var oximeterConnected = oximeterBleManager.connectionState.value is OximeterConnectionState.Connected
+
+            if (!oximeterConnected && !sessionActive.get() && oximeterHistory.isNotEmpty()) {
+                for (address in oximeterHistory) {
+                    if (sessionActive.get()) break
+                    Log.d(TAG, "Trying oximeter: $address")
+                    oximeterConnected = connectOximeterNow(address)
+                    if (oximeterConnected) {
+                        Log.d(TAG, "Oximeter connected: $address")
+                        break
+                    }
                 }
-                reconnectNow = false
-                retryDelay = (retryDelay * BACKOFF_MULTIPLIER).toLong()
-                    .coerceAtMost(MAX_RETRY_DELAY_MS)
             }
+
+            // ── 5. Start background scan if oximeter not connected ────────────
+            if (!oximeterConnected && oximeterHistory.isNotEmpty() && !sessionActive.get()) {
+                Log.d(TAG, "Oximeter not connected — starting background scan")
+                oximeterBleManager.startBackgroundScan(oximeterHistory)
+            } else {
+                oximeterBleManager.stopBackgroundScan()
+            }
+
+            // ── 6. Park until something changes ──────────────────────────────
+            // We wait here until:
+            //   - A device disconnects (reconnectNow = true)
+            //   - A session starts/ends
+            //   - The background scan finds a device (handled via callback)
+            //   - Periodic recheck interval expires
+            Log.d(TAG, "Parking — will recheck in ${RECHECK_INTERVAL_MS}ms or on event")
+            reconnectNow = false
+            val deadline = System.currentTimeMillis() + RECHECK_INTERVAL_MS
+            while (System.currentTimeMillis() < deadline && coroutineContext.isActive) {
+                if (reconnectNow || sessionActive.get()) break
+                delay(WAKE_CHECK_INTERVAL_MS)
+            }
+            reconnectNow = false
         }
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    /** True if at least one device from the candidate list is no longer connected. */
-    private fun anyDeviceDisconnectedFrom(candidates: List<DeviceCandidate>): Boolean =
-        candidates.any { !isCandidateConnected(it) }
-
-    /** True if this specific candidate is currently in the Connected state. */
-    private fun isCandidateConnected(candidate: DeviceCandidate): Boolean =
-        when (candidate.deviceType) {
-            "h10" ->
-                polarBleManager.h10State.value.let {
-                    it is BleConnectionState.Connected && it.deviceId == candidate.deviceId
-                }
-            "verity" ->
-                polarBleManager.verityState.value.let {
-                    it is BleConnectionState.Connected && it.deviceId == candidate.deviceId
-                }
-            "oximeter" ->
-                oximeterBleManager.connectionState.value.let {
-                    it is OximeterConnectionState.Connected && it.deviceAddress == candidate.deviceId
-                }
-            else -> false
-        }
+    // ── Oximeter connect helper ───────────────────────────────────────────────
 
     /**
-     * Builds the list of all previously-used devices from saved preferences.
-     * Only includes devices that have a saved ID/address (i.e. have been connected before).
+     * Attempts a scan-then-connect for the oximeter and waits for a terminal
+     * state.  Returns true if connected, false otherwise.
      */
-    private fun buildCandidateList(): List<DeviceCandidate> {
-        val list = mutableListOf<DeviceCandidate>()
-
-        // Log raw prefs so we can diagnose persistence issues
-        Log.d(TAG, "Prefs — H10='${prefs.savedH10Id}' Verity='${prefs.savedVerityId}' " +
-            "Oximeter='${prefs.savedOximeterAddress}'")
-
-        if (prefs.savedH10Id.isNotBlank())
-            list += DeviceCandidate(prefs.savedH10Id, "h10", "H10 (${prefs.savedH10Id})")
-        if (prefs.savedVerityId.isNotBlank())
-            list += DeviceCandidate(prefs.savedVerityId, "verity", "Verity (${prefs.savedVerityId})")
-        if (prefs.savedOximeterAddress.isNotBlank())
-            list += DeviceCandidate(prefs.savedOximeterAddress, "oximeter", "Oximeter (${prefs.savedOximeterAddress})")
-
-        Log.d(TAG, "Candidate list (${list.size}): ${list.map { it.label }}")
-        return list
-    }
-
-    private suspend fun tryConnect(candidate: DeviceCandidate): Boolean =
-        when (candidate.deviceType) {
-            "h10"      -> tryConnectPolar(candidate.deviceId, isH10 = true)
-            "verity"   -> tryConnectPolar(candidate.deviceId, isH10 = false)
-            "oximeter" -> tryConnectOximeter(candidate.deviceId)
-            else       -> false
+    private suspend fun connectOximeterNow(address: String): Boolean {
+        // Already connected?
+        oximeterBleManager.connectionState.value.let {
+            if (it is OximeterConnectionState.Connected &&
+                it.deviceAddress.equals(address, ignoreCase = true)
+            ) return true
         }
 
-    private suspend fun tryConnectPolar(deviceId: String, isH10: Boolean): Boolean {
-        polarBleManager.connectDevice(deviceId, isH10)
-        val stateFlow = if (isH10) polarBleManager.h10State else polarBleManager.verityState
-        return withTimeoutOrNull(CONNECT_TIMEOUT_MS) {
-            stateFlow.first { it is BleConnectionState.Connected || it is BleConnectionState.Error }
-            stateFlow.value is BleConnectionState.Connected
-        } ?: false
-    }
+        // Stop background scan during active connect attempt
+        oximeterBleManager.stopBackgroundScan()
 
-    private suspend fun tryConnectOximeter(address: String): Boolean {
-        // connectWithScan() does an 8 s targeted scan first so the BLE stack
-        // "sees" the device before the GATT connect — required for non-bonded devices.
-        oximeterBleManager.connectWithScan(address)
         return withTimeoutOrNull(OXIMETER_CONNECT_TIMEOUT_MS) {
-            oximeterBleManager.connectionState.first {
-                it is OximeterConnectionState.Connected || it is OximeterConnectionState.Error
+            // Subscribe BEFORE issuing the connect so we cannot miss the callback.
+            val resultDeferred = scope.async {
+                oximeterBleManager.connectionState
+                    .filter { state ->
+                        when (state) {
+                            is OximeterConnectionState.Connected ->
+                                state.deviceAddress.equals(address, ignoreCase = true)
+                            is OximeterConnectionState.Error       -> true
+                            is OximeterConnectionState.Disconnected -> true  // failed connect → back to disconnected
+                            is OximeterConnectionState.Connecting   -> false // still in progress
+                            is OximeterConnectionState.Scanning     -> false // still in progress
+                        }
+                    }
+                    .first()
             }
-            oximeterBleManager.connectionState.value is OximeterConnectionState.Connected
+
+            // Issue the connect (scan-then-connect).
+            oximeterBleManager.connectWithScan(address)
+
+            // Wait for terminal state.
+            val terminal = resultDeferred.await()
+            terminal is OximeterConnectionState.Connected
         } ?: false
     }
 
     // ── Constants ─────────────────────────────────────────────────────────────
 
     companion object {
-        /** How long to wait for a Polar device to connect before trying the next. */
-        private const val CONNECT_TIMEOUT_MS = 12_000L
-
         /**
-         * Oximeter timeout is longer because [OximeterBleManager.connectWithScan] runs
-         * an 8 s scan window before the GATT connect attempt.
+         * Oximeter connect timeout.  Covers the 8s scan window + GATT connect.
          */
-        private const val OXIMETER_CONNECT_TIMEOUT_MS = 25_000L
+        private const val OXIMETER_CONNECT_TIMEOUT_MS = 20_000L
 
-        /** First retry delay after all candidates fail. */
-        private const val INITIAL_RETRY_DELAY_MS = 15_000L
+        /** Brief pause after issuing a Polar connect to let the SDK settle. */
+        private const val POLAR_CONNECT_SETTLE_MS = 2_000L
 
-        /** Multiply delay by this factor after each failed round. */
-        private const val BACKOFF_MULTIPLIER = 1.5
-
-        /** Maximum delay between retry rounds (~2 min). */
-        private const val MAX_RETRY_DELAY_MS = 120_000L
-
-        /** How often to check for early-wake signals during the retry delay. */
+        /** How often to check for early-wake signals. */
         private const val WAKE_CHECK_INTERVAL_MS = 500L
 
         /** Poll interval while a session is active. */
         private const val SESSION_POLL_MS = 1_000L
 
-        /** Poll interval while all devices are connected (watching for disconnect). */
-        private const val CONNECTED_POLL_MS = 2_000L
-
         /** How long to wait before rechecking when no devices are saved. */
         private const val NO_DEVICE_WAIT_MS = 30_000L
+
+        /**
+         * Periodic recheck interval.  Even with background scan, we recheck
+         * periodically in case the Polar SDK's internal reconnection stalled
+         * or the background scan needs restarting.
+         */
+        private const val RECHECK_INTERVAL_MS = 30_000L
     }
 }
-
-// ── Internal model ────────────────────────────────────────────────────────────
-
-private data class DeviceCandidate(
-    val deviceId: String,
-    val deviceType: String,   // "h10" | "verity" | "oximeter"
-    val label: String
-)
