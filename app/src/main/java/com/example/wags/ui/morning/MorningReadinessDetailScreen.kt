@@ -26,10 +26,117 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wags.data.db.entity.MorningReadinessEntity
 import com.example.wags.data.db.entity.MorningReadinessTelemetryEntity
+import com.example.wags.ui.common.InfoHelpBubble
 import com.example.wags.ui.theme.*
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+
+// ── Help text constants ───────────────────────────────────────────────────────
+
+private const val HELP_READINESS_SCORE_TITLE = "Readiness Score"
+private const val HELP_READINESS_SCORE_TEXT =
+    "A 0–100 score summarising your Autonomic Nervous System's readiness to handle stress today.\n\n" +
+    "• 70–100 (GREEN) — Well recovered. Train hard or as planned.\n" +
+    "• 40–69 (YELLOW) — Moderate readiness. Consider reducing intensity.\n" +
+    "• 0–39 (RED) — Poor recovery. Prioritise rest, sleep, and nutrition.\n\n" +
+    "The score combines your resting HRV, how your heart responds to standing up (orthostatic response), and your subjective wellness (Hooper Index)."
+
+private const val HELP_RMSSD_TITLE = "RMSSD (Root Mean Square of Successive Differences)"
+private const val HELP_RMSSD_TEXT =
+    "The gold-standard HRV metric for daily recovery tracking.\n\n" +
+    "It measures the millisecond-level variation between consecutive heartbeats — a direct window into your parasympathetic ('rest and digest') nervous system.\n\n" +
+    "• Higher RMSSD → more parasympathetic activity → better recovery.\n" +
+    "• Typical healthy adult range: 20–80 ms (highly individual).\n" +
+    "• Track your personal trend rather than comparing to population norms."
+
+private const val HELP_HRV_SCORE_TITLE = "HRV Score (ln(RMSSD) × 20)"
+private const val HELP_HRV_SCORE_TEXT =
+    "Raw RMSSD values vary enormously between individuals (10 ms vs 80 ms can both be 'normal'). " +
+    "Applying a natural logarithm compresses this range, and multiplying by 20 maps it to a 0–100 scale that is easier to track over time.\n\n" +
+    "• Score 60–80 is typical for healthy adults.\n" +
+    "• Focus on your personal day-to-day changes, not absolute numbers."
+
+private const val HELP_SDNN_TITLE = "SDNN (Standard Deviation of NN Intervals)"
+private const val HELP_SDNN_TEXT =
+    "SDNN captures overall heart rate variability across the entire recording window, reflecting both sympathetic and parasympathetic activity.\n\n" +
+    "• Healthy adults at rest: 40–100 ms.\n" +
+    "• Lower than your baseline → increased stress load or poor recovery.\n" +
+    "• RMSSD is more sensitive to short-term parasympathetic changes; SDNN gives a broader picture."
+
+private const val HELP_RHR_TITLE = "Resting Heart Rate (RHR)"
+private const val HELP_RHR_TEXT =
+    "Your heart rate while lying still — a simple but powerful recovery indicator.\n\n" +
+    "• A rate 5–10 bpm above your personal baseline often signals incomplete recovery, illness, or dehydration.\n" +
+    "• Endurance athletes may have RHR as low as 35–45 bpm.\n" +
+    "• The app applies a hard limiter: if today's RHR is >10 bpm or >2.5 standard deviations above your 90-day average, the readiness score is capped at 50."
+
+private const val HELP_PEAK_STAND_HR_TITLE = "Peak Stand HR"
+private const val HELP_PEAK_STAND_HR_TEXT =
+    "The highest heart rate recorded during the first 30 seconds of standing.\n\n" +
+    "When you stand, gravity pulls blood toward your legs. Your sympathetic nervous system fires to compensate, spiking your heart rate.\n\n" +
+    "• A rise of 10–30 bpm above supine HR is normal.\n" +
+    "• >30 bpm rise may indicate orthostatic stress, dehydration, or fatigue.\n" +
+    "• <10 bpm rise can indicate high autonomic tone (very fit) or blunted response (overtraining).\n\n" +
+    "Note: A single-beat spike immediately on standing is often a motion artifact from the chest strap shifting — the app filters these out."
+
+private const val HELP_3015_TITLE = "30:15 Ratio"
+private const val HELP_3015_TEXT =
+    "A precise autonomic index of your vagal (parasympathetic) rebound after standing.\n\n" +
+    "When you stand, your heart rate spikes (beat ~15), then your vagus nerve slows it back down (beat ~30). The ratio of the slowest recovery beat to the fastest spike beat measures how elastic your nervous system is.\n\n" +
+    "• >1.15 (age <40) — Excellent vagal tone.\n" +
+    "• 1.08–1.15 — Normal.\n" +
+    "• <1.08 — Reduced vagal rebound; may indicate fatigue or overtraining.\n" +
+    "• Thresholds are age-adjusted (older adults have naturally lower ratios)."
+
+private const val HELP_OHRR_TITLE = "Orthostatic HR Recovery (OHRR)"
+private const val HELP_OHRR_TEXT =
+    "Measures how quickly your heart rate drops after the initial spike of standing, expressed as a percentage of the peak HR.\n\n" +
+    "• OHRR at 20 s: fast initial recovery — driven by vagal reactivation.\n" +
+    "• OHRR at 60 s: sustained recovery — reflects overall autonomic efficiency.\n\n" +
+    "• >20% drop at 60 s → Good recovery.\n" +
+    "• 10–20% → Borderline.\n" +
+    "• <10% → Sluggish; may indicate dehydration, fatigue, or illness."
+
+private const val HELP_ORTHO_MULTIPLIER_TITLE = "Orthostatic Multiplier"
+private const val HELP_ORTHO_MULTIPLIER_TEXT =
+    "A factor (0.80–1.05) applied to your HRV base score based on how well your autonomic nervous system handled the gravitational stress of standing.\n\n" +
+    "• 1.05 — Both 30:15 ratio and OHRR are excellent (small bonus).\n" +
+    "• 1.00 — Normal orthostatic response.\n" +
+    "• 0.95 — Borderline response (mild penalty).\n" +
+    "• 0.88 — One metric clearly abnormal.\n" +
+    "• 0.80 — Both metrics abnormal (clear orthostatic stress)."
+
+private const val HELP_HRV_BASE_TITLE = "HRV Base Score"
+private const val HELP_HRV_BASE_TEXT =
+    "Your today's HRV score (ln(RMSSD)×20) compared to your 30-day personal baseline, mapped to a 30–100 scale.\n\n" +
+    "• Within your Smallest Worthwhile Change (SWC) band → 90–100.\n" +
+    "• Above SWC but not extreme → capped at 75 (parasympathetic hyper-compensation).\n" +
+    "• Below SWC → score drops proportionally toward 30.\n\n" +
+    "This is the foundation of the readiness score before orthostatic and wellness adjustments."
+
+private const val HELP_HOOPER_TITLE = "Hooper Wellness Index"
+private const val HELP_HOOPER_TEXT =
+    "A validated subjective wellness questionnaire used by elite sports scientists.\n\n" +
+    "Four dimensions rated 1 (worst) to 5 (best): Sleep Quality, Fatigue, Muscle Soreness, and Stress. Total range: 4–20.\n\n" +
+    "• ≥16 — Good subjective state.\n" +
+    "• 11–15 — Moderate.\n" +
+    "• ≤10 — Poor; the app applies a penalty if your HRV looks good but your body feels bad.\n\n" +
+    "The Hooper Index acts as a 'sanity check' on the objective HRV data."
+
+private const val HELP_ARTIFACT_TITLE = "Artifact Percentage"
+private const val HELP_ARTIFACT_TEXT =
+    "The percentage of RR intervals flagged as motion or noise artifacts and corrected before HRV analysis.\n\n" +
+    "• <5% — Excellent signal quality.\n" +
+    "• 5–15% — Acceptable; results are reliable.\n" +
+    "• >15% — Poor signal; results may be less accurate. Ensure the H10 strap is wet and snug.\n\n" +
+    "Artifacts are replaced using interpolation rather than discarded, so the HRV calculation remains valid at low artifact rates."
+
+private const val HELP_STAND_MARKER_TITLE = "Stand Marker"
+private const val HELP_STAND_MARKER_TEXT =
+    "The orange dashed line marks the precise moment you stood up, detected from the H10 accelerometer.\n\n" +
+    "Everything to the left is your supine (lying) phase; everything to the right is your standing phase.\n\n" +
+    "The orthostatic response — the HR spike and subsequent recovery — is the key signal in the standing window."
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -198,7 +305,13 @@ private fun MorningReadinessDetailContent(
                         fontWeight = FontWeight.ExtraBold,
                         color = scoreColor
                     )
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(4.dp))
+                    InfoHelpBubble(
+                        title = HELP_READINESS_SCORE_TITLE,
+                        content = HELP_READINESS_SCORE_TEXT,
+                        iconTint = scoreColor
+                    )
+                    Spacer(Modifier.width(8.dp))
                     Column {
                         Text(
                             "Readiness Score",
@@ -248,30 +361,41 @@ private fun MorningReadinessDetailContent(
 
         // ── Supine HRV ────────────────────────────────────────────────────────
         DetailSection(title = "Supine HRV") {
-            DetailRow("RMSSD", "${String.format("%.1f", reading.supineRmssdMs)} ms")
-            DetailRow("HRV Score (ln×20)", (reading.supineLnRmssd * 20).toInt().toString())
-            DetailRow("SDNN", "${String.format("%.1f", reading.supineSdnnMs)} ms")
-            DetailRow("Resting HR", "${reading.supineRhr} bpm")
+            DetailRowWithHelp("RMSSD", "${String.format("%.1f", reading.supineRmssdMs)} ms",
+                HELP_RMSSD_TITLE, HELP_RMSSD_TEXT)
+            DetailRowWithHelp("HRV Score (ln×20)", (reading.supineLnRmssd * 20).toInt().toString(),
+                HELP_HRV_SCORE_TITLE, HELP_HRV_SCORE_TEXT)
+            DetailRowWithHelp("SDNN", "${String.format("%.1f", reading.supineSdnnMs)} ms",
+                HELP_SDNN_TITLE, HELP_SDNN_TEXT)
+            DetailRowWithHelp("Resting HR", "${reading.supineRhr} bpm",
+                HELP_RHR_TITLE, HELP_RHR_TEXT)
         }
 
         // ── Standing HRV ──────────────────────────────────────────────────────
         DetailSection(title = "Standing HRV") {
-            DetailRow("RMSSD", "${String.format("%.1f", reading.standingRmssdMs)} ms")
-            DetailRow("HRV Score (ln×20)", (reading.standingLnRmssd * 20).toInt().toString())
-            DetailRow("SDNN", "${String.format("%.1f", reading.standingSdnnMs)} ms")
-            DetailRow("Peak Stand HR", "${reading.peakStandHr} bpm")
+            DetailRowWithHelp("RMSSD", "${String.format("%.1f", reading.standingRmssdMs)} ms",
+                HELP_RMSSD_TITLE, HELP_RMSSD_TEXT)
+            DetailRowWithHelp("HRV Score (ln×20)", (reading.standingLnRmssd * 20).toInt().toString(),
+                HELP_HRV_SCORE_TITLE, HELP_HRV_SCORE_TEXT)
+            DetailRowWithHelp("SDNN", "${String.format("%.1f", reading.standingSdnnMs)} ms",
+                HELP_SDNN_TITLE, HELP_SDNN_TEXT)
+            DetailRowWithHelp("Peak Stand HR", "${reading.peakStandHr} bpm",
+                HELP_PEAK_STAND_HR_TITLE, HELP_PEAK_STAND_HR_TEXT)
         }
 
         // ── Orthostatic Response ──────────────────────────────────────────────
         DetailSection(title = "Orthostatic Response") {
             reading.thirtyFifteenRatio?.let {
-                DetailRow("30:15 Ratio", String.format("%.3f", it))
+                DetailRowWithHelp("30:15 Ratio", String.format("%.3f", it),
+                    HELP_3015_TITLE, HELP_3015_TEXT)
             } ?: DetailRow("30:15 Ratio", "—")
             reading.ohrrAt20sPercent?.let {
-                DetailRow("OHRR at 20s", "${String.format("%.1f", it)} %")
+                DetailRowWithHelp("OHRR at 20s", "${String.format("%.1f", it)} %",
+                    HELP_OHRR_TITLE, HELP_OHRR_TEXT)
             }
             reading.ohrrAt60sPercent?.let {
-                DetailRow("OHRR at 60s", "${String.format("%.1f", it)} %")
+                DetailRowWithHelp("OHRR at 60s", "${String.format("%.1f", it)} %",
+                    HELP_OHRR_TITLE, HELP_OHRR_TEXT)
             }
         }
 
@@ -292,18 +416,21 @@ private fun MorningReadinessDetailContent(
         // ── Hooper Wellness Index ─────────────────────────────────────────────
         reading.hooperTotal?.let { total ->
             DetailSection(title = "Hooper Wellness Index") {
-                DetailRow("Total", "${String.format("%.0f", total)} / 20")
-                reading.hooperSleep?.let    { DetailRow("Sleep Quality",   "$it / 5") }
-                reading.hooperFatigue?.let  { DetailRow("Fatigue",         "$it / 5") }
-                reading.hooperSoreness?.let { DetailRow("Muscle Soreness", "$it / 5") }
-                reading.hooperStress?.let   { DetailRow("Stress",          "$it / 5") }
+                DetailRowWithHelp("Total", "${String.format("%.1f", total)} / 20",
+                    HELP_HOOPER_TITLE, HELP_HOOPER_TEXT)
+                reading.hooperSleep?.let    { DetailRow("Sleep Quality",   String.format("%.1f", it)) }
+                reading.hooperFatigue?.let  { DetailRow("Fatigue",         String.format("%.1f", it)) }
+                reading.hooperSoreness?.let { DetailRow("Muscle Soreness", String.format("%.1f", it)) }
+                reading.hooperStress?.let   { DetailRow("Stress",          String.format("%.1f", it)) }
             }
         }
 
         // ── Score Breakdown ───────────────────────────────────────────────────
         DetailSection(title = "Score Breakdown") {
-            DetailRow("HRV Base Score", reading.hrvBaseScore.toString())
-            DetailRow("Ortho Multiplier", String.format("%.2f", reading.orthoMultiplier))
+            DetailRowWithHelp("HRV Base Score", reading.hrvBaseScore.toString(),
+                HELP_HRV_BASE_TITLE, HELP_HRV_BASE_TEXT)
+            DetailRowWithHelp("Ortho Multiplier", String.format("%.2f", reading.orthoMultiplier),
+                HELP_ORTHO_MULTIPLIER_TITLE, HELP_ORTHO_MULTIPLIER_TEXT)
             if (reading.cvPenaltyApplied) {
                 Text(
                     "⚠ CV penalty applied (high HRV variability)",
@@ -323,8 +450,10 @@ private fun MorningReadinessDetailContent(
         // ── Data Quality ──────────────────────────────────────────────────────
         DetailSection(title = "Data Quality") {
             DetailRow("HR Device", reading.hrDeviceId ?: "None recorded")
-            DetailRow("Artifact % (Supine)",   "${String.format("%.1f", reading.artifactPercentSupine)} %")
-            DetailRow("Artifact % (Standing)", "${String.format("%.1f", reading.artifactPercentStanding)} %")
+            DetailRowWithHelp("Artifact % (Supine)",   "${String.format("%.1f", reading.artifactPercentSupine)} %",
+                HELP_ARTIFACT_TITLE, HELP_ARTIFACT_TEXT)
+            DetailRowWithHelp("Artifact % (Standing)", "${String.format("%.1f", reading.artifactPercentStanding)} %",
+                HELP_ARTIFACT_TITLE, HELP_ARTIFACT_TEXT)
             if (telemetry.isNotEmpty()) {
                 DetailRow("Telemetry beats", telemetry.size.toString())
             }
@@ -419,12 +548,16 @@ private fun TelemetryChartCard(
                         )
                     }
                     Text(
-                        "Stand cue",
+                        "Stand",
                         style = MaterialTheme.typography.labelSmall,
                         color = ReadinessOrange
                     )
+                    InfoHelpBubble(
+                        title   = HELP_STAND_MARKER_TITLE,
+                        content = HELP_STAND_MARKER_TEXT,
+                        iconTint = ReadinessOrange
+                    )
                     if (supineAvg != null && standingAvg != null) {
-                        Spacer(Modifier.width(8.dp))
                         Text(
                             "Supine avg ${supineAvg.toInt()} $unit  →  Stand avg ${standingAvg.toInt()} $unit",
                             style = MaterialTheme.typography.labelSmall,
@@ -767,6 +900,39 @@ private fun DetailRow(label: String, value: String) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(label, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextPrimary,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+/** A detail row with a small info-bubble icon next to the label. */
+@Composable
+private fun DetailRowWithHelp(
+    label: String,
+    value: String,
+    helpTitle: String,
+    helpText: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(label, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+            InfoHelpBubble(
+                title   = helpTitle,
+                content = helpText,
+                iconTint = TextSecondary
+            )
+        }
         Text(
             value,
             style = MaterialTheme.typography.bodyMedium,

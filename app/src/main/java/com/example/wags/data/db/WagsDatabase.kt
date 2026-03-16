@@ -23,7 +23,7 @@ import com.example.wags.data.db.entity.*
         MeditationSessionEntity::class,
         MorningReadinessTelemetryEntity::class
     ],
-    version = 14,
+    version = 15,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -386,6 +386,83 @@ abstract class WagsDatabase : RoomDatabase() {
                     )
                 """.trimIndent())
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_morning_readiness_telemetry_readingId` ON `morning_readiness_telemetry` (`readingId`)")
+            }
+        }
+
+        /**
+         * v14 → v15: Change Hooper sub-score columns from INTEGER to REAL.
+         *
+         * The Hooper questionnaire now uses a continuous Float slider (1.0–5.0)
+         * instead of discrete integer steps. SQLite does not support ALTER COLUMN,
+         * so we rebuild the morning_readiness table with REAL columns for
+         * hooperSleep, hooperFatigue, hooperSoreness, and hooperStress.
+         *
+         * Existing INTEGER values are preserved — SQLite stores them as-is and
+         * Room will read them as Float (e.g. 3 → 3.0).
+         */
+        val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Create replacement table with REAL hooper columns
+                db.execSQL("""
+                    CREATE TABLE `morning_readiness_new` (
+                        `id`                       INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `timestamp`                INTEGER NOT NULL,
+                        `supineRmssdMs`            REAL    NOT NULL,
+                        `supineLnRmssd`            REAL    NOT NULL,
+                        `supineSdnnMs`             REAL    NOT NULL,
+                        `supineRhr`                INTEGER NOT NULL,
+                        `standingRmssdMs`          REAL    NOT NULL,
+                        `standingLnRmssd`          REAL    NOT NULL,
+                        `standingSdnnMs`           REAL    NOT NULL,
+                        `peakStandHr`              INTEGER NOT NULL,
+                        `thirtyFifteenRatio`       REAL,
+                        `ohrrAt20sPercent`         REAL,
+                        `ohrrAt60sPercent`         REAL,
+                        `respiratoryRateBpm`       REAL,
+                        `slowBreathingFlagged`     INTEGER NOT NULL,
+                        `hooperSleep`              REAL,
+                        `hooperFatigue`            REAL,
+                        `hooperSoreness`           REAL,
+                        `hooperStress`             REAL,
+                        `hooperTotal`              REAL,
+                        `artifactPercentSupine`    REAL    NOT NULL,
+                        `artifactPercentStanding`  REAL    NOT NULL,
+                        `readinessScore`           INTEGER NOT NULL,
+                        `readinessColor`           TEXT    NOT NULL,
+                        `hrvBaseScore`             INTEGER NOT NULL,
+                        `orthoMultiplier`          REAL    NOT NULL,
+                        `cvPenaltyApplied`         INTEGER NOT NULL,
+                        `rhrLimiterApplied`        INTEGER NOT NULL,
+                        `hrDeviceId`               TEXT DEFAULT NULL,
+                        `standTimestampMs`         INTEGER DEFAULT NULL
+                    )
+                """.trimIndent())
+
+                // Copy all existing rows — INTEGER hooper values are implicitly cast to REAL
+                db.execSQL("""
+                    INSERT INTO `morning_readiness_new`
+                    SELECT
+                        id, timestamp,
+                        supineRmssdMs, supineLnRmssd, supineSdnnMs, supineRhr,
+                        standingRmssdMs, standingLnRmssd, standingSdnnMs,
+                        peakStandHr,
+                        thirtyFifteenRatio, ohrrAt20sPercent, ohrrAt60sPercent,
+                        respiratoryRateBpm, slowBreathingFlagged,
+                        CAST(hooperSleep    AS REAL),
+                        CAST(hooperFatigue  AS REAL),
+                        CAST(hooperSoreness AS REAL),
+                        CAST(hooperStress   AS REAL),
+                        hooperTotal,
+                        artifactPercentSupine, artifactPercentStanding,
+                        readinessScore, readinessColor,
+                        hrvBaseScore, orthoMultiplier,
+                        cvPenaltyApplied, rhrLimiterApplied,
+                        hrDeviceId, standTimestampMs
+                    FROM `morning_readiness`
+                """.trimIndent())
+
+                db.execSQL("DROP TABLE `morning_readiness`")
+                db.execSQL("ALTER TABLE `morning_readiness_new` RENAME TO `morning_readiness`")
             }
         }
     }

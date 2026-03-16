@@ -301,10 +301,10 @@ private fun HooperSummaryCard(result: MorningReadinessResult, total: Float) {
                 fontWeight = FontWeight.Bold,
                 color = TextPrimary
             )
-            result.hooperSleep?.let { SimpleMetricRow("Sleep Quality", "$it / 5") }
-            result.hooperFatigue?.let { SimpleMetricRow("Fatigue", "$it / 5") }
-            result.hooperSoreness?.let { SimpleMetricRow("Muscle Soreness", "$it / 5") }
-            result.hooperStress?.let { SimpleMetricRow("Stress", "$it / 5") }
+            result.hooperSleep?.let    { SimpleMetricRow("Sleep Quality",   "${String.format("%.1f", it)} / 5") }
+            result.hooperFatigue?.let  { SimpleMetricRow("Fatigue",         "${String.format("%.1f", it)} / 5") }
+            result.hooperSoreness?.let { SimpleMetricRow("Muscle Soreness", "${String.format("%.1f", it)} / 5") }
+            result.hooperStress?.let   { SimpleMetricRow("Stress",          "${String.format("%.1f", it)} / 5") }
         }
     }
 }

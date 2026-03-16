@@ -329,7 +329,7 @@ private fun QuestionnaireContent(
     ) {
         Text("Hooper Wellness Check", style = MaterialTheme.typography.headlineSmall, color = EcgCyan)
         Text(
-            "Rate how you feel right now (1 = worst, 5 = best)",
+            "Slide to rate how you feel right now",
             style = MaterialTheme.typography.bodyMedium,
             color = TextSecondary,
             textAlign = TextAlign.Center
@@ -374,14 +374,28 @@ private fun QuestionnaireContent(
     }
 }
 
+/**
+ * A continuous gradient slider for a single Hooper dimension.
+ *
+ * The slider is intentionally step-free (no discrete snapping) so the user can
+ * express nuanced feelings rather than being forced into one of five buckets.
+ * The displayed value is rounded to one decimal place.
+ */
 @Composable
 private fun HooperSlider(
     label: String,
     lowLabel: String,
     highLabel: String,
-    value: Int,
-    onValueChange: (Int) -> Unit
+    value: Float,
+    onValueChange: (Float) -> Unit
 ) {
+    // Colour interpolates from red (1) through orange (3) to green (5)
+    val trackColor = when {
+        value <= 2f -> ReadinessRed
+        value <= 3f -> ReadinessOrange
+        else        -> ReadinessGreen
+    }
+
     Card(colors = CardDefaults.cardColors(containerColor = SurfaceVariant)) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(
@@ -391,18 +405,22 @@ private fun HooperSlider(
             ) {
                 Text(label, style = MaterialTheme.typography.titleSmall, color = TextPrimary)
                 Text(
-                    "$value / 5",
+                    String.format("%.1f", value),
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Bold,
-                    color = EcgCyan
+                    color = trackColor
                 )
             }
             Slider(
-                value = value.toFloat(),
-                onValueChange = { onValueChange(it.toInt()) },
+                value = value,
+                onValueChange = onValueChange,
                 valueRange = 1f..5f,
-                steps = 3,
-                colors = SliderDefaults.colors(thumbColor = EcgCyan, activeTrackColor = EcgCyan)
+                // No `steps` parameter → fully continuous gradient
+                colors = SliderDefaults.colors(
+                    thumbColor = trackColor,
+                    activeTrackColor = trackColor,
+                    inactiveTrackColor = SurfaceDark
+                )
             )
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(lowLabel, style = MaterialTheme.typography.labelSmall, color = TextDisabled)

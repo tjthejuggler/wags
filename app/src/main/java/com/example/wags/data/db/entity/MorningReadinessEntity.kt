@@ -29,11 +29,11 @@ data class MorningReadinessEntity(
     val respiratoryRateBpm: Float?,
     val slowBreathingFlagged: Boolean,
 
-    // Hooper Index
-    val hooperSleep: Int?,
-    val hooperFatigue: Int?,
-    val hooperSoreness: Int?,
-    val hooperStress: Int?,
+    // Hooper Index (continuous 1.0–5.0 per dimension; total 4.0–20.0)
+    val hooperSleep: Float?,
+    val hooperFatigue: Float?,
+    val hooperSoreness: Float?,
+    val hooperStress: Float?,
     val hooperTotal: Float?,
 
     // Data quality

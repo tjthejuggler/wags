@@ -96,6 +96,19 @@ class MorningReadinessFsm @Inject constructor(
         }
     }
 
+    /**
+     * Called by the ViewModel's StandDetector once the precise stand moment is
+     * confirmed from accelerometer data. Overwrites the coarse FSM timestamp.
+     * Only accepted while in STANDING state (or STAND_PROMPT, in case detection
+     * fires very quickly).
+     */
+    fun updateStandTimestamp(timestampMs: Long) {
+        val s = stateHandler.state.value
+        if (s == MorningReadinessState.STANDING || s == MorningReadinessState.STAND_PROMPT) {
+            _standTimestampMs = timestampMs
+        }
+    }
+
     private fun enterQuestionnaire() {
         stateHandler.transitionTo(MorningReadinessState.QUESTIONNAIRE)
         onQuestionnaireRequired?.invoke()

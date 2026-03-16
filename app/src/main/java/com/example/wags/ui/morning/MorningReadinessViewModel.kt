@@ -18,6 +18,7 @@ import com.example.wags.domain.model.RrInterval
 import com.example.wags.domain.usecase.readiness.MorningReadinessFsm
 import com.example.wags.domain.usecase.readiness.MorningReadinessOrchestrator
 import com.example.wags.domain.usecase.readiness.MorningReadinessState
+import com.example.wags.domain.usecase.readiness.StandDetector
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -42,10 +43,10 @@ data class MorningReadinessUiState(
     val liveRmssd: Double = 0.0,
     val rrCount: Int = 0,
     val peakStandHr: Int = 0,
-    val hooperSleep: Int = 3,
-    val hooperFatigue: Int = 3,
-    val hooperSoreness: Int = 3,
-    val hooperStress: Int = 3,
+    val hooperSleep: Float = 3f,
+    val hooperFatigue: Float = 3f,
+    val hooperSoreness: Float = 3f,
+    val hooperStress: Float = 3f,
     val result: MorningReadinessResult? = null,
     val errorMessage: String? = null,
     val noHrmDialogVisible: Boolean = false,
@@ -85,8 +86,10 @@ class MorningReadinessViewModel @Inject constructor(
     )
 
     private var rrPollingJob: Job? = null
+    private var accPollingJob: Job? = null
     private var lastRrBufferSize = 0
     private var storedHooper: HooperIndex? = null
+    private val standDetector = StandDetector()
 
     init {
         // Collect FSM state into UI state
@@ -113,6 +116,12 @@ class MorningReadinessViewModel @Inject constructor(
         // Set FSM callbacks
         fsm.onStandPromptReady = {
             _uiState.update { it.copy(triggerStandAlert = true) }
+            // Arm the stand detector with the last ~1 second of supine ACC data
+            val supineSamples = bleManager.accBuffer.readLast(200)
+            standDetector.arm(supineSamples)
+            // The FSM timestamp is the fallback if ACC detection times out
+            standDetector.setFallbackTimestamp(System.currentTimeMillis())
+            startAccPolling()
         }
         fsm.onQuestionnaireRequired = {
             // UI already reacts to fsmState == QUESTIONNAIRE
@@ -130,6 +139,10 @@ class MorningReadinessViewModel @Inject constructor(
 
         sessionHrDeviceLabel = hrDataSource.activeHrDeviceLabel()
         lastRrBufferSize = 0
+        standDetector.reset()
+        // Start ACC stream so the stand detector has data
+        val h10Id = (bleManager.h10State.value as? BleConnectionState.Connected)?.deviceId
+        if (h10Id != null) bleManager.startAccStream(h10Id)
         fsm.start(viewModelScope)
         startRrPolling()
     }
@@ -171,6 +184,28 @@ class MorningReadinessViewModel @Inject constructor(
                     )
                 }
             }
+        }
+    }
+
+    /**
+     * Polls the ACC buffer every 100 ms while the stand detector is armed.
+     * Once a stand is detected (or times out), updates the FSM's stand timestamp
+     * and stops polling.
+     */
+    private fun startAccPolling() {
+        accPollingJob?.cancel()
+        accPollingJob = viewModelScope.launch {
+            while (isActive && !standDetector.isDetected) {
+                delay(100L)
+                val samples = bleManager.accBuffer.readLast(20)  // last ~100ms at 200 Hz
+                val detectedTs = standDetector.checkSamples(samples)
+                if (detectedTs != null) {
+                    // Inform the FSM of the precise stand timestamp
+                    fsm.updateStandTimestamp(detectedTs)
+                    break
+                }
+            }
+            accPollingJob = null
         }
     }
 
@@ -236,7 +271,7 @@ class MorningReadinessViewModel @Inject constructor(
         }
     }
 
-    fun updateHooper(sleep: Int, fatigue: Int, soreness: Int, stress: Int) {
+    fun updateHooper(sleep: Float, fatigue: Float, soreness: Float, stress: Float) {
         _uiState.update {
             it.copy(
                 hooperSleep = sleep,
@@ -250,10 +285,10 @@ class MorningReadinessViewModel @Inject constructor(
     fun submitHooper() {
         val state = _uiState.value
         storedHooper = HooperIndex(
-            sleep = state.hooperSleep,
-            fatigue = state.hooperFatigue,
+            sleep    = state.hooperSleep,
+            fatigue  = state.hooperFatigue,
             soreness = state.hooperSoreness,
-            stress = state.hooperStress
+            stress   = state.hooperStress
         )
         fsm.submitHooper()
     }
@@ -265,8 +300,11 @@ class MorningReadinessViewModel @Inject constructor(
     fun reset() {
         rrPollingJob?.cancel()
         rrPollingJob = null
+        accPollingJob?.cancel()
+        accPollingJob = null
         lastRrBufferSize = 0
         storedHooper = null
+        standDetector.reset()
         fsm.reset()
         _uiState.value = MorningReadinessUiState()
     }
@@ -274,6 +312,7 @@ class MorningReadinessViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         rrPollingJob?.cancel()
+        accPollingJob?.cancel()
     }
 }
 
@@ -317,10 +356,17 @@ private fun MorningReadinessResult.toEntity(
  * Converts the raw supine + standing RR buffers into per-beat telemetry rows.
  *
  * For each beat we record:
- *  - timestampMs  : from the RrInterval
- *  - hrBpm        : 60_000 / rrMs
+ *  - timestampMs   : from the RrInterval
+ *  - hrBpm         : 60_000 / rrMs, with motion-artifact spike suppression
  *  - rollingRmssdMs: RMSSD over the preceding 20-beat sliding window
- *  - phase        : "SUPINE" or "STANDING"
+ *  - phase         : "SUPINE" or "STANDING"
+ *
+ * HR spike suppression:
+ *   A single beat whose HR is >40 bpm above the median of its ±5-beat neighbourhood
+ *   is almost certainly a motion artifact (e.g. the H10 strap shifting as the user
+ *   stands). We replace such spikes with the neighbourhood median so the chart
+ *   remains readable. The raw RR interval is still used for HRV calculations
+ *   (artifact correction happens separately in the orchestrator).
  */
 private fun buildTelemetryRows(
     readingId: Long,
@@ -328,18 +374,32 @@ private fun buildTelemetryRows(
     standingBuffer: List<RrInterval>
 ): List<MorningReadinessTelemetryEntity> {
     val windowSize = 20
-    val result = mutableListOf<MorningReadinessTelemetryEntity>()
+    val spikeNeighbourhood = 5   // ±5 beats for spike detection
+    val spikeThresholdBpm = 40   // bpm above neighbourhood median → artifact
 
     // Combine both phases into a single ordered list with phase tags
     val combined: List<Pair<RrInterval, String>> =
         supineBuffer.map { it to "SUPINE" } + standingBuffer.map { it to "STANDING" }
 
+    // Pre-compute raw HR for every beat
+    val rawHr: List<Int> = combined.map { (rr, _) ->
+        if (rr.intervalMs > 0) (60_000.0 / rr.intervalMs).roundToInt().coerceIn(20, 300)
+        else 0
+    }
+
+    // Spike-suppressed HR: replace single-beat outliers with neighbourhood median
+    val smoothHr: List<Int> = rawHr.mapIndexed { idx, hr ->
+        val lo = (idx - spikeNeighbourhood).coerceAtLeast(0)
+        val hi = (idx + spikeNeighbourhood + 1).coerceAtMost(rawHr.size)
+        val neighbours = rawHr.subList(lo, hi).filter { it > 0 }.sorted()
+        val median = if (neighbours.isNotEmpty()) neighbours[neighbours.size / 2] else hr
+        if (hr - median > spikeThresholdBpm) median else hr.coerceIn(20, 250)
+    }
+
+    val result = mutableListOf<MorningReadinessTelemetryEntity>()
+
     // Sliding-window RMSSD over the combined stream
     combined.forEachIndexed { idx, (rr, phase) ->
-        val hrBpm = if (rr.intervalMs > 0)
-            (60_000.0 / rr.intervalMs).roundToInt().coerceIn(20, 250)
-        else 0
-
         // Build window of up to `windowSize` preceding intervals (including current)
         val windowStart = (idx - windowSize + 1).coerceAtLeast(0)
         val window = combined.subList(windowStart, idx + 1).map { it.first.intervalMs }
@@ -351,7 +411,7 @@ private fun buildTelemetryRows(
         result += MorningReadinessTelemetryEntity(
             readingId      = readingId,
             timestampMs    = rr.timestampMs,
-            hrBpm          = hrBpm,
+            hrBpm          = smoothHr[idx],
             rollingRmssdMs = rollingRmssd,
             phase          = phase
         )

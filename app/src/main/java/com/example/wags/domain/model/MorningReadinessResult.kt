@@ -11,11 +11,11 @@ data class MorningReadinessResult(
     val ohrrAt60s: Float?,                 // % HR drop at 60s post-peak; null if not captured
     val respiratoryRateBpm: Float?,        // Breaths per minute; null if not calculated
     val slowBreathingFlagged: Boolean,     // true if respRate < 9 bpm (< 0.15 Hz)
-    val hooperIndex: Float?,               // Sum of 4 Hooper questions (1-5 scale each); null if skipped
-    val hooperSleep: Int?,                 // 1-5
-    val hooperFatigue: Int?,               // 1-5
-    val hooperSoreness: Int?,              // 1-5
-    val hooperStress: Int?,                // 1-5
+    val hooperIndex: Float?,               // Sum of 4 Hooper questions (1.0-5.0 scale each); null if skipped
+    val hooperSleep: Float?,               // 1.0-5.0 continuous
+    val hooperFatigue: Float?,             // 1.0-5.0 continuous
+    val hooperSoreness: Float?,            // 1.0-5.0 continuous
+    val hooperStress: Float?,              // 1.0-5.0 continuous
     val artifactPercentSupine: Float,      // % of beats flagged as artifacts in supine window
     val artifactPercentStanding: Float,    // % of beats flagged as artifacts in standing window
     val readinessScore: Int,               // Final 0-100 score
