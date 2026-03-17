@@ -1,5 +1,6 @@
 package com.example.wags.ui.morning
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.HrDataSource
@@ -218,6 +219,12 @@ class MorningReadinessViewModel @Inject constructor(
     private fun launchCalculation() {
         viewModelScope.launch {
             _uiState.update { it.copy(isCalculating = true) }
+            Log.d(TAG, "launchCalculation: starting")
+
+            // Track whether we successfully reached COMPLETE so the catch block
+            // never corrupts state after the user already sees results.
+            var completedSuccessfully = false
+
             try {
                 // Cancel polling jobs BEFORE snapshotting the FSM buffers.
                 // The rrPollingJob runs on the main dispatcher and calls fsm.addRrInterval()
@@ -234,6 +241,8 @@ class MorningReadinessViewModel @Inject constructor(
                 val standingBuffer = fsm.standingBuffer
                 val standTs        = fsm.standTimestampMs
 
+                Log.d(TAG, "launchCalculation: supine=${supineBuffer.size} standing=${standingBuffer.size} peakHr=${fsm.peakStandHr}")
+
                 val input = MorningReadinessOrchestrator.Input(
                     supineBuffer   = supineBuffer,
                     standingBuffer = standingBuffer,
@@ -244,12 +253,14 @@ class MorningReadinessViewModel @Inject constructor(
                 val result = withContext(mathDispatcher) {
                     orchestrator.compute(input)
                 }
+                Log.d(TAG, "launchCalculation: compute done, score=${result.readinessScore}")
 
                 withContext(ioDispatcher) {
                     // Save the main entity first to get its auto-generated id
                     val savedId = repository.save(
                         result.toEntity(sessionHrDeviceLabel, standTs)
                     )
+                    Log.d(TAG, "launchCalculation: saved entity id=$savedId")
                     // Build and save per-beat telemetry rows
                     val telemetryRows = buildTelemetryRows(
                         readingId      = savedId,
@@ -257,6 +268,7 @@ class MorningReadinessViewModel @Inject constructor(
                         standingBuffer = standingBuffer
                     )
                     repository.saveTelemetry(telemetryRows)
+                    Log.d(TAG, "launchCalculation: saved ${telemetryRows.size} telemetry rows")
                 }
 
                 // Transition the FSM to COMPLETE and set the result in _uiState
@@ -270,10 +282,10 @@ class MorningReadinessViewModel @Inject constructor(
                 // update — causing the screen to briefly show CalculatingContent() or crash
                 // on a null result dereference.
                 //
-                // By calling fsm.markComplete() (which only updates the FSM's own StateFlow)
-                // and then immediately setting both result AND fsmState=COMPLETE in one
-                // _uiState.update, we guarantee the screen always sees them together.
-                fsm.markComplete()
+                // By setting both result AND fsmState=COMPLETE in one _uiState.update FIRST,
+                // and then calling fsm.markComplete() afterwards, we guarantee the screen
+                // always sees them together. The FSM collector may fire redundantly but
+                // fsmState is already COMPLETE so it's a no-op.
                 _uiState.update {
                     it.copy(
                         fsmState = MorningReadinessState.COMPLETE,
@@ -281,18 +293,41 @@ class MorningReadinessViewModel @Inject constructor(
                         isCalculating = false
                     )
                 }
-                // Signal the Habit app that a Morning Readiness assessment completed
-                habitRepo.sendHabitIncrement(Slot.MORNING_READINESS)
+                fsm.markComplete()
+                completedSuccessfully = true
+                Log.d(TAG, "launchCalculation: COMPLETE — score=${result.readinessScore} color=${result.readinessColor}")
+
             } catch (e: Exception) {
-                fsm.signalError(e.message ?: "Calculation failed")
-                _uiState.update {
-                    it.copy(
-                        isCalculating = false,
-                        errorMessage = e.message ?: "Calculation failed"
-                    )
+                Log.e(TAG, "launchCalculation: FAILED — ${e.javaClass.simpleName}: ${e.message}", e)
+                // Only transition to ERROR if we haven't already shown results.
+                // If completedSuccessfully is true, the user already sees the result
+                // screen — transitioning to ERROR would corrupt the UI.
+                if (!completedSuccessfully) {
+                    fsm.signalError(e.message ?: "Calculation failed")
+                    _uiState.update {
+                        it.copy(
+                            isCalculating = false,
+                            errorMessage = e.message ?: "Calculation failed"
+                        )
+                    }
+                }
+            }
+
+            // Fire-and-forget: signal the Habit app OUTSIDE the try/catch.
+            // This must never affect the success/error path above.
+            // sendHabitIncrement has its own internal try/catch for SecurityException.
+            if (completedSuccessfully) {
+                try {
+                    habitRepo.sendHabitIncrement(Slot.MORNING_READINESS)
+                } catch (e: Exception) {
+                    Log.w(TAG, "launchCalculation: habit increment failed (non-fatal): ${e.message}")
                 }
             }
         }
+    }
+
+    companion object {
+        private const val TAG = "MorningReadinessVM"
     }
 
     fun updateHooper(sleep: Float, fatigue: Float, soreness: Float, stress: Float) {

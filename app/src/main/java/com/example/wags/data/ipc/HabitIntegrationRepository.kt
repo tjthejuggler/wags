@@ -152,17 +152,28 @@ class HabitIntegrationRepository @Inject constructor(
             return
         }
 
-        val intent = Intent(ACTION_INCREMENT).apply {
-            // Explicit broadcast — required for reliable delivery on API 26+
-            `package` = HABIT_APP_PACKAGE
-            putExtra(EXTRA_HABIT_ID, habitId)
-            putExtra(EXTRA_SLOT, slot.name)
-        }
+        try {
+            val intent = Intent(ACTION_INCREMENT).apply {
+                // Explicit broadcast — required for reliable delivery on API 26+
+                `package` = HABIT_APP_PACKAGE
+                putExtra(EXTRA_HABIT_ID, habitId)
+                putExtra(EXTRA_SLOT, slot.name)
+            }
 
-        // receiverPermission ensures only the Habit app (which declared the
-        // signature permission) can receive this broadcast.
-        context.sendBroadcast(intent, PERMISSION_TAIL)
-        Log.d(TAG, "sendHabitIncrement(${slot.name}): fired for habitId=$habitId")
+            // receiverPermission ensures only the Habit app (which declared the
+            // signature permission) can receive this broadcast.
+            context.sendBroadcast(intent, PERMISSION_TAIL)
+            Log.d(TAG, "sendHabitIncrement(${slot.name}): fired for habitId=$habitId")
+        } catch (e: SecurityException) {
+            // On Android 14+ (API 34), sendBroadcast with a receiverPermission that
+            // is not defined by any installed app can throw SecurityException.
+            // This happens when the Tail companion app is not installed.
+            Log.w(TAG, "sendHabitIncrement(${slot.name}): SecurityException — " +
+                    "Tail app likely not installed. ${e.message}")
+        } catch (e: Exception) {
+            // Catch-all: habit integration must never crash the host app.
+            Log.w(TAG, "sendHabitIncrement(${slot.name}): unexpected error — ${e.message}")
+        }
     }
 
     // ── Constants ─────────────────────────────────────────────────────────────

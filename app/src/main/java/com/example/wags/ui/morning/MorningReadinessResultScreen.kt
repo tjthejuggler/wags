@@ -1,8 +1,6 @@
 package com.example.wags.ui.morning
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -80,10 +78,12 @@ fun MorningReadinessResultScreen(
     result: MorningReadinessResult,
     onReset: () -> Unit
 ) {
+    // NOTE: Do NOT add verticalScroll() here — this composable is hosted inside
+    // MorningReadinessScreen's Column(Modifier.verticalScroll()), and nesting two
+    // vertically-scrollable containers causes an IllegalStateException crash
+    // ("measured with infinity maximum height constraints").
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState()),
+        modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
