@@ -78,12 +78,16 @@ class ReadinessViewModel @Inject constructor(
     private val collectedRr = mutableListOf<Double>()
     // Captured at session-start so the device label is recorded even if it disconnects before save
     private var sessionHrDeviceLabel: String? = null
+    // Buffer size at the moment the session started — used to ignore pre-session RR intervals
+    private var rrBufferSizeAtStart: Int = 0
 
     fun startSession(deviceId: String, durationSeconds: Long = 120L) {
         if (_uiState.value.sessionState == ReadinessSessionState.RECORDING) return
         collectedRr.clear()
         sessionHrDeviceLabel = hrDataSource.activeHrDeviceLabel()
         bleManager.startRrStream(deviceId)
+        // Snapshot the current buffer size so we only count intervals from this point forward
+        rrBufferSizeAtStart = bleManager.rrBuffer.size()
         _uiState.update {
             it.copy(
                 sessionState = ReadinessSessionState.RECORDING,
@@ -100,7 +104,10 @@ class ReadinessViewModel @Inject constructor(
             while (remaining > 0 && isActive) {
                 delay(1_000L)
                 remaining--
-                val snapshot = bleManager.rrBuffer.readLast(512)
+                // Only take intervals added since the session started
+                val totalInBuffer = bleManager.rrBuffer.size()
+                val newCount = totalInBuffer - rrBufferSizeAtStart
+                val snapshot = if (newCount > 0) bleManager.rrBuffer.readLast(newCount) else emptyList()
                 collectedRr.clear()
                 collectedRr.addAll(snapshot)
                 val liveRmssd = computeLiveRmssd(snapshot)
