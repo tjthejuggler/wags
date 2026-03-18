@@ -331,7 +331,7 @@ fun ApneaScreen(
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun NewPersonalBestDialog(
+internal fun NewPersonalBestDialog(
     newPbMs: Long,
     onDismiss: () -> Unit
 ) {
@@ -1223,7 +1223,7 @@ private fun StatsRow(label: String, value: String) {
 // Shared helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-private fun formatMs(ms: Long): String {
+internal fun formatMs(ms: Long): String {
     val totalSeconds = ms / 1000L
     val minutes = totalSeconds / 60L
     val seconds = totalSeconds % 60L

@@ -80,7 +80,9 @@ data class FreeHoldActiveUiState(
     val showTimer: Boolean = true,
     val freeHoldFirstContractionMs: Long? = null,
     val liveHr: Int? = null,
-    val liveSpO2: Int? = null
+    val liveSpO2: Int? = null,
+    /** Non-null when the just-completed hold set a new PB for this settings combination. */
+    val newPersonalBestMs: Long? = null
 )
 
 @HiltViewModel
@@ -162,8 +164,23 @@ class FreeHoldActiveViewModel @Inject constructor(
         val firstContractionMs = _uiState.value.freeHoldFirstContractionMs
         _uiState.update { it.copy(freeHoldActive = false, freeHoldFirstContractionMs = null) }
         audioHapticEngine.vibrateHoldEnd()
-        saveFreeHoldRecord(duration, firstContractionMs)
         habitRepo.sendHabitIncrement(Slot.FREE_HOLD)
+        viewModelScope.launch {
+            // Query the prior best BEFORE saving so we can detect a new record correctly.
+            // A null prior best means this is the first-ever hold for this settings combo —
+            // that always counts as a new personal best.
+            val priorBest = apneaRepository.getBestFreeHoldOnce(lungVolume, prepType, timeOfDay)
+            val isNewPb = priorBest == null || duration > priorBest
+            saveFreeHoldRecord(duration, firstContractionMs)
+            if (isNewPb) {
+                _uiState.update { it.copy(newPersonalBestMs = duration) }
+                habitRepo.sendHabitIncrement(Slot.APNEA_NEW_RECORD)
+            }
+        }
+    }
+
+    fun dismissNewPersonalBest() {
+        _uiState.update { it.copy(newPersonalBestMs = null) }
     }
 
     private fun saveFreeHoldRecord(durationMs: Long, firstContractionMs: Long? = null) {
@@ -291,6 +308,30 @@ fun FreeHoldActiveScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val deviceId = "PLACEHOLDER_H10_ID"
 
+    // True once the user taps Stop — we wait for the async PB check before navigating.
+    var stopRequested by remember { mutableStateOf(false) }
+
+    // Navigate back when:
+    //   • the user tapped Stop (stopRequested), AND
+    //   • the async PB check is done (newPersonalBestMs is no longer "pending" — either
+    //     it was set and then dismissed, or it was never set).
+    // We detect "check done" by watching freeHoldActive flip to false AND newPersonalBestMs
+    // being null (meaning either no PB or the dialog was already dismissed).
+    LaunchedEffect(stopRequested, state.freeHoldActive, state.newPersonalBestMs) {
+        if (stopRequested && !state.freeHoldActive && state.newPersonalBestMs == null) {
+            navController.popBackStack()
+        }
+    }
+
+    // Show the PB celebration dialog; dismiss clears the state which triggers the
+    // LaunchedEffect above to pop back.
+    state.newPersonalBestMs?.let { newPbMs ->
+        NewPersonalBestDialog(
+            newPbMs = newPbMs,
+            onDismiss = { viewModel.dismissNewPersonalBest() }
+        )
+    }
+
     Scaffold(
         containerColor = BackgroundDark,
         topBar = {
@@ -321,8 +362,8 @@ fun FreeHoldActiveScreen(
             onStart = { viewModel.startFreeHold(deviceId) },
             onFirstContraction = { viewModel.recordFreeHoldFirstContraction() },
             onStop = {
+                stopRequested = true
                 viewModel.stopFreeHold()
-                navController.popBackStack()
             }
         )
     }

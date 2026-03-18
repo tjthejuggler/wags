@@ -493,7 +493,8 @@ class ApneaViewModel @Inject constructor(
         oximeterCollectionJob?.cancel()
         oximeterCollectionJob = null
         val currentBest = _uiState.value.bestTimeForSettingsMs
-        val isNewBest = duration > currentBest && currentBest > 0L
+        // A currentBest of 0 means no prior record for this settings combo — always a new PB.
+        val isNewBest = currentBest == 0L || duration > currentBest
         val firstContractionMs = _uiState.value.freeHoldFirstContractionMs
         _uiState.update {
             it.copy(
@@ -507,7 +508,7 @@ class ApneaViewModel @Inject constructor(
         saveFreeHoldRecord(duration, firstContractionMs)
         // Signal the Habit app that a free breath hold was successfully completed
         habitRepo.sendHabitIncrement(Slot.FREE_HOLD)
-        // Signal a new personal best if this hold beat the previous record
+        // Signal a new personal best if this hold beat the previous record for this settings combo
         if (isNewBest) habitRepo.sendHabitIncrement(Slot.APNEA_NEW_RECORD)
     }
 

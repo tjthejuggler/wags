@@ -49,6 +49,16 @@ interface ApneaRecordDao {
     """)
     fun getBestFreeHoldRecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
 
+    /** One-shot (suspend) best free-hold duration for a given settings combination. */
+    @Query("""
+        SELECT MAX(durationMs) FROM apnea_records
+        WHERE lungVolume = :lungVolume
+          AND prepType   = :prepType
+          AND timeOfDay  = :timeOfDay
+          AND tableType IS NULL
+    """)
+    suspend fun getBestFreeHoldOnce(lungVolume: String, prepType: String, timeOfDay: String): Long?
+
     /** Single record by primary key. */
     @Query("SELECT * FROM apnea_records WHERE recordId = :recordId LIMIT 1")
     suspend fun getById(recordId: Long): ApneaRecordEntity?
