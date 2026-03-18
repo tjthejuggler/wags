@@ -42,6 +42,7 @@ data class MorningReadinessUiState(
     val fsmState: MorningReadinessState = MorningReadinessState.IDLE,
     val remainingSeconds: Int = 0,
     val liveRmssd: Double = 0.0,
+    val liveSdnn: Double = 0.0,
     val rrCount: Int = 0,
     val peakStandHr: Int = 0,
     val hooperSleep: Float = 3f,
@@ -54,7 +55,9 @@ data class MorningReadinessUiState(
     val isCalculating: Boolean = false,
     val triggerStandAlert: Boolean = false,
     val liveHr: Int? = null,
-    val liveSpO2: Int? = null
+    val liveSpO2: Int? = null,
+    /** Recent RR intervals (ms) for the scrolling chart — last ~30 s worth. */
+    val liveRrIntervals: List<Double> = emptyList()
 )
 
 @HiltViewModel
@@ -156,7 +159,7 @@ class MorningReadinessViewModel @Inject constructor(
         rrPollingJob?.cancel()
         rrPollingJob = viewModelScope.launch {
             while (isActive) {
-                delay(1_000L)
+                delay(500L) // Poll at 2 Hz for smoother chart updates
                 val snapshot = bleManager.rrBuffer.readLast(60)
                 val currentSize = bleManager.rrBuffer.readLast(512).size
 
@@ -175,13 +178,21 @@ class MorningReadinessViewModel @Inject constructor(
                     lastRrBufferSize = currentSize
                 }
 
-                // Update live RMSSD and counts
+                // Grab ~30 s worth of RR intervals for the scrolling chart.
+                // At a typical resting HR of ~60 bpm that's ~30 beats; at 80 bpm ~40 beats.
+                // We read the last 45 to cover a range of heart rates.
+                val chartRr = bleManager.rrBuffer.readLast(45)
+
+                // Update live RMSSD, SDNN, chart data, and counts
                 val liveRmssd = computeRmssd(snapshot)
+                val liveSdnn = computeSdnn(snapshot)
                 _uiState.update {
                     it.copy(
                         liveRmssd = liveRmssd,
+                        liveSdnn = liveSdnn,
                         rrCount = fsm.supineBuffer.size + fsm.standingBuffer.size,
-                        peakStandHr = fsm.peakStandHr
+                        peakStandHr = fsm.peakStandHr,
+                        liveRrIntervals = chartRr
                     )
                 }
             }
@@ -214,6 +225,13 @@ class MorningReadinessViewModel @Inject constructor(
         if (rr.size < 2) return 0.0
         val diffs = (1 until rr.size).map { rr[it] - rr[it - 1] }
         return Math.sqrt(diffs.sumOf { it * it } / diffs.size)
+    }
+
+    private fun computeSdnn(rr: List<Double>): Double {
+        if (rr.size < 2) return 0.0
+        val mean = rr.average()
+        val variance = rr.sumOf { (it - mean) * (it - mean) } / rr.size
+        return sqrt(variance)
     }
 
     private fun launchCalculation() {

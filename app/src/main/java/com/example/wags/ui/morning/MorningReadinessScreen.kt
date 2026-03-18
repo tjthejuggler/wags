@@ -7,27 +7,57 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wags.domain.usecase.readiness.MorningReadinessFsm
 import com.example.wags.domain.usecase.readiness.MorningReadinessState
 import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.theme.*
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
+
+// ── Monochrome palette ────────────────────────────────────────────────────────
+// Designed for e-ink / greyscale readability while still looking elegant on OLED.
+private val Bone = Color(0xFFE8E8E8)          // Primary text — near-white
+private val Silver = Color(0xFFB0B0B0)        // Secondary text — mid-grey
+private val Ash = Color(0xFF707070)           // Tertiary / disabled — dark grey
+private val Graphite = Color(0xFF383838)      // Card / surface fill
+private val Charcoal = Color(0xFF1C1C1C)      // Subtle divider / track
+private val Ink = Color(0xFF0A0A0A)           // Deep background
+private val ChartLine = Color(0xFFD0D0D0)     // Chart stroke — bright enough to pop
+private val ChartDot = Color(0xFFFFFFFF)      // Dot accent — pure white
+private val ChartGlow = Color(0xFF909090)     // Subtle glow under chart line
+private val ArcFill = Color(0xFFCCCCCC)       // Countdown arc — bright
+private val ArcTrack = Color(0xFF2A2A2A)      // Countdown arc track — barely visible
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -136,8 +166,6 @@ fun MorningReadinessScreen(
                             onReset = { viewModel.reset() }
                         )
                     } else {
-                        // Result not yet populated — stay on calculating screen
-                        // (the state update with the result arrives momentarily)
                         CalculatingContent()
                     }
                 }
@@ -151,7 +179,9 @@ fun MorningReadinessScreen(
     }
 }
 
-// ── Sub-composables ───────────────────────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  IDLE — Start screen
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 @Composable
 private fun IdleContent(onStart: () -> Unit) {
@@ -188,62 +218,102 @@ private fun IdleContent(onStart: () -> Unit) {
     }
 }
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  INIT — Get ready countdown
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 @Composable
 private fun InitContent(uiState: MorningReadinessUiState) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        Text("Get Ready", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
-        CountdownCircle(
-            seconds = uiState.remainingSeconds,
-            totalSeconds = MorningReadinessFsm.INIT_DURATION_SECONDS,
-            color = EcgCyanDim
+        Text(
+            "GET READY",
+            style = MaterialTheme.typography.titleMedium,
+            color = Silver,
+            letterSpacing = 4.sp
         )
+
+        MinimalistArcCountdown(
+            remainingSeconds = uiState.remainingSeconds,
+            totalSeconds = MorningReadinessFsm.INIT_DURATION_SECONDS
+        )
+
         Text(
             "Lie down flat on your back and relax",
             style = MaterialTheme.typography.bodyLarge,
-            color = TextSecondary,
+            color = Silver,
             textAlign = TextAlign.Center
         )
         Text(
             "The test will begin automatically",
             style = MaterialTheme.typography.bodyMedium,
-            color = TextDisabled,
+            color = Ash,
             textAlign = TextAlign.Center
         )
         PulsingDot()
     }
 }
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  SUPINE HRV — The main recording screen (redesigned)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 @Composable
 private fun SupineHrvContent(uiState: MorningReadinessUiState) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Text("Recording Supine Data", style = MaterialTheme.typography.headlineSmall, color = EcgCyan)
-        CountdownCircle(seconds = uiState.remainingSeconds, totalSeconds = MorningReadinessFsm.SUPINE_HRV_SECONDS, color = EcgCyan)
-        if (uiState.liveRmssd > 0.0) {
-            Text(
-                "Live RMSSD: ${String.format("%.1f", uiState.liveRmssd)} ms",
-                style = MaterialTheme.typography.bodyLarge,
-                color = EcgCyan
-            )
-        }
+        // ── Phase label ──
         Text(
-            "RR intervals: ${uiState.rrCount}",
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary
+            "SUPINE",
+            style = MaterialTheme.typography.titleMedium,
+            color = Silver,
+            letterSpacing = 6.sp
         )
+
+        // ── Countdown arc ──
+        MinimalistArcCountdown(
+            remainingSeconds = uiState.remainingSeconds,
+            totalSeconds = MorningReadinessFsm.SUPINE_HRV_SECONDS
+        )
+
+        Spacer(Modifier.height(4.dp))
+
+        // ── Live metrics row ──
+        LiveMetricsRow(
+            hrBpm = uiState.liveHr,
+            rmssd = uiState.liveRmssd,
+            sdnn = uiState.liveSdnn,
+            rrCount = uiState.rrCount
+        )
+
+        Spacer(Modifier.height(4.dp))
+
+        // ── Scrolling RR chart ──
+        RrIntervalChart(
+            rrIntervals = uiState.liveRrIntervals,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(140.dp)
+        )
+
+        // ── Subtle instruction ──
         Text(
-            "Stay still and breathe normally",
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary,
-            textAlign = TextAlign.Center
+            "breathe normally · stay still",
+            style = MaterialTheme.typography.bodySmall,
+            color = Ash,
+            letterSpacing = 2.sp
         )
     }
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  STAND PROMPT
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 @Composable
 private fun StandPromptContent() {
@@ -278,45 +348,65 @@ private fun StandPromptContent() {
     }
 }
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  STANDING — Recording standing data (redesigned)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 @Composable
 private fun StandingContent(uiState: MorningReadinessUiState) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Text("Recording Standing Data", style = MaterialTheme.typography.headlineSmall, color = EcgCyan)
-        CountdownCircle(
-            seconds = uiState.remainingSeconds,
-            totalSeconds = MorningReadinessFsm.STANDING_SECONDS,
-            color = ReadinessOrange
-        )
-        if (uiState.peakStandHr > 0) {
-            Text(
-                "Peak HR: ${uiState.peakStandHr} bpm",
-                style = MaterialTheme.typography.headlineMedium,
-                color = ReadinessOrange,
-                fontWeight = FontWeight.Bold
-            )
-        }
-        if (uiState.liveRmssd > 0.0) {
-            Text(
-                "Live RMSSD: ${String.format("%.1f", uiState.liveRmssd)} ms",
-                style = MaterialTheme.typography.bodyLarge,
-                color = EcgCyan
-            )
-        }
+        // ── Phase label ──
         Text(
-            "RR intervals: ${uiState.rrCount}",
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary
+            "STANDING",
+            style = MaterialTheme.typography.titleMedium,
+            color = Silver,
+            letterSpacing = 6.sp
         )
+
+        // ── Countdown arc ──
+        MinimalistArcCountdown(
+            remainingSeconds = uiState.remainingSeconds,
+            totalSeconds = MorningReadinessFsm.STANDING_SECONDS
+        )
+
+        Spacer(Modifier.height(4.dp))
+
+        // ── Live metrics row ──
+        LiveMetricsRow(
+            hrBpm = uiState.liveHr,
+            rmssd = uiState.liveRmssd,
+            sdnn = uiState.liveSdnn,
+            rrCount = uiState.rrCount,
+            peakHr = uiState.peakStandHr.takeIf { it > 0 }
+        )
+
+        Spacer(Modifier.height(4.dp))
+
+        // ── Scrolling RR chart ──
+        RrIntervalChart(
+            rrIntervals = uiState.liveRrIntervals,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(140.dp)
+        )
+
+        // ── Subtle instruction ──
         Text(
-            "Remain standing and still",
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary
+            "remain standing · stay still",
+            style = MaterialTheme.typography.bodySmall,
+            color = Ash,
+            letterSpacing = 2.sp
         )
     }
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  QUESTIONNAIRE
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 @Composable
 private fun QuestionnaireContent(
@@ -374,13 +464,6 @@ private fun QuestionnaireContent(
     }
 }
 
-/**
- * A continuous gradient slider for a single Hooper dimension.
- *
- * The slider is intentionally step-free (no discrete snapping) so the user can
- * express nuanced feelings rather than being forced into one of five buckets.
- * The displayed value is rounded to one decimal place.
- */
 @Composable
 private fun HooperSlider(
     label: String,
@@ -389,7 +472,6 @@ private fun HooperSlider(
     value: Float,
     onValueChange: (Float) -> Unit
 ) {
-    // Colour interpolates from red (1) through orange (3) to green (5)
     val trackColor = when {
         value <= 2f -> ReadinessRed
         value <= 3f -> ReadinessOrange
@@ -415,7 +497,6 @@ private fun HooperSlider(
                 value = value,
                 onValueChange = onValueChange,
                 valueRange = 1f..5f,
-                // No `steps` parameter → fully continuous gradient
                 colors = SliderDefaults.colors(
                     thumbColor = trackColor,
                     activeTrackColor = trackColor,
@@ -429,6 +510,10 @@ private fun HooperSlider(
         }
     }
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  CALCULATING / ERROR
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 @Composable
 private fun CalculatingContent() {
@@ -464,8 +549,436 @@ internal fun ErrorContent(errorMessage: String?, onRetry: () -> Unit) {
     }
 }
 
-// ── Shared UI helpers ─────────────────────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  ✦  MINIMALIST ARC COUNTDOWN
+//  A thin 270° arc that sweeps from full → empty as time elapses.
+//  The remaining seconds are displayed in the centre with a subtle
+//  breathing animation. No axis labels, no ticks — pure geometry.
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+@Composable
+private fun MinimalistArcCountdown(
+    remainingSeconds: Int,
+    totalSeconds: Int
+) {
+    val progress = if (totalSeconds > 0) remainingSeconds.toFloat() / totalSeconds.toFloat() else 0f
+
+    // Smooth animated progress so the arc doesn't jump every second
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(durationMillis = 900, easing = LinearOutSlowInEasing),
+        label = "arc_progress"
+    )
+
+    // Subtle breathing scale on the time text
+    val infiniteTransition = rememberInfiniteTransition(label = "countdown_breathe")
+    val breatheScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.04f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "breathe"
+    )
+
+    // Rotating tick mark at the end of the arc
+    val tickAngle = 135f + animatedProgress * 270f // 135° is start, sweeps 270°
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier.size(160.dp)
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val strokeWidth = 3.dp.toPx()
+            val padding = strokeWidth * 2
+            val arcSize = size.minDimension - padding * 2
+
+            // Track — very faint ring
+            drawArc(
+                color = ArcTrack,
+                startAngle = 135f,
+                sweepAngle = 270f,
+                useCenter = false,
+                topLeft = Offset(padding, padding),
+                size = androidx.compose.ui.geometry.Size(arcSize, arcSize),
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+            )
+
+            // Filled arc — bright, shows remaining time
+            if (animatedProgress > 0f) {
+                drawArc(
+                    color = ArcFill,
+                    startAngle = 135f,
+                    sweepAngle = animatedProgress * 270f,
+                    useCenter = false,
+                    topLeft = Offset(padding, padding),
+                    size = androidx.compose.ui.geometry.Size(arcSize, arcSize),
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                )
+            }
+
+            // Small dot at the leading edge of the arc
+            if (animatedProgress > 0.01f) {
+                val radius = arcSize / 2f
+                val centerX = size.width / 2f
+                val centerY = size.height / 2f
+                val angleRad = Math.toRadians(tickAngle.toDouble())
+                val dotX = centerX + radius * cos(angleRad).toFloat()
+                val dotY = centerY + radius * sin(angleRad).toFloat()
+                drawCircle(
+                    color = ChartDot,
+                    radius = 4.dp.toPx(),
+                    center = Offset(dotX, dotY)
+                )
+            }
+        }
+
+        // Centre text
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.scale(breatheScale)
+        ) {
+            val minutes = remainingSeconds / 60
+            val secs = remainingSeconds % 60
+            Text(
+                text = if (minutes > 0) String.format("%d:%02d", minutes, secs) else "$secs",
+                style = MaterialTheme.typography.displayMedium.copy(
+                    fontWeight = FontWeight.Thin,
+                    fontSize = if (minutes > 0) 36.sp else 42.sp,
+                    letterSpacing = 2.sp
+                ),
+                color = Bone
+            )
+            Text(
+                text = if (minutes > 0) "min" else "sec",
+                style = MaterialTheme.typography.bodySmall,
+                color = Ash
+            )
+        }
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  ✦  LIVE METRICS ROW
+//  Compact horizontal strip showing HR, RMSSD, SDNN, and beat count.
+//  Monochrome-safe: uses brightness hierarchy (white → grey → dark grey).
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@Composable
+private fun LiveMetricsRow(
+    hrBpm: Int?,
+    rmssd: Double,
+    sdnn: Double,
+    rrCount: Int,
+    peakHr: Int? = null
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Graphite)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // HR
+        MetricCell(
+            value = hrBpm?.toString() ?: "—",
+            label = "HR",
+            unit = "bpm",
+            highlight = true
+        )
+
+        ThinDivider()
+
+        // RMSSD
+        MetricCell(
+            value = if (rmssd > 0) String.format("%.0f", rmssd) else "—",
+            label = "RMSSD",
+            unit = "ms"
+        )
+
+        ThinDivider()
+
+        // SDNN
+        MetricCell(
+            value = if (sdnn > 0) String.format("%.0f", sdnn) else "—",
+            label = "SDNN",
+            unit = "ms"
+        )
+
+        // Peak HR (standing only)
+        if (peakHr != null) {
+            ThinDivider()
+            MetricCell(
+                value = peakHr.toString(),
+                label = "PEAK",
+                unit = "bpm",
+                highlight = true
+            )
+        }
+
+        ThinDivider()
+
+        // Beat count
+        MetricCell(
+            value = rrCount.toString(),
+            label = "BEATS",
+            unit = ""
+        )
+    }
+}
+
+@Composable
+private fun MetricCell(
+    value: String,
+    label: String,
+    unit: String,
+    highlight: Boolean = false
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontWeight = if (highlight) FontWeight.Bold else FontWeight.Normal,
+                fontSize = 20.sp
+            ),
+            color = if (highlight) Bone else Silver
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                color = Ash,
+                letterSpacing = 1.sp
+            )
+            if (unit.isNotEmpty()) {
+                Text(
+                    text = " $unit",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
+                    color = Ash.copy(alpha = 0.6f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThinDivider() {
+    Box(
+        modifier = Modifier
+            .width(1.dp)
+            .height(28.dp)
+            .background(Charcoal)
+    )
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  ✦  SCROLLING RR INTERVAL CHART
+//  A smooth Catmull-Rom spline through the last ~30 s of RR intervals.
+//  No axes, no labels — just a luminous line with subtle dots at each beat.
+//  The line fades out on the left edge for a "scrolling off" effect.
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@Composable
+private fun RrIntervalChart(
+    rrIntervals: List<Double>,
+    modifier: Modifier = Modifier
+) {
+    // Animate a subtle shimmer across the chart to give it life
+    val infiniteTransition = rememberInfiniteTransition(label = "chart_shimmer")
+    val shimmerPhase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmer"
+    )
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Ink,
+                        Charcoal.copy(alpha = 0.3f),
+                        Ink
+                    )
+                )
+            )
+    ) {
+        if (rrIntervals.size >= 2) {
+            Canvas(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 12.dp)) {
+                drawRrChart(rrIntervals, shimmerPhase)
+            }
+        } else {
+            // Waiting for data — show a subtle placeholder
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "awaiting heartbeats…",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Ash.copy(alpha = 0.5f),
+                    letterSpacing = 2.sp
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Draws the RR interval chart using Catmull-Rom spline interpolation.
+ * The chart auto-scales vertically to the data range with padding.
+ * Left edge fades out for a scrolling-off-screen effect.
+ */
+private fun DrawScope.drawRrChart(
+    rrIntervals: List<Double>,
+    shimmerPhase: Float
+) {
+    val n = rrIntervals.size
+    if (n < 2) return
+
+    val w = size.width
+    val h = size.height
+
+    // Compute Y range with padding
+    val minRr = rrIntervals.min()
+    val maxRr = rrIntervals.max()
+    val range = (maxRr - minRr).coerceAtLeast(50.0) // At least 50ms range
+    val paddedMin = minRr - range * 0.15
+    val paddedMax = maxRr + range * 0.15
+    val yRange = paddedMax - paddedMin
+
+    // Map data to screen coordinates
+    fun xAt(index: Int): Float = (index.toFloat() / (n - 1).toFloat()) * w
+    fun yAt(value: Double): Float = h - ((value - paddedMin) / yRange * h).toFloat()
+
+    val points = rrIntervals.mapIndexed { i, rr -> Offset(xAt(i), yAt(rr)) }
+
+    // ── Draw subtle glow line (wider, dimmer) ──
+    val glowPath = Path()
+    buildCatmullRomPath(glowPath, points)
+    drawPath(
+        path = glowPath,
+        color = ChartGlow.copy(alpha = 0.15f),
+        style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+    )
+
+    // ── Draw main line ──
+    val mainPath = Path()
+    buildCatmullRomPath(mainPath, points)
+    drawPath(
+        path = mainPath,
+        color = ChartLine,
+        style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+    )
+
+    // ── Draw dots at each data point ──
+    points.forEachIndexed { i, pt ->
+        // Fade out dots on the left edge (first 20% of chart)
+        val fadeAlpha = (i.toFloat() / (n * 0.2f)).coerceIn(0f, 1f)
+        // Subtle shimmer: dots near the shimmer phase glow brighter
+        val shimmerDist = kotlin.math.abs(i.toFloat() / n - shimmerPhase)
+        val shimmerBoost = (1f - (shimmerDist * 4f).coerceIn(0f, 1f)) * 0.4f
+
+        val dotAlpha = (0.3f + shimmerBoost) * fadeAlpha
+        val dotRadius = (1.8f + shimmerBoost * 2f).dp.toPx()
+
+        drawCircle(
+            color = ChartDot.copy(alpha = dotAlpha),
+            radius = dotRadius,
+            center = pt
+        )
+    }
+
+    // ── Left-edge fade overlay ──
+    // Draw a gradient rectangle that fades the left 15% to background
+    val fadeWidth = w * 0.15f
+    drawRect(
+        brush = Brush.horizontalGradient(
+            colors = listOf(Ink, Ink.copy(alpha = 0f)),
+            startX = 0f,
+            endX = fadeWidth
+        ),
+        size = size
+    )
+}
+
+/**
+ * Builds a Catmull-Rom spline path through the given points.
+ * This produces a smooth curve that passes through every data point,
+ * unlike Bézier which only approximates.
+ */
+private fun buildCatmullRomPath(path: Path, points: List<Offset>) {
+    if (points.size < 2) return
+
+    path.moveTo(points[0].x, points[0].y)
+
+    if (points.size == 2) {
+        path.lineTo(points[1].x, points[1].y)
+        return
+    }
+
+    // For Catmull-Rom, we need points before and after each segment.
+    // We mirror the first and last points to create virtual endpoints.
+    val extended = buildList {
+        add(Offset(
+            points[0].x - (points[1].x - points[0].x),
+            points[0].y - (points[1].y - points[0].y)
+        ))
+        addAll(points)
+        add(Offset(
+            points.last().x + (points.last().x - points[points.size - 2].x),
+            points.last().y + (points.last().y - points[points.size - 2].y)
+        ))
+    }
+
+    val tension = 0.5f // Standard Catmull-Rom tension
+    val segments = 12   // Interpolation segments per span
+
+    for (i in 1 until extended.size - 2) {
+        val p0 = extended[i - 1]
+        val p1 = extended[i]
+        val p2 = extended[i + 1]
+        val p3 = extended[i + 2]
+
+        for (s in 1..segments) {
+            val t = s.toFloat() / segments
+            val t2 = t * t
+            val t3 = t2 * t
+
+            val x = tension * (
+                (2 * p1.x) +
+                (-p0.x + p2.x) * t +
+                (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+                (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3
+            )
+            val y = tension * (
+                (2 * p1.y) +
+                (-p0.y + p2.y) * t +
+                (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+                (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3
+            )
+
+            path.lineTo(x, y)
+        }
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Shared helpers
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/**
+ * Legacy countdown circle — kept for backward compatibility but the new screens
+ * use [MinimalistArcCountdown] instead.
+ */
 @Composable
 internal fun CountdownCircle(seconds: Int, totalSeconds: Int, color: Color) {
     val progress = if (totalSeconds > 0) seconds.toFloat() / totalSeconds.toFloat() else 0f

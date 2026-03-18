@@ -40,11 +40,14 @@ data class ReadinessUiState(
     val sessionDurationSeconds: Long = 120L,
     val rrCount: Int = 0,
     val liveRmssd: Float? = null,
+    val liveSdnn: Float? = null,
     val hrvMetrics: HrvMetrics? = null,
     val readinessScore: ReadinessScore? = null,
     val errorMessage: String? = null,
     val liveHr: Int? = null,
-    val liveSpO2: Int? = null
+    val liveSpO2: Int? = null,
+    /** Recent RR intervals (ms) for the scrolling chart — last ~30 s worth. */
+    val liveRrIntervals: List<Double> = emptyList()
 )
 
 @HiltViewModel
@@ -102,8 +105,8 @@ class ReadinessViewModel @Inject constructor(
         sessionJob = viewModelScope.launch {
             var remaining = durationSeconds
             while (remaining > 0 && isActive) {
-                delay(1_000L)
-                remaining--
+                delay(500L) // Poll at 2 Hz for smoother chart updates
+                remaining = (remaining - 1L).coerceAtLeast(0L)
                 // Only take intervals added since the session started
                 val totalInBuffer = bleManager.rrBuffer.size()
                 val newCount = totalInBuffer - rrBufferSizeAtStart
@@ -111,13 +114,19 @@ class ReadinessViewModel @Inject constructor(
                 collectedRr.clear()
                 collectedRr.addAll(snapshot)
                 val liveRmssd = computeLiveRmssd(snapshot)
+                val liveSdnn = computeLiveSdnn(snapshot)
+                // Last ~45 RR intervals for the chart (~30 s at typical resting HR)
+                val chartRr = if (newCount > 0) bleManager.rrBuffer.readLast(45.coerceAtMost(newCount)) else emptyList()
                 _uiState.update {
                     it.copy(
                         remainingSeconds = remaining,
                         rrCount = snapshot.size,
-                        liveRmssd = liveRmssd
+                        liveRmssd = liveRmssd,
+                        liveSdnn = liveSdnn,
+                        liveRrIntervals = chartRr
                     )
                 }
+                if (remaining == 0L) break
             }
             if (isActive) processSession()
         }
@@ -127,6 +136,13 @@ class ReadinessViewModel @Inject constructor(
         if (rr.size < 2) return null
         val diffs = (1 until rr.size).map { rr[it] - rr[it - 1] }
         return Math.sqrt(diffs.sumOf { it * it } / diffs.size).toFloat()
+    }
+
+    private fun computeLiveSdnn(rr: List<Double>): Float? {
+        if (rr.size < 2) return null
+        val mean = rr.average()
+        val variance = rr.sumOf { (it - mean) * (it - mean) } / rr.size
+        return Math.sqrt(variance).toFloat()
     }
 
     private fun processSession() {
