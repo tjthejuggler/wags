@@ -1,7 +1,6 @@
 package com.example.wags.ui.morning
 
-import android.media.AudioManager
-import android.media.ToneGenerator
+import android.media.MediaPlayer
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -89,12 +88,13 @@ fun MorningReadinessScreen(
         )
     }
 
-    // Stand alert: play tone + vibrate when flag is set
+    // Stand alert: play singing bell + vibrate when flag is set
     LaunchedEffect(uiState.triggerStandAlert) {
         if (uiState.triggerStandAlert) {
             try {
-                val toneGen = ToneGenerator(AudioManager.STREAM_ALARM, 100)
-                toneGen.startTone(ToneGenerator.TONE_PROP_BEEP2, 800)
+                val mp = MediaPlayer.create(context, com.example.wags.R.raw.singing_bell)
+                mp?.setOnCompletionListener { it.release() }
+                mp?.start()
             } catch (_: Exception) { }
             try {
                 val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
