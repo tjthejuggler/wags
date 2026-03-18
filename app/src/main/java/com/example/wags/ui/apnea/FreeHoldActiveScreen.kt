@@ -82,7 +82,9 @@ data class FreeHoldActiveUiState(
     val liveHr: Int? = null,
     val liveSpO2: Int? = null,
     /** Non-null when the just-completed hold set a new PB for this settings combination. */
-    val newPersonalBestMs: Long? = null
+    val newPersonalBestMs: Long? = null,
+    /** True while the async personal-best check is still running after a hold ends. */
+    val pbCheckPending: Boolean = false
 )
 
 @HiltViewModel
@@ -162,7 +164,13 @@ class FreeHoldActiveViewModel @Inject constructor(
         oximeterCollectionJob?.cancel()
         oximeterCollectionJob = null
         val firstContractionMs = _uiState.value.freeHoldFirstContractionMs
-        _uiState.update { it.copy(freeHoldActive = false, freeHoldFirstContractionMs = null) }
+        _uiState.update {
+            it.copy(
+                freeHoldActive = false,
+                freeHoldFirstContractionMs = null,
+                pbCheckPending = true          // prevent navigation until PB check completes
+            )
+        }
         audioHapticEngine.vibrateHoldEnd()
         habitRepo.sendHabitIncrement(Slot.FREE_HOLD)
         viewModelScope.launch {
@@ -173,8 +181,10 @@ class FreeHoldActiveViewModel @Inject constructor(
             val isNewPb = priorBest == null || duration > priorBest
             saveFreeHoldRecord(duration, firstContractionMs)
             if (isNewPb) {
-                _uiState.update { it.copy(newPersonalBestMs = duration) }
+                _uiState.update { it.copy(newPersonalBestMs = duration, pbCheckPending = false) }
                 habitRepo.sendHabitIncrement(Slot.APNEA_NEW_RECORD)
+            } else {
+                _uiState.update { it.copy(pbCheckPending = false) }
             }
         }
     }
@@ -313,12 +323,10 @@ fun FreeHoldActiveScreen(
 
     // Navigate back when:
     //   • the user tapped Stop (stopRequested), AND
-    //   • the async PB check is done (newPersonalBestMs is no longer "pending" — either
-    //     it was set and then dismissed, or it was never set).
-    // We detect "check done" by watching freeHoldActive flip to false AND newPersonalBestMs
-    // being null (meaning either no PB or the dialog was already dismissed).
-    LaunchedEffect(stopRequested, state.freeHoldActive, state.newPersonalBestMs) {
-        if (stopRequested && !state.freeHoldActive && state.newPersonalBestMs == null) {
+    //   • the async PB check has finished (pbCheckPending is false), AND
+    //   • no PB dialog is showing (newPersonalBestMs is null — either no PB or dismissed).
+    LaunchedEffect(stopRequested, state.freeHoldActive, state.newPersonalBestMs, state.pbCheckPending) {
+        if (stopRequested && !state.freeHoldActive && !state.pbCheckPending && state.newPersonalBestMs == null) {
             navController.popBackStack()
         }
     }
