@@ -427,29 +427,25 @@ private fun QuestionnaireContent(
 
         HooperSlider(
             label = "Sleep Quality",
-            lowLabel = "Poor",
-            highLabel = "Excellent",
+            descriptors = listOf("Terrible", "Poor", "Okay", "Good", "Excellent"),
             value = uiState.hooperSleep,
             onValueChange = { viewModel.updateHooper(it, uiState.hooperFatigue, uiState.hooperSoreness, uiState.hooperStress) }
         )
         HooperSlider(
             label = "Fatigue",
-            lowLabel = "Very fatigued",
-            highLabel = "No fatigue",
+            descriptors = listOf("Exhausted", "Very tired", "Somewhat tired", "Slightly tired", "Fully rested"),
             value = uiState.hooperFatigue,
             onValueChange = { viewModel.updateHooper(uiState.hooperSleep, it, uiState.hooperSoreness, uiState.hooperStress) }
         )
         HooperSlider(
             label = "Muscle Soreness",
-            lowLabel = "Very sore",
-            highLabel = "No soreness",
+            descriptors = listOf("Severely sore", "Very sore", "Moderately sore", "Slightly sore", "No soreness"),
             value = uiState.hooperSoreness,
             onValueChange = { viewModel.updateHooper(uiState.hooperSleep, uiState.hooperFatigue, it, uiState.hooperStress) }
         )
         HooperSlider(
             label = "Stress",
-            lowLabel = "Very stressed",
-            highLabel = "No stress",
+            descriptors = listOf("Overwhelmed", "Very stressed", "Somewhat stressed", "Slightly stressed", "No stress"),
             value = uiState.hooperStress,
             onValueChange = { viewModel.updateHooper(uiState.hooperSleep, uiState.hooperFatigue, uiState.hooperSoreness, it) }
         )
@@ -464,48 +460,119 @@ private fun QuestionnaireContent(
     }
 }
 
+/**
+ * A Hooper wellness slider with:
+ *  - A bold label above identifying what is being rated
+ *  - A thumb that starts at the centre (3 / 5) and is considered "unset" until moved
+ *  - A single description line below the track that reads "unset" (muted) before
+ *    the first interaction, then switches to one of five contextual descriptors
+ *    that reflect the current thumb position
+ *
+ * @param label       The dimension being rated (e.g. "Sleep Quality")
+ * @param descriptors Exactly 5 strings mapping to positions 1 → 5 (worst → best)
+ * @param value       Current slider value in [1, 5]
+ * @param onValueChange Callback with the new value
+ */
 @Composable
 private fun HooperSlider(
     label: String,
-    lowLabel: String,
-    highLabel: String,
+    descriptors: List<String>,
     value: Float,
     onValueChange: (Float) -> Unit
 ) {
+    require(descriptors.size == 5) { "HooperSlider requires exactly 5 descriptors" }
+
+    // Track whether the user has interacted with this slider yet.
+    // Starts false; flips to true on the first drag event.
+    var touched by remember { mutableStateOf(false) }
+
+    // Colour of the active track / thumb across five equal zones of 1–100:
+    //   1–20  → red      (worst)
+    //   21–40 → orange
+    //   41–60 → silver   (neutral centre)
+    //   61–80 → green
+    //   81–100→ green    (best)
     val trackColor = when {
-        value <= 2f -> ReadinessRed
-        value <= 3f -> ReadinessOrange
-        else        -> ReadinessGreen
+        value <= 20f  -> ReadinessRed
+        value <= 40f  -> ReadinessOrange
+        value <= 60f  -> Silver
+        else          -> ReadinessGreen
+    }
+
+    // Map the continuous [1, 100] value to one of the five descriptor strings.
+    // Zones: 1–20, 21–40, 41–60, 61–80, 81–100
+    val descriptorIndex = when {
+        value <= 20f -> 0
+        value <= 40f -> 1
+        value <= 60f -> 2
+        value <= 80f -> 3
+        else         -> 4
     }
 
     Card(colors = CardDefaults.cardColors(containerColor = SurfaceVariant)) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            // ── Label row: topic on the left, numeric value on the right ──
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(label, style = MaterialTheme.typography.titleSmall, color = TextPrimary)
                 Text(
-                    String.format("%.1f", value),
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = trackColor
+                    text = label,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Bone,
+                    letterSpacing = 0.5.sp
+                )
+                Text(
+                    text = value.toInt().toString(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = if (touched) trackColor else Ash
                 )
             }
+
+            // ── Slider track ──
             Slider(
                 value = value,
-                onValueChange = onValueChange,
-                valueRange = 1f..5f,
+                onValueChange = { newVal ->
+                    touched = true
+                    onValueChange(newVal)
+                },
+                valueRange = 1f..100f,
                 colors = SliderDefaults.colors(
-                    thumbColor = trackColor,
-                    activeTrackColor = trackColor,
+                    thumbColor = if (touched) trackColor else Ash,
+                    activeTrackColor = if (touched) trackColor else Ash.copy(alpha = 0.4f),
                     inactiveTrackColor = SurfaceDark
-                )
+                ),
+                modifier = Modifier.fillMaxWidth()
             )
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(lowLabel, style = MaterialTheme.typography.labelSmall, color = TextDisabled)
-                Text(highLabel, style = MaterialTheme.typography.labelSmall, color = TextDisabled)
+
+            // ── Description line ──
+            // "unset" in muted Ash before first touch; contextual descriptor after
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!touched) {
+                    Text(
+                        text = "unset",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Ash.copy(alpha = 0.55f),
+                        letterSpacing = 1.sp
+                    )
+                } else {
+                    Text(
+                        text = descriptors[descriptorIndex],
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = trackColor,
+                        letterSpacing = 0.5.sp
+                    )
+                }
             }
         }
     }

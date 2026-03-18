@@ -45,10 +45,10 @@ data class MorningReadinessUiState(
     val liveSdnn: Double = 0.0,
     val rrCount: Int = 0,
     val peakStandHr: Int = 0,
-    val hooperSleep: Float = 3f,
-    val hooperFatigue: Float = 3f,
-    val hooperSoreness: Float = 3f,
-    val hooperStress: Float = 3f,
+    val hooperSleep: Float = 50f,
+    val hooperFatigue: Float = 50f,
+    val hooperSoreness: Float = 50f,
+    val hooperStress: Float = 50f,
     val result: MorningReadinessResult? = null,
     val errorMessage: String? = null,
     val noHrmDialogVisible: Boolean = false,
@@ -361,11 +361,14 @@ class MorningReadinessViewModel @Inject constructor(
 
     fun submitHooper() {
         val state = _uiState.value
+        // UI sliders run 1–100; HooperIndex expects 1–5.
+        // Normalize: hooper1to5 = (raw - 1) / 99 * 4 + 1
+        fun norm(v: Float): Float = (v - 1f) / 99f * 4f + 1f
         storedHooper = HooperIndex(
-            sleep    = state.hooperSleep,
-            fatigue  = state.hooperFatigue,
-            soreness = state.hooperSoreness,
-            stress   = state.hooperStress
+            sleep    = norm(state.hooperSleep),
+            fatigue  = norm(state.hooperFatigue),
+            soreness = norm(state.hooperSoreness),
+            stress   = norm(state.hooperStress)
         )
         fsm.submitHooper()
     }
