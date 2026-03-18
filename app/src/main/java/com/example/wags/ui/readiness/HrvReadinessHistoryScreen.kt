@@ -85,13 +85,19 @@ fun HrvReadinessHistoryScreen(
                 contentColor = EcgCyan
             ) {
                 HrvHistoryTab.entries.forEach { tab ->
+                    val isSelected = selectedTab == tab
                     Tab(
-                        selected = selectedTab == tab,
+                        selected = isSelected,
                         onClick = { selectedTab = tab },
+                        modifier = Modifier.background(
+                            if (isSelected) EcgCyan.copy(alpha = 0.15f)
+                            else Color.Transparent
+                        ),
                         text = {
                             Text(
                                 tab.label,
-                                color = if (selectedTab == tab) EcgCyan else TextDisabled
+                                color = if (isSelected) EcgCyan else TextDisabled,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                             )
                         }
                     )
