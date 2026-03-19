@@ -604,10 +604,12 @@ private fun ThinDivider() {
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  ✦  SCROLLING RR INTERVAL CHART
+//  Smooth-scroll: new beats slide in from the right rather than snapping.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 @Composable
 private fun RrIntervalChart(rrIntervals: List<Double>, modifier: Modifier = Modifier) {
+    // ── Shimmer ──
     val infiniteTransition = rememberInfiniteTransition(label = "chart_shimmer")
     val shimmerPhase by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -617,6 +619,40 @@ private fun RrIntervalChart(rrIntervals: List<Double>, modifier: Modifier = Modi
             repeatMode = RepeatMode.Restart
         ),
         label = "shimmer"
+    )
+
+    // ── Smooth-scroll state ──
+    val prevCount = remember { mutableIntStateOf(rrIntervals.size) }
+    val scrollOffset = remember { Animatable(1f) }
+
+    LaunchedEffect(rrIntervals.size) {
+        val newCount = rrIntervals.size
+        if (newCount > prevCount.intValue) {
+            scrollOffset.snapTo(0f)
+            scrollOffset.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing)
+            )
+        }
+        prevCount.intValue = newCount
+    }
+
+    // ── Animated Y-range ──
+    val targetMinRr = if (rrIntervals.isEmpty()) 600.0 else rrIntervals.min()
+    val targetMaxRr = if (rrIntervals.isEmpty()) 1000.0 else rrIntervals.max()
+    val targetRange = (targetMaxRr - targetMinRr).coerceAtLeast(50.0)
+    val targetPaddedMin = targetMinRr - targetRange * 0.15
+    val targetPaddedMax = targetMaxRr + targetRange * 0.15
+
+    val animatedPaddedMin by animateFloatAsState(
+        targetValue = targetPaddedMin.toFloat(),
+        animationSpec = tween(durationMillis = 600, easing = LinearOutSlowInEasing),
+        label = "y_min"
+    )
+    val animatedPaddedMax by animateFloatAsState(
+        targetValue = targetPaddedMax.toFloat(),
+        animationSpec = tween(durationMillis = 600, easing = LinearOutSlowInEasing),
+        label = "y_max"
     )
 
     Box(
@@ -629,8 +665,15 @@ private fun RrIntervalChart(rrIntervals: List<Double>, modifier: Modifier = Modi
             )
     ) {
         if (rrIntervals.size >= 2) {
+            val scrollOffsetValue = scrollOffset.value
             Canvas(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 12.dp)) {
-                drawRrChart(rrIntervals, shimmerPhase)
+                drawRrChart(
+                    rrIntervals = rrIntervals,
+                    shimmerPhase = shimmerPhase,
+                    scrollOffset = scrollOffsetValue,
+                    paddedMin = animatedPaddedMin.toDouble(),
+                    paddedMax = animatedPaddedMax.toDouble()
+                )
             }
         } else {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -645,21 +688,24 @@ private fun RrIntervalChart(rrIntervals: List<Double>, modifier: Modifier = Modi
     }
 }
 
-private fun DrawScope.drawRrChart(rrIntervals: List<Double>, shimmerPhase: Float) {
+private fun DrawScope.drawRrChart(
+    rrIntervals: List<Double>,
+    shimmerPhase: Float,
+    scrollOffset: Float,
+    paddedMin: Double,
+    paddedMax: Double
+) {
     val n = rrIntervals.size
     if (n < 2) return
 
     val w = size.width
     val h = size.height
 
-    val minRr = rrIntervals.min()
-    val maxRr = rrIntervals.max()
-    val range = (maxRr - minRr).coerceAtLeast(50.0)
-    val paddedMin = minRr - range * 0.15
-    val paddedMax = maxRr + range * 0.15
-    val yRange = paddedMax - paddedMin
+    val yRange = (paddedMax - paddedMin).coerceAtLeast(1.0)
+    val pointSpacing = w / (n - 1).toFloat()
+    val shiftX = pointSpacing * (1f - scrollOffset)
 
-    fun xAt(index: Int): Float = (index.toFloat() / (n - 1).toFloat()) * w
+    fun xAt(index: Int): Float = index.toFloat() * pointSpacing - shiftX
     fun yAt(value: Double): Float = h - ((value - paddedMin) / yRange * h).toFloat()
 
     val points = rrIntervals.mapIndexed { i, rr -> Offset(xAt(i), yAt(rr)) }
@@ -689,6 +735,7 @@ private fun DrawScope.drawRrChart(rrIntervals: List<Double>, shimmerPhase: Float
         drawCircle(color = ChartDot.copy(alpha = dotAlpha), radius = dotRadius, center = pt)
     }
 
+    // Left-edge fade
     drawRect(
         brush = Brush.horizontalGradient(
             colors = listOf(Ink, Ink.copy(alpha = 0f)),
@@ -697,6 +744,18 @@ private fun DrawScope.drawRrChart(rrIntervals: List<Double>, shimmerPhase: Float
         ),
         size = size
     )
+    // Right-edge fade during slide-in
+    if (scrollOffset < 1f) {
+        val rightFadeStart = w * (1f - (1f - scrollOffset) * 0.3f)
+        drawRect(
+            brush = Brush.horizontalGradient(
+                colors = listOf(Ink.copy(alpha = 0f), Ink),
+                startX = rightFadeStart,
+                endX = w
+            ),
+            size = size
+        )
+    }
 }
 
 private fun buildCatmullRomPath(path: Path, points: List<Offset>) {

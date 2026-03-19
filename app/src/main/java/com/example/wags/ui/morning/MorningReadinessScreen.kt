@@ -88,13 +88,21 @@ fun MorningReadinessScreen(
         )
     }
 
-    // Stand alert: play singing bell + vibrate when flag is set
+    // Stand alert: play singing bell + vibrate when flag is set.
+    // We use a monotonically-increasing generation counter as the LaunchedEffect key
+    // so the effect always re-fires even if the Boolean somehow stays true across
+    // recompositions driven by the liveHr/liveSpO2 combine emissions.
+    val standAlertGeneration = remember { androidx.compose.runtime.mutableIntStateOf(0) }
     LaunchedEffect(uiState.triggerStandAlert) {
         if (uiState.triggerStandAlert) {
+            standAlertGeneration.intValue++
             try {
-                val mp = MediaPlayer.create(context, com.example.wags.R.raw.singing_bell)
-                mp?.setOnCompletionListener { it.release() }
-                mp?.start()
+                // Use applicationContext so MediaPlayer is not tied to the Activity lifecycle.
+                val mp = MediaPlayer.create(context.applicationContext, com.example.wags.R.raw.singing_bell)
+                if (mp != null) {
+                    mp.setOnCompletionListener { it.release() }
+                    mp.start()
+                }
             } catch (_: Exception) { }
             try {
                 val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -151,7 +159,7 @@ fun MorningReadinessScreen(
                 MorningReadinessState.SUPINE_HRV ->
                     SupineHrvContent(uiState)
                 MorningReadinessState.STAND_PROMPT ->
-                    StandPromptContent()
+                    StandPromptContent(onSkipStanding = { viewModel.skipStanding() })
                 MorningReadinessState.STANDING ->
                     StandingContent(uiState)
                 MorningReadinessState.QUESTIONNAIRE ->
@@ -316,7 +324,7 @@ private fun SupineHrvContent(uiState: MorningReadinessUiState) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 @Composable
-private fun StandPromptContent() {
+private fun StandPromptContent(onSkipStanding: () -> Unit) {
     val infiniteTransition = rememberInfiniteTransition(label = "stand_pulse")
     val scale by infiniteTransition.animateFloat(
         initialValue = 1f,
@@ -343,6 +351,24 @@ private fun StandPromptContent() {
             "Stand up immediately and stay as still as possible",
             style = MaterialTheme.typography.bodyLarge,
             color = ReadinessOrange,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(
+            onClick = onSkipStanding,
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Ash),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Ash.copy(alpha = 0.4f))
+        ) {
+            Text(
+                "No Standing",
+                style = MaterialTheme.typography.bodyMedium,
+                letterSpacing = 1.sp
+            )
+        }
+        Text(
+            "Skip the standing phase and save results without orthostatic data",
+            style = MaterialTheme.typography.bodySmall,
+            color = Ash.copy(alpha = 0.6f),
             textAlign = TextAlign.Center
         )
     }
@@ -845,7 +871,13 @@ private fun ThinDivider() {
 //  ✦  SCROLLING RR INTERVAL CHART
 //  A smooth Catmull-Rom spline through the last ~30 s of RR intervals.
 //  No axes, no labels — just a luminous line with subtle dots at each beat.
-//  The line fades out on the left edge for a "scrolling off" effect.
+//
+//  Smooth-scroll approach:
+//  The ViewModel delivers data in ~500 ms polling chunks. To avoid the chart
+//  "jumping" when new beats arrive, we keep a stable Y-range that animates
+//  smoothly and use a fractional scroll offset that animates from 0→1 each
+//  time a new batch of points is appended. This makes new beats appear to
+//  slide in from the right rather than snapping into place.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 @Composable
@@ -853,7 +885,7 @@ private fun RrIntervalChart(
     rrIntervals: List<Double>,
     modifier: Modifier = Modifier
 ) {
-    // Animate a subtle shimmer across the chart to give it life
+    // ── Shimmer ──
     val infiniteTransition = rememberInfiniteTransition(label = "chart_shimmer")
     val shimmerPhase by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -863,6 +895,47 @@ private fun RrIntervalChart(
             repeatMode = RepeatMode.Restart
         ),
         label = "shimmer"
+    )
+
+    // ── Smooth-scroll state ──
+    // scrollOffset animates 0→1 whenever a new beat is appended.
+    // At 0 the newest point is just entering the right edge; at 1 it has
+    // settled into its final position and the chart is ready for the next beat.
+    val prevCount = remember { androidx.compose.runtime.mutableIntStateOf(rrIntervals.size) }
+    val scrollOffset = remember { androidx.compose.animation.core.Animatable(1f) }
+
+    LaunchedEffect(rrIntervals.size) {
+        val newCount = rrIntervals.size
+        if (newCount > prevCount.intValue) {
+            // New beats arrived — snap offset to 0 (new point at right edge) then
+            // animate to 1 (settled) over ~400 ms so the slide-in is visible but snappy.
+            scrollOffset.snapTo(0f)
+            scrollOffset.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing)
+            )
+        }
+        prevCount.intValue = newCount
+    }
+
+    // ── Animated Y-range ──
+    // Compute the target min/max from the current data and animate toward it
+    // so the vertical scale doesn't jump when an outlier beat arrives.
+    val targetMinRr = if (rrIntervals.isEmpty()) 600.0 else rrIntervals.min()
+    val targetMaxRr = if (rrIntervals.isEmpty()) 1000.0 else rrIntervals.max()
+    val targetRange = (targetMaxRr - targetMinRr).coerceAtLeast(50.0)
+    val targetPaddedMin = targetMinRr - targetRange * 0.15
+    val targetPaddedMax = targetMaxRr + targetRange * 0.15
+
+    val animatedPaddedMin by animateFloatAsState(
+        targetValue = targetPaddedMin.toFloat(),
+        animationSpec = tween(durationMillis = 600, easing = LinearOutSlowInEasing),
+        label = "y_min"
+    )
+    val animatedPaddedMax by animateFloatAsState(
+        targetValue = targetPaddedMax.toFloat(),
+        animationSpec = tween(durationMillis = 600, easing = LinearOutSlowInEasing),
+        label = "y_max"
     )
 
     Box(
@@ -879,8 +952,15 @@ private fun RrIntervalChart(
             )
     ) {
         if (rrIntervals.size >= 2) {
+            val scrollOffsetValue = scrollOffset.value
             Canvas(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 12.dp)) {
-                drawRrChart(rrIntervals, shimmerPhase)
+                drawRrChart(
+                    rrIntervals = rrIntervals,
+                    shimmerPhase = shimmerPhase,
+                    scrollOffset = scrollOffsetValue,
+                    paddedMin = animatedPaddedMin.toDouble(),
+                    paddedMax = animatedPaddedMax.toDouble()
+                )
             }
         } else {
             // Waiting for data — show a subtle placeholder
@@ -901,12 +981,21 @@ private fun RrIntervalChart(
 
 /**
  * Draws the RR interval chart using Catmull-Rom spline interpolation.
- * The chart auto-scales vertically to the data range with padding.
- * Left edge fades out for a scrolling-off-screen effect.
+ *
+ * [scrollOffset] is a value in [0, 1]:
+ *   0 = newest point is just entering from the right edge (mid-scroll)
+ *   1 = all points are in their final positions (scroll complete)
+ *
+ * When scrollOffset < 1, the entire chart is shifted left by one point-spacing
+ * worth of pixels, scaled by (1 - scrollOffset). This creates the illusion of
+ * the waveform continuously scrolling left as new beats arrive.
  */
 private fun DrawScope.drawRrChart(
     rrIntervals: List<Double>,
-    shimmerPhase: Float
+    shimmerPhase: Float,
+    scrollOffset: Float,
+    paddedMin: Double,
+    paddedMax: Double
 ) {
     val n = rrIntervals.size
     if (n < 2) return
@@ -914,16 +1003,17 @@ private fun DrawScope.drawRrChart(
     val w = size.width
     val h = size.height
 
-    // Compute Y range with padding
-    val minRr = rrIntervals.min()
-    val maxRr = rrIntervals.max()
-    val range = (maxRr - minRr).coerceAtLeast(50.0) // At least 50ms range
-    val paddedMin = minRr - range * 0.15
-    val paddedMax = maxRr + range * 0.15
-    val yRange = paddedMax - paddedMin
+    val yRange = (paddedMax - paddedMin).coerceAtLeast(1.0)
 
-    // Map data to screen coordinates
-    fun xAt(index: Int): Float = (index.toFloat() / (n - 1).toFloat()) * w
+    // The spacing between adjacent points in the final (settled) layout
+    val pointSpacing = w / (n - 1).toFloat()
+
+    // Horizontal shift: when scrollOffset=0 the chart is shifted left by one
+    // full point-spacing (new point just off the right edge). As scrollOffset→1
+    // the shift reduces to 0 (settled). This gives the smooth slide-in effect.
+    val shiftX = pointSpacing * (1f - scrollOffset)
+
+    fun xAt(index: Int): Float = index.toFloat() * pointSpacing - shiftX
     fun yAt(value: Double): Float = h - ((value - paddedMin) / yRange * h).toFloat()
 
     val points = rrIntervals.mapIndexed { i, rr -> Offset(xAt(i), yAt(rr)) }
@@ -965,7 +1055,8 @@ private fun DrawScope.drawRrChart(
     }
 
     // ── Left-edge fade overlay ──
-    // Draw a gradient rectangle that fades the left 15% to background
+    // Covers the left 15% to hide points scrolling off-screen and give the
+    // "scrolling off" effect. Also clips the right edge during slide-in.
     val fadeWidth = w * 0.15f
     drawRect(
         brush = Brush.horizontalGradient(
@@ -975,6 +1066,18 @@ private fun DrawScope.drawRrChart(
         ),
         size = size
     )
+    // Right-edge fade: hides the incoming point before it fully slides in
+    if (scrollOffset < 1f) {
+        val rightFadeStart = w * (1f - (1f - scrollOffset) * 0.3f)
+        drawRect(
+            brush = Brush.horizontalGradient(
+                colors = listOf(Ink.copy(alpha = 0f), Ink),
+                startX = rightFadeStart,
+                endX = w
+            ),
+            size = size
+        )
+    }
 }
 
 /**

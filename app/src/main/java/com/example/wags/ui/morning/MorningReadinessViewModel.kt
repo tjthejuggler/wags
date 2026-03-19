@@ -377,6 +377,17 @@ class MorningReadinessViewModel @Inject constructor(
         _uiState.update { it.copy(triggerStandAlert = false) }
     }
 
+    /**
+     * Called when the user taps "No Standing" during the stand prompt.
+     * Cancels the standing phase and jumps straight to the questionnaire.
+     * The report is still saved — just without any orthostatic / standing data.
+     */
+    fun skipStanding() {
+        accPollingJob?.cancel()
+        accPollingJob = null
+        fsm.skipStanding()
+    }
+
     fun reset() {
         rrPollingJob?.cancel()
         rrPollingJob = null

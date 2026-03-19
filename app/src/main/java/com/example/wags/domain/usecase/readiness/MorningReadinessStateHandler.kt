@@ -42,6 +42,7 @@ class MorningReadinessStateHandler @Inject constructor() {
             MorningReadinessState.STAND_PROMPT -> current == MorningReadinessState.SUPINE_HRV
             MorningReadinessState.STANDING     -> current == MorningReadinessState.STAND_PROMPT
             MorningReadinessState.QUESTIONNAIRE -> current == MorningReadinessState.STANDING
+                    || current == MorningReadinessState.STAND_PROMPT
             MorningReadinessState.CALCULATING  -> current == MorningReadinessState.QUESTIONNAIRE
             MorningReadinessState.COMPLETE     -> current == MorningReadinessState.CALCULATING
             MorningReadinessState.ERROR        -> true // Can error from any state

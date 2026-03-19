@@ -131,6 +131,20 @@ class MorningReadinessFsm @Inject constructor(
     }
 
     /**
+     * Called when the user taps "No Standing" during STAND_PROMPT.
+     * Cancels the standing phase entirely — the session proceeds directly to
+     * QUESTIONNAIRE with an empty standing buffer. The report is still saved,
+     * just without any orthostatic data.
+     */
+    fun skipStanding() {
+        val s = stateHandler.state.value
+        if (s == MorningReadinessState.STAND_PROMPT || s == MorningReadinessState.STANDING) {
+            timer.cancel()
+            enterQuestionnaire()
+        }
+    }
+
+    /**
      * Called by ViewModel to feed RR intervals into the appropriate buffer.
      * Records during SUPINE_HRV and STANDING states.
      * Tracks peak stand HR during STANDING.
