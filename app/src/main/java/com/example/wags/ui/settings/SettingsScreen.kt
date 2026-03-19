@@ -24,9 +24,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
+import com.example.wags.data.garmin.GarminConnectionState
 import com.example.wags.domain.model.BleConnectionState
 import com.example.wags.domain.model.HabitEntry
 import com.example.wags.domain.model.OximeterConnectionState
+import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 import com.polar.sdk.api.model.PolarDeviceInfo
 
@@ -146,6 +148,62 @@ fun SettingsScreen(
                     onDisconnectVerity = { viewModel.disconnectVerity() },
                     onDisconnectOximeter = { viewModel.disconnectOximeter() }
                 )
+            }
+
+            // ── Garmin Watch ─────────────────────────────────────────────────
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "⌚ Garmin Watch",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = Color.White
+                            )
+                            val (garminStatusText, garminStatusColor) = when (val gs = state.garminState) {
+                                is GarminConnectionState.Connected ->
+                                    "Connected: ${gs.deviceName}" to ReadinessGreen
+                                is GarminConnectionState.Initializing,
+                                is GarminConnectionState.SdkReady ->
+                                    "Connecting…" to ReadinessOrange
+                                is GarminConnectionState.DeviceFound ->
+                                    "Found: ${gs.deviceName}…" to ReadinessOrange
+                                is GarminConnectionState.WagsAppNotFound ->
+                                    "WAGS app not found on ${gs.deviceName}" to ButtonDanger
+                                is GarminConnectionState.Error ->
+                                    "Error" to ButtonDanger
+                                is GarminConnectionState.Uninitialized ->
+                                    "Not connected" to TextSecondary
+                            }
+                            Text(
+                                text = garminStatusText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = garminStatusColor
+                            )
+                        }
+                        Button(
+                            onClick = { navController.navigate(WagsRoutes.GARMIN) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = EcgCyan,
+                                contentColor = Color.Black
+                            )
+                        ) {
+                            Text(
+                                if (state.garminState is GarminConnectionState.Connected) "Manage"
+                                else "Setup"
+                            )
+                        }
+                    }
+                }
             }
 
             // ── Single unified scan button ─────────────────────────────────

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu2 id="SettingsMenu" title="Settings">
+    <menu-item id="menuLungVolume" label="Lung Volume" />
+    <menu-item id="menuPrepType"   label="Prep Type" />
+    <menu-item id="menuTimeOfDay"  label="Time of Day" />
+</menu2>

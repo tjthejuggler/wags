@@ -34,6 +34,7 @@ import com.example.wags.ui.session.SessionScreen
 import com.example.wags.ui.morning.MorningReadinessDetailScreen
 import com.example.wags.ui.morning.MorningReadinessHistoryScreen
 import com.example.wags.ui.morning.MorningReadinessScreen
+import com.example.wags.ui.garmin.GarminScreen
 import com.example.wags.ui.settings.SettingsScreen
 
 object WagsRoutes {
@@ -60,6 +61,9 @@ object WagsRoutes {
     const val APNEA_ALL_RECORDS = "apnea_all_records"
     const val FREE_HOLD_ACTIVE = "free_hold_active/{lungVolume}/{prepType}/{timeOfDay}/{showTimer}"
     // ── Meditation / NSDR ──────────────────────────────────────────────────────
+    // ── Garmin Watch ─────────────────────────────────────────────────────────
+    const val GARMIN = "garmin"
+
     const val MEDITATION = "meditation"
     const val MEDITATION_HISTORY = "meditation_history"
     const val MEDITATION_SESSION_DETAIL = "meditation_session_detail/{sessionId}"
@@ -263,6 +267,10 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             arguments = listOf(navArgument("sessionId") { type = NavType.LongType })
         ) {
             MeditationSessionDetailScreen(navController = navController)
+        }
+        // ── Garmin Watch ────────────────────────────────────────────────────
+        composable(WagsRoutes.GARMIN) {
+            GarminScreen(navController = navController)
         }
     }
 }

@@ -1,0 +1,8 @@
+# WAGS Garmin Connect IQ Project
+# Target: fenix 6X Pro (API Level 3.4.0)
+
+project.manifest = manifest.xml
+
+# Base source and resources
+base.sourcePath = source
+base.resourcePath = resources

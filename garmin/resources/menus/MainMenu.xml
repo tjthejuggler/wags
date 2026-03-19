@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu2 id="MainMenu" title="WAGS">
+    <menu-item id="menuApnea"    label="Apnea" />
+    <menu-item id="menuResonance" label="Resonance" />
+</menu2>

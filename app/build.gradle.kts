@@ -43,6 +43,7 @@ android {
 
 dependencies {
 
+    implementation("com.garmin.connectiq:ciq-companion-app-sdk:2.3.0@aar")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -93,4 +94,6 @@ dependencies {
 
     // Vico Charts
     implementation(libs.vico.compose)
+
+    // Garmin Connect IQ Companion SDK – resolved via Maven on line 46
 }

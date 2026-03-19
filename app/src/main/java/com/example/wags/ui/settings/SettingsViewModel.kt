@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.DevicePreferencesRepository
 import com.example.wags.data.ble.OximeterBleManager
 import com.example.wags.data.ble.PolarBleManager
+import com.example.wags.data.garmin.GarminConnectionState
+import com.example.wags.data.garmin.GarminManager
 import com.example.wags.data.ipc.HabitIntegrationRepository
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.domain.model.BleConnectionState
@@ -44,6 +46,8 @@ data class SettingsUiState(
     val oximeterScanResults: List<ScanResult> = emptyList(),
     val savedH10Id: String = "",
     val savedVerityId: String = "",
+    // ── Garmin Watch ──────────────────────────────────────────────────────────
+    val garminState: GarminConnectionState = GarminConnectionState.Uninitialized,
     // ── Meditation audio directory ─────────────────────────────────────────────
     /** SAF URI string of the chosen meditation audio folder, or "" if not set. */
     val meditationAudioDirUri: String = "",
@@ -71,7 +75,8 @@ class SettingsViewModel @Inject constructor(
     private val bleManager: PolarBleManager,
     private val oximeterBleManager: OximeterBleManager,
     private val habitRepo: HabitIntegrationRepository,
-    private val meditationRepository: com.example.wags.data.repository.MeditationRepository
+    private val meditationRepository: com.example.wags.data.repository.MeditationRepository,
+    private val garminManager: GarminManager
 ) : ViewModel() {
 
     // Separate MutableStateFlow for habit-specific state so it doesn't need to
@@ -85,7 +90,8 @@ class SettingsViewModel @Inject constructor(
         bleManager.scanResults,
         oximeterBleManager.connectionState,
         oximeterBleManager.scanResults,
-        devicePrefs.snapshot
+        devicePrefs.snapshot,
+        garminManager.connectionState
     ) { args ->
         @Suppress("UNCHECKED_CAST")
         val h10State        = args[0] as BleConnectionState
@@ -98,6 +104,7 @@ class SettingsViewModel @Inject constructor(
         @Suppress("UNCHECKED_CAST")
         val oximeterResults = args[5] as List<ScanResult>
         val snap            = args[6] as com.example.wags.data.ble.DevicePrefsSnapshot
+        val garminState     = args[7] as GarminConnectionState
 
         val oximeterScanning = oximeterState is OximeterConnectionState.Scanning
 
@@ -110,6 +117,7 @@ class SettingsViewModel @Inject constructor(
             oximeterScanResults   = oximeterResults,
             savedH10Id            = snap.savedH10Id,
             savedVerityId         = snap.savedVerityId,
+            garminState           = garminState,
             meditationAudioDirUri = snap.meditationAudioDirUri
         )
     }.combine(_habitState) { bleState, habit ->

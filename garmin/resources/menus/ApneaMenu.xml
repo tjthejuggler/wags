@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu2 id="ApneaMenu" title="Apnea">
+    <menu-item id="menuFreeHold" label="Free Hold" />
+    <menu-item id="menuSettings" label="Settings" />
+</menu2>

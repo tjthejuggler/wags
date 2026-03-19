@@ -1,0 +1,189 @@
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc"; @line = 1; @symbol_usingdef<0> = [Toybox,1,6,12]; @symbol_usingdef<1> = [WatchUi,1,13,20]; ]
+using Toybox.WatchUi;
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc"; @line = 2; @symbol_usingdef<0> = [Toybox,2,6,12]; @symbol_usingdef<1> = [Graphics,2,13,21]; ]
+using Toybox.Graphics;
+//! Placeholder view for the Resonance section (not yet implemented).
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc"; @line = 5; @symbol_classdef = [ResonancePlaceholderView,5,6,30]; @symbol_extends<0> = [WatchUi,5,39,46]; @symbol_extends<1> = [View,5,47,51]; ]
+class ResonancePlaceholderView extends WatchUi.View {
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc"; @line = 5; ]
+    <init> {
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc"; @line = 5; ]
+    static
+    <init> {
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc"; @line = 7; @symbol_functiondef = [initialize,7,13,23]; ]
+    function initialize() as Void {
+_home_twain_AndroidStudioProjects_wags_garmin_source_ResonancePlaceholderView_mc_7_26_9_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc" 8 8 ]
+        symbol [ View %tmp.2 8 8 12 ];
+        %tmp.2 = getv ? :View;
+        symbol [ initialize %tmp.3 8 13 23 ];
+        %tmp.3 = getv function %tmp.2 :initialize;
+        invoke %tmp.2 %tmp.3();
+_home_twain_AndroidStudioProjects_wags_garmin_source_ResonancePlaceholderView_mc_7_26_9_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc"; @line = 11; @symbol_functiondef = [onUpdate,11,13,21]; @symbol_param<0> = [dc,11,22,24]; ]
+    function onUpdate(dc) {
+_home_twain_AndroidStudioProjects_wags_garmin_source_ResonancePlaceholderView_mc_11_26_23_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc" 12 8 ]
+        %tmp.1 = lgetv %dc;
+        symbol [ dc %tmp.1 12 8 10 ];
+        symbol [ setColor %tmp.2 12 11 19 ];
+        %tmp.2 = getv function %tmp.1 :setColor;
+        symbol [ Graphics %tmp.3 12 20 28 ];
+        %tmp.3 = getm $.Toybox.Graphics;
+        symbol [ COLOR_BLACK %tmp.4 12 29 40 ];
+        %tmp.4 = getv %tmp.3 :COLOR_BLACK;
+        symbol [ Graphics %tmp.5 12 42 50 ];
+        %tmp.5 = getm $.Toybox.Graphics;
+        symbol [ COLOR_BLACK %tmp.6 12 51 62 ];
+        %tmp.6 = getv %tmp.5 :COLOR_BLACK;
+        invoke %tmp.1 %tmp.2(%tmp.4, %tmp.6);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc" 13 8 ]
+        %tmp.7 = lgetv %dc;
+        symbol [ dc %tmp.7 13 8 10 ];
+        symbol [ clear %tmp.8 13 11 16 ];
+        %tmp.8 = getv function %tmp.7 :clear;
+        invoke %tmp.7 %tmp.8();
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc" 15 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_ResonancePlaceholderView_mc_11_26_23_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_ResonancePlaceholderView_mc_11_26_23_4_stop" ]
+        %cx.1 = local;
+        symbol [ cx %cx.1 15 12 14 ];
+        %tmp.9 = lgetv %dc;
+        symbol [ dc %tmp.9 15 17 19 ];
+        symbol [ getWidth %tmp.10 15 20 28 ];
+        %tmp.10 = getv function %tmp.9 :getWidth;
+        %tmp.11 = invoke %tmp.9 %tmp.10();
+        %tmp.12 = 2;
+        %tmp.13 = div %tmp.11 %tmp.12;
+        lputv %cx.1 %tmp.13;
+        symbol [ cx %cx.1 15 12 14 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc" 16 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_ResonancePlaceholderView_mc_11_26_23_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_ResonancePlaceholderView_mc_11_26_23_4_stop" ]
+        %cy.2 = local;
+        symbol [ cy %cy.2 16 12 14 ];
+        %tmp.14 = lgetv %dc;
+        symbol [ dc %tmp.14 16 17 19 ];
+        symbol [ getHeight %tmp.15 16 20 29 ];
+        %tmp.15 = getv function %tmp.14 :getHeight;
+        %tmp.16 = invoke %tmp.14 %tmp.15();
+        %tmp.17 = 2;
+        %tmp.18 = div %tmp.16 %tmp.17;
+        lputv %cy.2 %tmp.18;
+        symbol [ cy %cy.2 16 12 14 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc" 18 8 ]
+        %tmp.19 = lgetv %dc;
+        symbol [ dc %tmp.19 18 8 10 ];
+        symbol [ setColor %tmp.20 18 11 19 ];
+        %tmp.20 = getv function %tmp.19 :setColor;
+        symbol [ Graphics %tmp.21 18 20 28 ];
+        %tmp.21 = getm $.Toybox.Graphics;
+        symbol [ COLOR_WHITE %tmp.22 18 29 40 ];
+        %tmp.22 = getv %tmp.21 :COLOR_WHITE;
+        symbol [ Graphics %tmp.23 18 42 50 ];
+        %tmp.23 = getm $.Toybox.Graphics;
+        symbol [ COLOR_TRANSPARENT %tmp.24 18 51 68 ];
+        %tmp.24 = getv %tmp.23 :COLOR_TRANSPARENT;
+        invoke %tmp.19 %tmp.20(%tmp.22, %tmp.24);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc" 19 8 ]
+        %tmp.25 = lgetv %dc;
+        symbol [ dc %tmp.25 19 8 10 ];
+        symbol [ drawText %tmp.26 19 11 19 ];
+        %tmp.26 = getv function %tmp.25 :drawText;
+        %tmp.27 = lgetv %cx.1;
+        symbol [ cx %tmp.27 19 20 22 ];
+        %tmp.28 = lgetv %cy.2;
+        symbol [ cy %tmp.28 19 24 26 ];
+        %tmp.29 = 20;
+        %tmp.30 = sub %tmp.28 %tmp.29;
+        symbol [ Graphics %tmp.31 19 33 41 ];
+        %tmp.31 = getm $.Toybox.Graphics;
+        symbol [ FONT_MEDIUM %tmp.32 19 42 53 ];
+        %tmp.32 = getv %tmp.31 :FONT_MEDIUM;
+        %tmp.33 = "Resonance";
+        symbol [ Graphics %tmp.34 19 68 76 ];
+        %tmp.34 = getm $.Toybox.Graphics;
+        symbol [ TEXT_JUSTIFY_CENTER %tmp.35 19 77 96 ];
+        %tmp.35 = getv %tmp.34 :TEXT_JUSTIFY_CENTER;
+        invoke %tmp.25 %tmp.26(%tmp.27, %tmp.30, %tmp.32, %tmp.33, %tmp.35);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc" 21 8 ]
+        %tmp.36 = lgetv %dc;
+        symbol [ dc %tmp.36 21 8 10 ];
+        symbol [ setColor %tmp.37 21 11 19 ];
+        %tmp.37 = getv function %tmp.36 :setColor;
+        symbol [ Graphics %tmp.38 21 20 28 ];
+        %tmp.38 = getm $.Toybox.Graphics;
+        symbol [ COLOR_LT_GRAY %tmp.39 21 29 42 ];
+        %tmp.39 = getv %tmp.38 :COLOR_LT_GRAY;
+        symbol [ Graphics %tmp.40 21 44 52 ];
+        %tmp.40 = getm $.Toybox.Graphics;
+        symbol [ COLOR_TRANSPARENT %tmp.41 21 53 70 ];
+        %tmp.41 = getv %tmp.40 :COLOR_TRANSPARENT;
+        invoke %tmp.36 %tmp.37(%tmp.39, %tmp.41);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc" 22 8 ]
+        %tmp.42 = lgetv %dc;
+        symbol [ dc %tmp.42 22 8 10 ];
+        symbol [ drawText %tmp.43 22 11 19 ];
+        %tmp.43 = getv function %tmp.42 :drawText;
+        %tmp.44 = lgetv %cx.1;
+        symbol [ cx %tmp.44 22 20 22 ];
+        %tmp.45 = lgetv %cy.2;
+        symbol [ cy %tmp.45 22 24 26 ];
+        %tmp.46 = 20;
+        %tmp.47 = add %tmp.45 %tmp.46;
+        symbol [ Graphics %tmp.48 22 33 41 ];
+        %tmp.48 = getm $.Toybox.Graphics;
+        symbol [ FONT_SMALL %tmp.49 22 42 52 ];
+        %tmp.49 = getv %tmp.48 :FONT_SMALL;
+        %tmp.50 = "Coming Soon";
+        symbol [ Graphics %tmp.51 22 69 77 ];
+        %tmp.51 = getm $.Toybox.Graphics;
+        symbol [ TEXT_JUSTIFY_CENTER %tmp.52 22 78 97 ];
+        %tmp.52 = getv %tmp.51 :TEXT_JUSTIFY_CENTER;
+        invoke %tmp.42 %tmp.43(%tmp.44, %tmp.47, %tmp.49, %tmp.50, %tmp.52);
+_home_twain_AndroidStudioProjects_wags_garmin_source_ResonancePlaceholderView_mc_11_26_23_4_stop:
+    }
+}
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc"; @line = 26; @symbol_classdef = [ResonancePlaceholderDelegate,26,6,34]; @symbol_extends<0> = [WatchUi,26,43,50]; @symbol_extends<1> = [BehaviorDelegate,26,51,67]; ]
+class ResonancePlaceholderDelegate extends WatchUi.BehaviorDelegate {
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc"; @line = 26; ]
+    <init> {
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc"; @line = 26; ]
+    static
+    <init> {
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc"; @line = 28; @symbol_functiondef = [initialize,28,13,23]; ]
+    function initialize() as Void {
+_home_twain_AndroidStudioProjects_wags_garmin_source_ResonancePlaceholderView_mc_28_26_30_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc" 29 8 ]
+        symbol [ BehaviorDelegate %tmp.2 29 8 24 ];
+        %tmp.2 = getv ? :BehaviorDelegate;
+        symbol [ initialize %tmp.3 29 25 35 ];
+        %tmp.3 = getv function %tmp.2 :initialize;
+        invoke %tmp.2 %tmp.3();
+_home_twain_AndroidStudioProjects_wags_garmin_source_ResonancePlaceholderView_mc_28_26_30_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc"; @line = 32; @symbol_functiondef = [onBack,32,13,19]; ]
+    function onBack() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_ResonancePlaceholderView_mc_32_22_35_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc" 33 8 ]
+        symbol [ WatchUi %tmp.1 33 8 15 ];
+        %tmp.1 = getm $.Toybox.WatchUi;
+        symbol [ popView %tmp.2 33 16 23 ];
+        %tmp.2 = getv function %tmp.1 :popView;
+        symbol [ WatchUi %tmp.3 33 24 31 ];
+        %tmp.3 = getm $.Toybox.WatchUi;
+        symbol [ SLIDE_RIGHT %tmp.4 33 32 43 ];
+        %tmp.4 = getv %tmp.3 :SLIDE_RIGHT;
+        invoke %tmp.1 %tmp.2(%tmp.4);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc" 34 8 ]
+        %tmp.5 = true;
+        ret %tmp.5;
+_home_twain_AndroidStudioProjects_wags_garmin_source_ResonancePlaceholderView_mc_32_22_35_4_stop:
+    }
+}
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc"; @line = 1; ]
+<init> {
+}

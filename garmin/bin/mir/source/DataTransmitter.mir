@@ -1,0 +1,755 @@
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc"; @line = 1; @symbol_usingdef<0> = [Toybox,1,6,12]; @symbol_usingdef<1> = [Communications,1,13,27]; ]
+using Toybox.Communications;
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc"; @line = 2; @symbol_usingdef<0> = [Toybox,2,6,12]; @symbol_usingdef<1> = [System,2,13,19]; ]
+using Toybox.System;
+//! ConnectionListener for batch transmissions.
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc"; @line = 5; @symbol_classdef = [BatchConnectionListener,5,6,29]; @symbol_extends<0> = [Communications,5,38,52]; @symbol_extends<1> = [ConnectionListener,5,53,71]; ]
+class BatchConnectionListener extends Communications.ConnectionListener {
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc"; @line = 5; ]
+    <init> {
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc"; @line = 5; ]
+    static
+    <init> {
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc"; @line = 6; @symbol_functiondef = [initialize,6,13,23]; ]
+    function initialize() as Void {
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_6_26_8_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 7 8 ]
+        symbol [ ConnectionListener %tmp.2 7 8 26 ];
+        %tmp.2 = getv ? :ConnectionListener;
+        symbol [ initialize %tmp.3 7 27 37 ];
+        %tmp.3 = getv function %tmp.2 :initialize;
+        invoke %tmp.2 %tmp.3();
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_6_26_8_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc"; @line = 10; @symbol_functiondef = [onComplete,10,13,23]; ]
+    function onComplete() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_10_26_12_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 11 8 ]
+        symbol [ System %tmp.1 11 8 14 ];
+        %tmp.1 = getm $.Toybox.System;
+        symbol [ println %tmp.2 11 15 22 ];
+        %tmp.2 = getv function %tmp.1 :println;
+        %tmp.3 = "[WAGS] Batch transmit OK";
+        invoke %tmp.1 %tmp.2(%tmp.3);
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_10_26_12_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc"; @line = 14; @symbol_functiondef = [onError,14,13,20]; ]
+    function onError() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_14_23_16_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 15 8 ]
+        symbol [ System %tmp.1 15 8 14 ];
+        %tmp.1 = getm $.Toybox.System;
+        symbol [ println %tmp.2 15 15 22 ];
+        %tmp.2 = getv function %tmp.1 :println;
+        %tmp.3 = "[WAGS] Batch transmit FAILED";
+        invoke %tmp.1 %tmp.2(%tmp.3);
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_14_23_16_4_stop:
+    }
+}
+//! ConnectionListener for the main/summary transmission.
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc"; @line = 20; @symbol_classdef = [MainConnectionListener,20,6,28]; @symbol_extends<0> = [Communications,20,37,51]; @symbol_extends<1> = [ConnectionListener,20,52,70]; ]
+class MainConnectionListener extends Communications.ConnectionListener {
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc"; @line = 20; ]
+    <init> {
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc"; @line = 20; ]
+    static
+    <init> {
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc"; @line = 21; @symbol_functiondef = [initialize,21,13,23]; ]
+    function initialize() as Void {
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_21_26_23_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 22 8 ]
+        symbol [ ConnectionListener %tmp.2 22 8 26 ];
+        %tmp.2 = getv ? :ConnectionListener;
+        symbol [ initialize %tmp.3 22 27 37 ];
+        %tmp.3 = getv function %tmp.2 :initialize;
+        invoke %tmp.2 %tmp.3();
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_21_26_23_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc"; @line = 25; @symbol_functiondef = [onComplete,25,13,23]; ]
+    function onComplete() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_25_26_29_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 26 8 ]
+        symbol [ System %tmp.1 26 8 14 ];
+        %tmp.1 = getm $.Toybox.System;
+        symbol [ println %tmp.2 26 15 22 ];
+        %tmp.2 = getv function %tmp.1 :println;
+        %tmp.3 = "[WAGS] Main transmit OK — data sent to phone!";
+        invoke %tmp.1 %tmp.2(%tmp.3);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 27 8 ]
+        symbol [ DataTransmitter %tmp.4 27 8 23 ];
+        %tmp.4 = getv self :DataTransmitter;
+        %tmp.5 = null;
+        symbol [ _pendingPayload ? 27 24 39 ];
+        putv %tmp.4 :_pendingPayload %tmp.5;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 28 8 ]
+        symbol [ DataTransmitter %tmp.6 28 8 23 ];
+        %tmp.6 = getv self :DataTransmitter;
+        %tmp.7 = 0;
+        symbol [ _retryCount ? 28 24 35 ];
+        putv %tmp.6 :_retryCount %tmp.7;
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_25_26_29_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc"; @line = 31; @symbol_functiondef = [onError,31,13,20]; ]
+    function onError() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_31_23_42_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 32 8 ]
+        symbol [ System %tmp.1 32 8 14 ];
+        %tmp.1 = getm $.Toybox.System;
+        symbol [ println %tmp.2 32 15 22 ];
+        %tmp.2 = getv function %tmp.1 :println;
+        %tmp.3 = "[WAGS] Main transmit FAILED";
+        invoke %tmp.1 %tmp.2(%tmp.3);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 33 8 ]
+        symbol [ DataTransmitter %tmp.4 33 8 23 ];
+        %tmp.4 = getv self :DataTransmitter;
+        symbol [ DataTransmitter %tmp.7 33 8 23 ];
+        %tmp.7 = getv ? :DataTransmitter;
+        symbol [ _retryCount %tmp.8 33 24 35 ];
+        %tmp.8 = getv %tmp.7 :_retryCount;
+        %tmp.9 = add %tmp.8 1;
+        symbol [ _retryCount ? 33 24 35 ];
+        putv %tmp.4 :_retryCount dup %tmp.9;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 34 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_34_8_41_8_if_stmt:
+        symbol [ DataTransmitter %tmp.11 34 12 27 ];
+        %tmp.11 = getv ? :DataTransmitter;
+        symbol [ _retryCount %tmp.12 34 28 39 ];
+        %tmp.12 = getv %tmp.11 :_retryCount;
+        symbol [ DataTransmitter %tmp.14 34 42 57 ];
+        %tmp.14 = getv ? :DataTransmitter;
+        symbol [ MAX_RETRIES %tmp.15 34 58 69 ];
+        %tmp.15 = getv %tmp.14 :MAX_RETRIES;
+        %tmp.16 = lt %tmp.12 %tmp.15;
+        bf %tmp.16 @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_34_8_41_8_if_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_34_8_41_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_34_71_37_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 35 12 ]
+        symbol [ System %tmp.17 35 12 18 ];
+        %tmp.17 = getm $.Toybox.System;
+        symbol [ println %tmp.18 35 19 26 ];
+        %tmp.18 = getv function %tmp.17 :println;
+        %tmp.19 = "[WAGS] Retrying... attempt ";
+        symbol [ DataTransmitter %tmp.21 35 59 74 ];
+        %tmp.21 = getv ? :DataTransmitter;
+        symbol [ _retryCount %tmp.22 35 75 86 ];
+        %tmp.22 = getv %tmp.21 :_retryCount;
+        %tmp.23 = add %tmp.19 %tmp.22;
+        invoke %tmp.17 %tmp.18(%tmp.23);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 36 12 ]
+        symbol [ DataTransmitter %tmp.25 36 12 27 ];
+        %tmp.25 = getv ? :DataTransmitter;
+        symbol [ doTransmit %tmp.26 36 28 38 ];
+        %tmp.26 = getv function %tmp.25 :doTransmit;
+        invoke %tmp.25 %tmp.26();
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_34_71_37_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_34_8_41_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_34_8_41_8_if_else_false:
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_37_15_41_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 38 12 ]
+        symbol [ System %tmp.27 38 12 18 ];
+        %tmp.27 = getm $.Toybox.System;
+        symbol [ println %tmp.28 38 19 26 ];
+        %tmp.28 = getv function %tmp.27 :println;
+        %tmp.29 = "[WAGS] Max retries reached, giving up.";
+        invoke %tmp.27 %tmp.28(%tmp.29);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 39 12 ]
+        symbol [ DataTransmitter %tmp.30 39 12 27 ];
+        %tmp.30 = getv self :DataTransmitter;
+        %tmp.31 = null;
+        symbol [ _pendingPayload ? 39 28 43 ];
+        putv %tmp.30 :_pendingPayload %tmp.31;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 40 12 ]
+        symbol [ DataTransmitter %tmp.32 40 12 27 ];
+        %tmp.32 = getv self :DataTransmitter;
+        %tmp.33 = 0;
+        symbol [ _retryCount ? 40 28 39 ];
+        putv %tmp.32 :_retryCount %tmp.33;
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_37_15_41_8_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_34_8_41_8_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_31_23_42_4_stop:
+    }
+}
+//! Handles transmitting session data from the watch to the companion phone app.
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc"; @line = 46; @symbol_moduledef = [DataTransmitter,46,7,22]; ]
+module DataTransmitter {
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc"; @line = 46; ]
+    <init> {
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc"; @line = 48; @position = 8; @symbol_vardef = [_retryCount,48,8,19]; ]
+    var _retryCount = 0;
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc"; @line = 49; @position = 8; @symbol_vardef = [_pendingPayload,49,8,23]; ]
+    var _pendingPayload = null;
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc"; @line = 50; @position = 10; @symbol_constdef = [MAX_RETRIES,50,10,21]; ]
+    const MAX_RETRIES = 3;
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc"; @line = 52; @symbol_functiondef = [transmit,52,13,21]; @symbol_param<0> = [payload,52,22,29]; ]
+    function transmit(payload) {
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_52_31_65_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 53 8 ]
+        symbol [ System %tmp.1 53 8 14 ];
+        %tmp.1 = getm $.Toybox.System;
+        symbol [ println %tmp.2 53 15 22 ];
+        %tmp.2 = getv function %tmp.1 :println;
+        %tmp.3 = "[WAGS] DataTransmitter.transmit() called";
+        invoke %tmp.1 %tmp.2(%tmp.3);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 54 8 ]
+        %tmp.4 = lgetv %payload;
+        symbol [ payload %tmp.4 54 26 33 ];
+        symbol [ _pendingPayload ? 54 8 23 ];
+        putv self :_pendingPayload %tmp.4;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 55 8 ]
+        %tmp.5 = 0;
+        symbol [ _retryCount ? 55 8 19 ];
+        putv self :_retryCount %tmp.5;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 58 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_52_31_65_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_52_31_65_4_stop" ]
+        %pType.1 = local;
+        symbol [ pType %pType.1 58 12 17 ];
+        %tmp.6 = lgetv %payload;
+        symbol [ payload %tmp.6 58 20 27 ];
+        symbol [ get %tmp.7 58 28 31 ];
+        %tmp.7 = getv function %tmp.6 :get;
+        %tmp.8 = "type";
+        %tmp.9 = invoke %tmp.6 %tmp.7(%tmp.8);
+        lputv %pType.1 %tmp.9;
+        symbol [ pType %pType.1 58 12 17 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 59 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_52_31_65_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_52_31_65_4_stop" ]
+        %pDur.2 = local;
+        symbol [ pDur %pDur.2 59 12 16 ];
+        %tmp.10 = lgetv %payload;
+        symbol [ payload %tmp.10 59 19 26 ];
+        symbol [ get %tmp.11 59 27 30 ];
+        %tmp.11 = getv function %tmp.10 :get;
+        %tmp.12 = "durationMs";
+        %tmp.13 = invoke %tmp.10 %tmp.11(%tmp.12);
+        lputv %pDur.2 %tmp.13;
+        symbol [ pDur %pDur.2 59 12 16 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 60 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_52_31_65_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_52_31_65_4_stop" ]
+        %pSamples.3 = local;
+        symbol [ pSamples %pSamples.3 60 12 20 ];
+        %tmp.14 = lgetv %payload;
+        symbol [ payload %tmp.14 60 23 30 ];
+        symbol [ get %tmp.15 60 31 34 ];
+        %tmp.15 = getv function %tmp.14 :get;
+        %tmp.16 = "packedSamples";
+        %tmp.17 = invoke %tmp.14 %tmp.15(%tmp.16);
+        lputv %pSamples.3 %tmp.17;
+        symbol [ pSamples %pSamples.3 60 12 20 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 61 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_52_31_65_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_52_31_65_4_stop" ]
+        %sampleCount.4 = local;
+        symbol [ sampleCount %sampleCount.4 61 12 23 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_61_26_61_65_begin:
+        %tmp.18 = lgetv %pSamples.3;
+        symbol [ pSamples %tmp.18 61 27 35 ];
+        %tmp.19 = null;
+        %tmp.20 = ne %tmp.18 %tmp.19;
+        bf %tmp.20 @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_61_26_61_65_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_61_26_61_65_true:
+        %tmp.21 = lgetv %pSamples.3;
+        symbol [ pSamples %tmp.21 61 47 55 ];
+        %tmp.22 = as %tmp.21 { (!Null) };
+        symbol [ size %tmp.23 61 56 60 ];
+        %tmp.23 = getv function %tmp.22 :size;
+        %tmp.24 = invoke %tmp.22 %tmp.23();
+        push %tmp.24;
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_61_26_61_65_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_61_26_61_65_else_false:
+        %tmp.25 = 0;
+        push %tmp.25;
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_61_26_61_65_end:
+        %tmp.26 = phi [%tmp.20 @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_61_26_61_65_begin] [%tmp.24 @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_61_26_61_65_true] [%tmp.25 @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_61_26_61_65_else_false] [%tmp.26 @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_61_26_61_65_end];
+        lputv %sampleCount.4 %tmp.26;
+        symbol [ sampleCount %sampleCount.4 61 12 23 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 62 8 ]
+        symbol [ System %tmp.27 62 8 14 ];
+        %tmp.27 = getm $.Toybox.System;
+        symbol [ println %tmp.28 62 15 22 ];
+        %tmp.28 = getv function %tmp.27 :println;
+        %tmp.29 = "[WAGS] Payload: type=";
+        %tmp.30 = lgetv %pType.1;
+        symbol [ pType %tmp.30 62 49 54 ];
+        %tmp.31 = add %tmp.29 %tmp.30;
+        %tmp.32 = " duration=";
+        %tmp.33 = add %tmp.31 %tmp.32;
+        %tmp.34 = lgetv %pDur.2;
+        symbol [ pDur %tmp.34 62 72 76 ];
+        %tmp.35 = add %tmp.33 %tmp.34;
+        %tmp.36 = " samples=";
+        %tmp.37 = add %tmp.35 %tmp.36;
+        %tmp.38 = lgetv %sampleCount.4;
+        symbol [ sampleCount %tmp.38 62 93 104 ];
+        %tmp.39 = add %tmp.37 %tmp.38;
+        invoke %tmp.27 %tmp.28(%tmp.39);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 64 8 ]
+        %tmp.40 = self;
+        symbol [ doTransmit %tmp.41 64 8 18 ];
+        %tmp.41 = getv function %tmp.40 :doTransmit;
+        invoke %tmp.40 %tmp.41();
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_52_31_65_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc"; @line = 67; @symbol_functiondef = [doTransmit,67,13,23]; ]
+    function doTransmit() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_67_26_84_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 68 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_68_8_71_8_if_stmt:
+        symbol [ _pendingPayload %tmp.2 68 12 27 ];
+        %tmp.2 = getv ? :_pendingPayload;
+        %tmp.3 = null;
+        %tmp.4 = eq %tmp.2 %tmp.3;
+        bf %tmp.4 @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_68_8_71_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_68_8_71_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_68_37_71_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 69 12 ]
+        symbol [ System %tmp.5 69 12 18 ];
+        %tmp.5 = getm $.Toybox.System;
+        symbol [ println %tmp.6 69 19 26 ];
+        %tmp.6 = getv function %tmp.5 :println;
+        %tmp.7 = "[WAGS] doTransmit: no pending payload";
+        invoke %tmp.5 %tmp.6(%tmp.7);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 70 12 ]
+        ret ?;
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_68_37_71_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_68_8_71_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_68_8_71_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 73 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_67_26_84_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_67_26_84_4_stop" ]
+        %payload.1 = local;
+        symbol [ payload %payload.1 73 12 19 ];
+        symbol [ _pendingPayload %tmp.9 73 22 37 ];
+        %tmp.9 = getv ? :_pendingPayload;
+        lputv %payload.1 %tmp.9;
+        symbol [ payload %payload.1 73 12 19 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 74 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_67_26_84_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_67_26_84_4_stop" ]
+        %samples.2 = local;
+        symbol [ samples %samples.2 74 12 19 ];
+        %tmp.10 = lgetv %payload.1;
+        symbol [ payload %tmp.10 74 22 29 ];
+        symbol [ get %tmp.11 74 30 33 ];
+        %tmp.11 = getv function %tmp.10 :get;
+        %tmp.12 = "packedSamples";
+        %tmp.13 = invoke %tmp.10 %tmp.11(%tmp.12);
+        lputv %samples.2 %tmp.13;
+        symbol [ samples %samples.2 74 12 19 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 76 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_76_8_83_8_if_stmt:
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_76_12_76_48_begin:
+        %tmp.14 = lgetv %samples.2;
+        symbol [ samples %tmp.14 76 12 19 ];
+        %tmp.15 = null;
+        %tmp.16 = ne %tmp.14 %tmp.15;
+        bf %tmp.16 @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_76_8_83_8_if_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_76_31_76_48_true:
+        %tmp.17 = lgetv %samples.2;
+        symbol [ samples %tmp.17 76 31 38 ];
+        %tmp.18 = as %tmp.17 { (!Null) };
+        symbol [ size %tmp.19 76 39 43 ];
+        %tmp.19 = getv function %tmp.18 :size;
+        %tmp.20 = invoke %tmp.18 %tmp.19();
+        %tmp.21 = 60;
+        %tmp.22 = gt %tmp.20 %tmp.21;
+        push %tmp.22;
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_76_31_76_48_end:
+        %tmp.23 = phi [%tmp.16 @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_76_12_76_48_begin] [%tmp.22 @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_76_31_76_48_true] [%tmp.23 @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_76_31_76_48_end];
+        bf %tmp.23 @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_76_8_83_8_if_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_76_8_83_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_76_52_79_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 77 12 ]
+        symbol [ System %tmp.24 77 12 18 ];
+        %tmp.24 = getm $.Toybox.System;
+        symbol [ println %tmp.25 77 19 26 ];
+        %tmp.25 = getv function %tmp.24 :println;
+        %tmp.26 = "[WAGS] Sending batched (";
+        %tmp.27 = lgetv %samples.2;
+        symbol [ samples %tmp.27 77 56 63 ];
+        %tmp.28 = as %tmp.27 { (!Null) };
+        symbol [ size %tmp.29 77 64 68 ];
+        %tmp.29 = getv function %tmp.28 :size;
+        %tmp.30 = invoke %tmp.28 %tmp.29();
+        %tmp.31 = add %tmp.26 %tmp.30;
+        %tmp.32 = " samples)";
+        %tmp.33 = add %tmp.31 %tmp.32;
+        invoke %tmp.24 %tmp.25(%tmp.33);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 78 12 ]
+        %tmp.34 = self;
+        symbol [ transmitBatched %tmp.35 78 12 27 ];
+        %tmp.35 = getv function %tmp.34 :transmitBatched;
+        %tmp.36 = lgetv %payload.1;
+        symbol [ payload %tmp.36 78 28 35 ];
+        invoke %tmp.34 %tmp.35(%tmp.36);
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_76_52_79_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_76_8_83_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_76_8_83_8_if_else_false:
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_79_15_83_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 80 12 ]
+        symbol [ System %tmp.37 80 12 18 ];
+        %tmp.37 = getm $.Toybox.System;
+        symbol [ println %tmp.38 80 19 26 ];
+        %tmp.38 = getv function %tmp.37 :println;
+        %tmp.39 = "[WAGS] Sending single message (samples=";
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_81_17_81_54_begin:
+        %tmp.40 = lgetv %samples.2;
+        symbol [ samples %tmp.40 81 18 25 ];
+        %tmp.41 = null;
+        %tmp.42 = ne %tmp.40 %tmp.41;
+        bf %tmp.42 @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_81_17_81_54_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_81_17_81_54_true:
+        %tmp.43 = lgetv %samples.2;
+        symbol [ samples %tmp.43 81 37 44 ];
+        %tmp.44 = as %tmp.43 { (!Null) };
+        symbol [ size %tmp.45 81 45 49 ];
+        %tmp.45 = getv function %tmp.44 :size;
+        %tmp.46 = invoke %tmp.44 %tmp.45();
+        push %tmp.46;
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_81_17_81_54_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_81_17_81_54_else_false:
+        %tmp.47 = 0;
+        push %tmp.47;
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_81_17_81_54_end:
+        %tmp.48 = phi [%tmp.42 @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_81_17_81_54_begin] [%tmp.46 @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_81_17_81_54_true] [%tmp.47 @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_81_17_81_54_else_false] [%tmp.48 @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_81_17_81_54_end];
+        %tmp.49 = add %tmp.39 %tmp.48;
+        %tmp.50 = ")";
+        %tmp.51 = add %tmp.49 %tmp.50;
+        invoke %tmp.37 %tmp.38(%tmp.51);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 82 12 ]
+        symbol [ Communications %tmp.52 82 12 26 ];
+        %tmp.52 = getm $.Toybox.Communications;
+        symbol [ transmit %tmp.53 82 27 35 ];
+        %tmp.53 = getv function %tmp.52 :transmit;
+        %tmp.54 = lgetv %payload.1;
+        symbol [ payload %tmp.54 82 36 43 ];
+        %tmp.55 = null;
+        symbol [ MainConnectionListener %tmp.59 82 55 77 ];
+        %tmp.59 = getv ? :MainConnectionListener;
+        %tmp.56 = newc %tmp.59 ();
+        invoke %tmp.52 %tmp.53(%tmp.54, %tmp.55, %tmp.56);
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_79_15_83_8_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_76_8_83_8_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_67_26_84_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc"; @line = 86; @symbol_functiondef = [transmitBatched,86,13,28]; @symbol_param<0> = [payload,86,29,36]; ]
+    function transmitBatched(payload) {
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_86_38_129_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 87 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_86_38_129_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_86_38_129_4_stop" ]
+        %samples.1 = local;
+        symbol [ samples %samples.1 87 12 19 ];
+        %tmp.1 = lgetv %payload;
+        symbol [ payload %tmp.1 87 22 29 ];
+        symbol [ get %tmp.2 87 30 33 ];
+        %tmp.2 = getv function %tmp.1 :get;
+        %tmp.3 = "packedSamples";
+        %tmp.4 = invoke %tmp.1 %tmp.2(%tmp.3);
+        lputv %samples.1 %tmp.4;
+        symbol [ samples %samples.1 87 12 19 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 88 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_86_38_129_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_86_38_129_4_stop" ]
+        %totalSamples.2 = local;
+        symbol [ totalSamples %totalSamples.2 88 12 24 ];
+        %tmp.5 = lgetv %samples.1;
+        symbol [ samples %tmp.5 88 27 34 ];
+        symbol [ size %tmp.6 88 35 39 ];
+        %tmp.6 = getv function %tmp.5 :size;
+        %tmp.7 = invoke %tmp.5 %tmp.6();
+        lputv %totalSamples.2 %tmp.7;
+        symbol [ totalSamples %totalSamples.2 88 12 24 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 89 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_86_38_129_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_86_38_129_4_stop" ]
+        %batchSize.3 = local;
+        symbol [ batchSize %batchSize.3 89 12 21 ];
+        %tmp.8 = 60;
+        lputv %batchSize.3 %tmp.8;
+        symbol [ batchSize %batchSize.3 89 12 21 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 91 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_86_38_129_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_86_38_129_4_stop" ]
+        %batchIndex.4 = local;
+        symbol [ batchIndex %batchIndex.4 91 12 22 ];
+        %tmp.9 = 0;
+        lputv %batchIndex.4 %tmp.9;
+        symbol [ batchIndex %batchIndex.4 91 12 22 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 92 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_86_38_129_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_86_38_129_4_stop" ]
+        %offset.5 = local;
+        symbol [ offset %offset.5 92 12 18 ];
+        %tmp.10 = 0;
+        lputv %offset.5 %tmp.10;
+        symbol [ offset %offset.5 92 12 18 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 93 8 ]
+        while @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_93_8_111_8_while_test @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_93_8_111_8_while_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_93_8_111_8_while_test:
+        %tmp.11 = lgetv %offset.5;
+        symbol [ offset %tmp.11 93 15 21 ];
+        %tmp.12 = lgetv %totalSamples.2;
+        symbol [ totalSamples %tmp.12 93 24 36 ];
+        %tmp.13 = lt %tmp.11 %tmp.12;
+        bf %tmp.13 @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_93_8_111_8_while_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_93_8_111_8_while_begin:
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_93_38_111_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 94 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_93_38_111_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_93_38_111_8_stop" ]
+        %end.6 = local;
+        symbol [ end %end.6 94 16 19 ];
+        %tmp.14 = lgetv %offset.5;
+        symbol [ offset %tmp.14 94 22 28 ];
+        %tmp.15 = lgetv %batchSize.3;
+        symbol [ batchSize %tmp.15 94 31 40 ];
+        %tmp.16 = add %tmp.14 %tmp.15;
+        lputv %end.6 %tmp.16;
+        symbol [ end %end.6 94 16 19 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 95 12 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_95_12_97_12_if_stmt:
+        %tmp.17 = lgetv %end.6;
+        symbol [ end %tmp.17 95 16 19 ];
+        %tmp.18 = lgetv %totalSamples.2;
+        symbol [ totalSamples %tmp.18 95 22 34 ];
+        %tmp.19 = gt %tmp.17 %tmp.18;
+        bf %tmp.19 @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_95_12_97_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_95_12_97_12_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_95_36_97_12_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 96 16 ]
+        %tmp.20 = lgetv %totalSamples.2;
+        symbol [ totalSamples %tmp.20 96 22 34 ];
+        lputv %end.6 %tmp.20;
+        symbol [ end %end.6 96 16 19 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_95_36_97_12_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_95_12_97_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_95_12_97_12_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 99 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_93_38_111_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_93_38_111_8_stop" ]
+        %chunk.7 = local;
+        symbol [ chunk %chunk.7 99 16 21 ];
+        %tmp.21 = lgetv %samples.1;
+        symbol [ samples %tmp.21 99 24 31 ];
+        symbol [ slice %tmp.22 99 32 37 ];
+        %tmp.22 = getv function %tmp.21 :slice;
+        %tmp.23 = lgetv %offset.5;
+        symbol [ offset %tmp.23 99 38 44 ];
+        %tmp.24 = lgetv %end.6;
+        symbol [ end %tmp.24 99 46 49 ];
+        %tmp.25 = invoke %tmp.21 %tmp.22(%tmp.23, %tmp.24);
+        lputv %chunk.7 %tmp.25;
+        symbol [ chunk %chunk.7 99 16 21 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 100 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_93_38_111_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_93_38_111_8_stop" ]
+        %batchPayload.8 = local;
+        symbol [ batchPayload %batchPayload.8 100 16 28 ];
+        %tmp.26 = newd 4;
+        %tmp.27 = "type";
+        %tmp.28 = "TELEMETRY_BATCH";
+        %tmp.29 = dup %tmp.26;
+        %tmp.30 = aputv %tmp.29 %tmp.27 %tmp.28;
+        %tmp.31 = "batchIndex";
+        %tmp.32 = lgetv %batchIndex.4;
+        symbol [ batchIndex %tmp.32 102 32 42 ];
+        %tmp.33 = dup %tmp.30;
+        %tmp.34 = aputv %tmp.33 %tmp.31 %tmp.32;
+        %tmp.35 = "offset";
+        %tmp.36 = lgetv %offset.5;
+        symbol [ offset %tmp.36 103 32 38 ];
+        %tmp.37 = dup %tmp.34;
+        %tmp.38 = aputv %tmp.37 %tmp.35 %tmp.36;
+        %tmp.39 = "samples";
+        %tmp.40 = lgetv %chunk.7;
+        symbol [ chunk %tmp.40 104 32 37 ];
+        %tmp.41 = dup %tmp.38;
+        %tmp.42 = aputv %tmp.41 %tmp.39 %tmp.40;
+        lputv %batchPayload.8 %tmp.42;
+        symbol [ batchPayload %batchPayload.8 100 16 28 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 107 12 ]
+        symbol [ System %tmp.43 107 12 18 ];
+        %tmp.43 = getm $.Toybox.System;
+        symbol [ println %tmp.44 107 19 26 ];
+        %tmp.44 = getv function %tmp.43 :println;
+        %tmp.45 = "[WAGS] Sending batch ";
+        %tmp.46 = lgetv %batchIndex.4;
+        symbol [ batchIndex %tmp.46 107 53 63 ];
+        %tmp.47 = add %tmp.45 %tmp.46;
+        %tmp.48 = " (offset=";
+        %tmp.49 = add %tmp.47 %tmp.48;
+        %tmp.50 = lgetv %offset.5;
+        symbol [ offset %tmp.50 107 80 86 ];
+        %tmp.51 = add %tmp.49 %tmp.50;
+        %tmp.52 = ", size=";
+        %tmp.53 = add %tmp.51 %tmp.52;
+        %tmp.54 = lgetv %chunk.7;
+        symbol [ chunk %tmp.54 107 101 106 ];
+        symbol [ size %tmp.55 107 107 111 ];
+        %tmp.55 = getv function %tmp.54 :size;
+        %tmp.56 = invoke %tmp.54 %tmp.55();
+        %tmp.57 = add %tmp.53 %tmp.56;
+        %tmp.58 = ")";
+        %tmp.59 = add %tmp.57 %tmp.58;
+        invoke %tmp.43 %tmp.44(%tmp.59);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 108 12 ]
+        symbol [ Communications %tmp.60 108 12 26 ];
+        %tmp.60 = getm $.Toybox.Communications;
+        symbol [ transmit %tmp.61 108 27 35 ];
+        %tmp.61 = getv function %tmp.60 :transmit;
+        %tmp.62 = lgetv %batchPayload.8;
+        symbol [ batchPayload %tmp.62 108 36 48 ];
+        %tmp.63 = null;
+        symbol [ BatchConnectionListener %tmp.67 108 60 83 ];
+        %tmp.67 = getv ? :BatchConnectionListener;
+        %tmp.64 = newc %tmp.67 ();
+        invoke %tmp.60 %tmp.61(%tmp.62, %tmp.63, %tmp.64);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 109 12 ]
+        %tmp.68 = lgetv %end.6;
+        symbol [ end %tmp.68 109 21 24 ];
+        lputv %offset.5 %tmp.68;
+        symbol [ offset %offset.5 109 12 18 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 110 12 ]
+        %tmp.71 = lgetv %batchIndex.4;
+        symbol [ batchIndex %tmp.71 110 12 22 ];
+        %tmp.72 = add %tmp.71 1;
+        lputv %batchIndex.4 %tmp.72;
+        symbol [ batchIndex %batchIndex.4 110 12 22 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_93_38_111_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_93_8_111_8_while_test;
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_93_8_111_8_while_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 113 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_86_38_129_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_86_38_129_4_stop" ]
+        %summary.9 = local;
+        symbol [ summary %summary.9 113 12 19 ];
+        %tmp.73 = newd 12;
+        %tmp.74 = "type";
+        %tmp.75 = lgetv %payload;
+        symbol [ payload %tmp.75 114 36 43 ];
+        symbol [ get %tmp.76 114 44 47 ];
+        %tmp.76 = getv function %tmp.75 :get;
+        %tmp.77 = "type";
+        %tmp.78 = invoke %tmp.75 %tmp.76(%tmp.77);
+        %tmp.79 = dup %tmp.73;
+        %tmp.80 = aputv %tmp.79 %tmp.74 %tmp.78;
+        %tmp.81 = "id";
+        %tmp.82 = lgetv %payload;
+        symbol [ payload %tmp.82 115 36 43 ];
+        symbol [ get %tmp.83 115 44 47 ];
+        %tmp.83 = getv function %tmp.82 :get;
+        %tmp.84 = "id";
+        %tmp.85 = invoke %tmp.82 %tmp.83(%tmp.84);
+        %tmp.86 = dup %tmp.80;
+        %tmp.87 = aputv %tmp.86 %tmp.81 %tmp.85;
+        %tmp.88 = "durationMs";
+        %tmp.89 = lgetv %payload;
+        symbol [ payload %tmp.89 116 36 43 ];
+        symbol [ get %tmp.90 116 44 47 ];
+        %tmp.90 = getv function %tmp.89 :get;
+        %tmp.91 = "durationMs";
+        %tmp.92 = invoke %tmp.89 %tmp.90(%tmp.91);
+        %tmp.93 = dup %tmp.87;
+        %tmp.94 = aputv %tmp.93 %tmp.88 %tmp.92;
+        %tmp.95 = "lungVolume";
+        %tmp.96 = lgetv %payload;
+        symbol [ payload %tmp.96 117 36 43 ];
+        symbol [ get %tmp.97 117 44 47 ];
+        %tmp.97 = getv function %tmp.96 :get;
+        %tmp.98 = "lungVolume";
+        %tmp.99 = invoke %tmp.96 %tmp.97(%tmp.98);
+        %tmp.100 = dup %tmp.94;
+        %tmp.101 = aputv %tmp.100 %tmp.95 %tmp.99;
+        %tmp.102 = "prepType";
+        %tmp.103 = lgetv %payload;
+        symbol [ payload %tmp.103 118 36 43 ];
+        symbol [ get %tmp.104 118 44 47 ];
+        %tmp.104 = getv function %tmp.103 :get;
+        %tmp.105 = "prepType";
+        %tmp.106 = invoke %tmp.103 %tmp.104(%tmp.105);
+        %tmp.107 = dup %tmp.101;
+        %tmp.108 = aputv %tmp.107 %tmp.102 %tmp.106;
+        %tmp.109 = "timeOfDay";
+        %tmp.110 = lgetv %payload;
+        symbol [ payload %tmp.110 119 36 43 ];
+        symbol [ get %tmp.111 119 44 47 ];
+        %tmp.111 = getv function %tmp.110 :get;
+        %tmp.112 = "timeOfDay";
+        %tmp.113 = invoke %tmp.110 %tmp.111(%tmp.112);
+        %tmp.114 = dup %tmp.108;
+        %tmp.115 = aputv %tmp.114 %tmp.109 %tmp.113;
+        %tmp.116 = "firstContractionMs";
+        %tmp.117 = lgetv %payload;
+        symbol [ payload %tmp.117 120 36 43 ];
+        symbol [ get %tmp.118 120 44 47 ];
+        %tmp.118 = getv function %tmp.117 :get;
+        %tmp.119 = "firstContractionMs";
+        %tmp.120 = invoke %tmp.117 %tmp.118(%tmp.119);
+        %tmp.121 = dup %tmp.115;
+        %tmp.122 = aputv %tmp.121 %tmp.116 %tmp.120;
+        %tmp.123 = "contractions";
+        %tmp.124 = lgetv %payload;
+        symbol [ payload %tmp.124 121 36 43 ];
+        symbol [ get %tmp.125 121 44 47 ];
+        %tmp.125 = getv function %tmp.124 :get;
+        %tmp.126 = "contractions";
+        %tmp.127 = invoke %tmp.124 %tmp.125(%tmp.126);
+        %tmp.128 = dup %tmp.122;
+        %tmp.129 = aputv %tmp.128 %tmp.123 %tmp.127;
+        %tmp.130 = "sampleCount";
+        %tmp.131 = lgetv %payload;
+        symbol [ payload %tmp.131 122 36 43 ];
+        symbol [ get %tmp.132 122 44 47 ];
+        %tmp.132 = getv function %tmp.131 :get;
+        %tmp.133 = "sampleCount";
+        %tmp.134 = invoke %tmp.131 %tmp.132(%tmp.133);
+        %tmp.135 = dup %tmp.129;
+        %tmp.136 = aputv %tmp.135 %tmp.130 %tmp.134;
+        %tmp.137 = "startEpochMs";
+        %tmp.138 = lgetv %payload;
+        symbol [ payload %tmp.138 123 36 43 ];
+        symbol [ get %tmp.139 123 44 47 ];
+        %tmp.139 = getv function %tmp.138 :get;
+        %tmp.140 = "startEpochMs";
+        %tmp.141 = invoke %tmp.138 %tmp.139(%tmp.140);
+        %tmp.142 = dup %tmp.136;
+        %tmp.143 = aputv %tmp.142 %tmp.137 %tmp.141;
+        %tmp.144 = "endEpochMs";
+        %tmp.145 = lgetv %payload;
+        symbol [ payload %tmp.145 124 36 43 ];
+        symbol [ get %tmp.146 124 44 47 ];
+        %tmp.146 = getv function %tmp.145 :get;
+        %tmp.147 = "endEpochMs";
+        %tmp.148 = invoke %tmp.145 %tmp.146(%tmp.147);
+        %tmp.149 = dup %tmp.143;
+        %tmp.150 = aputv %tmp.149 %tmp.144 %tmp.148;
+        %tmp.151 = "batchCount";
+        %tmp.152 = lgetv %batchIndex.4;
+        symbol [ batchIndex %tmp.152 125 36 46 ];
+        %tmp.153 = dup %tmp.150;
+        %tmp.154 = aputv %tmp.153 %tmp.151 %tmp.152;
+        lputv %summary.9 %tmp.154;
+        symbol [ summary %summary.9 113 12 19 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 127 8 ]
+        symbol [ System %tmp.155 127 8 14 ];
+        %tmp.155 = getm $.Toybox.System;
+        symbol [ println %tmp.156 127 15 22 ];
+        %tmp.156 = getv function %tmp.155 :println;
+        %tmp.157 = "[WAGS] Sending summary message (batchCount=";
+        %tmp.158 = lgetv %batchIndex.4;
+        symbol [ batchIndex %tmp.158 127 71 81 ];
+        %tmp.159 = add %tmp.157 %tmp.158;
+        %tmp.160 = ")";
+        %tmp.161 = add %tmp.159 %tmp.160;
+        invoke %tmp.155 %tmp.156(%tmp.161);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc" 128 8 ]
+        symbol [ Communications %tmp.162 128 8 22 ];
+        %tmp.162 = getm $.Toybox.Communications;
+        symbol [ transmit %tmp.163 128 23 31 ];
+        %tmp.163 = getv function %tmp.162 :transmit;
+        %tmp.164 = lgetv %summary.9;
+        symbol [ summary %tmp.164 128 32 39 ];
+        %tmp.165 = null;
+        symbol [ MainConnectionListener %tmp.169 128 51 73 ];
+        %tmp.169 = getv ? :MainConnectionListener;
+        %tmp.166 = newc %tmp.169 ();
+        invoke %tmp.162 %tmp.163(%tmp.164, %tmp.165, %tmp.166);
+_home_twain_AndroidStudioProjects_wags_garmin_source_DataTransmitter_mc_86_38_129_4_stop:
+    }
+}
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/DataTransmitter.mc"; @line = 1; ]
+<init> {
+}

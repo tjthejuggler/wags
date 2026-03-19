@@ -1,0 +1,801 @@
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc"; @line = 1; @symbol_usingdef<0> = [Toybox,1,6,12]; @symbol_usingdef<1> = [Application,1,13,24]; ]
+using Toybox.Application;
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc"; @line = 2; @symbol_usingdef<0> = [Toybox,2,6,12]; @symbol_usingdef<1> = [Application,2,13,24]; @symbol_usingdef<2> = [Storage,2,25,32]; ]
+using Toybox.Application.Storage;
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc"; @line = 3; @symbol_usingdef<0> = [Toybox,3,6,12]; @symbol_usingdef<1> = [System,3,13,19]; ]
+using Toybox.System;
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc"; @line = 4; @symbol_usingdef<0> = [Toybox,4,6,12]; @symbol_usingdef<1> = [Time,4,13,17]; ]
+using Toybox.Time;
+//! Persistent storage for completed free-hold sessions.
+//!
+//! Holds are stored in Application.Storage as a list of dictionaries.
+//! Each hold has a unique ID and a "synced" flag.
+//! The phone app requests unsynced holds, and once confirmed received,
+//! the watch marks them as synced.
+//!
+//! Storage keys:
+//!   "holds"     -> Array of hold dictionaries
+//!   "nextId"    -> Next hold ID counter
+//!
+//! Each hold dictionary:
+//!   "id"                  -> Integer unique ID
+//!   "synced"              -> Boolean
+//!   "durationMs"          -> Integer
+//!   "lungVolume"          -> String
+//!   "prepType"            -> String
+//!   "timeOfDay"           -> String
+//!   "firstContractionMs"  -> Integer or null
+//!   "contractions"        -> Array of Integer (elapsed ms)
+//!   "packedSamples"       -> Array of Integer (HR<<8 | SpO2)
+//!   "sampleCount"         -> Integer
+//!   "startEpochMs"        -> Long
+//!   "endEpochMs"          -> Long
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc"; @line = 30; @symbol_moduledef = [HoldStorage,30,7,18]; ]
+module HoldStorage {
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc"; @line = 30; ]
+    <init> {
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc"; @line = 32; @position = 10; @symbol_constdef = [KEY_HOLDS,32,10,19]; ]
+    const KEY_HOLDS = "holds";
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc"; @line = 33; @position = 10; @symbol_constdef = [KEY_NEXT_ID,33,10,21]; ]
+    const KEY_NEXT_ID = "nextId";
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc"; @line = 34; @position = 10; @symbol_constdef = [MAX_HOLDS,34,10,19]; ]
+    const MAX_HOLDS = 20;
+    //! Save a completed hold to persistent storage.
+    //! Returns the hold ID.
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc"; @line = 38; @symbol_functiondef = [saveHold,38,13,21]; @symbol_param<0> = [holdData,38,22,30]; ]
+    function saveHold(holdData) {
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_38_32_71_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 39 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_38_32_71_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_38_32_71_4_stop" ]
+        %holds.1 = local;
+        symbol [ holds %holds.1 39 12 17 ];
+        %tmp.1 = self;
+        symbol [ getHolds %tmp.2 39 20 28 ];
+        %tmp.2 = getv function %tmp.1 :getHolds;
+        %tmp.3 = invoke %tmp.1 %tmp.2();
+        lputv %holds.1 %tmp.3;
+        symbol [ holds %holds.1 39 12 17 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 40 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_38_32_71_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_38_32_71_4_stop" ]
+        %nextId.2 = local;
+        symbol [ nextId %nextId.2 40 12 18 ];
+        symbol [ Storage %tmp.4 40 21 28 ];
+        %tmp.4 = getm $.Toybox.Application.Storage;
+        symbol [ getValue %tmp.5 40 29 37 ];
+        %tmp.5 = getv function %tmp.4 :getValue;
+        symbol [ KEY_NEXT_ID %tmp.7 40 38 49 ];
+        %tmp.7 = getv ? :KEY_NEXT_ID;
+        %tmp.8 = invoke %tmp.4 %tmp.5(%tmp.7);
+        lputv %nextId.2 %tmp.8;
+        symbol [ nextId %nextId.2 40 12 18 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 41 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_41_8_43_8_if_stmt:
+        %tmp.9 = lgetv %nextId.2;
+        symbol [ nextId %tmp.9 41 12 18 ];
+        %tmp.10 = null;
+        %tmp.11 = eq %tmp.9 %tmp.10;
+        bf %tmp.11 @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_41_8_43_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_41_8_43_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_41_28_43_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 42 12 ]
+        %tmp.12 = 1;
+        lputv %nextId.2 %tmp.12;
+        symbol [ nextId %nextId.2 42 12 18 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_41_28_43_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_41_8_43_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_41_8_43_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 45 8 ]
+        %tmp.13 = lgetv %holdData;
+        symbol [ holdData %tmp.13 45 8 16 ];
+        symbol [ put %tmp.14 45 17 20 ];
+        %tmp.14 = getv function %tmp.13 :put;
+        %tmp.15 = "id";
+        %tmp.16 = lgetv %nextId.2;
+        symbol [ nextId %tmp.16 45 27 33 ];
+        invoke %tmp.13 %tmp.14(%tmp.15, %tmp.16);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 46 8 ]
+        %tmp.17 = lgetv %holdData;
+        symbol [ holdData %tmp.17 46 8 16 ];
+        symbol [ put %tmp.18 46 17 20 ];
+        %tmp.18 = getv function %tmp.17 :put;
+        %tmp.19 = "synced";
+        %tmp.20 = false;
+        invoke %tmp.17 %tmp.18(%tmp.19, %tmp.20);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 48 8 ]
+        %tmp.21 = lgetv %holds.1;
+        symbol [ holds %tmp.21 48 8 13 ];
+        symbol [ add %tmp.22 48 14 17 ];
+        %tmp.22 = getv function %tmp.21 :add;
+        %tmp.23 = lgetv %holdData;
+        symbol [ holdData %tmp.23 48 18 26 ];
+        invoke %tmp.21 %tmp.22(%tmp.23);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 51 8 ]
+        while @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_51_8_64_8_while_test @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_51_8_64_8_while_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_51_8_64_8_while_test:
+        %tmp.24 = lgetv %holds.1;
+        symbol [ holds %tmp.24 51 15 20 ];
+        symbol [ size %tmp.25 51 21 25 ];
+        %tmp.25 = getv function %tmp.24 :size;
+        %tmp.26 = invoke %tmp.24 %tmp.25();
+        symbol [ MAX_HOLDS %tmp.28 51 30 39 ];
+        %tmp.28 = getv ? :MAX_HOLDS;
+        %tmp.29 = gt %tmp.26 %tmp.28;
+        bf %tmp.29 @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_51_8_64_8_while_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_51_8_64_8_while_begin:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_51_41_64_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 52 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_51_41_64_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_51_41_64_8_stop" ]
+        %removedSynced.3 = local;
+        symbol [ removedSynced %removedSynced.3 52 16 29 ];
+        %tmp.30 = false;
+        lputv %removedSynced.3 %tmp.30;
+        symbol [ removedSynced %removedSynced.3 52 16 29 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 53 12 ]
+        for @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_53_12_59_12_for_test @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_53_12_59_12_for_incr @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_53_12_59_12_for_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_53_12_59_12_for_init:
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_53_12_59_12_for_begin" "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_53_12_59_12_for_end" ]
+        %i.4 = local;
+        symbol [ i %i.4 53 21 22 ];
+        %tmp.31 = 0;
+        lputv %i.4 %tmp.31;
+        symbol [ i %i.4 53 21 22 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_53_12_59_12_for_test:
+        %tmp.32 = lgetv %i.4;
+        symbol [ i %tmp.32 53 28 29 ];
+        %tmp.33 = lgetv %holds.1;
+        symbol [ holds %tmp.33 53 32 37 ];
+        symbol [ size %tmp.34 53 38 42 ];
+        %tmp.34 = getv function %tmp.33 :size;
+        %tmp.35 = invoke %tmp.33 %tmp.34();
+        %tmp.36 = lt %tmp.32 %tmp.35;
+        bf %tmp.36 @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_53_12_59_12_for_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_53_12_59_12_for_begin:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_53_51_59_12_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 54 16 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_54_16_58_16_if_stmt:
+        %tmp.37 = lgetv %holds.1;
+        symbol [ holds %tmp.37 54 20 25 ];
+        %tmp.38 = lgetv %i.4;
+        symbol [ i %tmp.38 54 26 27 ];
+        %tmp.39 = agetv %tmp.37 %tmp.38;
+        symbol [ get %tmp.40 54 29 32 ];
+        %tmp.40 = getv function %tmp.39 :get;
+        %tmp.41 = "synced";
+        %tmp.42 = invoke %tmp.39 %tmp.40(%tmp.41);
+        %tmp.43 = true;
+        %tmp.44 = eq %tmp.42 %tmp.43;
+        bf %tmp.44 @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_54_16_58_16_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_54_16_58_16_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_54_52_58_16_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 55 20 ]
+        %tmp.45 = self;
+        symbol [ removeAt %tmp.46 55 28 36 ];
+        %tmp.46 = getv function %tmp.45 :removeAt;
+        %tmp.47 = lgetv %holds.1;
+        symbol [ holds %tmp.47 55 37 42 ];
+        %tmp.48 = lgetv %i.4;
+        symbol [ i %tmp.48 55 44 45 ];
+        %tmp.49 = invoke %tmp.45 %tmp.46(%tmp.47, %tmp.48);
+        lputv %holds.1 %tmp.49;
+        symbol [ holds %holds.1 55 20 25 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 56 20 ]
+        %tmp.50 = true;
+        lputv %removedSynced.3 %tmp.50;
+        symbol [ removedSynced %removedSynced.3 56 20 33 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 57 20 ]
+        goto break @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_53_12_59_12_for_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_54_52_58_16_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_54_16_58_16_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_54_16_58_16_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_53_51_59_12_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_53_12_59_12_for_incr:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 53 ]
+        %tmp.53 = lgetv %i.4;
+        symbol [ i %tmp.53 53 46 47 ];
+        %tmp.54 = add %tmp.53 1;
+        lputv %i.4 %tmp.54;
+        symbol [ i %i.4 53 46 47 ];
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_53_12_59_12_for_test;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_53_12_59_12_for_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 60 12 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_60_12_63_12_if_stmt:
+        %tmp.55 = lgetv %removedSynced.3;
+        symbol [ removedSynced %tmp.55 60 17 30 ];
+        %tmp.56 = not %tmp.55;
+        bf %tmp.56 @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_60_12_63_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_60_12_63_12_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_60_32_63_12_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 62 16 ]
+        %tmp.57 = self;
+        symbol [ removeAt %tmp.58 62 24 32 ];
+        %tmp.58 = getv function %tmp.57 :removeAt;
+        %tmp.59 = lgetv %holds.1;
+        symbol [ holds %tmp.59 62 33 38 ];
+        %tmp.60 = 0;
+        %tmp.61 = invoke %tmp.57 %tmp.58(%tmp.59, %tmp.60);
+        lputv %holds.1 %tmp.61;
+        symbol [ holds %holds.1 62 16 21 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_60_32_63_12_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_60_12_63_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_60_12_63_12_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_51_41_64_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_51_8_64_8_while_test;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_51_8_64_8_while_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 66 8 ]
+        symbol [ Storage %tmp.62 66 8 15 ];
+        %tmp.62 = getm $.Toybox.Application.Storage;
+        symbol [ setValue %tmp.63 66 16 24 ];
+        %tmp.63 = getv function %tmp.62 :setValue;
+        symbol [ KEY_HOLDS %tmp.65 66 25 34 ];
+        %tmp.65 = getv ? :KEY_HOLDS;
+        %tmp.66 = lgetv %holds.1;
+        symbol [ holds %tmp.66 66 36 41 ];
+        invoke %tmp.62 %tmp.63(%tmp.65, %tmp.66);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 67 8 ]
+        symbol [ Storage %tmp.67 67 8 15 ];
+        %tmp.67 = getm $.Toybox.Application.Storage;
+        symbol [ setValue %tmp.68 67 16 24 ];
+        %tmp.68 = getv function %tmp.67 :setValue;
+        symbol [ KEY_NEXT_ID %tmp.70 67 25 36 ];
+        %tmp.70 = getv ? :KEY_NEXT_ID;
+        %tmp.71 = lgetv %nextId.2;
+        symbol [ nextId %tmp.71 67 38 44 ];
+        %tmp.72 = 1;
+        %tmp.73 = add %tmp.71 %tmp.72;
+        invoke %tmp.67 %tmp.68(%tmp.70, %tmp.73);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 69 8 ]
+        symbol [ System %tmp.74 69 8 14 ];
+        %tmp.74 = getm $.Toybox.System;
+        symbol [ println %tmp.75 69 15 22 ];
+        %tmp.75 = getv function %tmp.74 :println;
+        %tmp.76 = "[WAGS] Hold saved: id=";
+        %tmp.77 = lgetv %nextId.2;
+        symbol [ nextId %tmp.77 69 50 56 ];
+        %tmp.78 = add %tmp.76 %tmp.77;
+        %tmp.79 = " total=";
+        %tmp.80 = add %tmp.78 %tmp.79;
+        %tmp.81 = lgetv %holds.1;
+        symbol [ holds %tmp.81 69 71 76 ];
+        symbol [ size %tmp.82 69 77 81 ];
+        %tmp.82 = getv function %tmp.81 :size;
+        %tmp.83 = invoke %tmp.81 %tmp.82();
+        %tmp.84 = add %tmp.80 %tmp.83;
+        invoke %tmp.74 %tmp.75(%tmp.84);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 70 8 ]
+        %tmp.85 = lgetv %nextId.2;
+        symbol [ nextId %tmp.85 70 15 21 ];
+        ret %tmp.85;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_38_32_71_4_stop:
+    }
+    //! Get all stored holds.
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc"; @line = 74; @symbol_functiondef = [getHolds,74,13,21]; ]
+    function getHolds() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_74_24_80_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 75 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_74_24_80_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_74_24_80_4_stop" ]
+        %holds.1 = local;
+        symbol [ holds %holds.1 75 12 17 ];
+        symbol [ Storage %tmp.1 75 20 27 ];
+        %tmp.1 = getm $.Toybox.Application.Storage;
+        symbol [ getValue %tmp.2 75 28 36 ];
+        %tmp.2 = getv function %tmp.1 :getValue;
+        symbol [ KEY_HOLDS %tmp.4 75 37 46 ];
+        %tmp.4 = getv ? :KEY_HOLDS;
+        %tmp.5 = invoke %tmp.1 %tmp.2(%tmp.4);
+        lputv %holds.1 %tmp.5;
+        symbol [ holds %holds.1 75 12 17 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 76 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_76_8_78_8_if_stmt:
+        %tmp.6 = lgetv %holds.1;
+        symbol [ holds %tmp.6 76 12 17 ];
+        %tmp.7 = null;
+        %tmp.8 = eq %tmp.6 %tmp.7;
+        bf %tmp.8 @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_76_8_78_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_76_8_78_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_76_27_78_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 77 12 ]
+        %tmp.9 = newa 0;
+        ret %tmp.9;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_76_27_78_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_76_8_78_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_76_8_78_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 79 8 ]
+        %tmp.10 = lgetv %holds.1;
+        symbol [ holds %tmp.10 79 15 20 ];
+        ret %tmp.10;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_74_24_80_4_stop:
+    }
+    //! Get all unsynced holds.
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc"; @line = 83; @symbol_functiondef = [getUnsyncedHolds,83,13,29]; ]
+    function getUnsyncedHolds() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_83_32_93_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 84 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_83_32_93_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_83_32_93_4_stop" ]
+        %holds.1 = local;
+        symbol [ holds %holds.1 84 12 17 ];
+        %tmp.1 = self;
+        symbol [ getHolds %tmp.2 84 20 28 ];
+        %tmp.2 = getv function %tmp.1 :getHolds;
+        %tmp.3 = invoke %tmp.1 %tmp.2();
+        lputv %holds.1 %tmp.3;
+        symbol [ holds %holds.1 84 12 17 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 85 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_83_32_93_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_83_32_93_4_stop" ]
+        %unsynced.2 = local;
+        symbol [ unsynced %unsynced.2 85 12 20 ];
+        %tmp.4 = newa 0;
+        lputv %unsynced.2 %tmp.4;
+        symbol [ unsynced %unsynced.2 85 12 20 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 86 8 ]
+        for @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_86_8_90_8_for_test @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_86_8_90_8_for_incr @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_86_8_90_8_for_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_86_8_90_8_for_init:
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_86_8_90_8_for_begin" "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_86_8_90_8_for_end" ]
+        %i.3 = local;
+        symbol [ i %i.3 86 17 18 ];
+        %tmp.5 = 0;
+        lputv %i.3 %tmp.5;
+        symbol [ i %i.3 86 17 18 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_86_8_90_8_for_test:
+        %tmp.6 = lgetv %i.3;
+        symbol [ i %tmp.6 86 24 25 ];
+        %tmp.7 = lgetv %holds.1;
+        symbol [ holds %tmp.7 86 28 33 ];
+        symbol [ size %tmp.8 86 34 38 ];
+        %tmp.8 = getv function %tmp.7 :size;
+        %tmp.9 = invoke %tmp.7 %tmp.8();
+        %tmp.10 = lt %tmp.6 %tmp.9;
+        bf %tmp.10 @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_86_8_90_8_for_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_86_8_90_8_for_begin:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_86_47_90_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 87 12 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_87_12_89_12_if_stmt:
+        %tmp.11 = lgetv %holds.1;
+        symbol [ holds %tmp.11 87 16 21 ];
+        %tmp.12 = lgetv %i.3;
+        symbol [ i %tmp.12 87 22 23 ];
+        %tmp.13 = agetv %tmp.11 %tmp.12;
+        symbol [ get %tmp.14 87 25 28 ];
+        %tmp.14 = getv function %tmp.13 :get;
+        %tmp.15 = "synced";
+        %tmp.16 = invoke %tmp.13 %tmp.14(%tmp.15);
+        %tmp.17 = true;
+        %tmp.18 = ne %tmp.16 %tmp.17;
+        bf %tmp.18 @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_87_12_89_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_87_12_89_12_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_87_48_89_12_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 88 16 ]
+        %tmp.19 = lgetv %unsynced.2;
+        symbol [ unsynced %tmp.19 88 16 24 ];
+        symbol [ add %tmp.20 88 25 28 ];
+        %tmp.20 = getv function %tmp.19 :add;
+        %tmp.21 = lgetv %holds.1;
+        symbol [ holds %tmp.21 88 29 34 ];
+        %tmp.22 = lgetv %i.3;
+        symbol [ i %tmp.22 88 35 36 ];
+        %tmp.23 = agetv %tmp.21 %tmp.22;
+        invoke %tmp.19 %tmp.20(%tmp.23);
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_87_48_89_12_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_87_12_89_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_87_12_89_12_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_86_47_90_8_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_86_8_90_8_for_incr:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 86 ]
+        %tmp.26 = lgetv %i.3;
+        symbol [ i %tmp.26 86 42 43 ];
+        %tmp.27 = add %tmp.26 1;
+        lputv %i.3 %tmp.27;
+        symbol [ i %i.3 86 42 43 ];
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_86_8_90_8_for_test;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_86_8_90_8_for_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 91 8 ]
+        symbol [ System %tmp.28 91 8 14 ];
+        %tmp.28 = getm $.Toybox.System;
+        symbol [ println %tmp.29 91 15 22 ];
+        %tmp.29 = getv function %tmp.28 :println;
+        %tmp.30 = "[WAGS] Unsynced holds: ";
+        %tmp.31 = lgetv %unsynced.2;
+        symbol [ unsynced %tmp.31 91 51 59 ];
+        symbol [ size %tmp.32 91 60 64 ];
+        %tmp.32 = getv function %tmp.31 :size;
+        %tmp.33 = invoke %tmp.31 %tmp.32();
+        %tmp.34 = add %tmp.30 %tmp.33;
+        %tmp.35 = " of ";
+        %tmp.36 = add %tmp.34 %tmp.35;
+        %tmp.37 = lgetv %holds.1;
+        symbol [ holds %tmp.37 91 78 83 ];
+        symbol [ size %tmp.38 91 84 88 ];
+        %tmp.38 = getv function %tmp.37 :size;
+        %tmp.39 = invoke %tmp.37 %tmp.38();
+        %tmp.40 = add %tmp.36 %tmp.39;
+        invoke %tmp.28 %tmp.29(%tmp.40);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 92 8 ]
+        %tmp.41 = lgetv %unsynced.2;
+        symbol [ unsynced %tmp.41 92 15 23 ];
+        ret %tmp.41;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_83_32_93_4_stop:
+    }
+    //! Get count of unsynced holds.
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc"; @line = 96; @symbol_functiondef = [getUnsyncedCount,96,13,29]; ]
+    function getUnsyncedCount() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_96_32_105_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 97 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_96_32_105_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_96_32_105_4_stop" ]
+        %holds.1 = local;
+        symbol [ holds %holds.1 97 12 17 ];
+        %tmp.1 = self;
+        symbol [ getHolds %tmp.2 97 20 28 ];
+        %tmp.2 = getv function %tmp.1 :getHolds;
+        %tmp.3 = invoke %tmp.1 %tmp.2();
+        lputv %holds.1 %tmp.3;
+        symbol [ holds %holds.1 97 12 17 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 98 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_96_32_105_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_96_32_105_4_stop" ]
+        %count.2 = local;
+        symbol [ count %count.2 98 12 17 ];
+        %tmp.4 = 0;
+        lputv %count.2 %tmp.4;
+        symbol [ count %count.2 98 12 17 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 99 8 ]
+        for @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_99_8_103_8_for_test @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_99_8_103_8_for_incr @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_99_8_103_8_for_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_99_8_103_8_for_init:
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_99_8_103_8_for_begin" "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_99_8_103_8_for_end" ]
+        %i.3 = local;
+        symbol [ i %i.3 99 17 18 ];
+        %tmp.5 = 0;
+        lputv %i.3 %tmp.5;
+        symbol [ i %i.3 99 17 18 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_99_8_103_8_for_test:
+        %tmp.6 = lgetv %i.3;
+        symbol [ i %tmp.6 99 24 25 ];
+        %tmp.7 = lgetv %holds.1;
+        symbol [ holds %tmp.7 99 28 33 ];
+        symbol [ size %tmp.8 99 34 38 ];
+        %tmp.8 = getv function %tmp.7 :size;
+        %tmp.9 = invoke %tmp.7 %tmp.8();
+        %tmp.10 = lt %tmp.6 %tmp.9;
+        bf %tmp.10 @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_99_8_103_8_for_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_99_8_103_8_for_begin:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_99_47_103_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 100 12 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_100_12_102_12_if_stmt:
+        %tmp.11 = lgetv %holds.1;
+        symbol [ holds %tmp.11 100 16 21 ];
+        %tmp.12 = lgetv %i.3;
+        symbol [ i %tmp.12 100 22 23 ];
+        %tmp.13 = agetv %tmp.11 %tmp.12;
+        symbol [ get %tmp.14 100 25 28 ];
+        %tmp.14 = getv function %tmp.13 :get;
+        %tmp.15 = "synced";
+        %tmp.16 = invoke %tmp.13 %tmp.14(%tmp.15);
+        %tmp.17 = true;
+        %tmp.18 = ne %tmp.16 %tmp.17;
+        bf %tmp.18 @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_100_12_102_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_100_12_102_12_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_100_48_102_12_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 101 16 ]
+        %tmp.21 = lgetv %count.2;
+        symbol [ count %tmp.21 101 16 21 ];
+        %tmp.22 = add %tmp.21 1;
+        lputv %count.2 %tmp.22;
+        symbol [ count %count.2 101 16 21 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_100_48_102_12_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_100_12_102_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_100_12_102_12_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_99_47_103_8_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_99_8_103_8_for_incr:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 99 ]
+        %tmp.25 = lgetv %i.3;
+        symbol [ i %tmp.25 99 42 43 ];
+        %tmp.26 = add %tmp.25 1;
+        lputv %i.3 %tmp.26;
+        symbol [ i %i.3 99 42 43 ];
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_99_8_103_8_for_test;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_99_8_103_8_for_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 104 8 ]
+        %tmp.27 = lgetv %count.2;
+        symbol [ count %tmp.27 104 15 20 ];
+        ret %tmp.27;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_96_32_105_4_stop:
+    }
+    //! Mark a hold as synced by ID.
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc"; @line = 108; @symbol_functiondef = [markSynced,108,13,23]; @symbol_param<0> = [holdId,108,24,30]; ]
+    function markSynced(holdId) {
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_108_32_120_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 109 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_108_32_120_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_108_32_120_4_stop" ]
+        %holds.1 = local;
+        symbol [ holds %holds.1 109 12 17 ];
+        %tmp.1 = self;
+        symbol [ getHolds %tmp.2 109 20 28 ];
+        %tmp.2 = getv function %tmp.1 :getHolds;
+        %tmp.3 = invoke %tmp.1 %tmp.2();
+        lputv %holds.1 %tmp.3;
+        symbol [ holds %holds.1 109 12 17 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 110 8 ]
+        for @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_110_8_117_8_for_test @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_110_8_117_8_for_incr @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_110_8_117_8_for_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_110_8_117_8_for_init:
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_110_8_117_8_for_begin" "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_110_8_117_8_for_end" ]
+        %i.2 = local;
+        symbol [ i %i.2 110 17 18 ];
+        %tmp.4 = 0;
+        lputv %i.2 %tmp.4;
+        symbol [ i %i.2 110 17 18 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_110_8_117_8_for_test:
+        %tmp.5 = lgetv %i.2;
+        symbol [ i %tmp.5 110 24 25 ];
+        %tmp.6 = lgetv %holds.1;
+        symbol [ holds %tmp.6 110 28 33 ];
+        symbol [ size %tmp.7 110 34 38 ];
+        %tmp.7 = getv function %tmp.6 :size;
+        %tmp.8 = invoke %tmp.6 %tmp.7();
+        %tmp.9 = lt %tmp.5 %tmp.8;
+        bf %tmp.9 @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_110_8_117_8_for_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_110_8_117_8_for_begin:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_110_47_117_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 111 12 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_111_12_116_12_if_stmt:
+        %tmp.10 = lgetv %holds.1;
+        symbol [ holds %tmp.10 111 16 21 ];
+        %tmp.11 = lgetv %i.2;
+        symbol [ i %tmp.11 111 22 23 ];
+        %tmp.12 = agetv %tmp.10 %tmp.11;
+        symbol [ get %tmp.13 111 25 28 ];
+        %tmp.13 = getv function %tmp.12 :get;
+        %tmp.14 = "id";
+        %tmp.15 = invoke %tmp.12 %tmp.13(%tmp.14);
+        %tmp.16 = lgetv %holdId;
+        symbol [ holdId %tmp.16 111 38 44 ];
+        %tmp.17 = eq %tmp.15 %tmp.16;
+        bf %tmp.17 @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_111_12_116_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_111_12_116_12_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_111_46_116_12_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 112 16 ]
+        %tmp.18 = lgetv %holds.1;
+        symbol [ holds %tmp.18 112 16 21 ];
+        %tmp.19 = lgetv %i.2;
+        symbol [ i %tmp.19 112 22 23 ];
+        %tmp.20 = agetv %tmp.18 %tmp.19;
+        symbol [ put %tmp.21 112 25 28 ];
+        %tmp.21 = getv function %tmp.20 :put;
+        %tmp.22 = "synced";
+        %tmp.23 = true;
+        invoke %tmp.20 %tmp.21(%tmp.22, %tmp.23);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 113 16 ]
+        symbol [ Storage %tmp.24 113 16 23 ];
+        %tmp.24 = getm $.Toybox.Application.Storage;
+        symbol [ setValue %tmp.25 113 24 32 ];
+        %tmp.25 = getv function %tmp.24 :setValue;
+        symbol [ KEY_HOLDS %tmp.27 113 33 42 ];
+        %tmp.27 = getv ? :KEY_HOLDS;
+        %tmp.28 = lgetv %holds.1;
+        symbol [ holds %tmp.28 113 44 49 ];
+        invoke %tmp.24 %tmp.25(%tmp.27, %tmp.28);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 114 16 ]
+        symbol [ System %tmp.29 114 16 22 ];
+        %tmp.29 = getm $.Toybox.System;
+        symbol [ println %tmp.30 114 23 30 ];
+        %tmp.30 = getv function %tmp.29 :println;
+        %tmp.31 = "[WAGS] Hold ";
+        %tmp.32 = lgetv %holdId;
+        symbol [ holdId %tmp.32 114 48 54 ];
+        %tmp.33 = add %tmp.31 %tmp.32;
+        %tmp.34 = " marked as synced";
+        %tmp.35 = add %tmp.33 %tmp.34;
+        invoke %tmp.29 %tmp.30(%tmp.35);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 115 16 ]
+        %tmp.36 = true;
+        ret %tmp.36;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_111_46_116_12_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_111_12_116_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_111_12_116_12_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_110_47_117_8_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_110_8_117_8_for_incr:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 110 ]
+        %tmp.39 = lgetv %i.2;
+        symbol [ i %tmp.39 110 42 43 ];
+        %tmp.40 = add %tmp.39 1;
+        lputv %i.2 %tmp.40;
+        symbol [ i %i.2 110 42 43 ];
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_110_8_117_8_for_test;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_110_8_117_8_for_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 118 8 ]
+        symbol [ System %tmp.41 118 8 14 ];
+        %tmp.41 = getm $.Toybox.System;
+        symbol [ println %tmp.42 118 15 22 ];
+        %tmp.42 = getv function %tmp.41 :println;
+        %tmp.43 = "[WAGS] Hold ";
+        %tmp.44 = lgetv %holdId;
+        symbol [ holdId %tmp.44 118 40 46 ];
+        %tmp.45 = add %tmp.43 %tmp.44;
+        %tmp.46 = " not found for sync marking";
+        %tmp.47 = add %tmp.45 %tmp.46;
+        invoke %tmp.41 %tmp.42(%tmp.47);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 119 8 ]
+        %tmp.48 = false;
+        ret %tmp.48;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_108_32_120_4_stop:
+    }
+    //! Remove element at index from array (returns new array).
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc"; @line = 123; @symbol_functiondef = [removeAt,123,13,21]; @symbol_param<0> = [arr,123,22,25]; @symbol_param<1> = [idx,123,27,30]; ]
+    function removeAt(arr, idx) {
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_123_32_131_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 124 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_123_32_131_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_123_32_131_4_stop" ]
+        %result.1 = local;
+        symbol [ result %result.1 124 12 18 ];
+        %tmp.1 = newa 0;
+        lputv %result.1 %tmp.1;
+        symbol [ result %result.1 124 12 18 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 125 8 ]
+        for @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_125_8_129_8_for_test @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_125_8_129_8_for_incr @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_125_8_129_8_for_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_125_8_129_8_for_init:
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_125_8_129_8_for_begin" "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_125_8_129_8_for_end" ]
+        %i.2 = local;
+        symbol [ i %i.2 125 17 18 ];
+        %tmp.2 = 0;
+        lputv %i.2 %tmp.2;
+        symbol [ i %i.2 125 17 18 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_125_8_129_8_for_test:
+        %tmp.3 = lgetv %i.2;
+        symbol [ i %tmp.3 125 24 25 ];
+        %tmp.4 = lgetv %arr;
+        symbol [ arr %tmp.4 125 28 31 ];
+        symbol [ size %tmp.5 125 32 36 ];
+        %tmp.5 = getv function %tmp.4 :size;
+        %tmp.6 = invoke %tmp.4 %tmp.5();
+        %tmp.7 = lt %tmp.3 %tmp.6;
+        bf %tmp.7 @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_125_8_129_8_for_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_125_8_129_8_for_begin:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_125_45_129_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 126 12 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_126_12_128_12_if_stmt:
+        %tmp.8 = lgetv %i.2;
+        symbol [ i %tmp.8 126 16 17 ];
+        %tmp.9 = lgetv %idx;
+        symbol [ idx %tmp.9 126 21 24 ];
+        %tmp.10 = ne %tmp.8 %tmp.9;
+        bf %tmp.10 @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_126_12_128_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_126_12_128_12_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_126_26_128_12_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 127 16 ]
+        %tmp.11 = lgetv %result.1;
+        symbol [ result %tmp.11 127 16 22 ];
+        symbol [ add %tmp.12 127 23 26 ];
+        %tmp.12 = getv function %tmp.11 :add;
+        %tmp.13 = lgetv %arr;
+        symbol [ arr %tmp.13 127 27 30 ];
+        %tmp.14 = lgetv %i.2;
+        symbol [ i %tmp.14 127 31 32 ];
+        %tmp.15 = agetv %tmp.13 %tmp.14;
+        invoke %tmp.11 %tmp.12(%tmp.15);
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_126_26_128_12_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_126_12_128_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_126_12_128_12_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_125_45_129_8_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_125_8_129_8_for_incr:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 125 ]
+        %tmp.18 = lgetv %i.2;
+        symbol [ i %tmp.18 125 40 41 ];
+        %tmp.19 = add %tmp.18 1;
+        lputv %i.2 %tmp.19;
+        symbol [ i %i.2 125 40 41 ];
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_125_8_129_8_for_test;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_125_8_129_8_for_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 130 8 ]
+        %tmp.20 = lgetv %result.1;
+        symbol [ result %tmp.20 130 15 21 ];
+        ret %tmp.20;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_123_32_131_4_stop:
+    }
+    //! Clear all synced holds to free storage space.
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc"; @line = 134; @symbol_functiondef = [clearSynced,134,13,24]; ]
+    function clearSynced() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_134_27_144_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 135 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_134_27_144_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_134_27_144_4_stop" ]
+        %holds.1 = local;
+        symbol [ holds %holds.1 135 12 17 ];
+        %tmp.1 = self;
+        symbol [ getHolds %tmp.2 135 20 28 ];
+        %tmp.2 = getv function %tmp.1 :getHolds;
+        %tmp.3 = invoke %tmp.1 %tmp.2();
+        lputv %holds.1 %tmp.3;
+        symbol [ holds %holds.1 135 12 17 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 136 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_134_27_144_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_134_27_144_4_stop" ]
+        %remaining.2 = local;
+        symbol [ remaining %remaining.2 136 12 21 ];
+        %tmp.4 = newa 0;
+        lputv %remaining.2 %tmp.4;
+        symbol [ remaining %remaining.2 136 12 21 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 137 8 ]
+        for @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_137_8_141_8_for_test @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_137_8_141_8_for_incr @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_137_8_141_8_for_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_137_8_141_8_for_init:
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_137_8_141_8_for_begin" "_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_137_8_141_8_for_end" ]
+        %i.3 = local;
+        symbol [ i %i.3 137 17 18 ];
+        %tmp.5 = 0;
+        lputv %i.3 %tmp.5;
+        symbol [ i %i.3 137 17 18 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_137_8_141_8_for_test:
+        %tmp.6 = lgetv %i.3;
+        symbol [ i %tmp.6 137 24 25 ];
+        %tmp.7 = lgetv %holds.1;
+        symbol [ holds %tmp.7 137 28 33 ];
+        symbol [ size %tmp.8 137 34 38 ];
+        %tmp.8 = getv function %tmp.7 :size;
+        %tmp.9 = invoke %tmp.7 %tmp.8();
+        %tmp.10 = lt %tmp.6 %tmp.9;
+        bf %tmp.10 @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_137_8_141_8_for_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_137_8_141_8_for_begin:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_137_47_141_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 138 12 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_138_12_140_12_if_stmt:
+        %tmp.11 = lgetv %holds.1;
+        symbol [ holds %tmp.11 138 16 21 ];
+        %tmp.12 = lgetv %i.3;
+        symbol [ i %tmp.12 138 22 23 ];
+        %tmp.13 = agetv %tmp.11 %tmp.12;
+        symbol [ get %tmp.14 138 25 28 ];
+        %tmp.14 = getv function %tmp.13 :get;
+        %tmp.15 = "synced";
+        %tmp.16 = invoke %tmp.13 %tmp.14(%tmp.15);
+        %tmp.17 = true;
+        %tmp.18 = ne %tmp.16 %tmp.17;
+        bf %tmp.18 @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_138_12_140_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_138_12_140_12_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_138_48_140_12_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 139 16 ]
+        %tmp.19 = lgetv %remaining.2;
+        symbol [ remaining %tmp.19 139 16 25 ];
+        symbol [ add %tmp.20 139 26 29 ];
+        %tmp.20 = getv function %tmp.19 :add;
+        %tmp.21 = lgetv %holds.1;
+        symbol [ holds %tmp.21 139 30 35 ];
+        %tmp.22 = lgetv %i.3;
+        symbol [ i %tmp.22 139 36 37 ];
+        %tmp.23 = agetv %tmp.21 %tmp.22;
+        invoke %tmp.19 %tmp.20(%tmp.23);
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_138_48_140_12_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_138_12_140_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_138_12_140_12_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_137_47_141_8_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_137_8_141_8_for_incr:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 137 ]
+        %tmp.26 = lgetv %i.3;
+        symbol [ i %tmp.26 137 42 43 ];
+        %tmp.27 = add %tmp.26 1;
+        lputv %i.3 %tmp.27;
+        symbol [ i %i.3 137 42 43 ];
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_137_8_141_8_for_test;
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_137_8_141_8_for_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 142 8 ]
+        symbol [ Storage %tmp.28 142 8 15 ];
+        %tmp.28 = getm $.Toybox.Application.Storage;
+        symbol [ setValue %tmp.29 142 16 24 ];
+        %tmp.29 = getv function %tmp.28 :setValue;
+        symbol [ KEY_HOLDS %tmp.31 142 25 34 ];
+        %tmp.31 = getv ? :KEY_HOLDS;
+        %tmp.32 = lgetv %remaining.2;
+        symbol [ remaining %tmp.32 142 36 45 ];
+        invoke %tmp.28 %tmp.29(%tmp.31, %tmp.32);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" 143 8 ]
+        symbol [ System %tmp.33 143 8 14 ];
+        %tmp.33 = getm $.Toybox.System;
+        symbol [ println %tmp.34 143 15 22 ];
+        %tmp.34 = getv function %tmp.33 :println;
+        %tmp.35 = "[WAGS] Cleared synced holds. Remaining: ";
+        %tmp.36 = lgetv %remaining.2;
+        symbol [ remaining %tmp.36 143 68 77 ];
+        symbol [ size %tmp.37 143 78 82 ];
+        %tmp.37 = getv function %tmp.36 :size;
+        %tmp.38 = invoke %tmp.36 %tmp.37();
+        %tmp.39 = add %tmp.35 %tmp.38;
+        invoke %tmp.33 %tmp.34(%tmp.39);
+_home_twain_AndroidStudioProjects_wags_garmin_source_HoldStorage_mc_134_27_144_4_stop:
+    }
+}
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc"; @line = 1; ]
+<init> {
+}

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu2 id="LungVolumeMenu" title="Lung Volume">
+    <menu-item id="lvFull"    label="Full" />
+    <menu-item id="lvEmpty"   label="Empty" />
+    <menu-item id="lvPartial" label="Partial" />
+</menu2>

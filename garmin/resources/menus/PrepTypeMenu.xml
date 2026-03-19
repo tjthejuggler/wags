@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu2 id="PrepTypeMenu" title="Prep Type">
+    <menu-item id="ptNoPrep"    label="No Prep" />
+    <menu-item id="ptResonance" label="Resonance" />
+    <menu-item id="ptHyper"     label="Hyper" />
+</menu2>

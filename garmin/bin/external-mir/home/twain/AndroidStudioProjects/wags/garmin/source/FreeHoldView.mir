@@ -1,0 +1,2160 @@
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 1; @symbol_usingdef<0> = [Toybox,1,6,12]; @symbol_usingdef<1> = [WatchUi,1,13,20]; ]
+using Toybox.WatchUi;
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 2; @symbol_usingdef<0> = [Toybox,2,6,12]; @symbol_usingdef<1> = [Graphics,2,13,21]; ]
+using Toybox.Graphics;
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 3; @symbol_usingdef<0> = [Toybox,3,6,12]; @symbol_usingdef<1> = [System,3,13,19]; ]
+using Toybox.System;
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 4; @symbol_usingdef<0> = [Toybox,4,6,12]; @symbol_usingdef<1> = [Timer,4,13,18]; ]
+using Toybox.Timer;
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 5; @symbol_usingdef<0> = [Toybox,5,6,12]; @symbol_usingdef<1> = [Sensor,5,13,19]; ]
+using Toybox.Sensor;
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 6; @symbol_usingdef<0> = [Toybox,6,6,12]; @symbol_usingdef<1> = [Attention,6,13,22]; ]
+using Toybox.Attention;
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 7; @symbol_usingdef<0> = [Toybox,7,6,12]; @symbol_usingdef<1> = [Time,7,13,17]; ]
+using Toybox.Time;
+//! Free Hold breath-hold view.
+//!
+//! States:
+//!   READY   -> big "START" prompt; SELECT starts the hold
+//!   HOLDING -> timer running, HR/SpO2 displayed; SELECT = contraction, BACK = stop
+//!   DONE    -> summary shown; SELECT or BACK pops back to menu
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 15; @symbol_classdef = [FreeHoldView,15,6,18]; @symbol_extends<0> = [WatchUi,15,27,34]; @symbol_extends<1> = [View,15,35,39]; ]
+class FreeHoldView extends WatchUi.View {
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 15; ]
+    <init> {
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 27 8 ]
+        %tmp.1 = newa 0;
+        putv self :contractionTimesMs %tmp.1;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 30 8 ]
+        %tmp.2 = newa 0;
+        putv self :hrSamples %tmp.2;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 31 8 ]
+        %tmp.3 = newa 0;
+        putv self :spo2Samples %tmp.3;
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 15; ]
+    static
+    <init> {
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 19; @position = 8; @symbol_vardef = [holdState,19,8,17]; ]
+    var holdState = 0;
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 22; @position = 8; @symbol_vardef = [holdStartMs,22,8,19]; ]
+    var holdStartMs = 0;
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 23; @position = 8; @symbol_vardef = [holdEndMs,23,8,17]; ]
+    var holdEndMs = 0;
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 24; @position = 8; @symbol_vardef = [elapsedMs,24,8,17]; ]
+    var elapsedMs = 0;
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 27; @position = 8; @symbol_vardef = [contractionTimesMs,27,8,26]; ]
+    var contractionTimesMs;
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 30; @position = 8; @symbol_vardef = [hrSamples,30,8,17]; ]
+    var hrSamples;
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 31; @position = 8; @symbol_vardef = [spo2Samples,31,8,19]; ]
+    var spo2Samples;
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 34; @position = 8; @symbol_vardef = [liveHr,34,8,14]; ]
+    var liveHr = null;
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 35; @position = 8; @symbol_vardef = [liveSpo2,35,8,16]; ]
+    var liveSpo2 = null;
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 38; @position = 8; @symbol_vardef = [refreshTimer,38,8,20]; ]
+    var refreshTimer = null;
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 40; @symbol_functiondef = [initialize,40,13,23]; ]
+    function initialize() as Void {
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_40_26_43_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 41 8 ]
+        symbol [ View %tmp.2 41 8 12 ];
+        %tmp.2 = getv ? :View;
+        symbol [ initialize %tmp.3 41 13 23 ];
+        %tmp.3 = getv function %tmp.2 :initialize;
+        invoke %tmp.2 %tmp.3();
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 42 8 ]
+        symbol [ Timer %tmp.6 42 27 32 ];
+        %tmp.6 = getm $.Toybox.Timer;
+        symbol [ Timer %tmp.7 42 33 38 ];
+        %tmp.7 = getv function ? %tmp.6 :Timer;
+        %tmp.4 = newc %tmp.7 ();
+        symbol [ refreshTimer ? 42 8 20 ];
+        putv self :refreshTimer %tmp.4;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_40_26_43_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 45; @symbol_functiondef = [onShow,45,13,19]; ]
+    function onShow() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_45_22_48_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 46 8 ]
+        symbol [ Sensor %tmp.1 46 8 14 ];
+        %tmp.1 = getm $.Toybox.Sensor;
+        symbol [ setEnabledSensors %tmp.2 46 15 32 ];
+        %tmp.2 = getv function %tmp.1 :setEnabledSensors;
+        %tmp.3 = newa 1;
+        symbol [ Sensor %tmp.4 46 34 40 ];
+        %tmp.4 = getm $.Toybox.Sensor;
+        symbol [ SENSOR_HEARTRATE %tmp.5 46 41 57 ];
+        %tmp.5 = getv %tmp.4 :SENSOR_HEARTRATE;
+        %tmp.6 = dup %tmp.3;
+        %tmp.7 = aputv %tmp.6 0 %tmp.5;
+        invoke %tmp.1 %tmp.2(%tmp.7);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 47 8 ]
+        symbol [ Sensor %tmp.8 47 8 14 ];
+        %tmp.8 = getm $.Toybox.Sensor;
+        symbol [ enableSensorEvents %tmp.9 47 15 33 ];
+        %tmp.9 = getv function %tmp.8 :enableSensorEvents;
+        %tmp.10 = self;
+        symbol [ method %tmp.11 47 34 40 ];
+        %tmp.11 = getv function %tmp.10 :method;
+        %tmp.13 = const :onSensorEvent;
+        symbol [ onSensorEvent %tmp.13 47 42 55 const ];
+        %tmp.14 = invoke %tmp.10 %tmp.11(%tmp.13);
+        invoke %tmp.8 %tmp.9(%tmp.14);
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_45_22_48_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 50; @symbol_functiondef = [onHide,50,13,19]; ]
+    function onHide() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_50_22_53_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 51 8 ]
+        symbol [ Sensor %tmp.1 51 8 14 ];
+        %tmp.1 = getm $.Toybox.Sensor;
+        symbol [ enableSensorEvents %tmp.2 51 15 33 ];
+        %tmp.2 = getv function %tmp.1 :enableSensorEvents;
+        %tmp.3 = null;
+        invoke %tmp.1 %tmp.2(%tmp.3);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 52 8 ]
+        symbol [ refreshTimer %tmp.5 52 8 20 ];
+        %tmp.5 = getv ? :refreshTimer;
+        symbol [ stop %tmp.6 52 21 25 ];
+        %tmp.6 = getv function %tmp.5 :stop;
+        invoke %tmp.5 %tmp.6();
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_50_22_53_4_stop:
+    }
+    //! Sensor callback – must accept a single Sensor.Info parameter and return nothing.
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 56; @symbol_functiondef = [onSensorEvent,56,13,26]; @symbol_param<0> = [sensorInfo,56,27,37]; @symbol_param<0>_type<0> = [Sensor,56,41,47]; @symbol_param<0>_type<1> = [Info,56,48,52]; ]
+    function onSensorEvent(sensorInfo as Sensor.Info) as Void {
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_56_62_77_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 57 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_57_8_61_8_if_stmt:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_57_12_57_67_begin:
+        %tmp.1 = lgetv %sensorInfo;
+        symbol [ sensorInfo %tmp.1 57 12 22 ];
+        symbol [ heartRate %tmp.2 57 23 32 ];
+        %tmp.2 = getv %tmp.1 :heartRate;
+        %tmp.3 = null;
+        %tmp.4 = ne %tmp.2 %tmp.3;
+        bf %tmp.4 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_57_8_61_8_if_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_57_44_57_67_true:
+        %tmp.5 = lgetv %sensorInfo;
+        symbol [ sensorInfo %tmp.5 57 44 54 ];
+        symbol [ heartRate %tmp.6 57 55 64 ];
+        %tmp.6 = getv %tmp.5 :heartRate;
+        %tmp.7 = 0;
+        %tmp.8 = gt %tmp.6 %tmp.7;
+        push %tmp.8;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_57_44_57_67_end:
+        %tmp.9 = phi [%tmp.4 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_57_12_57_67_begin] [%tmp.8 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_57_44_57_67_true] [%tmp.9 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_57_44_57_67_end];
+        bf %tmp.9 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_57_8_61_8_if_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_57_8_61_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_57_70_59_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 58 12 ]
+        %tmp.10 = lgetv %sensorInfo;
+        symbol [ sensorInfo %tmp.10 58 21 31 ];
+        symbol [ heartRate %tmp.11 58 32 41 ];
+        %tmp.11 = getv %tmp.10 :heartRate;
+        symbol [ liveHr ? 58 12 18 ];
+        putv self :liveHr %tmp.11;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_57_70_59_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_57_8_61_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_57_8_61_8_if_else_false:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_59_15_61_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 60 12 ]
+        %tmp.12 = null;
+        symbol [ liveHr ? 60 12 18 ];
+        putv self :liveHr %tmp.12;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_59_15_61_8_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_57_8_61_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 63 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_63_8_67_8_if_stmt:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_63_12_63_79_begin:
+        %tmp.13 = lgetv %sensorInfo;
+        symbol [ sensorInfo %tmp.13 63 12 22 ];
+        %tmp.15 = const :oxygenSaturation;
+        symbol [ oxygenSaturation %tmp.15 63 28 44 const ];
+        %tmp.16 = canhazplz %tmp.13 %tmp.15;
+        bf %tmp.16 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_63_8_67_8_if_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_63_48_63_79_true:
+        %tmp.17 = lgetv %sensorInfo;
+        symbol [ sensorInfo %tmp.17 63 48 58 ];
+        %tmp.18 = as %tmp.17 { (interface { var oxygenSaturation; }) };
+        symbol [ oxygenSaturation %tmp.19 63 59 75 ];
+        %tmp.19 = getv %tmp.18 :oxygenSaturation;
+        %tmp.20 = null;
+        %tmp.21 = ne %tmp.19 %tmp.20;
+        push %tmp.21;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_63_48_63_79_end:
+        %tmp.22 = phi [%tmp.16 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_63_12_63_79_begin] [%tmp.21 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_63_48_63_79_true] [%tmp.22 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_63_48_63_79_end];
+        bf %tmp.22 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_63_8_67_8_if_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_63_8_67_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_63_85_65_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 64 12 ]
+        %tmp.23 = lgetv %sensorInfo;
+        symbol [ sensorInfo %tmp.23 64 23 33 ];
+        %tmp.24 = as %tmp.23 { (interface { var oxygenSaturation; }) };
+        symbol [ oxygenSaturation %tmp.25 64 34 50 ];
+        %tmp.25 = getv %tmp.24 :oxygenSaturation;
+        symbol [ liveSpo2 ? 64 12 20 ];
+        putv self :liveSpo2 %tmp.25;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_63_85_65_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_63_8_67_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_63_8_67_8_if_else_false:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_65_15_67_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 66 12 ]
+        %tmp.26 = null;
+        symbol [ liveSpo2 ? 66 12 20 ];
+        putv self :liveSpo2 %tmp.26;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_65_15_67_8_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_63_8_67_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 70 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_70_8_74_8_if_stmt:
+        symbol [ holdState %tmp.28 70 12 21 ];
+        %tmp.28 = getv ? :holdState;
+        %tmp.29 = 1;
+        %tmp.30 = eq %tmp.28 %tmp.29;
+        bf %tmp.30 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_70_8_74_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_70_8_74_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_70_28_74_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 71 12 ]
+        symbol [ hrSamples %tmp.32 71 12 21 ];
+        %tmp.32 = getv ? :hrSamples;
+        symbol [ add %tmp.33 71 22 25 ];
+        %tmp.33 = getv function %tmp.32 :add;
+        symbol [ liveHr %tmp.35 71 26 32 ];
+        %tmp.35 = getv ? :liveHr;
+        invoke %tmp.32 %tmp.33(%tmp.35);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 72 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_70_28_74_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_70_28_74_8_stop" ]
+        %sp.1 = local;
+        symbol [ sp %sp.1 72 16 18 ];
+        symbol [ liveSpo2 %tmp.37 72 21 29 ];
+        %tmp.37 = getv ? :liveSpo2;
+        lputv %sp.1 %tmp.37;
+        symbol [ sp %sp.1 72 16 18 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 73 12 ]
+        symbol [ spo2Samples %tmp.39 73 12 23 ];
+        %tmp.39 = getv ? :spo2Samples;
+        symbol [ add %tmp.40 73 24 27 ];
+        %tmp.40 = getv function %tmp.39 :add;
+        %tmp.41 = lgetv %sp.1;
+        symbol [ sp %tmp.41 73 28 30 ];
+        invoke %tmp.39 %tmp.40(%tmp.41);
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_70_28_74_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_70_8_74_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_70_8_74_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 76 8 ]
+        symbol [ WatchUi %tmp.42 76 8 15 ];
+        %tmp.42 = getm $.Toybox.WatchUi;
+        symbol [ requestUpdate %tmp.43 76 16 29 ];
+        %tmp.43 = getv function %tmp.42 :requestUpdate;
+        invoke %tmp.42 %tmp.43();
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_56_62_77_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 79; @symbol_functiondef = [onUpdate,79,13,21]; @symbol_param<0> = [dc,79,22,24]; ]
+    function onUpdate(dc) {
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_79_26_95_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 80 8 ]
+        %tmp.1 = lgetv %dc;
+        symbol [ dc %tmp.1 80 8 10 ];
+        symbol [ setColor %tmp.2 80 11 19 ];
+        %tmp.2 = getv function %tmp.1 :setColor;
+        symbol [ Graphics %tmp.3 80 20 28 ];
+        %tmp.3 = getm $.Toybox.Graphics;
+        symbol [ COLOR_BLACK %tmp.4 80 29 40 ];
+        %tmp.4 = getv %tmp.3 :COLOR_BLACK;
+        symbol [ Graphics %tmp.5 80 42 50 ];
+        %tmp.5 = getm $.Toybox.Graphics;
+        symbol [ COLOR_BLACK %tmp.6 80 51 62 ];
+        %tmp.6 = getv %tmp.5 :COLOR_BLACK;
+        invoke %tmp.1 %tmp.2(%tmp.4, %tmp.6);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 81 8 ]
+        %tmp.7 = lgetv %dc;
+        symbol [ dc %tmp.7 81 8 10 ];
+        symbol [ clear %tmp.8 81 11 16 ];
+        %tmp.8 = getv function %tmp.7 :clear;
+        invoke %tmp.7 %tmp.8();
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 83 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_79_26_95_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_79_26_95_4_stop" ]
+        %w.1 = local;
+        symbol [ w %w.1 83 12 13 ];
+        %tmp.9 = lgetv %dc;
+        symbol [ dc %tmp.9 83 16 18 ];
+        symbol [ getWidth %tmp.10 83 19 27 ];
+        %tmp.10 = getv function %tmp.9 :getWidth;
+        %tmp.11 = invoke %tmp.9 %tmp.10();
+        lputv %w.1 %tmp.11;
+        symbol [ w %w.1 83 12 13 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 84 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_79_26_95_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_79_26_95_4_stop" ]
+        %h.2 = local;
+        symbol [ h %h.2 84 12 13 ];
+        %tmp.12 = lgetv %dc;
+        symbol [ dc %tmp.12 84 16 18 ];
+        symbol [ getHeight %tmp.13 84 19 28 ];
+        %tmp.13 = getv function %tmp.12 :getHeight;
+        %tmp.14 = invoke %tmp.12 %tmp.13();
+        lputv %h.2 %tmp.14;
+        symbol [ h %h.2 84 12 13 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 85 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_79_26_95_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_79_26_95_4_stop" ]
+        %cx.3 = local;
+        symbol [ cx %cx.3 85 12 14 ];
+        %tmp.15 = lgetv %w.1;
+        symbol [ w %tmp.15 85 17 18 ];
+        %tmp.16 = 2;
+        %tmp.17 = div %tmp.15 %tmp.16;
+        lputv %cx.3 %tmp.17;
+        symbol [ cx %cx.3 85 12 14 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 86 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_79_26_95_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_79_26_95_4_stop" ]
+        %cy.4 = local;
+        symbol [ cy %cy.4 86 12 14 ];
+        %tmp.18 = lgetv %h.2;
+        symbol [ h %tmp.18 86 17 18 ];
+        %tmp.19 = 2;
+        %tmp.20 = div %tmp.18 %tmp.19;
+        lputv %cy.4 %tmp.20;
+        symbol [ cy %cy.4 86 12 14 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 88 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_88_8_94_8_if_stmt:
+        symbol [ holdState %tmp.22 88 12 21 ];
+        %tmp.22 = getv ? :holdState;
+        %tmp.23 = 0;
+        %tmp.24 = eq %tmp.22 %tmp.23;
+        bf %tmp.24 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_88_8_94_8_if_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_88_8_94_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_88_28_90_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 89 12 ]
+        %tmp.25 = self;
+        symbol [ drawReadyState %tmp.26 89 12 26 ];
+        %tmp.26 = getv function %tmp.25 :drawReadyState;
+        %tmp.27 = lgetv %dc;
+        symbol [ dc %tmp.27 89 27 29 ];
+        %tmp.28 = lgetv %cx.3;
+        symbol [ cx %tmp.28 89 31 33 ];
+        %tmp.29 = lgetv %cy.4;
+        symbol [ cy %tmp.29 89 35 37 ];
+        %tmp.30 = lgetv %w.1;
+        symbol [ w %tmp.30 89 39 40 ];
+        %tmp.31 = lgetv %h.2;
+        symbol [ h %tmp.31 89 42 43 ];
+        invoke %tmp.25 %tmp.26(%tmp.27, %tmp.28, %tmp.29, %tmp.30, %tmp.31);
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_88_28_90_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_88_8_94_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_88_8_94_8_if_false:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 90 15 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_90_15_94_8_if_stmt:
+        symbol [ holdState %tmp.33 90 19 28 ];
+        %tmp.33 = getv ? :holdState;
+        %tmp.34 = 1;
+        %tmp.35 = eq %tmp.33 %tmp.34;
+        bf %tmp.35 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_90_15_94_8_if_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_90_15_94_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_90_35_92_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 91 12 ]
+        %tmp.36 = self;
+        symbol [ drawHoldingState %tmp.37 91 12 28 ];
+        %tmp.37 = getv function %tmp.36 :drawHoldingState;
+        %tmp.38 = lgetv %dc;
+        symbol [ dc %tmp.38 91 29 31 ];
+        %tmp.39 = lgetv %cx.3;
+        symbol [ cx %tmp.39 91 33 35 ];
+        %tmp.40 = lgetv %cy.4;
+        symbol [ cy %tmp.40 91 37 39 ];
+        %tmp.41 = lgetv %w.1;
+        symbol [ w %tmp.41 91 41 42 ];
+        %tmp.42 = lgetv %h.2;
+        symbol [ h %tmp.42 91 44 45 ];
+        invoke %tmp.36 %tmp.37(%tmp.38, %tmp.39, %tmp.40, %tmp.41, %tmp.42);
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_90_35_92_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_90_15_94_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_90_15_94_8_if_else_false:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_92_15_94_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 93 12 ]
+        %tmp.43 = self;
+        symbol [ drawDoneState %tmp.44 93 12 25 ];
+        %tmp.44 = getv function %tmp.43 :drawDoneState;
+        %tmp.45 = lgetv %dc;
+        symbol [ dc %tmp.45 93 26 28 ];
+        %tmp.46 = lgetv %cx.3;
+        symbol [ cx %tmp.46 93 30 32 ];
+        %tmp.47 = lgetv %cy.4;
+        symbol [ cy %tmp.47 93 34 36 ];
+        %tmp.48 = lgetv %w.1;
+        symbol [ w %tmp.48 93 38 39 ];
+        %tmp.49 = lgetv %h.2;
+        symbol [ h %tmp.49 93 41 42 ];
+        invoke %tmp.43 %tmp.44(%tmp.45, %tmp.46, %tmp.47, %tmp.48, %tmp.49);
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_92_15_94_8_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_90_15_94_8_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_88_8_94_8_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_79_26_95_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 97; @symbol_functiondef = [drawReadyState,97,13,27]; @symbol_param<0> = [dc,97,28,30]; @symbol_param<1> = [cx,97,32,34]; @symbol_param<2> = [cy,97,36,38]; @symbol_param<3> = [w,97,40,41]; @symbol_param<4> = [h,97,43,44]; ]
+    function drawReadyState(dc, cx, cy, w, h) {
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_97_46_114_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 98 8 ]
+        %tmp.1 = lgetv %dc;
+        symbol [ dc %tmp.1 98 8 10 ];
+        symbol [ setColor %tmp.2 98 11 19 ];
+        %tmp.2 = getv function %tmp.1 :setColor;
+        symbol [ Graphics %tmp.3 98 20 28 ];
+        %tmp.3 = getm $.Toybox.Graphics;
+        symbol [ COLOR_LT_GRAY %tmp.4 98 29 42 ];
+        %tmp.4 = getv %tmp.3 :COLOR_LT_GRAY;
+        symbol [ Graphics %tmp.5 98 44 52 ];
+        %tmp.5 = getm $.Toybox.Graphics;
+        symbol [ COLOR_TRANSPARENT %tmp.6 98 53 70 ];
+        %tmp.6 = getv %tmp.5 :COLOR_TRANSPARENT;
+        invoke %tmp.1 %tmp.2(%tmp.4, %tmp.6);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 99 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_97_46_114_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_97_46_114_4_stop" ]
+        %lv.1 = local;
+        symbol [ lv %lv.1 99 12 14 ];
+        symbol [ SettingsManager %tmp.8 99 17 32 ];
+        %tmp.8 = getv ? :SettingsManager;
+        symbol [ lungVolumeLabel %tmp.9 99 33 48 ];
+        %tmp.9 = getv function %tmp.8 :lungVolumeLabel;
+        symbol [ SettingsManager %tmp.11 99 49 64 ];
+        %tmp.11 = getv ? :SettingsManager;
+        symbol [ getLungVolume %tmp.12 99 65 78 ];
+        %tmp.12 = getv function %tmp.11 :getLungVolume;
+        %tmp.13 = invoke %tmp.11 %tmp.12();
+        %tmp.14 = invoke %tmp.8 %tmp.9(%tmp.13);
+        lputv %lv.1 %tmp.14;
+        symbol [ lv %lv.1 99 12 14 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 100 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_97_46_114_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_97_46_114_4_stop" ]
+        %pt.2 = local;
+        symbol [ pt %pt.2 100 12 14 ];
+        symbol [ SettingsManager %tmp.16 100 17 32 ];
+        %tmp.16 = getv ? :SettingsManager;
+        symbol [ prepTypeLabel %tmp.17 100 33 46 ];
+        %tmp.17 = getv function %tmp.16 :prepTypeLabel;
+        symbol [ SettingsManager %tmp.19 100 47 62 ];
+        %tmp.19 = getv ? :SettingsManager;
+        symbol [ getPrepType %tmp.20 100 63 74 ];
+        %tmp.20 = getv function %tmp.19 :getPrepType;
+        %tmp.21 = invoke %tmp.19 %tmp.20();
+        %tmp.22 = invoke %tmp.16 %tmp.17(%tmp.21);
+        lputv %pt.2 %tmp.22;
+        symbol [ pt %pt.2 100 12 14 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 101 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_97_46_114_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_97_46_114_4_stop" ]
+        %tod.3 = local;
+        symbol [ tod %tod.3 101 12 15 ];
+        symbol [ SettingsManager %tmp.24 101 18 33 ];
+        %tmp.24 = getv ? :SettingsManager;
+        symbol [ timeOfDayLabel %tmp.25 101 34 48 ];
+        %tmp.25 = getv function %tmp.24 :timeOfDayLabel;
+        symbol [ SettingsManager %tmp.27 101 49 64 ];
+        %tmp.27 = getv ? :SettingsManager;
+        symbol [ getTimeOfDay %tmp.28 101 65 77 ];
+        %tmp.28 = getv function %tmp.27 :getTimeOfDay;
+        %tmp.29 = invoke %tmp.27 %tmp.28();
+        %tmp.30 = invoke %tmp.24 %tmp.25(%tmp.29);
+        lputv %tod.3 %tmp.30;
+        symbol [ tod %tod.3 101 12 15 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 102 8 ]
+        %tmp.31 = lgetv %dc;
+        symbol [ dc %tmp.31 102 8 10 ];
+        symbol [ drawText %tmp.32 102 11 19 ];
+        %tmp.32 = getv function %tmp.31 :drawText;
+        %tmp.33 = lgetv %cx;
+        symbol [ cx %tmp.33 102 20 22 ];
+        %tmp.34 = lgetv %h;
+        symbol [ h %tmp.34 102 24 25 ];
+        %tmp.35 = 6;
+        %tmp.36 = div %tmp.34 %tmp.35;
+        symbol [ Graphics %tmp.37 102 31 39 ];
+        %tmp.37 = getm $.Toybox.Graphics;
+        symbol [ FONT_XTINY %tmp.38 102 40 50 ];
+        %tmp.38 = getv %tmp.37 :FONT_XTINY;
+        %tmp.39 = lgetv %lv.1;
+        symbol [ lv %tmp.39 102 52 54 ];
+        %tmp.40 = " | ";
+        %tmp.41 = add %tmp.39 %tmp.40;
+        %tmp.42 = lgetv %pt.2;
+        symbol [ pt %tmp.42 102 65 67 ];
+        %tmp.43 = add %tmp.41 %tmp.42;
+        %tmp.44 = " | ";
+        %tmp.45 = add %tmp.43 %tmp.44;
+        %tmp.46 = lgetv %tod.3;
+        symbol [ tod %tmp.46 102 78 81 ];
+        %tmp.47 = add %tmp.45 %tmp.46;
+        symbol [ Graphics %tmp.48 102 83 91 ];
+        %tmp.48 = getm $.Toybox.Graphics;
+        symbol [ TEXT_JUSTIFY_CENTER %tmp.49 102 92 111 ];
+        %tmp.49 = getv %tmp.48 :TEXT_JUSTIFY_CENTER;
+        invoke %tmp.31 %tmp.32(%tmp.33, %tmp.36, %tmp.38, %tmp.47, %tmp.49);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 104 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_104_8_107_8_if_stmt:
+        symbol [ liveHr %tmp.51 104 12 18 ];
+        %tmp.51 = getv ? :liveHr;
+        %tmp.52 = null;
+        %tmp.53 = ne %tmp.51 %tmp.52;
+        bf %tmp.53 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_104_8_107_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_104_8_107_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_104_28_107_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 105 12 ]
+        %tmp.54 = lgetv %dc;
+        symbol [ dc %tmp.54 105 12 14 ];
+        symbol [ setColor %tmp.55 105 15 23 ];
+        %tmp.55 = getv function %tmp.54 :setColor;
+        symbol [ Graphics %tmp.56 105 24 32 ];
+        %tmp.56 = getm $.Toybox.Graphics;
+        symbol [ COLOR_RED %tmp.57 105 33 42 ];
+        %tmp.57 = getv %tmp.56 :COLOR_RED;
+        symbol [ Graphics %tmp.58 105 44 52 ];
+        %tmp.58 = getm $.Toybox.Graphics;
+        symbol [ COLOR_TRANSPARENT %tmp.59 105 53 70 ];
+        %tmp.59 = getv %tmp.58 :COLOR_TRANSPARENT;
+        invoke %tmp.54 %tmp.55(%tmp.57, %tmp.59);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 106 12 ]
+        %tmp.60 = lgetv %dc;
+        symbol [ dc %tmp.60 106 12 14 ];
+        symbol [ drawText %tmp.61 106 15 23 ];
+        %tmp.61 = getv function %tmp.60 :drawText;
+        %tmp.62 = lgetv %cx;
+        symbol [ cx %tmp.62 106 24 26 ];
+        %tmp.63 = lgetv %h;
+        symbol [ h %tmp.63 106 28 29 ];
+        %tmp.64 = 4;
+        %tmp.65 = div %tmp.63 %tmp.64;
+        %tmp.66 = 5;
+        %tmp.67 = add %tmp.65 %tmp.66;
+        symbol [ Graphics %tmp.68 106 39 47 ];
+        %tmp.68 = getm $.Toybox.Graphics;
+        symbol [ FONT_SMALL %tmp.69 106 48 58 ];
+        %tmp.69 = getv %tmp.68 :FONT_SMALL;
+        %tmp.70 = "HR ";
+        symbol [ liveHr %tmp.72 106 68 74 ];
+        %tmp.72 = getv ? :liveHr;
+        symbol [ toString %tmp.73 106 75 83 ];
+        %tmp.73 = getv function %tmp.72 :toString;
+        %tmp.74 = invoke %tmp.72 %tmp.73();
+        %tmp.75 = add %tmp.70 %tmp.74;
+        symbol [ Graphics %tmp.76 106 87 95 ];
+        %tmp.76 = getm $.Toybox.Graphics;
+        symbol [ TEXT_JUSTIFY_CENTER %tmp.77 106 96 115 ];
+        %tmp.77 = getv %tmp.76 :TEXT_JUSTIFY_CENTER;
+        invoke %tmp.60 %tmp.61(%tmp.62, %tmp.67, %tmp.69, %tmp.75, %tmp.77);
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_104_28_107_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_104_8_107_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_104_8_107_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 109 8 ]
+        %tmp.78 = lgetv %dc;
+        symbol [ dc %tmp.78 109 8 10 ];
+        symbol [ setColor %tmp.79 109 11 19 ];
+        %tmp.79 = getv function %tmp.78 :setColor;
+        %tmp.80 = 0x00CC66;
+        symbol [ Graphics %tmp.81 109 30 38 ];
+        %tmp.81 = getm $.Toybox.Graphics;
+        symbol [ COLOR_TRANSPARENT %tmp.82 109 39 56 ];
+        %tmp.82 = getv %tmp.81 :COLOR_TRANSPARENT;
+        invoke %tmp.78 %tmp.79(%tmp.80, %tmp.82);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 110 8 ]
+        %tmp.83 = lgetv %dc;
+        symbol [ dc %tmp.83 110 8 10 ];
+        symbol [ drawText %tmp.84 110 11 19 ];
+        %tmp.84 = getv function %tmp.83 :drawText;
+        %tmp.85 = lgetv %cx;
+        symbol [ cx %tmp.85 110 20 22 ];
+        %tmp.86 = lgetv %cy;
+        symbol [ cy %tmp.86 110 24 26 ];
+        %tmp.87 = 10;
+        %tmp.88 = sub %tmp.86 %tmp.87;
+        symbol [ Graphics %tmp.89 110 33 41 ];
+        %tmp.89 = getm $.Toybox.Graphics;
+        symbol [ FONT_LARGE %tmp.90 110 42 52 ];
+        %tmp.90 = getv %tmp.89 :FONT_LARGE;
+        %tmp.91 = "START";
+        symbol [ Graphics %tmp.92 110 63 71 ];
+        %tmp.92 = getm $.Toybox.Graphics;
+        symbol [ TEXT_JUSTIFY_CENTER %tmp.93 110 72 91 ];
+        %tmp.93 = getv %tmp.92 :TEXT_JUSTIFY_CENTER;
+        invoke %tmp.83 %tmp.84(%tmp.85, %tmp.88, %tmp.90, %tmp.91, %tmp.93);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 112 8 ]
+        %tmp.94 = lgetv %dc;
+        symbol [ dc %tmp.94 112 8 10 ];
+        symbol [ setColor %tmp.95 112 11 19 ];
+        %tmp.95 = getv function %tmp.94 :setColor;
+        symbol [ Graphics %tmp.96 112 20 28 ];
+        %tmp.96 = getm $.Toybox.Graphics;
+        symbol [ COLOR_LT_GRAY %tmp.97 112 29 42 ];
+        %tmp.97 = getv %tmp.96 :COLOR_LT_GRAY;
+        symbol [ Graphics %tmp.98 112 44 52 ];
+        %tmp.98 = getm $.Toybox.Graphics;
+        symbol [ COLOR_TRANSPARENT %tmp.99 112 53 70 ];
+        %tmp.99 = getv %tmp.98 :COLOR_TRANSPARENT;
+        invoke %tmp.94 %tmp.95(%tmp.97, %tmp.99);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 113 8 ]
+        %tmp.100 = lgetv %dc;
+        symbol [ dc %tmp.100 113 8 10 ];
+        symbol [ drawText %tmp.101 113 11 19 ];
+        %tmp.101 = getv function %tmp.100 :drawText;
+        %tmp.102 = lgetv %cx;
+        symbol [ cx %tmp.102 113 20 22 ];
+        %tmp.103 = lgetv %cy;
+        symbol [ cy %tmp.103 113 24 26 ];
+        %tmp.104 = 30;
+        %tmp.105 = add %tmp.103 %tmp.104;
+        symbol [ Graphics %tmp.106 113 33 41 ];
+        %tmp.106 = getm $.Toybox.Graphics;
+        symbol [ FONT_XTINY %tmp.107 113 42 52 ];
+        %tmp.107 = getv %tmp.106 :FONT_XTINY;
+        %tmp.108 = "Press SELECT";
+        symbol [ Graphics %tmp.109 113 70 78 ];
+        %tmp.109 = getm $.Toybox.Graphics;
+        symbol [ TEXT_JUSTIFY_CENTER %tmp.110 113 79 98 ];
+        %tmp.110 = getv %tmp.109 :TEXT_JUSTIFY_CENTER;
+        invoke %tmp.100 %tmp.101(%tmp.102, %tmp.105, %tmp.107, %tmp.108, %tmp.110);
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_97_46_114_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 116; @symbol_functiondef = [drawHoldingState,116,13,29]; @symbol_param<0> = [dc,116,30,32]; @symbol_param<1> = [cx,116,34,36]; @symbol_param<2> = [cy,116,38,40]; @symbol_param<3> = [w,116,42,43]; @symbol_param<4> = [h,116,45,46]; ]
+    function drawHoldingState(dc, cx, cy, w, h) {
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_116_48_157_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 117 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_116_48_157_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_116_48_157_4_stop" ]
+        %now.1 = local;
+        symbol [ now %now.1 117 12 15 ];
+        symbol [ System %tmp.1 117 18 24 ];
+        %tmp.1 = getm $.Toybox.System;
+        symbol [ getTimer %tmp.2 117 25 33 ];
+        %tmp.2 = getv function %tmp.1 :getTimer;
+        %tmp.3 = invoke %tmp.1 %tmp.2();
+        lputv %now.1 %tmp.3;
+        symbol [ now %now.1 117 12 15 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 118 8 ]
+        %tmp.4 = lgetv %now.1;
+        symbol [ now %tmp.4 118 20 23 ];
+        symbol [ holdStartMs %tmp.6 118 26 37 ];
+        %tmp.6 = getv ? :holdStartMs;
+        %tmp.7 = sub %tmp.4 %tmp.6;
+        symbol [ elapsedMs ? 118 8 17 ];
+        putv self :elapsedMs %tmp.7;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 119 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_116_48_157_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_116_48_157_4_stop" ]
+        %totalSec.2 = local;
+        symbol [ totalSec %totalSec.2 119 12 20 ];
+        symbol [ elapsedMs %tmp.9 119 23 32 ];
+        %tmp.9 = getv ? :elapsedMs;
+        %tmp.10 = 1000;
+        %tmp.11 = div %tmp.9 %tmp.10;
+        lputv %totalSec.2 %tmp.11;
+        symbol [ totalSec %totalSec.2 119 12 20 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 120 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_116_48_157_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_116_48_157_4_stop" ]
+        %min.3 = local;
+        symbol [ min %min.3 120 12 15 ];
+        %tmp.12 = lgetv %totalSec.2;
+        symbol [ totalSec %tmp.12 120 18 26 ];
+        %tmp.13 = 60;
+        %tmp.14 = div %tmp.12 %tmp.13;
+        lputv %min.3 %tmp.14;
+        symbol [ min %min.3 120 12 15 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 121 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_116_48_157_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_116_48_157_4_stop" ]
+        %sec.4 = local;
+        symbol [ sec %sec.4 121 12 15 ];
+        %tmp.15 = lgetv %totalSec.2;
+        symbol [ totalSec %tmp.15 121 18 26 ];
+        %tmp.16 = 60;
+        %tmp.17 = mod %tmp.15 %tmp.16;
+        lputv %sec.4 %tmp.17;
+        symbol [ sec %sec.4 121 12 15 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 123 8 ]
+        %tmp.18 = lgetv %dc;
+        symbol [ dc %tmp.18 123 8 10 ];
+        symbol [ setColor %tmp.19 123 11 19 ];
+        %tmp.19 = getv function %tmp.18 :setColor;
+        %tmp.20 = 0x00AAFF;
+        symbol [ Graphics %tmp.21 123 30 38 ];
+        %tmp.21 = getm $.Toybox.Graphics;
+        symbol [ COLOR_TRANSPARENT %tmp.22 123 39 56 ];
+        %tmp.22 = getv %tmp.21 :COLOR_TRANSPARENT;
+        invoke %tmp.18 %tmp.19(%tmp.20, %tmp.22);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 124 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_116_48_157_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_116_48_157_4_stop" ]
+        %timeStr.5 = local;
+        symbol [ timeStr %timeStr.5 124 12 19 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 125 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_125_8_129_8_if_stmt:
+        %tmp.23 = lgetv %min.3;
+        symbol [ min %tmp.23 125 12 15 ];
+        %tmp.24 = 0;
+        %tmp.25 = gt %tmp.23 %tmp.24;
+        bf %tmp.25 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_125_8_129_8_if_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_125_8_129_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_125_21_127_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 126 12 ]
+        %tmp.26 = lgetv %min.3;
+        symbol [ min %tmp.26 126 22 25 ];
+        symbol [ format %tmp.27 126 26 32 ];
+        %tmp.27 = getv function %tmp.26 :format;
+        %tmp.28 = "%d";
+        %tmp.29 = invoke %tmp.26 %tmp.27(%tmp.28);
+        %tmp.30 = ":";
+        %tmp.31 = add %tmp.29 %tmp.30;
+        %tmp.32 = lgetv %sec.4;
+        symbol [ sec %tmp.32 126 47 50 ];
+        symbol [ format %tmp.33 126 51 57 ];
+        %tmp.33 = getv function %tmp.32 :format;
+        %tmp.34 = "%02d";
+        %tmp.35 = invoke %tmp.32 %tmp.33(%tmp.34);
+        %tmp.36 = add %tmp.31 %tmp.35;
+        lputv %timeStr.5 %tmp.36;
+        symbol [ timeStr %timeStr.5 126 12 19 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_125_21_127_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_125_8_129_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_125_8_129_8_if_else_false:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_127_15_129_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 128 12 ]
+        %tmp.37 = lgetv %sec.4;
+        symbol [ sec %tmp.37 128 22 25 ];
+        symbol [ format %tmp.38 128 26 32 ];
+        %tmp.38 = getv function %tmp.37 :format;
+        %tmp.39 = "%d";
+        %tmp.40 = invoke %tmp.37 %tmp.38(%tmp.39);
+        %tmp.41 = "s";
+        %tmp.42 = add %tmp.40 %tmp.41;
+        lputv %timeStr.5 %tmp.42;
+        symbol [ timeStr %timeStr.5 128 12 19 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_127_15_129_8_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_125_8_129_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 130 8 ]
+        %tmp.43 = lgetv %dc;
+        symbol [ dc %tmp.43 130 8 10 ];
+        symbol [ drawText %tmp.44 130 11 19 ];
+        %tmp.44 = getv function %tmp.43 :drawText;
+        %tmp.45 = lgetv %cx;
+        symbol [ cx %tmp.45 130 20 22 ];
+        %tmp.46 = lgetv %cy;
+        symbol [ cy %tmp.46 130 24 26 ];
+        %tmp.47 = 35;
+        %tmp.48 = sub %tmp.46 %tmp.47;
+        symbol [ Graphics %tmp.49 130 33 41 ];
+        %tmp.49 = getm $.Toybox.Graphics;
+        symbol [ FONT_NUMBER_HOT %tmp.50 130 42 57 ];
+        %tmp.50 = getv %tmp.49 :FONT_NUMBER_HOT;
+        %tmp.51 = lgetv %timeStr.5;
+        symbol [ timeStr %tmp.51 130 59 66 ];
+        symbol [ Graphics %tmp.52 130 68 76 ];
+        %tmp.52 = getm $.Toybox.Graphics;
+        symbol [ TEXT_JUSTIFY_CENTER %tmp.53 130 77 96 ];
+        %tmp.53 = getv %tmp.52 :TEXT_JUSTIFY_CENTER;
+        invoke %tmp.43 %tmp.44(%tmp.45, %tmp.48, %tmp.50, %tmp.51, %tmp.53);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 132 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_116_48_157_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_116_48_157_4_stop" ]
+        %sensorY.6 = local;
+        symbol [ sensorY %sensorY.6 132 12 19 ];
+        %tmp.54 = lgetv %cy;
+        symbol [ cy %tmp.54 132 22 24 ];
+        %tmp.55 = 25;
+        %tmp.56 = add %tmp.54 %tmp.55;
+        lputv %sensorY.6 %tmp.56;
+        symbol [ sensorY %sensorY.6 132 12 19 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 133 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_133_8_136_8_if_stmt:
+        symbol [ liveHr %tmp.58 133 12 18 ];
+        %tmp.58 = getv ? :liveHr;
+        %tmp.59 = null;
+        %tmp.60 = ne %tmp.58 %tmp.59;
+        bf %tmp.60 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_133_8_136_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_133_8_136_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_133_28_136_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 134 12 ]
+        %tmp.61 = lgetv %dc;
+        symbol [ dc %tmp.61 134 12 14 ];
+        symbol [ setColor %tmp.62 134 15 23 ];
+        %tmp.62 = getv function %tmp.61 :setColor;
+        symbol [ Graphics %tmp.63 134 24 32 ];
+        %tmp.63 = getm $.Toybox.Graphics;
+        symbol [ COLOR_RED %tmp.64 134 33 42 ];
+        %tmp.64 = getv %tmp.63 :COLOR_RED;
+        symbol [ Graphics %tmp.65 134 44 52 ];
+        %tmp.65 = getm $.Toybox.Graphics;
+        symbol [ COLOR_TRANSPARENT %tmp.66 134 53 70 ];
+        %tmp.66 = getv %tmp.65 :COLOR_TRANSPARENT;
+        invoke %tmp.61 %tmp.62(%tmp.64, %tmp.66);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 135 12 ]
+        %tmp.67 = lgetv %dc;
+        symbol [ dc %tmp.67 135 12 14 ];
+        symbol [ drawText %tmp.68 135 15 23 ];
+        %tmp.68 = getv function %tmp.67 :drawText;
+        %tmp.69 = lgetv %cx;
+        symbol [ cx %tmp.69 135 24 26 ];
+        %tmp.70 = 30;
+        %tmp.71 = sub %tmp.69 %tmp.70;
+        %tmp.72 = lgetv %sensorY.6;
+        symbol [ sensorY %tmp.72 135 33 40 ];
+        symbol [ Graphics %tmp.73 135 42 50 ];
+        %tmp.73 = getm $.Toybox.Graphics;
+        symbol [ FONT_SMALL %tmp.74 135 51 61 ];
+        %tmp.74 = getv %tmp.73 :FONT_SMALL;
+        %tmp.75 = "HR";
+        symbol [ liveHr %tmp.77 135 70 76 ];
+        %tmp.77 = getv ? :liveHr;
+        symbol [ toString %tmp.78 135 77 85 ];
+        %tmp.78 = getv function %tmp.77 :toString;
+        %tmp.79 = invoke %tmp.77 %tmp.78();
+        %tmp.80 = add %tmp.75 %tmp.79;
+        symbol [ Graphics %tmp.81 135 89 97 ];
+        %tmp.81 = getm $.Toybox.Graphics;
+        symbol [ TEXT_JUSTIFY_CENTER %tmp.82 135 98 117 ];
+        %tmp.82 = getv %tmp.81 :TEXT_JUSTIFY_CENTER;
+        invoke %tmp.67 %tmp.68(%tmp.71, %tmp.72, %tmp.74, %tmp.80, %tmp.82);
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_133_28_136_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_133_8_136_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_133_8_136_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 137 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_137_8_140_8_if_stmt:
+        symbol [ liveSpo2 %tmp.84 137 12 20 ];
+        %tmp.84 = getv ? :liveSpo2;
+        %tmp.85 = null;
+        %tmp.86 = ne %tmp.84 %tmp.85;
+        bf %tmp.86 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_137_8_140_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_137_8_140_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_137_30_140_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 138 12 ]
+        %tmp.87 = lgetv %dc;
+        symbol [ dc %tmp.87 138 12 14 ];
+        symbol [ setColor %tmp.88 138 15 23 ];
+        %tmp.88 = getv function %tmp.87 :setColor;
+        %tmp.89 = 0x00CC66;
+        symbol [ Graphics %tmp.90 138 34 42 ];
+        %tmp.90 = getm $.Toybox.Graphics;
+        symbol [ COLOR_TRANSPARENT %tmp.91 138 43 60 ];
+        %tmp.91 = getv %tmp.90 :COLOR_TRANSPARENT;
+        invoke %tmp.87 %tmp.88(%tmp.89, %tmp.91);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 139 12 ]
+        %tmp.92 = lgetv %dc;
+        symbol [ dc %tmp.92 139 12 14 ];
+        symbol [ drawText %tmp.93 139 15 23 ];
+        %tmp.93 = getv function %tmp.92 :drawText;
+        %tmp.94 = lgetv %cx;
+        symbol [ cx %tmp.94 139 24 26 ];
+        %tmp.95 = 35;
+        %tmp.96 = add %tmp.94 %tmp.95;
+        %tmp.97 = lgetv %sensorY.6;
+        symbol [ sensorY %tmp.97 139 33 40 ];
+        symbol [ Graphics %tmp.98 139 42 50 ];
+        %tmp.98 = getm $.Toybox.Graphics;
+        symbol [ FONT_SMALL %tmp.99 139 51 61 ];
+        %tmp.99 = getv %tmp.98 :FONT_SMALL;
+        symbol [ liveSpo2 %tmp.101 139 63 71 ];
+        %tmp.101 = getv ? :liveSpo2;
+        symbol [ toString %tmp.102 139 72 80 ];
+        %tmp.102 = getv function %tmp.101 :toString;
+        %tmp.103 = invoke %tmp.101 %tmp.102();
+        %tmp.104 = "%";
+        %tmp.105 = add %tmp.103 %tmp.104;
+        symbol [ Graphics %tmp.106 139 90 98 ];
+        %tmp.106 = getm $.Toybox.Graphics;
+        symbol [ TEXT_JUSTIFY_CENTER %tmp.107 139 99 118 ];
+        %tmp.107 = getv %tmp.106 :TEXT_JUSTIFY_CENTER;
+        invoke %tmp.92 %tmp.93(%tmp.96, %tmp.97, %tmp.99, %tmp.105, %tmp.107);
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_137_30_140_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_137_8_140_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_137_8_140_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 142 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_116_48_157_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_116_48_157_4_stop" ]
+        %cCount.7 = local;
+        symbol [ cCount %cCount.7 142 12 18 ];
+        symbol [ contractionTimesMs %tmp.109 142 21 39 ];
+        %tmp.109 = getv ? :contractionTimesMs;
+        symbol [ size %tmp.110 142 40 44 ];
+        %tmp.110 = getv function %tmp.109 :size;
+        %tmp.111 = invoke %tmp.109 %tmp.110();
+        lputv %cCount.7 %tmp.111;
+        symbol [ cCount %cCount.7 142 12 18 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 143 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_143_8_149_8_if_stmt:
+        %tmp.112 = lgetv %cCount.7;
+        symbol [ cCount %tmp.112 143 12 18 ];
+        %tmp.113 = 0;
+        %tmp.114 = gt %tmp.112 %tmp.113;
+        bf %tmp.114 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_143_8_149_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_143_8_149_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_143_24_149_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 144 12 ]
+        %tmp.115 = lgetv %dc;
+        symbol [ dc %tmp.115 144 12 14 ];
+        symbol [ setColor %tmp.116 144 15 23 ];
+        %tmp.116 = getv function %tmp.115 :setColor;
+        %tmp.117 = 0xFFAA00;
+        symbol [ Graphics %tmp.118 144 34 42 ];
+        %tmp.118 = getm $.Toybox.Graphics;
+        symbol [ COLOR_TRANSPARENT %tmp.119 144 43 60 ];
+        %tmp.119 = getv %tmp.118 :COLOR_TRANSPARENT;
+        invoke %tmp.115 %tmp.116(%tmp.117, %tmp.119);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 145 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_143_24_149_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_143_24_149_8_stop" ]
+        %firstC.8 = local;
+        symbol [ firstC %firstC.8 145 16 22 ];
+        symbol [ contractionTimesMs %tmp.121 145 25 43 ];
+        %tmp.121 = getv ? :contractionTimesMs;
+        %tmp.122 = 0;
+        %tmp.123 = agetv %tmp.121 %tmp.122;
+        lputv %firstC.8 %tmp.123;
+        symbol [ firstC %firstC.8 145 16 22 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 146 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_143_24_149_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_143_24_149_8_stop" ]
+        %fcSec.9 = local;
+        symbol [ fcSec %fcSec.9 146 16 21 ];
+        %tmp.124 = lgetv %firstC.8;
+        symbol [ firstC %tmp.124 146 24 30 ];
+        %tmp.125 = 1000;
+        %tmp.126 = div %tmp.124 %tmp.125;
+        lputv %fcSec.9 %tmp.126;
+        symbol [ fcSec %fcSec.9 146 16 21 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 147 12 ]
+        %tmp.127 = lgetv %dc;
+        symbol [ dc %tmp.127 147 12 14 ];
+        symbol [ drawText %tmp.128 147 15 23 ];
+        %tmp.128 = getv function %tmp.127 :drawText;
+        %tmp.129 = lgetv %cx;
+        symbol [ cx %tmp.129 147 24 26 ];
+        %tmp.130 = lgetv %sensorY.6;
+        symbol [ sensorY %tmp.130 147 28 35 ];
+        %tmp.131 = 25;
+        %tmp.132 = add %tmp.130 %tmp.131;
+        symbol [ Graphics %tmp.133 147 42 50 ];
+        %tmp.133 = getm $.Toybox.Graphics;
+        symbol [ FONT_XTINY %tmp.134 147 51 61 ];
+        %tmp.134 = getv %tmp.133 :FONT_XTINY;
+        %tmp.135 = "Contraction @ ";
+        %tmp.136 = lgetv %fcSec.9;
+        symbol [ fcSec %tmp.136 148 35 40 ];
+        symbol [ toString %tmp.137 148 41 49 ];
+        %tmp.137 = getv function %tmp.136 :toString;
+        %tmp.138 = invoke %tmp.136 %tmp.137();
+        %tmp.139 = add %tmp.135 %tmp.138;
+        %tmp.140 = "s";
+        %tmp.141 = add %tmp.139 %tmp.140;
+        symbol [ Graphics %tmp.142 148 59 67 ];
+        %tmp.142 = getm $.Toybox.Graphics;
+        symbol [ TEXT_JUSTIFY_CENTER %tmp.143 148 68 87 ];
+        %tmp.143 = getv %tmp.142 :TEXT_JUSTIFY_CENTER;
+        invoke %tmp.127 %tmp.128(%tmp.129, %tmp.132, %tmp.134, %tmp.141, %tmp.143);
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_143_24_149_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_143_8_149_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_143_8_149_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 151 8 ]
+        %tmp.144 = lgetv %dc;
+        symbol [ dc %tmp.144 151 8 10 ];
+        symbol [ setColor %tmp.145 151 11 19 ];
+        %tmp.145 = getv function %tmp.144 :setColor;
+        symbol [ Graphics %tmp.146 151 20 28 ];
+        %tmp.146 = getm $.Toybox.Graphics;
+        symbol [ COLOR_DK_GRAY %tmp.147 151 29 42 ];
+        %tmp.147 = getv %tmp.146 :COLOR_DK_GRAY;
+        symbol [ Graphics %tmp.148 151 44 52 ];
+        %tmp.148 = getm $.Toybox.Graphics;
+        symbol [ COLOR_TRANSPARENT %tmp.149 151 53 70 ];
+        %tmp.149 = getv %tmp.148 :COLOR_TRANSPARENT;
+        invoke %tmp.144 %tmp.145(%tmp.147, %tmp.149);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 152 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_152_8_156_8_if_stmt:
+        %tmp.150 = lgetv %cCount.7;
+        symbol [ cCount %tmp.150 152 12 18 ];
+        %tmp.151 = 0;
+        %tmp.152 = gt %tmp.150 %tmp.151;
+        bf %tmp.152 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_152_8_156_8_if_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_152_8_156_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_152_24_154_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 153 12 ]
+        %tmp.153 = lgetv %dc;
+        symbol [ dc %tmp.153 153 12 14 ];
+        symbol [ drawText %tmp.154 153 15 23 ];
+        %tmp.154 = getv function %tmp.153 :drawText;
+        %tmp.155 = lgetv %cx;
+        symbol [ cx %tmp.155 153 24 26 ];
+        %tmp.156 = lgetv %h;
+        symbol [ h %tmp.156 153 28 29 ];
+        %tmp.157 = 35;
+        %tmp.158 = sub %tmp.156 %tmp.157;
+        symbol [ Graphics %tmp.159 153 36 44 ];
+        %tmp.159 = getm $.Toybox.Graphics;
+        symbol [ FONT_XTINY %tmp.160 153 45 55 ];
+        %tmp.160 = getv %tmp.159 :FONT_XTINY;
+        %tmp.161 = "SEL=Stop  BACK=Stop";
+        symbol [ Graphics %tmp.162 153 80 88 ];
+        %tmp.162 = getm $.Toybox.Graphics;
+        symbol [ TEXT_JUSTIFY_CENTER %tmp.163 153 89 108 ];
+        %tmp.163 = getv %tmp.162 :TEXT_JUSTIFY_CENTER;
+        invoke %tmp.153 %tmp.154(%tmp.155, %tmp.158, %tmp.160, %tmp.161, %tmp.163);
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_152_24_154_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_152_8_156_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_152_8_156_8_if_else_false:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_154_15_156_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 155 12 ]
+        %tmp.164 = lgetv %dc;
+        symbol [ dc %tmp.164 155 12 14 ];
+        symbol [ drawText %tmp.165 155 15 23 ];
+        %tmp.165 = getv function %tmp.164 :drawText;
+        %tmp.166 = lgetv %cx;
+        symbol [ cx %tmp.166 155 24 26 ];
+        %tmp.167 = lgetv %h;
+        symbol [ h %tmp.167 155 28 29 ];
+        %tmp.168 = 35;
+        %tmp.169 = sub %tmp.167 %tmp.168;
+        symbol [ Graphics %tmp.170 155 36 44 ];
+        %tmp.170 = getm $.Toybox.Graphics;
+        symbol [ FONT_XTINY %tmp.171 155 45 55 ];
+        %tmp.171 = getv %tmp.170 :FONT_XTINY;
+        %tmp.172 = "SEL=Contract BACK=Stop";
+        symbol [ Graphics %tmp.173 155 83 91 ];
+        %tmp.173 = getm $.Toybox.Graphics;
+        symbol [ TEXT_JUSTIFY_CENTER %tmp.174 155 92 111 ];
+        %tmp.174 = getv %tmp.173 :TEXT_JUSTIFY_CENTER;
+        invoke %tmp.164 %tmp.165(%tmp.166, %tmp.169, %tmp.171, %tmp.172, %tmp.174);
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_154_15_156_8_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_152_8_156_8_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_116_48_157_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 159; @symbol_functiondef = [drawDoneState,159,13,26]; @symbol_param<0> = [dc,159,27,29]; @symbol_param<1> = [cx,159,31,33]; @symbol_param<2> = [cy,159,35,37]; @symbol_param<3> = [w,159,39,40]; @symbol_param<4> = [h,159,42,43]; ]
+    function drawDoneState(dc, cx, cy, w, h) {
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_159_45_194_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 160 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_159_45_194_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_159_45_194_4_stop" ]
+        %durationMs.1 = local;
+        symbol [ durationMs %durationMs.1 160 12 22 ];
+        symbol [ holdEndMs %tmp.2 160 25 34 ];
+        %tmp.2 = getv ? :holdEndMs;
+        symbol [ holdStartMs %tmp.4 160 37 48 ];
+        %tmp.4 = getv ? :holdStartMs;
+        %tmp.5 = sub %tmp.2 %tmp.4;
+        lputv %durationMs.1 %tmp.5;
+        symbol [ durationMs %durationMs.1 160 12 22 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 161 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_159_45_194_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_159_45_194_4_stop" ]
+        %totalSec.2 = local;
+        symbol [ totalSec %totalSec.2 161 12 20 ];
+        %tmp.6 = lgetv %durationMs.1;
+        symbol [ durationMs %tmp.6 161 23 33 ];
+        %tmp.7 = 1000;
+        %tmp.8 = div %tmp.6 %tmp.7;
+        lputv %totalSec.2 %tmp.8;
+        symbol [ totalSec %totalSec.2 161 12 20 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 162 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_159_45_194_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_159_45_194_4_stop" ]
+        %min.3 = local;
+        symbol [ min %min.3 162 12 15 ];
+        %tmp.9 = lgetv %totalSec.2;
+        symbol [ totalSec %tmp.9 162 18 26 ];
+        %tmp.10 = 60;
+        %tmp.11 = div %tmp.9 %tmp.10;
+        lputv %min.3 %tmp.11;
+        symbol [ min %min.3 162 12 15 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 163 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_159_45_194_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_159_45_194_4_stop" ]
+        %sec.4 = local;
+        symbol [ sec %sec.4 163 12 15 ];
+        %tmp.12 = lgetv %totalSec.2;
+        symbol [ totalSec %tmp.12 163 18 26 ];
+        %tmp.13 = 60;
+        %tmp.14 = mod %tmp.12 %tmp.13;
+        lputv %sec.4 %tmp.14;
+        symbol [ sec %sec.4 163 12 15 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 165 8 ]
+        %tmp.15 = lgetv %dc;
+        symbol [ dc %tmp.15 165 8 10 ];
+        symbol [ setColor %tmp.16 165 11 19 ];
+        %tmp.16 = getv function %tmp.15 :setColor;
+        symbol [ Graphics %tmp.17 165 20 28 ];
+        %tmp.17 = getm $.Toybox.Graphics;
+        symbol [ COLOR_WHITE %tmp.18 165 29 40 ];
+        %tmp.18 = getv %tmp.17 :COLOR_WHITE;
+        symbol [ Graphics %tmp.19 165 42 50 ];
+        %tmp.19 = getm $.Toybox.Graphics;
+        symbol [ COLOR_TRANSPARENT %tmp.20 165 51 68 ];
+        %tmp.20 = getv %tmp.19 :COLOR_TRANSPARENT;
+        invoke %tmp.15 %tmp.16(%tmp.18, %tmp.20);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 166 8 ]
+        %tmp.21 = lgetv %dc;
+        symbol [ dc %tmp.21 166 8 10 ];
+        symbol [ drawText %tmp.22 166 11 19 ];
+        %tmp.22 = getv function %tmp.21 :drawText;
+        %tmp.23 = lgetv %cx;
+        symbol [ cx %tmp.23 166 20 22 ];
+        %tmp.24 = lgetv %h;
+        symbol [ h %tmp.24 166 24 25 ];
+        %tmp.25 = 6;
+        %tmp.26 = div %tmp.24 %tmp.25;
+        symbol [ Graphics %tmp.27 166 31 39 ];
+        %tmp.27 = getm $.Toybox.Graphics;
+        symbol [ FONT_SMALL %tmp.28 166 40 50 ];
+        %tmp.28 = getv %tmp.27 :FONT_SMALL;
+        %tmp.29 = "Hold Complete";
+        symbol [ Graphics %tmp.30 166 69 77 ];
+        %tmp.30 = getm $.Toybox.Graphics;
+        symbol [ TEXT_JUSTIFY_CENTER %tmp.31 166 78 97 ];
+        %tmp.31 = getv %tmp.30 :TEXT_JUSTIFY_CENTER;
+        invoke %tmp.21 %tmp.22(%tmp.23, %tmp.26, %tmp.28, %tmp.29, %tmp.31);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 168 8 ]
+        %tmp.32 = lgetv %dc;
+        symbol [ dc %tmp.32 168 8 10 ];
+        symbol [ setColor %tmp.33 168 11 19 ];
+        %tmp.33 = getv function %tmp.32 :setColor;
+        %tmp.34 = 0x00AAFF;
+        symbol [ Graphics %tmp.35 168 30 38 ];
+        %tmp.35 = getm $.Toybox.Graphics;
+        symbol [ COLOR_TRANSPARENT %tmp.36 168 39 56 ];
+        %tmp.36 = getv %tmp.35 :COLOR_TRANSPARENT;
+        invoke %tmp.32 %tmp.33(%tmp.34, %tmp.36);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 169 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_159_45_194_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_159_45_194_4_stop" ]
+        %timeStr.5 = local;
+        symbol [ timeStr %timeStr.5 169 12 19 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 170 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_170_8_174_8_if_stmt:
+        %tmp.37 = lgetv %min.3;
+        symbol [ min %tmp.37 170 12 15 ];
+        %tmp.38 = 0;
+        %tmp.39 = gt %tmp.37 %tmp.38;
+        bf %tmp.39 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_170_8_174_8_if_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_170_8_174_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_170_21_172_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 171 12 ]
+        %tmp.40 = lgetv %min.3;
+        symbol [ min %tmp.40 171 22 25 ];
+        symbol [ format %tmp.41 171 26 32 ];
+        %tmp.41 = getv function %tmp.40 :format;
+        %tmp.42 = "%d";
+        %tmp.43 = invoke %tmp.40 %tmp.41(%tmp.42);
+        %tmp.44 = "m ";
+        %tmp.45 = add %tmp.43 %tmp.44;
+        %tmp.46 = lgetv %sec.4;
+        symbol [ sec %tmp.46 171 48 51 ];
+        symbol [ format %tmp.47 171 52 58 ];
+        %tmp.47 = getv function %tmp.46 :format;
+        %tmp.48 = "%d";
+        %tmp.49 = invoke %tmp.46 %tmp.47(%tmp.48);
+        %tmp.50 = add %tmp.45 %tmp.49;
+        %tmp.51 = "s";
+        %tmp.52 = add %tmp.50 %tmp.51;
+        lputv %timeStr.5 %tmp.52;
+        symbol [ timeStr %timeStr.5 171 12 19 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_170_21_172_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_170_8_174_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_170_8_174_8_if_else_false:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_172_15_174_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 173 12 ]
+        %tmp.53 = lgetv %sec.4;
+        symbol [ sec %tmp.53 173 22 25 ];
+        symbol [ format %tmp.54 173 26 32 ];
+        %tmp.54 = getv function %tmp.53 :format;
+        %tmp.55 = "%d";
+        %tmp.56 = invoke %tmp.53 %tmp.54(%tmp.55);
+        %tmp.57 = "s";
+        %tmp.58 = add %tmp.56 %tmp.57;
+        lputv %timeStr.5 %tmp.58;
+        symbol [ timeStr %timeStr.5 173 12 19 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_172_15_174_8_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_170_8_174_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 175 8 ]
+        %tmp.59 = lgetv %dc;
+        symbol [ dc %tmp.59 175 8 10 ];
+        symbol [ drawText %tmp.60 175 11 19 ];
+        %tmp.60 = getv function %tmp.59 :drawText;
+        %tmp.61 = lgetv %cx;
+        symbol [ cx %tmp.61 175 20 22 ];
+        %tmp.62 = lgetv %cy;
+        symbol [ cy %tmp.62 175 24 26 ];
+        %tmp.63 = 25;
+        %tmp.64 = sub %tmp.62 %tmp.63;
+        symbol [ Graphics %tmp.65 175 33 41 ];
+        %tmp.65 = getm $.Toybox.Graphics;
+        symbol [ FONT_MEDIUM %tmp.66 175 42 53 ];
+        %tmp.66 = getv %tmp.65 :FONT_MEDIUM;
+        %tmp.67 = lgetv %timeStr.5;
+        symbol [ timeStr %tmp.67 175 55 62 ];
+        symbol [ Graphics %tmp.68 175 64 72 ];
+        %tmp.68 = getm $.Toybox.Graphics;
+        symbol [ TEXT_JUSTIFY_CENTER %tmp.69 175 73 92 ];
+        %tmp.69 = getv %tmp.68 :TEXT_JUSTIFY_CENTER;
+        invoke %tmp.59 %tmp.60(%tmp.61, %tmp.64, %tmp.66, %tmp.67, %tmp.69);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 177 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_159_45_194_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_159_45_194_4_stop" ]
+        %cCount.6 = local;
+        symbol [ cCount %cCount.6 177 12 18 ];
+        symbol [ contractionTimesMs %tmp.71 177 21 39 ];
+        %tmp.71 = getv ? :contractionTimesMs;
+        symbol [ size %tmp.72 177 40 44 ];
+        %tmp.72 = getv function %tmp.71 :size;
+        %tmp.73 = invoke %tmp.71 %tmp.72();
+        lputv %cCount.6 %tmp.73;
+        symbol [ cCount %cCount.6 177 12 18 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 178 8 ]
+        %tmp.74 = lgetv %dc;
+        symbol [ dc %tmp.74 178 8 10 ];
+        symbol [ setColor %tmp.75 178 11 19 ];
+        %tmp.75 = getv function %tmp.74 :setColor;
+        %tmp.76 = 0xFFAA00;
+        symbol [ Graphics %tmp.77 178 30 38 ];
+        %tmp.77 = getm $.Toybox.Graphics;
+        symbol [ COLOR_TRANSPARENT %tmp.78 178 39 56 ];
+        %tmp.78 = getv %tmp.77 :COLOR_TRANSPARENT;
+        invoke %tmp.74 %tmp.75(%tmp.76, %tmp.78);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 179 8 ]
+        %tmp.79 = lgetv %dc;
+        symbol [ dc %tmp.79 179 8 10 ];
+        symbol [ drawText %tmp.80 179 11 19 ];
+        %tmp.80 = getv function %tmp.79 :drawText;
+        %tmp.81 = lgetv %cx;
+        symbol [ cx %tmp.81 179 20 22 ];
+        %tmp.82 = lgetv %cy;
+        symbol [ cy %tmp.82 179 24 26 ];
+        %tmp.83 = 5;
+        %tmp.84 = add %tmp.82 %tmp.83;
+        symbol [ Graphics %tmp.85 179 32 40 ];
+        %tmp.85 = getm $.Toybox.Graphics;
+        symbol [ FONT_SMALL %tmp.86 179 41 51 ];
+        %tmp.86 = getv %tmp.85 :FONT_SMALL;
+        %tmp.87 = "Contractions: ";
+        %tmp.88 = lgetv %cCount.6;
+        symbol [ cCount %tmp.88 180 31 37 ];
+        symbol [ toString %tmp.89 180 38 46 ];
+        %tmp.89 = getv function %tmp.88 :toString;
+        %tmp.90 = invoke %tmp.88 %tmp.89();
+        %tmp.91 = add %tmp.87 %tmp.90;
+        symbol [ Graphics %tmp.92 180 50 58 ];
+        %tmp.92 = getm $.Toybox.Graphics;
+        symbol [ TEXT_JUSTIFY_CENTER %tmp.93 180 59 78 ];
+        %tmp.93 = getv %tmp.92 :TEXT_JUSTIFY_CENTER;
+        invoke %tmp.79 %tmp.80(%tmp.81, %tmp.84, %tmp.86, %tmp.91, %tmp.93);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 182 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_182_8_188_8_if_stmt:
+        %tmp.94 = lgetv %cCount.6;
+        symbol [ cCount %tmp.94 182 12 18 ];
+        %tmp.95 = 0;
+        %tmp.96 = gt %tmp.94 %tmp.95;
+        bf %tmp.96 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_182_8_188_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_182_8_188_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_182_24_188_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 183 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_182_24_188_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_182_24_188_8_stop" ]
+        %firstC.7 = local;
+        symbol [ firstC %firstC.7 183 16 22 ];
+        symbol [ contractionTimesMs %tmp.98 183 25 43 ];
+        %tmp.98 = getv ? :contractionTimesMs;
+        %tmp.99 = 0;
+        %tmp.100 = agetv %tmp.98 %tmp.99;
+        lputv %firstC.7 %tmp.100;
+        symbol [ firstC %firstC.7 183 16 22 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 184 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_182_24_188_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_182_24_188_8_stop" ]
+        %fcSec.8 = local;
+        symbol [ fcSec %fcSec.8 184 16 21 ];
+        %tmp.101 = lgetv %firstC.7;
+        symbol [ firstC %tmp.101 184 24 30 ];
+        %tmp.102 = 1000;
+        %tmp.103 = div %tmp.101 %tmp.102;
+        lputv %fcSec.8 %tmp.103;
+        symbol [ fcSec %fcSec.8 184 16 21 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 185 12 ]
+        %tmp.104 = lgetv %dc;
+        symbol [ dc %tmp.104 185 12 14 ];
+        symbol [ setColor %tmp.105 185 15 23 ];
+        %tmp.105 = getv function %tmp.104 :setColor;
+        symbol [ Graphics %tmp.106 185 24 32 ];
+        %tmp.106 = getm $.Toybox.Graphics;
+        symbol [ COLOR_LT_GRAY %tmp.107 185 33 46 ];
+        %tmp.107 = getv %tmp.106 :COLOR_LT_GRAY;
+        symbol [ Graphics %tmp.108 185 48 56 ];
+        %tmp.108 = getm $.Toybox.Graphics;
+        symbol [ COLOR_TRANSPARENT %tmp.109 185 57 74 ];
+        %tmp.109 = getv %tmp.108 :COLOR_TRANSPARENT;
+        invoke %tmp.104 %tmp.105(%tmp.107, %tmp.109);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 186 12 ]
+        %tmp.110 = lgetv %dc;
+        symbol [ dc %tmp.110 186 12 14 ];
+        symbol [ drawText %tmp.111 186 15 23 ];
+        %tmp.111 = getv function %tmp.110 :drawText;
+        %tmp.112 = lgetv %cx;
+        symbol [ cx %tmp.112 186 24 26 ];
+        %tmp.113 = lgetv %cy;
+        symbol [ cy %tmp.113 186 28 30 ];
+        %tmp.114 = 30;
+        %tmp.115 = add %tmp.113 %tmp.114;
+        symbol [ Graphics %tmp.116 186 37 45 ];
+        %tmp.116 = getm $.Toybox.Graphics;
+        symbol [ FONT_XTINY %tmp.117 186 46 56 ];
+        %tmp.117 = getv %tmp.116 :FONT_XTINY;
+        %tmp.118 = "1st @ ";
+        %tmp.119 = lgetv %fcSec.8;
+        symbol [ fcSec %tmp.119 187 27 32 ];
+        symbol [ toString %tmp.120 187 33 41 ];
+        %tmp.120 = getv function %tmp.119 :toString;
+        %tmp.121 = invoke %tmp.119 %tmp.120();
+        %tmp.122 = add %tmp.118 %tmp.121;
+        %tmp.123 = "s";
+        %tmp.124 = add %tmp.122 %tmp.123;
+        symbol [ Graphics %tmp.125 187 51 59 ];
+        %tmp.125 = getm $.Toybox.Graphics;
+        symbol [ TEXT_JUSTIFY_CENTER %tmp.126 187 60 79 ];
+        %tmp.126 = getv %tmp.125 :TEXT_JUSTIFY_CENTER;
+        invoke %tmp.110 %tmp.111(%tmp.112, %tmp.115, %tmp.117, %tmp.124, %tmp.126);
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_182_24_188_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_182_8_188_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_182_8_188_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 190 8 ]
+        %tmp.127 = lgetv %dc;
+        symbol [ dc %tmp.127 190 8 10 ];
+        symbol [ setColor %tmp.128 190 11 19 ];
+        %tmp.128 = getv function %tmp.127 :setColor;
+        %tmp.129 = 0x00CC66;
+        symbol [ Graphics %tmp.130 190 30 38 ];
+        %tmp.130 = getm $.Toybox.Graphics;
+        symbol [ COLOR_TRANSPARENT %tmp.131 190 39 56 ];
+        %tmp.131 = getv %tmp.130 :COLOR_TRANSPARENT;
+        invoke %tmp.127 %tmp.128(%tmp.129, %tmp.131);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 191 8 ]
+        %tmp.132 = lgetv %dc;
+        symbol [ dc %tmp.132 191 8 10 ];
+        symbol [ drawText %tmp.133 191 11 19 ];
+        %tmp.133 = getv function %tmp.132 :drawText;
+        %tmp.134 = lgetv %cx;
+        symbol [ cx %tmp.134 191 20 22 ];
+        %tmp.135 = lgetv %h;
+        symbol [ h %tmp.135 191 24 25 ];
+        %tmp.136 = 3;
+        %tmp.137 = mul %tmp.135 %tmp.136;
+        %tmp.138 = 4;
+        %tmp.139 = div %tmp.137 %tmp.138;
+        %tmp.140 = 10;
+        %tmp.141 = add %tmp.139 %tmp.140;
+        symbol [ Graphics %tmp.142 191 40 48 ];
+        %tmp.142 = getm $.Toybox.Graphics;
+        symbol [ FONT_XTINY %tmp.143 191 49 59 ];
+        %tmp.143 = getv %tmp.142 :FONT_XTINY;
+        %tmp.144 = "Saved & syncing to phone";
+        symbol [ Graphics %tmp.145 191 89 97 ];
+        %tmp.145 = getm $.Toybox.Graphics;
+        symbol [ TEXT_JUSTIFY_CENTER %tmp.146 191 98 117 ];
+        %tmp.146 = getv %tmp.145 :TEXT_JUSTIFY_CENTER;
+        invoke %tmp.132 %tmp.133(%tmp.134, %tmp.141, %tmp.143, %tmp.144, %tmp.146);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 192 8 ]
+        %tmp.147 = lgetv %dc;
+        symbol [ dc %tmp.147 192 8 10 ];
+        symbol [ setColor %tmp.148 192 11 19 ];
+        %tmp.148 = getv function %tmp.147 :setColor;
+        symbol [ Graphics %tmp.149 192 20 28 ];
+        %tmp.149 = getm $.Toybox.Graphics;
+        symbol [ COLOR_DK_GRAY %tmp.150 192 29 42 ];
+        %tmp.150 = getv %tmp.149 :COLOR_DK_GRAY;
+        symbol [ Graphics %tmp.151 192 44 52 ];
+        %tmp.151 = getm $.Toybox.Graphics;
+        symbol [ COLOR_TRANSPARENT %tmp.152 192 53 70 ];
+        %tmp.152 = getv %tmp.151 :COLOR_TRANSPARENT;
+        invoke %tmp.147 %tmp.148(%tmp.150, %tmp.152);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 193 8 ]
+        %tmp.153 = lgetv %dc;
+        symbol [ dc %tmp.153 193 8 10 ];
+        symbol [ drawText %tmp.154 193 11 19 ];
+        %tmp.154 = getv function %tmp.153 :drawText;
+        %tmp.155 = lgetv %cx;
+        symbol [ cx %tmp.155 193 20 22 ];
+        %tmp.156 = lgetv %h;
+        symbol [ h %tmp.156 193 24 25 ];
+        %tmp.157 = 25;
+        %tmp.158 = sub %tmp.156 %tmp.157;
+        symbol [ Graphics %tmp.159 193 32 40 ];
+        %tmp.159 = getm $.Toybox.Graphics;
+        symbol [ FONT_XTINY %tmp.160 193 41 51 ];
+        %tmp.160 = getv %tmp.159 :FONT_XTINY;
+        %tmp.161 = "BACK to return";
+        symbol [ Graphics %tmp.162 193 71 79 ];
+        %tmp.162 = getm $.Toybox.Graphics;
+        symbol [ TEXT_JUSTIFY_CENTER %tmp.163 193 80 99 ];
+        %tmp.163 = getv %tmp.162 :TEXT_JUSTIFY_CENTER;
+        invoke %tmp.153 %tmp.154(%tmp.155, %tmp.158, %tmp.160, %tmp.161, %tmp.163);
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_159_45_194_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 198; @symbol_functiondef = [startHold,198,13,22]; ]
+    function startHold() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_198_25_213_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 199 8 ]
+        %tmp.1 = 1;
+        symbol [ holdState ? 199 8 17 ];
+        putv self :holdState %tmp.1;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 200 8 ]
+        symbol [ System %tmp.2 200 22 28 ];
+        %tmp.2 = getm $.Toybox.System;
+        symbol [ getTimer %tmp.3 200 29 37 ];
+        %tmp.3 = getv function %tmp.2 :getTimer;
+        %tmp.4 = invoke %tmp.2 %tmp.3();
+        symbol [ holdStartMs ? 200 8 19 ];
+        putv self :holdStartMs %tmp.4;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 201 8 ]
+        %tmp.5 = 0;
+        symbol [ holdEndMs ? 201 8 17 ];
+        putv self :holdEndMs %tmp.5;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 202 8 ]
+        %tmp.6 = 0;
+        symbol [ elapsedMs ? 202 8 17 ];
+        putv self :elapsedMs %tmp.6;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 203 8 ]
+        %tmp.7 = newa 0;
+        symbol [ contractionTimesMs ? 203 8 26 ];
+        putv self :contractionTimesMs %tmp.7;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 204 8 ]
+        %tmp.8 = newa 0;
+        symbol [ hrSamples ? 204 8 17 ];
+        putv self :hrSamples %tmp.8;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 205 8 ]
+        %tmp.9 = newa 0;
+        symbol [ spo2Samples ? 205 8 19 ];
+        putv self :spo2Samples %tmp.9;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 207 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_207_8_209_8_if_stmt:
+        symbol [ Attention %tmp.10 207 12 21 ];
+        %tmp.10 = getm $.Toybox.Attention;
+        %tmp.12 = const :vibrate;
+        symbol [ vibrate %tmp.12 207 27 34 const ];
+        %tmp.13 = canhazplz %tmp.10 %tmp.12;
+        bf %tmp.13 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_207_8_209_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_207_8_209_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_207_36_209_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 208 12 ]
+        symbol [ Attention %tmp.14 208 12 21 ];
+        %tmp.14 = getm $.Toybox.Attention;
+        symbol [ vibrate %tmp.15 208 22 29 ];
+        %tmp.15 = getv function %tmp.14 :vibrate;
+        %tmp.16 = newa 1;
+        symbol [ Attention %tmp.19 208 35 44 ];
+        %tmp.19 = getm $.Toybox.Attention;
+        symbol [ VibeProfile %tmp.20 208 45 56 ];
+        %tmp.20 = getv function ? %tmp.19 :VibeProfile;
+        %tmp.21 = 100;
+        %tmp.22 = 200;
+        %tmp.17 = newc %tmp.20 (%tmp.21, %tmp.22);
+        %tmp.23 = dup %tmp.16;
+        %tmp.24 = aputv %tmp.23 0 %tmp.17;
+        invoke %tmp.14 %tmp.15(%tmp.24);
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_207_36_209_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_207_8_209_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_207_8_209_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 211 8 ]
+        symbol [ refreshTimer %tmp.26 211 8 20 ];
+        %tmp.26 = getv ? :refreshTimer;
+        symbol [ start %tmp.27 211 21 26 ];
+        %tmp.27 = getv function %tmp.26 :start;
+        %tmp.28 = self;
+        symbol [ method %tmp.29 211 27 33 ];
+        %tmp.29 = getv function %tmp.28 :method;
+        %tmp.31 = const :onRefreshTimer;
+        symbol [ onRefreshTimer %tmp.31 211 35 49 const ];
+        %tmp.32 = invoke %tmp.28 %tmp.29(%tmp.31);
+        %tmp.33 = 200;
+        %tmp.34 = true;
+        invoke %tmp.26 %tmp.27(%tmp.32, %tmp.33, %tmp.34);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 212 8 ]
+        symbol [ WatchUi %tmp.35 212 8 15 ];
+        %tmp.35 = getm $.Toybox.WatchUi;
+        symbol [ requestUpdate %tmp.36 212 16 29 ];
+        %tmp.36 = getv function %tmp.35 :requestUpdate;
+        invoke %tmp.35 %tmp.36();
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_198_25_213_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 215; @symbol_functiondef = [recordContraction,215,13,30]; ]
+    function recordContraction() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_215_33_227_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 216 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_216_8_218_8_if_stmt:
+        symbol [ holdState %tmp.2 216 12 21 ];
+        %tmp.2 = getv ? :holdState;
+        %tmp.3 = 1;
+        %tmp.4 = ne %tmp.2 %tmp.3;
+        bf %tmp.4 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_216_8_218_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_216_8_218_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_216_28_218_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 217 12 ]
+        ret ?;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_216_28_218_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_216_8_218_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_216_8_218_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 219 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_215_33_227_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_215_33_227_4_stop" ]
+        %elapsed.1 = local;
+        symbol [ elapsed %elapsed.1 219 12 19 ];
+        symbol [ System %tmp.5 219 22 28 ];
+        %tmp.5 = getm $.Toybox.System;
+        symbol [ getTimer %tmp.6 219 29 37 ];
+        %tmp.6 = getv function %tmp.5 :getTimer;
+        %tmp.7 = invoke %tmp.5 %tmp.6();
+        symbol [ holdStartMs %tmp.9 219 42 53 ];
+        %tmp.9 = getv ? :holdStartMs;
+        %tmp.10 = sub %tmp.7 %tmp.9;
+        lputv %elapsed.1 %tmp.10;
+        symbol [ elapsed %elapsed.1 219 12 19 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 220 8 ]
+        symbol [ contractionTimesMs %tmp.12 220 8 26 ];
+        %tmp.12 = getv ? :contractionTimesMs;
+        symbol [ add %tmp.13 220 27 30 ];
+        %tmp.13 = getv function %tmp.12 :add;
+        %tmp.14 = lgetv %elapsed.1;
+        symbol [ elapsed %tmp.14 220 31 38 ];
+        invoke %tmp.12 %tmp.13(%tmp.14);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 222 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_222_8_224_8_if_stmt:
+        symbol [ Attention %tmp.15 222 12 21 ];
+        %tmp.15 = getm $.Toybox.Attention;
+        %tmp.17 = const :vibrate;
+        symbol [ vibrate %tmp.17 222 27 34 const ];
+        %tmp.18 = canhazplz %tmp.15 %tmp.17;
+        bf %tmp.18 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_222_8_224_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_222_8_224_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_222_36_224_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 223 12 ]
+        symbol [ Attention %tmp.19 223 12 21 ];
+        %tmp.19 = getm $.Toybox.Attention;
+        symbol [ vibrate %tmp.20 223 22 29 ];
+        %tmp.20 = getv function %tmp.19 :vibrate;
+        %tmp.21 = newa 1;
+        symbol [ Attention %tmp.24 223 35 44 ];
+        %tmp.24 = getm $.Toybox.Attention;
+        symbol [ VibeProfile %tmp.25 223 45 56 ];
+        %tmp.25 = getv function ? %tmp.24 :VibeProfile;
+        %tmp.26 = 50;
+        %tmp.27 = 100;
+        %tmp.22 = newc %tmp.25 (%tmp.26, %tmp.27);
+        %tmp.28 = dup %tmp.21;
+        %tmp.29 = aputv %tmp.28 0 %tmp.22;
+        invoke %tmp.19 %tmp.20(%tmp.29);
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_222_36_224_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_222_8_224_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_222_8_224_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 226 8 ]
+        symbol [ WatchUi %tmp.30 226 8 15 ];
+        %tmp.30 = getm $.Toybox.WatchUi;
+        symbol [ requestUpdate %tmp.31 226 16 29 ];
+        %tmp.31 = getv function %tmp.30 :requestUpdate;
+        invoke %tmp.30 %tmp.31();
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_215_33_227_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 229; @symbol_functiondef = [stopHold,229,13,21]; ]
+    function stopHold() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_229_24_247_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 230 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_230_8_232_8_if_stmt:
+        symbol [ holdState %tmp.2 230 12 21 ];
+        %tmp.2 = getv ? :holdState;
+        %tmp.3 = 1;
+        %tmp.4 = ne %tmp.2 %tmp.3;
+        bf %tmp.4 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_230_8_232_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_230_8_232_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_230_28_232_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 231 12 ]
+        ret ?;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_230_28_232_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_230_8_232_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_230_8_232_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 233 8 ]
+        symbol [ System %tmp.5 233 20 26 ];
+        %tmp.5 = getm $.Toybox.System;
+        symbol [ getTimer %tmp.6 233 27 35 ];
+        %tmp.6 = getv function %tmp.5 :getTimer;
+        %tmp.7 = invoke %tmp.5 %tmp.6();
+        symbol [ holdEndMs ? 233 8 17 ];
+        putv self :holdEndMs %tmp.7;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 234 8 ]
+        %tmp.8 = 2;
+        symbol [ holdState ? 234 8 17 ];
+        putv self :holdState %tmp.8;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 235 8 ]
+        symbol [ refreshTimer %tmp.10 235 8 20 ];
+        %tmp.10 = getv ? :refreshTimer;
+        symbol [ stop %tmp.11 235 21 25 ];
+        %tmp.11 = getv function %tmp.10 :stop;
+        invoke %tmp.10 %tmp.11();
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 237 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_237_8_243_8_if_stmt:
+        symbol [ Attention %tmp.12 237 12 21 ];
+        %tmp.12 = getm $.Toybox.Attention;
+        %tmp.14 = const :vibrate;
+        symbol [ vibrate %tmp.14 237 27 34 const ];
+        %tmp.15 = canhazplz %tmp.12 %tmp.14;
+        bf %tmp.15 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_237_8_243_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_237_8_243_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_237_36_243_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 238 12 ]
+        symbol [ Attention %tmp.16 238 12 21 ];
+        %tmp.16 = getm $.Toybox.Attention;
+        symbol [ vibrate %tmp.17 238 22 29 ];
+        %tmp.17 = getv function %tmp.16 :vibrate;
+        %tmp.18 = newa 3;
+        symbol [ Attention %tmp.21 239 20 29 ];
+        %tmp.21 = getm $.Toybox.Attention;
+        symbol [ VibeProfile %tmp.22 239 30 41 ];
+        %tmp.22 = getv function ? %tmp.21 :VibeProfile;
+        %tmp.23 = 100;
+        %tmp.24 = 200;
+        %tmp.19 = newc %tmp.22 (%tmp.23, %tmp.24);
+        %tmp.25 = dup %tmp.18;
+        %tmp.26 = aputv %tmp.25 0 %tmp.19;
+        symbol [ Attention %tmp.29 240 20 29 ];
+        %tmp.29 = getm $.Toybox.Attention;
+        symbol [ VibeProfile %tmp.30 240 30 41 ];
+        %tmp.30 = getv function ? %tmp.29 :VibeProfile;
+        %tmp.31 = 0;
+        %tmp.32 = 100;
+        %tmp.27 = newc %tmp.30 (%tmp.31, %tmp.32);
+        %tmp.33 = dup %tmp.26;
+        %tmp.34 = aputv %tmp.33 1 %tmp.27;
+        symbol [ Attention %tmp.37 241 20 29 ];
+        %tmp.37 = getm $.Toybox.Attention;
+        symbol [ VibeProfile %tmp.38 241 30 41 ];
+        %tmp.38 = getv function ? %tmp.37 :VibeProfile;
+        %tmp.39 = 100;
+        %tmp.40 = 200;
+        %tmp.35 = newc %tmp.38 (%tmp.39, %tmp.40);
+        %tmp.41 = dup %tmp.34;
+        %tmp.42 = aputv %tmp.41 2 %tmp.35;
+        invoke %tmp.16 %tmp.17(%tmp.42);
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_237_36_243_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_237_8_243_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_237_8_243_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 245 8 ]
+        %tmp.43 = self;
+        symbol [ saveSessionData %tmp.44 245 8 23 ];
+        %tmp.44 = getv function %tmp.43 :saveSessionData;
+        invoke %tmp.43 %tmp.44();
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 246 8 ]
+        symbol [ WatchUi %tmp.45 246 8 15 ];
+        %tmp.45 = getm $.Toybox.WatchUi;
+        symbol [ requestUpdate %tmp.46 246 16 29 ];
+        %tmp.46 = getv function %tmp.45 :requestUpdate;
+        invoke %tmp.45 %tmp.46();
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_229_24_247_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 249; @symbol_functiondef = [onRefreshTimer,249,13,27]; ]
+    function onRefreshTimer() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_249_30_251_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 250 8 ]
+        symbol [ WatchUi %tmp.1 250 8 15 ];
+        %tmp.1 = getm $.Toybox.WatchUi;
+        symbol [ requestUpdate %tmp.2 250 16 29 ];
+        %tmp.2 = getv function %tmp.1 :requestUpdate;
+        invoke %tmp.1 %tmp.2();
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_249_30_251_4_stop:
+    }
+    //! Save the completed hold to persistent storage AND transmit to phone.
+    //! Dual approach: save locally (in case phone isn't listening) and also
+    //! transmit immediately (in case phone IS listening right now).
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 258; @symbol_functiondef = [saveSessionData,258,13,28]; ]
+    function saveSessionData() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_258_31_306_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 259 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_258_31_306_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_258_31_306_4_stop" ]
+        %durationMs.1 = local;
+        symbol [ durationMs %durationMs.1 259 12 22 ];
+        symbol [ holdEndMs %tmp.2 259 25 34 ];
+        %tmp.2 = getv ? :holdEndMs;
+        symbol [ holdStartMs %tmp.4 259 37 48 ];
+        %tmp.4 = getv ? :holdStartMs;
+        %tmp.5 = sub %tmp.2 %tmp.4;
+        lputv %durationMs.1 %tmp.5;
+        symbol [ durationMs %durationMs.1 259 12 22 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 261 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_258_31_306_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_258_31_306_4_stop" ]
+        %contractions.2 = local;
+        symbol [ contractions %contractions.2 261 12 24 ];
+        %tmp.6 = newa 0;
+        lputv %contractions.2 %tmp.6;
+        symbol [ contractions %contractions.2 261 12 24 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 262 8 ]
+        for @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_262_8_264_8_for_test @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_262_8_264_8_for_incr @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_262_8_264_8_for_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_262_8_264_8_for_init:
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_262_8_264_8_for_begin" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_262_8_264_8_for_end" ]
+        %i.3 = local;
+        symbol [ i %i.3 262 17 18 ];
+        %tmp.7 = 0;
+        lputv %i.3 %tmp.7;
+        symbol [ i %i.3 262 17 18 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_262_8_264_8_for_test:
+        %tmp.8 = lgetv %i.3;
+        symbol [ i %tmp.8 262 24 25 ];
+        symbol [ contractionTimesMs %tmp.10 262 28 46 ];
+        %tmp.10 = getv ? :contractionTimesMs;
+        symbol [ size %tmp.11 262 47 51 ];
+        %tmp.11 = getv function %tmp.10 :size;
+        %tmp.12 = invoke %tmp.10 %tmp.11();
+        %tmp.13 = lt %tmp.8 %tmp.12;
+        bf %tmp.13 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_262_8_264_8_for_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_262_8_264_8_for_begin:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_262_60_264_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 263 12 ]
+        %tmp.14 = lgetv %contractions.2;
+        symbol [ contractions %tmp.14 263 12 24 ];
+        symbol [ add %tmp.15 263 25 28 ];
+        %tmp.15 = getv function %tmp.14 :add;
+        symbol [ contractionTimesMs %tmp.17 263 29 47 ];
+        %tmp.17 = getv ? :contractionTimesMs;
+        %tmp.18 = lgetv %i.3;
+        symbol [ i %tmp.18 263 48 49 ];
+        %tmp.19 = agetv %tmp.17 %tmp.18;
+        invoke %tmp.14 %tmp.15(%tmp.19);
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_262_60_264_8_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_262_8_264_8_for_incr:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 262 ]
+        %tmp.22 = lgetv %i.3;
+        symbol [ i %tmp.22 262 55 56 ];
+        %tmp.23 = add %tmp.22 1;
+        lputv %i.3 %tmp.23;
+        symbol [ i %i.3 262 55 56 ];
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_262_8_264_8_for_test;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_262_8_264_8_for_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 266 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_258_31_306_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_258_31_306_4_stop" ]
+        %firstContractionMs.4 = local;
+        symbol [ firstContractionMs %firstContractionMs.4 266 12 30 ];
+        %tmp.24 = null;
+        lputv %firstContractionMs.4 %tmp.24;
+        symbol [ firstContractionMs %firstContractionMs.4 266 12 30 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 267 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_267_8_269_8_if_stmt:
+        symbol [ contractionTimesMs %tmp.26 267 12 30 ];
+        %tmp.26 = getv ? :contractionTimesMs;
+        symbol [ size %tmp.27 267 31 35 ];
+        %tmp.27 = getv function %tmp.26 :size;
+        %tmp.28 = invoke %tmp.26 %tmp.27();
+        %tmp.29 = 0;
+        %tmp.30 = gt %tmp.28 %tmp.29;
+        bf %tmp.30 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_267_8_269_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_267_8_269_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_267_43_269_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 268 12 ]
+        symbol [ contractionTimesMs %tmp.32 268 33 51 ];
+        %tmp.32 = getv ? :contractionTimesMs;
+        %tmp.33 = 0;
+        %tmp.34 = agetv %tmp.32 %tmp.33;
+        lputv %firstContractionMs.4 %tmp.34;
+        symbol [ firstContractionMs %firstContractionMs.4 268 12 30 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_267_43_269_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_267_8_269_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_267_8_269_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 273 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_258_31_306_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_258_31_306_4_stop" ]
+        %packedSamples.5 = local;
+        symbol [ packedSamples %packedSamples.5 273 12 25 ];
+        %tmp.35 = newa 0;
+        lputv %packedSamples.5 %tmp.35;
+        symbol [ packedSamples %packedSamples.5 273 12 25 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 274 8 ]
+        for @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_274_8_280_8_for_test @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_274_8_280_8_for_incr @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_274_8_280_8_for_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_274_8_280_8_for_init:
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_274_8_280_8_for_begin" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_274_8_280_8_for_end" ]
+        %i.6 = local;
+        symbol [ i %i.6 274 17 18 ];
+        %tmp.36 = 0;
+        lputv %i.6 %tmp.36;
+        symbol [ i %i.6 274 17 18 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_274_8_280_8_for_test:
+        %tmp.37 = lgetv %i.6;
+        symbol [ i %tmp.37 274 24 25 ];
+        symbol [ hrSamples %tmp.39 274 28 37 ];
+        %tmp.39 = getv ? :hrSamples;
+        symbol [ size %tmp.40 274 38 42 ];
+        %tmp.40 = getv function %tmp.39 :size;
+        %tmp.41 = invoke %tmp.39 %tmp.40();
+        %tmp.42 = lt %tmp.37 %tmp.41;
+        bf %tmp.42 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_274_8_280_8_for_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_274_8_280_8_for_begin:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_274_51_280_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 275 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_274_51_280_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_274_51_280_8_stop" ]
+        %hr.7 = local;
+        symbol [ hr %hr.7 275 16 18 ];
+        symbol [ hrSamples %tmp.44 275 21 30 ];
+        %tmp.44 = getv ? :hrSamples;
+        %tmp.45 = lgetv %i.6;
+        symbol [ i %tmp.45 275 31 32 ];
+        %tmp.46 = agetv %tmp.44 %tmp.45;
+        lputv %hr.7 %tmp.46;
+        symbol [ hr %hr.7 275 16 18 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 276 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_274_51_280_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_274_51_280_8_stop" ]
+        %sp.8 = local;
+        symbol [ sp %sp.8 276 16 18 ];
+        symbol [ spo2Samples %tmp.48 276 21 32 ];
+        %tmp.48 = getv ? :spo2Samples;
+        %tmp.49 = lgetv %i.6;
+        symbol [ i %tmp.49 276 33 34 ];
+        %tmp.50 = agetv %tmp.48 %tmp.49;
+        lputv %sp.8 %tmp.50;
+        symbol [ sp %sp.8 276 16 18 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 277 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_274_51_280_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_274_51_280_8_stop" ]
+        %hrVal.9 = local;
+        symbol [ hrVal %hrVal.9 277 16 21 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_277_24_277_44_begin:
+        %tmp.51 = lgetv %hr.7;
+        symbol [ hr %tmp.51 277 25 27 ];
+        %tmp.52 = null;
+        %tmp.53 = ne %tmp.51 %tmp.52;
+        bf %tmp.53 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_277_24_277_44_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_277_24_277_44_true:
+        %tmp.54 = lgetv %hr.7;
+        symbol [ hr %tmp.54 277 39 41 ];
+        %tmp.55 = as %tmp.54 { (!Null) };
+        push %tmp.55;
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_277_24_277_44_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_277_24_277_44_else_false:
+        %tmp.56 = 0;
+        push %tmp.56;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_277_24_277_44_end:
+        %tmp.57 = phi [%tmp.53 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_277_24_277_44_begin] [%tmp.55 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_277_24_277_44_true] [%tmp.56 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_277_24_277_44_else_false] [%tmp.57 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_277_24_277_44_end];
+        lputv %hrVal.9 %tmp.57;
+        symbol [ hrVal %hrVal.9 277 16 21 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 278 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_274_51_280_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_274_51_280_8_stop" ]
+        %spVal.10 = local;
+        symbol [ spVal %spVal.10 278 16 21 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_278_24_278_44_begin:
+        %tmp.58 = lgetv %sp.8;
+        symbol [ sp %tmp.58 278 25 27 ];
+        %tmp.59 = null;
+        %tmp.60 = ne %tmp.58 %tmp.59;
+        bf %tmp.60 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_278_24_278_44_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_278_24_278_44_true:
+        %tmp.61 = lgetv %sp.8;
+        symbol [ sp %tmp.61 278 39 41 ];
+        %tmp.62 = as %tmp.61 { (!Null) };
+        push %tmp.62;
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_278_24_278_44_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_278_24_278_44_else_false:
+        %tmp.63 = 255;
+        push %tmp.63;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_278_24_278_44_end:
+        %tmp.64 = phi [%tmp.60 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_278_24_278_44_begin] [%tmp.62 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_278_24_278_44_true] [%tmp.63 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_278_24_278_44_else_false] [%tmp.64 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_278_24_278_44_end];
+        lputv %spVal.10 %tmp.64;
+        symbol [ spVal %spVal.10 278 16 21 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 279 12 ]
+        %tmp.65 = lgetv %packedSamples.5;
+        symbol [ packedSamples %tmp.65 279 12 25 ];
+        symbol [ add %tmp.66 279 26 29 ];
+        %tmp.66 = getv function %tmp.65 :add;
+        %tmp.67 = lgetv %hrVal.9;
+        symbol [ hrVal %tmp.67 279 31 36 ];
+        %tmp.68 = 8;
+        %tmp.69 = shl %tmp.67 %tmp.68;
+        %tmp.70 = lgetv %spVal.10;
+        symbol [ spVal %tmp.70 279 45 50 ];
+        %tmp.71 = bitor %tmp.69 %tmp.70;
+        invoke %tmp.65 %tmp.66(%tmp.71);
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_274_51_280_8_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_274_8_280_8_for_incr:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 274 ]
+        %tmp.74 = lgetv %i.6;
+        symbol [ i %tmp.74 274 46 47 ];
+        %tmp.75 = add %tmp.74 1;
+        lputv %i.6 %tmp.75;
+        symbol [ i %i.6 274 46 47 ];
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_274_8_280_8_for_test;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_274_8_280_8_for_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 282 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_258_31_306_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_258_31_306_4_stop" ]
+        %nowEpoch.11 = local;
+        symbol [ nowEpoch %nowEpoch.11 282 12 20 ];
+        symbol [ Time %tmp.76 282 23 27 ];
+        %tmp.76 = getm $.Toybox.Time;
+        symbol [ now %tmp.77 282 28 31 ];
+        %tmp.77 = getv function %tmp.76 :now;
+        %tmp.78 = invoke %tmp.76 %tmp.77();
+        symbol [ value %tmp.79 282 34 39 ];
+        %tmp.79 = getv function %tmp.78 :value;
+        %tmp.80 = invoke %tmp.78 %tmp.79();
+        %tmp.81 = 1000;
+        %tmp.82 = mul %tmp.80 %tmp.81;
+        lputv %nowEpoch.11 %tmp.82;
+        symbol [ nowEpoch %nowEpoch.11 282 12 20 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 284 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_258_31_306_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_258_31_306_4_stop" ]
+        %holdData.12 = local;
+        symbol [ holdData %holdData.12 284 12 20 ];
+        %tmp.83 = newd 10;
+        %tmp.84 = "durationMs";
+        %tmp.85 = lgetv %durationMs.1;
+        symbol [ durationMs %tmp.85 285 35 45 ];
+        %tmp.86 = dup %tmp.83;
+        %tmp.87 = aputv %tmp.86 %tmp.84 %tmp.85;
+        %tmp.88 = "lungVolume";
+        symbol [ SettingsManager %tmp.90 286 35 50 ];
+        %tmp.90 = getv ? :SettingsManager;
+        symbol [ getLungVolume %tmp.91 286 51 64 ];
+        %tmp.91 = getv function %tmp.90 :getLungVolume;
+        %tmp.92 = invoke %tmp.90 %tmp.91();
+        %tmp.93 = dup %tmp.87;
+        %tmp.94 = aputv %tmp.93 %tmp.88 %tmp.92;
+        %tmp.95 = "prepType";
+        symbol [ SettingsManager %tmp.97 287 35 50 ];
+        %tmp.97 = getv ? :SettingsManager;
+        symbol [ getPrepType %tmp.98 287 51 62 ];
+        %tmp.98 = getv function %tmp.97 :getPrepType;
+        %tmp.99 = invoke %tmp.97 %tmp.98();
+        %tmp.100 = dup %tmp.94;
+        %tmp.101 = aputv %tmp.100 %tmp.95 %tmp.99;
+        %tmp.102 = "timeOfDay";
+        symbol [ SettingsManager %tmp.104 288 35 50 ];
+        %tmp.104 = getv ? :SettingsManager;
+        symbol [ getTimeOfDay %tmp.105 288 51 63 ];
+        %tmp.105 = getv function %tmp.104 :getTimeOfDay;
+        %tmp.106 = invoke %tmp.104 %tmp.105();
+        %tmp.107 = dup %tmp.101;
+        %tmp.108 = aputv %tmp.107 %tmp.102 %tmp.106;
+        %tmp.109 = "firstContractionMs";
+        %tmp.110 = lgetv %firstContractionMs.4;
+        symbol [ firstContractionMs %tmp.110 289 36 54 ];
+        %tmp.111 = dup %tmp.108;
+        %tmp.112 = aputv %tmp.111 %tmp.109 %tmp.110;
+        %tmp.113 = "contractions";
+        %tmp.114 = lgetv %contractions.2;
+        symbol [ contractions %tmp.114 290 35 47 ];
+        %tmp.115 = dup %tmp.112;
+        %tmp.116 = aputv %tmp.115 %tmp.113 %tmp.114;
+        %tmp.117 = "packedSamples";
+        %tmp.118 = lgetv %packedSamples.5;
+        symbol [ packedSamples %tmp.118 291 35 48 ];
+        %tmp.119 = dup %tmp.116;
+        %tmp.120 = aputv %tmp.119 %tmp.117 %tmp.118;
+        %tmp.121 = "sampleCount";
+        symbol [ hrSamples %tmp.123 292 35 44 ];
+        %tmp.123 = getv ? :hrSamples;
+        symbol [ size %tmp.124 292 45 49 ];
+        %tmp.124 = getv function %tmp.123 :size;
+        %tmp.125 = invoke %tmp.123 %tmp.124();
+        %tmp.126 = dup %tmp.120;
+        %tmp.127 = aputv %tmp.126 %tmp.121 %tmp.125;
+        %tmp.128 = "startEpochMs";
+        %tmp.129 = lgetv %nowEpoch.11;
+        symbol [ nowEpoch %tmp.129 293 35 43 ];
+        %tmp.130 = lgetv %durationMs.1;
+        symbol [ durationMs %tmp.130 293 46 56 ];
+        %tmp.131 = sub %tmp.129 %tmp.130;
+        %tmp.132 = dup %tmp.127;
+        %tmp.133 = aputv %tmp.132 %tmp.128 %tmp.131;
+        %tmp.134 = "endEpochMs";
+        %tmp.135 = lgetv %nowEpoch.11;
+        symbol [ nowEpoch %tmp.135 294 35 43 ];
+        %tmp.136 = dup %tmp.133;
+        %tmp.137 = aputv %tmp.136 %tmp.134 %tmp.135;
+        lputv %holdData.12 %tmp.137;
+        symbol [ holdData %holdData.12 284 12 20 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 298 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_258_31_306_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_258_31_306_4_stop" ]
+        %holdId.13 = local;
+        symbol [ holdId %holdId.13 298 12 18 ];
+        symbol [ HoldStorage %tmp.139 298 21 32 ];
+        %tmp.139 = getv ? :HoldStorage;
+        symbol [ saveHold %tmp.140 298 33 41 ];
+        %tmp.140 = getv function %tmp.139 :saveHold;
+        %tmp.141 = lgetv %holdData.12;
+        symbol [ holdData %tmp.141 298 42 50 ];
+        %tmp.142 = invoke %tmp.139 %tmp.140(%tmp.141);
+        lputv %holdId.13 %tmp.142;
+        symbol [ holdId %holdId.13 298 12 18 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 302 8 ]
+        %tmp.143 = lgetv %holdData.12;
+        symbol [ holdData %tmp.143 302 8 16 ];
+        symbol [ put %tmp.144 302 17 20 ];
+        %tmp.144 = getv function %tmp.143 :put;
+        %tmp.145 = "type";
+        %tmp.146 = "FREE_HOLD_RESULT";
+        invoke %tmp.143 %tmp.144(%tmp.145, %tmp.146);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 303 8 ]
+        %tmp.147 = lgetv %holdData.12;
+        symbol [ holdData %tmp.147 303 8 16 ];
+        symbol [ put %tmp.148 303 17 20 ];
+        %tmp.148 = getv function %tmp.147 :put;
+        %tmp.149 = "id";
+        %tmp.150 = lgetv %holdId.13;
+        symbol [ holdId %tmp.150 303 27 33 ];
+        invoke %tmp.147 %tmp.148(%tmp.149, %tmp.150);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 304 8 ]
+        symbol [ System %tmp.151 304 8 14 ];
+        %tmp.151 = getm $.Toybox.System;
+        symbol [ println %tmp.152 304 15 22 ];
+        %tmp.152 = getv function %tmp.151 :println;
+        %tmp.153 = "[WAGS] Transmitting hold ";
+        %tmp.154 = lgetv %holdId.13;
+        symbol [ holdId %tmp.154 304 53 59 ];
+        %tmp.155 = add %tmp.153 %tmp.154;
+        %tmp.156 = " to phone...";
+        %tmp.157 = add %tmp.155 %tmp.156;
+        invoke %tmp.151 %tmp.152(%tmp.157);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 305 8 ]
+        symbol [ DataTransmitter %tmp.159 305 8 23 ];
+        %tmp.159 = getv ? :DataTransmitter;
+        symbol [ transmit %tmp.160 305 24 32 ];
+        %tmp.160 = getv function %tmp.159 :transmit;
+        %tmp.161 = lgetv %holdData.12;
+        symbol [ holdData %tmp.161 305 33 41 ];
+        invoke %tmp.159 %tmp.160(%tmp.161);
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_258_31_306_4_stop:
+    }
+}
+//! Input delegate for the Free Hold view.
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 310; @symbol_classdef = [FreeHoldDelegate,310,6,22]; @symbol_extends<0> = [WatchUi,310,31,38]; @symbol_extends<1> = [BehaviorDelegate,310,39,55]; ]
+class FreeHoldDelegate extends WatchUi.BehaviorDelegate {
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 310; ]
+    <init> {
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 310; ]
+    static
+    <init> {
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 312; @position = 8; @symbol_vardef = [_view,312,8,13]; ]
+    var _view;
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 314; @symbol_functiondef = [initialize,314,13,23]; @symbol_param<0> = [view,314,24,28]; ]
+    function initialize(view) as Void {
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_314_30_317_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 315 8 ]
+        symbol [ BehaviorDelegate %tmp.2 315 8 24 ];
+        %tmp.2 = getv ? :BehaviorDelegate;
+        symbol [ initialize %tmp.3 315 25 35 ];
+        %tmp.3 = getv function %tmp.2 :initialize;
+        invoke %tmp.2 %tmp.3();
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 316 8 ]
+        %tmp.4 = lgetv %view;
+        symbol [ view %tmp.4 316 16 20 ];
+        symbol [ _view ? 316 8 13 ];
+        putv self :_view %tmp.4;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_314_30_317_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 319; @symbol_functiondef = [onSelect,319,13,21]; ]
+    function onSelect() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_319_24_333_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 320 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_320_8_331_8_if_stmt:
+        symbol [ _view %tmp.2 320 12 17 ];
+        %tmp.2 = getv ? :_view;
+        symbol [ holdState %tmp.3 320 18 27 ];
+        %tmp.3 = getv %tmp.2 :holdState;
+        %tmp.4 = 0;
+        %tmp.5 = eq %tmp.3 %tmp.4;
+        bf %tmp.5 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_320_8_331_8_if_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_320_8_331_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_320_34_322_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 321 12 ]
+        symbol [ _view %tmp.7 321 12 17 ];
+        %tmp.7 = getv ? :_view;
+        symbol [ startHold %tmp.8 321 18 27 ];
+        %tmp.8 = getv function %tmp.7 :startHold;
+        invoke %tmp.7 %tmp.8();
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_320_34_322_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_320_8_331_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_320_8_331_8_if_false:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 322 15 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_322_15_331_8_if_stmt:
+        symbol [ _view %tmp.10 322 19 24 ];
+        %tmp.10 = getv ? :_view;
+        symbol [ holdState %tmp.11 322 25 34 ];
+        %tmp.11 = getv %tmp.10 :holdState;
+        %tmp.12 = 1;
+        %tmp.13 = eq %tmp.11 %tmp.12;
+        bf %tmp.13 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_322_15_331_8_if_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_322_15_331_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_322_41_329_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 323 12 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_323_12_328_12_if_stmt:
+        symbol [ _view %tmp.15 323 16 21 ];
+        %tmp.15 = getv ? :_view;
+        symbol [ contractionTimesMs %tmp.16 323 22 40 ];
+        %tmp.16 = getv %tmp.15 :contractionTimesMs;
+        symbol [ size %tmp.17 323 41 45 ];
+        %tmp.17 = getv function %tmp.16 :size;
+        %tmp.18 = invoke %tmp.16 %tmp.17();
+        %tmp.19 = 0;
+        %tmp.20 = gt %tmp.18 %tmp.19;
+        bf %tmp.20 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_323_12_328_12_if_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_323_12_328_12_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_323_53_326_12_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 325 16 ]
+        symbol [ _view %tmp.22 325 16 21 ];
+        %tmp.22 = getv ? :_view;
+        symbol [ stopHold %tmp.23 325 22 30 ];
+        %tmp.23 = getv function %tmp.22 :stopHold;
+        invoke %tmp.22 %tmp.23();
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_323_53_326_12_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_323_12_328_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_323_12_328_12_if_else_false:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_326_19_328_12_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 327 16 ]
+        symbol [ _view %tmp.25 327 16 21 ];
+        %tmp.25 = getv ? :_view;
+        symbol [ recordContraction %tmp.26 327 22 39 ];
+        %tmp.26 = getv function %tmp.25 :recordContraction;
+        invoke %tmp.25 %tmp.26();
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_326_19_328_12_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_323_12_328_12_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_322_41_329_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_322_15_331_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_322_15_331_8_if_else_false:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_329_15_331_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 330 12 ]
+        symbol [ WatchUi %tmp.27 330 12 19 ];
+        %tmp.27 = getm $.Toybox.WatchUi;
+        symbol [ popView %tmp.28 330 20 27 ];
+        %tmp.28 = getv function %tmp.27 :popView;
+        symbol [ WatchUi %tmp.29 330 28 35 ];
+        %tmp.29 = getm $.Toybox.WatchUi;
+        symbol [ SLIDE_RIGHT %tmp.30 330 36 47 ];
+        %tmp.30 = getv %tmp.29 :SLIDE_RIGHT;
+        invoke %tmp.27 %tmp.28(%tmp.30);
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_329_15_331_8_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_322_15_331_8_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_320_8_331_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 332 8 ]
+        %tmp.31 = true;
+        ret %tmp.31;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_319_24_333_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 335; @symbol_functiondef = [onBack,335,13,19]; ]
+    function onBack() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_335_22_342_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 336 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_336_8_340_8_if_stmt:
+        symbol [ _view %tmp.2 336 12 17 ];
+        %tmp.2 = getv ? :_view;
+        symbol [ holdState %tmp.3 336 18 27 ];
+        %tmp.3 = getv %tmp.2 :holdState;
+        %tmp.4 = 1;
+        %tmp.5 = eq %tmp.3 %tmp.4;
+        bf %tmp.5 @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_336_8_340_8_if_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_336_8_340_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_336_34_338_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 337 12 ]
+        symbol [ _view %tmp.7 337 12 17 ];
+        %tmp.7 = getv ? :_view;
+        symbol [ stopHold %tmp.8 337 18 26 ];
+        %tmp.8 = getv function %tmp.7 :stopHold;
+        invoke %tmp.7 %tmp.8();
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_336_34_338_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_336_8_340_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_336_8_340_8_if_else_false:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_338_15_340_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 339 12 ]
+        symbol [ WatchUi %tmp.9 339 12 19 ];
+        %tmp.9 = getm $.Toybox.WatchUi;
+        symbol [ popView %tmp.10 339 20 27 ];
+        %tmp.10 = getv function %tmp.9 :popView;
+        symbol [ WatchUi %tmp.11 339 28 35 ];
+        %tmp.11 = getm $.Toybox.WatchUi;
+        symbol [ SLIDE_RIGHT %tmp.12 339 36 47 ];
+        %tmp.12 = getv %tmp.11 :SLIDE_RIGHT;
+        invoke %tmp.9 %tmp.10(%tmp.12);
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_338_15_340_8_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_336_8_340_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" 341 8 ]
+        %tmp.13 = true;
+        ret %tmp.13;
+_home_twain_AndroidStudioProjects_wags_garmin_source_FreeHoldView_mc_335_22_342_4_stop:
+    }
+}
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc"; @line = 1; ]
+<init> {
+}
