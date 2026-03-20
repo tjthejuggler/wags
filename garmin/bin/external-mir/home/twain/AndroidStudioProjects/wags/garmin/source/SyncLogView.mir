@@ -1,0 +1,917 @@
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc"; @line = 1; @symbol_usingdef<0> = [Toybox,1,6,12]; @symbol_usingdef<1> = [WatchUi,1,13,20]; ]
+using Toybox.WatchUi;
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc"; @line = 2; @symbol_usingdef<0> = [Toybox,2,6,12]; @symbol_usingdef<1> = [Graphics,2,13,21]; ]
+using Toybox.Graphics;
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc"; @line = 3; @symbol_usingdef<0> = [Toybox,3,6,12]; @symbol_usingdef<1> = [System,3,13,19]; ]
+using Toybox.System;
+//! Scrollable view that displays the SyncLog entries on the watch.
+//! Shows newest entries first. UP/DOWN scrolls, BACK exits.
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc"; @line = 7; @symbol_classdef = [SyncLogView,7,6,17]; @symbol_extends<0> = [WatchUi,7,26,33]; @symbol_extends<1> = [View,7,34,38]; ]
+class SyncLogView extends WatchUi.View {
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc"; @line = 7; ]
+    <init> {
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 10 8 ]
+        %tmp.1 = newa 0;
+        putv self :entries %tmp.1;
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc"; @line = 7; ]
+    static
+    <init> {
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc"; @line = 9; @position = 8; @symbol_vardef = [scrollOffset,9,8,20]; ]
+    var scrollOffset = 0;
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc"; @line = 10; @position = 8; @symbol_vardef = [entries,10,8,15]; ]
+    var entries;
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc"; @line = 11; @position = 8; @symbol_vardef = [linesPerPage,11,8,20]; ]
+    var linesPerPage = 6;
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc"; @line = 13; @symbol_functiondef = [initialize,13,13,23]; ]
+    function initialize() as Void {
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_13_26_15_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 14 8 ]
+        symbol [ View %tmp.2 14 8 12 ];
+        %tmp.2 = getv ? :View;
+        symbol [ initialize %tmp.3 14 13 23 ];
+        %tmp.3 = getv function %tmp.2 :initialize;
+        invoke %tmp.2 %tmp.3();
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_13_26_15_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc"; @line = 17; @symbol_functiondef = [onShow,17,13,19]; ]
+    function onShow() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_17_22_27_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 19 8 ]
+        symbol [ SyncLog %tmp.2 19 18 25 ];
+        %tmp.2 = getv ? :SyncLog;
+        symbol [ getEntries %tmp.3 19 26 36 ];
+        %tmp.3 = getv function %tmp.2 :getEntries;
+        %tmp.4 = invoke %tmp.2 %tmp.3();
+        symbol [ entries ? 19 8 15 ];
+        putv self :entries %tmp.4;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 21 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_17_22_27_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_17_22_27_4_stop" ]
+        %reversed.1 = local;
+        symbol [ reversed %reversed.1 21 12 20 ];
+        %tmp.5 = newa 0;
+        lputv %reversed.1 %tmp.5;
+        symbol [ reversed %reversed.1 21 12 20 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 22 8 ]
+        for @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_22_8_24_8_for_test @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_22_8_24_8_for_incr @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_22_8_24_8_for_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_22_8_24_8_for_init:
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_22_8_24_8_for_begin" "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_22_8_24_8_for_end" ]
+        %i.2 = local;
+        symbol [ i %i.2 22 17 18 ];
+        symbol [ entries %tmp.7 22 21 28 ];
+        %tmp.7 = getv ? :entries;
+        symbol [ size %tmp.8 22 29 33 ];
+        %tmp.8 = getv function %tmp.7 :size;
+        %tmp.9 = invoke %tmp.7 %tmp.8();
+        %tmp.10 = 1;
+        %tmp.11 = sub %tmp.9 %tmp.10;
+        lputv %i.2 %tmp.11;
+        symbol [ i %i.2 22 17 18 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_22_8_24_8_for_test:
+        %tmp.12 = lgetv %i.2;
+        symbol [ i %tmp.12 22 41 42 ];
+        %tmp.13 = 0;
+        %tmp.14 = gte %tmp.12 %tmp.13;
+        bf %tmp.14 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_22_8_24_8_for_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_22_8_24_8_for_begin:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_22_54_24_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 23 12 ]
+        %tmp.15 = lgetv %reversed.1;
+        symbol [ reversed %tmp.15 23 12 20 ];
+        symbol [ add %tmp.16 23 21 24 ];
+        %tmp.16 = getv function %tmp.15 :add;
+        symbol [ entries %tmp.18 23 25 32 ];
+        %tmp.18 = getv ? :entries;
+        %tmp.19 = lgetv %i.2;
+        symbol [ i %tmp.19 23 33 34 ];
+        %tmp.20 = agetv %tmp.18 %tmp.19;
+        invoke %tmp.15 %tmp.16(%tmp.20);
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_22_54_24_8_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_22_8_24_8_for_incr:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 22 ]
+        %tmp.23 = lgetv %i.2;
+        symbol [ i %tmp.23 22 49 50 ];
+        %tmp.24 = sub %tmp.23 1;
+        lputv %i.2 %tmp.24;
+        symbol [ i %i.2 22 49 50 ];
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_22_8_24_8_for_test;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_22_8_24_8_for_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 25 8 ]
+        %tmp.25 = lgetv %reversed.1;
+        symbol [ reversed %tmp.25 25 18 26 ];
+        symbol [ entries ? 25 8 15 ];
+        putv self :entries %tmp.25;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 26 8 ]
+        %tmp.26 = 0;
+        symbol [ scrollOffset ? 26 8 20 ];
+        putv self :scrollOffset %tmp.26;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_17_22_27_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc"; @line = 29; @symbol_functiondef = [onUpdate,29,13,21]; @symbol_param<0> = [dc,29,22,24]; ]
+    function onUpdate(dc) {
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_29_26_94_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 30 8 ]
+        %tmp.1 = lgetv %dc;
+        symbol [ dc %tmp.1 30 8 10 ];
+        symbol [ setColor %tmp.2 30 11 19 ];
+        %tmp.2 = getv function %tmp.1 :setColor;
+        symbol [ Graphics %tmp.3 30 20 28 ];
+        %tmp.3 = getm $.Toybox.Graphics;
+        symbol [ COLOR_BLACK %tmp.4 30 29 40 ];
+        %tmp.4 = getv %tmp.3 :COLOR_BLACK;
+        symbol [ Graphics %tmp.5 30 42 50 ];
+        %tmp.5 = getm $.Toybox.Graphics;
+        symbol [ COLOR_BLACK %tmp.6 30 51 62 ];
+        %tmp.6 = getv %tmp.5 :COLOR_BLACK;
+        invoke %tmp.1 %tmp.2(%tmp.4, %tmp.6);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 31 8 ]
+        %tmp.7 = lgetv %dc;
+        symbol [ dc %tmp.7 31 8 10 ];
+        symbol [ clear %tmp.8 31 11 16 ];
+        %tmp.8 = getv function %tmp.7 :clear;
+        invoke %tmp.7 %tmp.8();
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 33 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_29_26_94_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_29_26_94_4_stop" ]
+        %w.1 = local;
+        symbol [ w %w.1 33 12 13 ];
+        %tmp.9 = lgetv %dc;
+        symbol [ dc %tmp.9 33 16 18 ];
+        symbol [ getWidth %tmp.10 33 19 27 ];
+        %tmp.10 = getv function %tmp.9 :getWidth;
+        %tmp.11 = invoke %tmp.9 %tmp.10();
+        lputv %w.1 %tmp.11;
+        symbol [ w %w.1 33 12 13 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 34 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_29_26_94_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_29_26_94_4_stop" ]
+        %h.2 = local;
+        symbol [ h %h.2 34 12 13 ];
+        %tmp.12 = lgetv %dc;
+        symbol [ dc %tmp.12 34 16 18 ];
+        symbol [ getHeight %tmp.13 34 19 28 ];
+        %tmp.13 = getv function %tmp.12 :getHeight;
+        %tmp.14 = invoke %tmp.12 %tmp.13();
+        lputv %h.2 %tmp.14;
+        symbol [ h %h.2 34 12 13 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 35 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_29_26_94_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_29_26_94_4_stop" ]
+        %cx.3 = local;
+        symbol [ cx %cx.3 35 12 14 ];
+        %tmp.15 = lgetv %w.1;
+        symbol [ w %tmp.15 35 17 18 ];
+        %tmp.16 = 2;
+        %tmp.17 = div %tmp.15 %tmp.16;
+        lputv %cx.3 %tmp.17;
+        symbol [ cx %cx.3 35 12 14 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 38 8 ]
+        %tmp.18 = lgetv %dc;
+        symbol [ dc %tmp.18 38 8 10 ];
+        symbol [ setColor %tmp.19 38 11 19 ];
+        %tmp.19 = getv function %tmp.18 :setColor;
+        %tmp.20 = 0x00AAFF;
+        symbol [ Graphics %tmp.21 38 30 38 ];
+        %tmp.21 = getm $.Toybox.Graphics;
+        symbol [ COLOR_TRANSPARENT %tmp.22 38 39 56 ];
+        %tmp.22 = getv %tmp.21 :COLOR_TRANSPARENT;
+        invoke %tmp.18 %tmp.19(%tmp.20, %tmp.22);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 39 8 ]
+        %tmp.23 = lgetv %dc;
+        symbol [ dc %tmp.23 39 8 10 ];
+        symbol [ drawText %tmp.24 39 11 19 ];
+        %tmp.24 = getv function %tmp.23 :drawText;
+        %tmp.25 = lgetv %cx.3;
+        symbol [ cx %tmp.25 39 20 22 ];
+        %tmp.26 = 5;
+        symbol [ Graphics %tmp.27 39 27 35 ];
+        %tmp.27 = getm $.Toybox.Graphics;
+        symbol [ FONT_XTINY %tmp.28 39 36 46 ];
+        %tmp.28 = getv %tmp.27 :FONT_XTINY;
+        %tmp.29 = "Sync Log (";
+        symbol [ entries %tmp.31 39 63 70 ];
+        %tmp.31 = getv ? :entries;
+        symbol [ size %tmp.32 39 71 75 ];
+        %tmp.32 = getv function %tmp.31 :size;
+        %tmp.33 = invoke %tmp.31 %tmp.32();
+        %tmp.34 = add %tmp.29 %tmp.33;
+        %tmp.35 = ")";
+        %tmp.36 = add %tmp.34 %tmp.35;
+        symbol [ Graphics %tmp.37 39 85 93 ];
+        %tmp.37 = getm $.Toybox.Graphics;
+        symbol [ TEXT_JUSTIFY_CENTER %tmp.38 39 94 113 ];
+        %tmp.38 = getv %tmp.37 :TEXT_JUSTIFY_CENTER;
+        invoke %tmp.23 %tmp.24(%tmp.25, %tmp.26, %tmp.28, %tmp.36, %tmp.38);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 41 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_41_8_47_8_if_stmt:
+        symbol [ entries %tmp.40 41 12 19 ];
+        %tmp.40 = getv ? :entries;
+        symbol [ size %tmp.41 41 20 24 ];
+        %tmp.41 = getv function %tmp.40 :size;
+        %tmp.42 = invoke %tmp.40 %tmp.41();
+        %tmp.43 = 0;
+        %tmp.44 = eq %tmp.42 %tmp.43;
+        bf %tmp.44 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_41_8_47_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_41_8_47_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_41_33_47_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 42 12 ]
+        %tmp.45 = lgetv %dc;
+        symbol [ dc %tmp.45 42 12 14 ];
+        symbol [ setColor %tmp.46 42 15 23 ];
+        %tmp.46 = getv function %tmp.45 :setColor;
+        symbol [ Graphics %tmp.47 42 24 32 ];
+        %tmp.47 = getm $.Toybox.Graphics;
+        symbol [ COLOR_LT_GRAY %tmp.48 42 33 46 ];
+        %tmp.48 = getv %tmp.47 :COLOR_LT_GRAY;
+        symbol [ Graphics %tmp.49 42 48 56 ];
+        %tmp.49 = getm $.Toybox.Graphics;
+        symbol [ COLOR_TRANSPARENT %tmp.50 42 57 74 ];
+        %tmp.50 = getv %tmp.49 :COLOR_TRANSPARENT;
+        invoke %tmp.45 %tmp.46(%tmp.48, %tmp.50);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 43 12 ]
+        %tmp.51 = lgetv %dc;
+        symbol [ dc %tmp.51 43 12 14 ];
+        symbol [ drawText %tmp.52 43 15 23 ];
+        %tmp.52 = getv function %tmp.51 :drawText;
+        %tmp.53 = lgetv %cx.3;
+        symbol [ cx %tmp.53 43 24 26 ];
+        %tmp.54 = lgetv %h.2;
+        symbol [ h %tmp.54 43 28 29 ];
+        %tmp.55 = 2;
+        %tmp.56 = div %tmp.54 %tmp.55;
+        %tmp.57 = 10;
+        %tmp.58 = sub %tmp.56 %tmp.57;
+        symbol [ Graphics %tmp.59 43 40 48 ];
+        %tmp.59 = getm $.Toybox.Graphics;
+        symbol [ FONT_SMALL %tmp.60 43 49 59 ];
+        %tmp.60 = getv %tmp.59 :FONT_SMALL;
+        %tmp.61 = "No entries";
+        symbol [ Graphics %tmp.62 43 75 83 ];
+        %tmp.62 = getm $.Toybox.Graphics;
+        symbol [ TEXT_JUSTIFY_CENTER %tmp.63 43 84 103 ];
+        %tmp.63 = getv %tmp.62 :TEXT_JUSTIFY_CENTER;
+        invoke %tmp.51 %tmp.52(%tmp.53, %tmp.58, %tmp.60, %tmp.61, %tmp.63);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 44 12 ]
+        %tmp.64 = lgetv %dc;
+        symbol [ dc %tmp.64 44 12 14 ];
+        symbol [ setColor %tmp.65 44 15 23 ];
+        %tmp.65 = getv function %tmp.64 :setColor;
+        symbol [ Graphics %tmp.66 44 24 32 ];
+        %tmp.66 = getm $.Toybox.Graphics;
+        symbol [ COLOR_DK_GRAY %tmp.67 44 33 46 ];
+        %tmp.67 = getv %tmp.66 :COLOR_DK_GRAY;
+        symbol [ Graphics %tmp.68 44 48 56 ];
+        %tmp.68 = getm $.Toybox.Graphics;
+        symbol [ COLOR_TRANSPARENT %tmp.69 44 57 74 ];
+        %tmp.69 = getv %tmp.68 :COLOR_TRANSPARENT;
+        invoke %tmp.64 %tmp.65(%tmp.67, %tmp.69);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 45 12 ]
+        %tmp.70 = lgetv %dc;
+        symbol [ dc %tmp.70 45 12 14 ];
+        symbol [ drawText %tmp.71 45 15 23 ];
+        %tmp.71 = getv function %tmp.70 :drawText;
+        %tmp.72 = lgetv %cx.3;
+        symbol [ cx %tmp.72 45 24 26 ];
+        %tmp.73 = lgetv %h.2;
+        symbol [ h %tmp.73 45 28 29 ];
+        %tmp.74 = 2;
+        %tmp.75 = div %tmp.73 %tmp.74;
+        %tmp.76 = 15;
+        %tmp.77 = add %tmp.75 %tmp.76;
+        symbol [ Graphics %tmp.78 45 40 48 ];
+        %tmp.78 = getm $.Toybox.Graphics;
+        symbol [ FONT_XTINY %tmp.79 45 49 59 ];
+        %tmp.79 = getv %tmp.78 :FONT_XTINY;
+        %tmp.80 = "Run a hold to see logs";
+        symbol [ Graphics %tmp.81 45 87 95 ];
+        %tmp.81 = getm $.Toybox.Graphics;
+        symbol [ TEXT_JUSTIFY_CENTER %tmp.82 45 96 115 ];
+        %tmp.82 = getv %tmp.81 :TEXT_JUSTIFY_CENTER;
+        invoke %tmp.70 %tmp.71(%tmp.72, %tmp.77, %tmp.79, %tmp.80, %tmp.82);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 46 12 ]
+        ret ?;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_41_33_47_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_41_8_47_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_41_8_47_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 50 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_29_26_94_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_29_26_94_4_stop" ]
+        %yStart.4 = local;
+        symbol [ yStart %yStart.4 50 12 18 ];
+        %tmp.83 = 25;
+        lputv %yStart.4 %tmp.83;
+        symbol [ yStart %yStart.4 50 12 18 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 51 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_29_26_94_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_29_26_94_4_stop" ]
+        %lineHeight.5 = local;
+        symbol [ lineHeight %lineHeight.5 51 12 22 ];
+        %tmp.84 = 22;
+        lputv %lineHeight.5 %tmp.84;
+        symbol [ lineHeight %lineHeight.5 51 12 22 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 52 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_29_26_94_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_29_26_94_4_stop" ]
+        %maxLines.6 = local;
+        symbol [ maxLines %maxLines.6 52 12 20 ];
+        %tmp.85 = lgetv %h.2;
+        symbol [ h %tmp.85 52 24 25 ];
+        %tmp.86 = lgetv %yStart.4;
+        symbol [ yStart %tmp.86 52 28 34 ];
+        %tmp.87 = sub %tmp.85 %tmp.86;
+        %tmp.88 = 20;
+        %tmp.89 = sub %tmp.87 %tmp.88;
+        %tmp.90 = lgetv %lineHeight.5;
+        symbol [ lineHeight %tmp.90 52 43 53 ];
+        %tmp.91 = div %tmp.89 %tmp.90;
+        lputv %maxLines.6 %tmp.91;
+        symbol [ maxLines %maxLines.6 52 12 20 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 53 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_53_8_53_42_if_stmt:
+        %tmp.92 = lgetv %maxLines.6;
+        symbol [ maxLines %tmp.92 53 12 20 ];
+        %tmp.93 = 1;
+        %tmp.94 = lt %tmp.92 %tmp.93;
+        bf %tmp.94 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_53_8_53_42_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_53_8_53_42_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_53_26_53_42_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 53 28 ]
+        %tmp.95 = 1;
+        lputv %maxLines.6 %tmp.95;
+        symbol [ maxLines %maxLines.6 53 28 36 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_53_26_53_42_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_53_8_53_42_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_53_8_53_42_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 54 8 ]
+        %tmp.96 = lgetv %maxLines.6;
+        symbol [ maxLines %tmp.96 54 23 31 ];
+        symbol [ linesPerPage ? 54 8 20 ];
+        putv self :linesPerPage %tmp.96;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 56 8 ]
+        for @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_8_84_8_for_test @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_8_84_8_for_incr @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_8_84_8_for_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_8_84_8_for_init:
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_8_84_8_for_begin" "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_8_84_8_for_end" ]
+        %i.7 = local;
+        symbol [ i %i.7 56 17 18 ];
+        %tmp.97 = 0;
+        lputv %i.7 %tmp.97;
+        symbol [ i %i.7 56 17 18 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_8_84_8_for_test:
+        %tmp.98 = lgetv %i.7;
+        symbol [ i %tmp.98 56 24 25 ];
+        %tmp.99 = lgetv %maxLines.6;
+        symbol [ maxLines %tmp.99 56 28 36 ];
+        %tmp.100 = lt %tmp.98 %tmp.99;
+        bf %tmp.100 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_8_84_8_for_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_8_84_8_for_begin:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_43_84_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 57 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_43_84_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_43_84_8_stop" ]
+        %idx.8 = local;
+        symbol [ idx %idx.8 57 16 19 ];
+        symbol [ scrollOffset %tmp.102 57 22 34 ];
+        %tmp.102 = getv ? :scrollOffset;
+        %tmp.103 = lgetv %i.7;
+        symbol [ i %tmp.103 57 37 38 ];
+        %tmp.104 = add %tmp.102 %tmp.103;
+        lputv %idx.8 %tmp.104;
+        symbol [ idx %idx.8 57 16 19 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 58 12 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_58_12_60_12_if_stmt:
+        %tmp.105 = lgetv %idx.8;
+        symbol [ idx %tmp.105 58 16 19 ];
+        symbol [ entries %tmp.107 58 23 30 ];
+        %tmp.107 = getv ? :entries;
+        symbol [ size %tmp.108 58 31 35 ];
+        %tmp.108 = getv function %tmp.107 :size;
+        %tmp.109 = invoke %tmp.107 %tmp.108();
+        %tmp.110 = gte %tmp.105 %tmp.109;
+        bf %tmp.110 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_58_12_60_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_58_12_60_12_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_58_39_60_12_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 59 16 ]
+        goto break @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_8_84_8_for_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_58_39_60_12_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_58_12_60_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_58_12_60_12_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 62 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_43_84_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_43_84_8_stop" ]
+        %entry.9 = local;
+        symbol [ entry %entry.9 62 16 21 ];
+        symbol [ entries %tmp.112 62 24 31 ];
+        %tmp.112 = getv ? :entries;
+        %tmp.113 = lgetv %idx.8;
+        symbol [ idx %tmp.113 62 32 35 ];
+        %tmp.114 = agetv %tmp.112 %tmp.113;
+        lputv %entry.9 %tmp.114;
+        symbol [ entry %entry.9 62 16 21 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 63 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_43_84_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_43_84_8_stop" ]
+        %y.10 = local;
+        symbol [ y %y.10 63 16 17 ];
+        %tmp.115 = lgetv %yStart.4;
+        symbol [ yStart %tmp.115 63 20 26 ];
+        %tmp.116 = lgetv %i.7;
+        symbol [ i %tmp.116 63 30 31 ];
+        %tmp.117 = lgetv %lineHeight.5;
+        symbol [ lineHeight %tmp.117 63 34 44 ];
+        %tmp.118 = mul %tmp.116 %tmp.117;
+        %tmp.119 = add %tmp.115 %tmp.118;
+        lputv %y.10 %tmp.119;
+        symbol [ y %y.10 63 16 17 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 66 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_43_84_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_43_84_8_stop" ]
+        %color.11 = local;
+        symbol [ color %color.11 66 16 21 ];
+        symbol [ Graphics %tmp.120 66 24 32 ];
+        %tmp.120 = getm $.Toybox.Graphics;
+        symbol [ COLOR_LT_GRAY %tmp.121 66 33 46 ];
+        %tmp.121 = getv %tmp.120 :COLOR_LT_GRAY;
+        lputv %color.11 %tmp.121;
+        symbol [ color %color.11 66 16 21 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 67 12 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_67_12_73_12_if_stmt:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_67_16_67_99_begin:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_67_16_67_67_begin:
+        %tmp.122 = lgetv %entry.9;
+        symbol [ entry %tmp.122 67 16 21 ];
+        symbol [ find %tmp.123 67 22 26 ];
+        %tmp.123 = getv function %tmp.122 :find;
+        %tmp.124 = "OK";
+        %tmp.125 = invoke %tmp.122 %tmp.123(%tmp.124);
+        %tmp.126 = null;
+        %tmp.127 = ne %tmp.125 %tmp.126;
+        bt %tmp.127 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_67_12_73_12_if_true;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_67_44_67_67_false:
+        %tmp.128 = lgetv %entry.9;
+        symbol [ entry %tmp.128 67 44 49 ];
+        symbol [ find %tmp.129 67 50 54 ];
+        %tmp.129 = getv function %tmp.128 :find;
+        %tmp.130 = "SAVED";
+        %tmp.131 = invoke %tmp.128 %tmp.129(%tmp.130);
+        %tmp.132 = null;
+        %tmp.133 = ne %tmp.131 %tmp.132;
+        push %tmp.133;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_67_44_67_67_end:
+        %tmp.134 = phi [%tmp.127 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_67_16_67_67_begin] [%tmp.133 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_67_44_67_67_false] [%tmp.134 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_67_44_67_67_end];
+        bt %tmp.134 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_67_12_73_12_if_true;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_67_75_67_99_false:
+        %tmp.135 = lgetv %entry.9;
+        symbol [ entry %tmp.135 67 75 80 ];
+        symbol [ find %tmp.136 67 81 85 ];
+        %tmp.136 = getv function %tmp.135 :find;
+        %tmp.137 = "SYNCED";
+        %tmp.138 = invoke %tmp.135 %tmp.136(%tmp.137);
+        %tmp.139 = null;
+        %tmp.140 = ne %tmp.138 %tmp.139;
+        push %tmp.140;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_67_75_67_99_end:
+        %tmp.141 = phi [%tmp.134 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_67_16_67_99_begin] [%tmp.140 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_67_75_67_99_false] [%tmp.141 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_67_75_67_99_end];
+        bf %tmp.141 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_67_12_73_12_if_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_67_12_73_12_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_67_105_69_12_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 68 16 ]
+        %tmp.142 = 0x00CC66;
+        lputv %color.11 %tmp.142;
+        symbol [ color %color.11 68 16 21 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_67_105_69_12_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_67_12_73_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_67_12_73_12_if_false:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 69 19 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_69_19_73_12_if_stmt:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_69_23_69_74_begin:
+        %tmp.143 = lgetv %entry.9;
+        symbol [ entry %tmp.143 69 23 28 ];
+        symbol [ find %tmp.144 69 29 33 ];
+        %tmp.144 = getv function %tmp.143 :find;
+        %tmp.145 = "FAIL";
+        %tmp.146 = invoke %tmp.143 %tmp.144(%tmp.145);
+        %tmp.147 = null;
+        %tmp.148 = ne %tmp.146 %tmp.147;
+        bt %tmp.148 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_69_19_73_12_if_true;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_69_53_69_74_false:
+        %tmp.149 = lgetv %entry.9;
+        symbol [ entry %tmp.149 69 53 58 ];
+        symbol [ find %tmp.150 69 59 63 ];
+        %tmp.150 = getv function %tmp.149 :find;
+        %tmp.151 = "ERR";
+        %tmp.152 = invoke %tmp.149 %tmp.150(%tmp.151);
+        %tmp.153 = null;
+        %tmp.154 = ne %tmp.152 %tmp.153;
+        push %tmp.154;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_69_53_69_74_end:
+        %tmp.155 = phi [%tmp.148 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_69_23_69_74_begin] [%tmp.154 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_69_53_69_74_false] [%tmp.155 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_69_53_69_74_end];
+        bf %tmp.155 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_69_19_73_12_if_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_69_19_73_12_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_69_80_71_12_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 70 16 ]
+        %tmp.156 = 0xFF4444;
+        lputv %color.11 %tmp.156;
+        symbol [ color %color.11 70 16 21 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_69_80_71_12_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_69_19_73_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_69_19_73_12_if_false:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 71 19 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_71_19_73_12_if_stmt:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_71_23_71_104_begin:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_71_23_71_73_begin:
+        %tmp.157 = lgetv %entry.9;
+        symbol [ entry %tmp.157 71 23 28 ];
+        symbol [ find %tmp.158 71 29 33 ];
+        %tmp.158 = getv function %tmp.157 :find;
+        %tmp.159 = "SEND";
+        %tmp.160 = invoke %tmp.157 %tmp.158(%tmp.159);
+        %tmp.161 = null;
+        %tmp.162 = ne %tmp.160 %tmp.161;
+        bt %tmp.162 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_71_19_73_12_if_true;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_71_53_71_73_false:
+        %tmp.163 = lgetv %entry.9;
+        symbol [ entry %tmp.163 71 53 58 ];
+        symbol [ find %tmp.164 71 59 63 ];
+        %tmp.164 = getv function %tmp.163 :find;
+        %tmp.165 = "TX";
+        %tmp.166 = invoke %tmp.163 %tmp.164(%tmp.165);
+        %tmp.167 = null;
+        %tmp.168 = ne %tmp.166 %tmp.167;
+        push %tmp.168;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_71_53_71_73_end:
+        %tmp.169 = phi [%tmp.162 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_71_23_71_73_begin] [%tmp.168 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_71_53_71_73_false] [%tmp.169 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_71_53_71_73_end];
+        bt %tmp.169 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_71_19_73_12_if_true;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_71_81_71_104_false:
+        %tmp.170 = lgetv %entry.9;
+        symbol [ entry %tmp.170 71 81 86 ];
+        symbol [ find %tmp.171 71 87 91 ];
+        %tmp.171 = getv function %tmp.170 :find;
+        %tmp.172 = "START";
+        %tmp.173 = invoke %tmp.170 %tmp.171(%tmp.172);
+        %tmp.174 = null;
+        %tmp.175 = ne %tmp.173 %tmp.174;
+        push %tmp.175;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_71_81_71_104_end:
+        %tmp.176 = phi [%tmp.169 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_71_23_71_104_begin] [%tmp.175 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_71_81_71_104_false] [%tmp.176 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_71_81_71_104_end];
+        bf %tmp.176 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_71_19_73_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_71_19_73_12_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_71_110_73_12_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 72 16 ]
+        %tmp.177 = 0xFFAA00;
+        lputv %color.11 %tmp.177;
+        symbol [ color %color.11 72 16 21 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_71_110_73_12_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_71_19_73_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_71_19_73_12_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_69_19_73_12_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_67_12_73_12_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 75 12 ]
+        %tmp.178 = lgetv %dc;
+        symbol [ dc %tmp.178 75 12 14 ];
+        symbol [ setColor %tmp.179 75 15 23 ];
+        %tmp.179 = getv function %tmp.178 :setColor;
+        %tmp.180 = lgetv %color.11;
+        symbol [ color %tmp.180 75 24 29 ];
+        symbol [ Graphics %tmp.181 75 31 39 ];
+        %tmp.181 = getm $.Toybox.Graphics;
+        symbol [ COLOR_TRANSPARENT %tmp.182 75 40 57 ];
+        %tmp.182 = getv %tmp.181 :COLOR_TRANSPARENT;
+        invoke %tmp.178 %tmp.179(%tmp.180, %tmp.182);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 78 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_43_84_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_43_84_8_stop" ]
+        %maxChars.12 = local;
+        symbol [ maxChars %maxChars.12 78 16 24 ];
+        %tmp.183 = lgetv %w.1;
+        symbol [ w %tmp.183 78 27 28 ];
+        %tmp.184 = 6;
+        %tmp.185 = div %tmp.183 %tmp.184;
+        lputv %maxChars.12 %tmp.185;
+        symbol [ maxChars %maxChars.12 78 16 24 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 79 12 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_79_12_81_12_if_stmt:
+        %tmp.186 = lgetv %entry.9;
+        symbol [ entry %tmp.186 79 16 21 ];
+        symbol [ length %tmp.187 79 22 28 ];
+        %tmp.187 = getv function %tmp.186 :length;
+        %tmp.188 = invoke %tmp.186 %tmp.187();
+        %tmp.189 = lgetv %maxChars.12;
+        symbol [ maxChars %tmp.189 79 33 41 ];
+        %tmp.190 = gt %tmp.188 %tmp.189;
+        bf %tmp.190 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_79_12_81_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_79_12_81_12_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_79_43_81_12_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 80 16 ]
+        %tmp.191 = lgetv %entry.9;
+        symbol [ entry %tmp.191 80 24 29 ];
+        symbol [ substring %tmp.192 80 30 39 ];
+        %tmp.192 = getv function %tmp.191 :substring;
+        %tmp.193 = 0;
+        %tmp.194 = lgetv %maxChars.12;
+        symbol [ maxChars %tmp.194 80 43 51 ];
+        %tmp.195 = invoke %tmp.191 %tmp.192(%tmp.193, %tmp.194);
+        lputv %entry.9 %tmp.195;
+        symbol [ entry %entry.9 80 16 21 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_79_43_81_12_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_79_12_81_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_79_12_81_12_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 83 12 ]
+        %tmp.196 = lgetv %dc;
+        symbol [ dc %tmp.196 83 12 14 ];
+        symbol [ drawText %tmp.197 83 15 23 ];
+        %tmp.197 = getv function %tmp.196 :drawText;
+        %tmp.198 = 5;
+        %tmp.199 = lgetv %y.10;
+        symbol [ y %tmp.199 83 27 28 ];
+        symbol [ Graphics %tmp.200 83 30 38 ];
+        %tmp.200 = getm $.Toybox.Graphics;
+        symbol [ FONT_XTINY %tmp.201 83 39 49 ];
+        %tmp.201 = getv %tmp.200 :FONT_XTINY;
+        %tmp.202 = lgetv %entry.9;
+        symbol [ entry %tmp.202 83 51 56 ];
+        symbol [ Graphics %tmp.203 83 58 66 ];
+        %tmp.203 = getm $.Toybox.Graphics;
+        symbol [ TEXT_JUSTIFY_LEFT %tmp.204 83 67 84 ];
+        %tmp.204 = getv %tmp.203 :TEXT_JUSTIFY_LEFT;
+        invoke %tmp.196 %tmp.197(%tmp.198, %tmp.199, %tmp.201, %tmp.202, %tmp.204);
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_43_84_8_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_8_84_8_for_incr:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 56 ]
+        %tmp.207 = lgetv %i.7;
+        symbol [ i %tmp.207 56 38 39 ];
+        %tmp.208 = add %tmp.207 1;
+        lputv %i.7 %tmp.208;
+        symbol [ i %i.7 56 38 39 ];
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_8_84_8_for_test;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_56_8_84_8_for_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 87 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_87_8_93_8_if_stmt:
+        symbol [ entries %tmp.210 87 12 19 ];
+        %tmp.210 = getv ? :entries;
+        symbol [ size %tmp.211 87 20 24 ];
+        %tmp.211 = getv function %tmp.210 :size;
+        %tmp.212 = invoke %tmp.210 %tmp.211();
+        %tmp.213 = lgetv %maxLines.6;
+        symbol [ maxLines %tmp.213 87 29 37 ];
+        %tmp.214 = gt %tmp.212 %tmp.213;
+        bf %tmp.214 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_87_8_93_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_87_8_93_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_87_39_93_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 88 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_87_39_93_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_87_39_93_8_stop" ]
+        %totalPages.13 = local;
+        symbol [ totalPages %totalPages.13 88 16 26 ];
+        symbol [ entries %tmp.216 88 30 37 ];
+        %tmp.216 = getv ? :entries;
+        symbol [ size %tmp.217 88 38 42 ];
+        %tmp.217 = getv function %tmp.216 :size;
+        %tmp.218 = invoke %tmp.216 %tmp.217();
+        %tmp.219 = lgetv %maxLines.6;
+        symbol [ maxLines %tmp.219 88 47 55 ];
+        %tmp.220 = add %tmp.218 %tmp.219;
+        %tmp.221 = 1;
+        %tmp.222 = sub %tmp.220 %tmp.221;
+        %tmp.223 = lgetv %maxLines.6;
+        symbol [ maxLines %tmp.223 88 63 71 ];
+        %tmp.224 = div %tmp.222 %tmp.223;
+        lputv %totalPages.13 %tmp.224;
+        symbol [ totalPages %totalPages.13 88 16 26 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 89 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_87_39_93_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_87_39_93_8_stop" ]
+        %currentPage.14 = local;
+        symbol [ currentPage %currentPage.14 89 16 27 ];
+        symbol [ scrollOffset %tmp.226 89 31 43 ];
+        %tmp.226 = getv ? :scrollOffset;
+        %tmp.227 = lgetv %maxLines.6;
+        symbol [ maxLines %tmp.227 89 46 54 ];
+        %tmp.228 = div %tmp.226 %tmp.227;
+        %tmp.229 = 1;
+        %tmp.230 = add %tmp.228 %tmp.229;
+        lputv %currentPage.14 %tmp.230;
+        symbol [ currentPage %currentPage.14 89 16 27 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 90 12 ]
+        %tmp.231 = lgetv %dc;
+        symbol [ dc %tmp.231 90 12 14 ];
+        symbol [ setColor %tmp.232 90 15 23 ];
+        %tmp.232 = getv function %tmp.231 :setColor;
+        symbol [ Graphics %tmp.233 90 24 32 ];
+        %tmp.233 = getm $.Toybox.Graphics;
+        symbol [ COLOR_DK_GRAY %tmp.234 90 33 46 ];
+        %tmp.234 = getv %tmp.233 :COLOR_DK_GRAY;
+        symbol [ Graphics %tmp.235 90 48 56 ];
+        %tmp.235 = getm $.Toybox.Graphics;
+        symbol [ COLOR_TRANSPARENT %tmp.236 90 57 74 ];
+        %tmp.236 = getv %tmp.235 :COLOR_TRANSPARENT;
+        invoke %tmp.231 %tmp.232(%tmp.234, %tmp.236);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 91 12 ]
+        %tmp.237 = lgetv %dc;
+        symbol [ dc %tmp.237 91 12 14 ];
+        symbol [ drawText %tmp.238 91 15 23 ];
+        %tmp.238 = getv function %tmp.237 :drawText;
+        %tmp.239 = lgetv %cx.3;
+        symbol [ cx %tmp.239 91 24 26 ];
+        %tmp.240 = lgetv %h.2;
+        symbol [ h %tmp.240 91 28 29 ];
+        %tmp.241 = 18;
+        %tmp.242 = sub %tmp.240 %tmp.241;
+        symbol [ Graphics %tmp.243 91 36 44 ];
+        %tmp.243 = getm $.Toybox.Graphics;
+        symbol [ FONT_XTINY %tmp.244 91 45 55 ];
+        %tmp.244 = getv %tmp.243 :FONT_XTINY;
+        %tmp.245 = lgetv %currentPage.14;
+        symbol [ currentPage %tmp.245 92 16 27 ];
+        %tmp.246 = "/";
+        %tmp.247 = add %tmp.245 %tmp.246;
+        %tmp.248 = lgetv %totalPages.13;
+        symbol [ totalPages %tmp.248 92 36 46 ];
+        %tmp.249 = add %tmp.247 %tmp.248;
+        symbol [ Graphics %tmp.250 92 48 56 ];
+        %tmp.250 = getm $.Toybox.Graphics;
+        symbol [ TEXT_JUSTIFY_CENTER %tmp.251 92 57 76 ];
+        %tmp.251 = getv %tmp.250 :TEXT_JUSTIFY_CENTER;
+        invoke %tmp.237 %tmp.238(%tmp.239, %tmp.242, %tmp.244, %tmp.249, %tmp.251);
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_87_39_93_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_87_8_93_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_87_8_93_8_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_29_26_94_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc"; @line = 96; @symbol_functiondef = [scrollDown,96,13,23]; ]
+    function scrollDown() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_96_26_101_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 97 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_97_8_100_8_if_stmt:
+        symbol [ scrollOffset %tmp.2 97 12 24 ];
+        %tmp.2 = getv ? :scrollOffset;
+        symbol [ linesPerPage %tmp.4 97 27 39 ];
+        %tmp.4 = getv ? :linesPerPage;
+        %tmp.5 = add %tmp.2 %tmp.4;
+        symbol [ entries %tmp.7 97 42 49 ];
+        %tmp.7 = getv ? :entries;
+        symbol [ size %tmp.8 97 50 54 ];
+        %tmp.8 = getv function %tmp.7 :size;
+        %tmp.9 = invoke %tmp.7 %tmp.8();
+        %tmp.10 = lt %tmp.5 %tmp.9;
+        bf %tmp.10 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_97_8_100_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_97_8_100_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_97_58_100_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 98 12 ]
+        symbol [ scrollOffset %tmp.11 98 12 24 ];
+        %tmp.11 = getv self :scrollOffset;
+        symbol [ linesPerPage %tmp.13 98 28 40 ];
+        %tmp.13 = getv ? :linesPerPage;
+        %tmp.14 = add %tmp.11 %tmp.13;
+        symbol [ scrollOffset ? 98 12 24 ];
+        putv self :scrollOffset dup %tmp.14;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 99 12 ]
+        symbol [ WatchUi %tmp.15 99 12 19 ];
+        %tmp.15 = getm $.Toybox.WatchUi;
+        symbol [ requestUpdate %tmp.16 99 20 33 ];
+        %tmp.16 = getv function %tmp.15 :requestUpdate;
+        invoke %tmp.15 %tmp.16();
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_97_58_100_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_97_8_100_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_97_8_100_8_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_96_26_101_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc"; @line = 103; @symbol_functiondef = [scrollUp,103,13,21]; ]
+    function scrollUp() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_103_24_109_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 104 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_104_8_108_8_if_stmt:
+        symbol [ scrollOffset %tmp.2 104 12 24 ];
+        %tmp.2 = getv ? :scrollOffset;
+        %tmp.3 = 0;
+        %tmp.4 = gt %tmp.2 %tmp.3;
+        bf %tmp.4 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_104_8_108_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_104_8_108_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_104_30_108_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 105 12 ]
+        symbol [ scrollOffset %tmp.5 105 12 24 ];
+        %tmp.5 = getv self :scrollOffset;
+        symbol [ linesPerPage %tmp.7 105 28 40 ];
+        %tmp.7 = getv ? :linesPerPage;
+        %tmp.8 = sub %tmp.5 %tmp.7;
+        symbol [ scrollOffset ? 105 12 24 ];
+        putv self :scrollOffset dup %tmp.8;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 106 12 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_106_12_106_54_if_stmt:
+        symbol [ scrollOffset %tmp.10 106 16 28 ];
+        %tmp.10 = getv ? :scrollOffset;
+        %tmp.11 = 0;
+        %tmp.12 = lt %tmp.10 %tmp.11;
+        bf %tmp.12 @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_106_12_106_54_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_106_12_106_54_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_106_34_106_54_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 106 36 ]
+        %tmp.13 = 0;
+        symbol [ scrollOffset ? 106 36 48 ];
+        putv self :scrollOffset %tmp.13;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_106_34_106_54_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_106_12_106_54_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_106_12_106_54_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 107 12 ]
+        symbol [ WatchUi %tmp.14 107 12 19 ];
+        %tmp.14 = getm $.Toybox.WatchUi;
+        symbol [ requestUpdate %tmp.15 107 20 33 ];
+        %tmp.15 = getv function %tmp.14 :requestUpdate;
+        invoke %tmp.14 %tmp.15();
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_104_30_108_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_104_8_108_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_104_8_108_8_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_103_24_109_4_stop:
+    }
+}
+//! Delegate for the SyncLogView — handles scrolling and back.
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc"; @line = 113; @symbol_classdef = [SyncLogDelegate,113,6,21]; @symbol_extends<0> = [WatchUi,113,30,37]; @symbol_extends<1> = [BehaviorDelegate,113,38,54]; ]
+class SyncLogDelegate extends WatchUi.BehaviorDelegate {
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc"; @line = 113; ]
+    <init> {
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc"; @line = 113; ]
+    static
+    <init> {
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc"; @line = 115; @position = 8; @symbol_vardef = [_view,115,8,13]; ]
+    var _view;
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc"; @line = 117; @symbol_functiondef = [initialize,117,13,23]; @symbol_param<0> = [view,117,24,28]; ]
+    function initialize(view) as Void {
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_117_30_120_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 118 8 ]
+        symbol [ BehaviorDelegate %tmp.2 118 8 24 ];
+        %tmp.2 = getv ? :BehaviorDelegate;
+        symbol [ initialize %tmp.3 118 25 35 ];
+        %tmp.3 = getv function %tmp.2 :initialize;
+        invoke %tmp.2 %tmp.3();
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 119 8 ]
+        %tmp.4 = lgetv %view;
+        symbol [ view %tmp.4 119 16 20 ];
+        symbol [ _view ? 119 8 13 ];
+        putv self :_view %tmp.4;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_117_30_120_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc"; @line = 122; @symbol_functiondef = [onNextPage,122,13,23]; ]
+    function onNextPage() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_122_26_125_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 123 8 ]
+        symbol [ _view %tmp.2 123 8 13 ];
+        %tmp.2 = getv ? :_view;
+        symbol [ scrollDown %tmp.3 123 14 24 ];
+        %tmp.3 = getv function %tmp.2 :scrollDown;
+        invoke %tmp.2 %tmp.3();
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 124 8 ]
+        %tmp.4 = true;
+        ret %tmp.4;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_122_26_125_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc"; @line = 127; @symbol_functiondef = [onPreviousPage,127,13,27]; ]
+    function onPreviousPage() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_127_30_130_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 128 8 ]
+        symbol [ _view %tmp.2 128 8 13 ];
+        %tmp.2 = getv ? :_view;
+        symbol [ scrollUp %tmp.3 128 14 22 ];
+        %tmp.3 = getv function %tmp.2 :scrollUp;
+        invoke %tmp.2 %tmp.3();
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 129 8 ]
+        %tmp.4 = true;
+        ret %tmp.4;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_127_30_130_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc"; @line = 132; @symbol_functiondef = [onSelect,132,13,21]; ]
+    function onSelect() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_132_24_138_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 134 8 ]
+        symbol [ SyncLog %tmp.2 134 8 15 ];
+        %tmp.2 = getv ? :SyncLog;
+        symbol [ clear %tmp.3 134 16 21 ];
+        %tmp.3 = getv function %tmp.2 :clear;
+        invoke %tmp.2 %tmp.3();
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 135 8 ]
+        symbol [ _view %tmp.5 135 8 13 ];
+        %tmp.5 = getv ? :_view;
+        symbol [ onShow %tmp.6 135 14 20 ];
+        %tmp.6 = getv function %tmp.5 :onShow;
+        invoke %tmp.5 %tmp.6();
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 136 8 ]
+        symbol [ WatchUi %tmp.7 136 8 15 ];
+        %tmp.7 = getm $.Toybox.WatchUi;
+        symbol [ requestUpdate %tmp.8 136 16 29 ];
+        %tmp.8 = getv function %tmp.7 :requestUpdate;
+        invoke %tmp.7 %tmp.8();
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 137 8 ]
+        %tmp.9 = true;
+        ret %tmp.9;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_132_24_138_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc"; @line = 140; @symbol_functiondef = [onBack,140,13,19]; ]
+    function onBack() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_140_22_143_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 141 8 ]
+        symbol [ WatchUi %tmp.1 141 8 15 ];
+        %tmp.1 = getm $.Toybox.WatchUi;
+        symbol [ popView %tmp.2 141 16 23 ];
+        %tmp.2 = getv function %tmp.1 :popView;
+        symbol [ WatchUi %tmp.3 141 24 31 ];
+        %tmp.3 = getm $.Toybox.WatchUi;
+        symbol [ SLIDE_RIGHT %tmp.4 141 32 43 ];
+        %tmp.4 = getv %tmp.3 :SLIDE_RIGHT;
+        invoke %tmp.1 %tmp.2(%tmp.4);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" 142 8 ]
+        %tmp.5 = true;
+        ret %tmp.5;
+_home_twain_AndroidStudioProjects_wags_garmin_source_SyncLogView_mc_140_22_143_4_stop:
+    }
+}
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc"; @line = 1; ]
+<init> {
+}

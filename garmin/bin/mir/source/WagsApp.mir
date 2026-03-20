@@ -6,1032 +6,1865 @@ using Toybox.Communications;
 using Toybox.WatchUi;
 [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 4; @symbol_usingdef<0> = [Toybox,4,6,12]; @symbol_usingdef<1> = [System,4,13,19]; ]
 using Toybox.System;
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 5; @symbol_usingdef<0> = [Toybox,5,6,12]; @symbol_usingdef<1> = [Timer,5,13,18]; ]
+using Toybox.Timer;
 //! Main application entry point for the WAGS Garmin Device App.
-//! Displays a top-level menu: Apnea | Resonance.
-//!
-//! Also registers for incoming phone messages so the companion Android app
-//! can request unsynced holds and acknowledge receipt.
-[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 11; @symbol_classdef = [WagsApp,11,6,13]; @symbol_extends<0> = [Application,11,22,33]; @symbol_extends<1> = [AppBase,11,34,41]; ]
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 8; @symbol_classdef = [WagsApp,8,6,13]; @symbol_extends<0> = [Application,8,22,33]; @symbol_extends<1> = [AppBase,8,34,41]; ]
 class WagsApp extends Application.AppBase {
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 11; ]
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 8; ]
     <init> {
     }
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 11; ]
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 8; ]
     static
     <init> {
     }
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 13; @symbol_functiondef = [initialize,13,13,23]; ]
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 10; @symbol_functiondef = [initialize,10,13,23]; ]
     function initialize() as Void {
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_13_26_15_4_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 14 8 ]
-        symbol [ AppBase %tmp.2 14 8 15 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_10_26_12_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 11 8 ]
+        symbol [ AppBase %tmp.2 11 8 15 ];
         %tmp.2 = getv ? :AppBase;
-        symbol [ initialize %tmp.3 14 16 26 ];
+        symbol [ initialize %tmp.3 11 16 26 ];
         %tmp.3 = getv function %tmp.2 :initialize;
         invoke %tmp.2 %tmp.3();
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_13_26_15_4_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_10_26_12_4_stop:
     }
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 17; @symbol_functiondef = [onStart,17,13,20]; @symbol_param<0> = [state,17,21,26]; ]
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 14; @symbol_functiondef = [onStart,14,13,20]; @symbol_param<0> = [state,14,21,26]; ]
     function onStart(state) {
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_17_28_22_4_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 20 8 ]
-        symbol [ Communications %tmp.1 20 8 22 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_14_28_18_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 15 8 ]
+        symbol [ Communications %tmp.1 15 8 22 ];
         %tmp.1 = getm $.Toybox.Communications;
-        symbol [ registerForPhoneAppMessages %tmp.2 20 23 50 ];
+        symbol [ registerForPhoneAppMessages %tmp.2 15 23 50 ];
         %tmp.2 = getv function %tmp.1 :registerForPhoneAppMessages;
         %tmp.3 = self;
-        symbol [ method %tmp.4 20 51 57 ];
+        symbol [ method %tmp.4 15 51 57 ];
         %tmp.4 = getv function %tmp.3 :method;
         %tmp.6 = const :onPhoneMessage;
-        symbol [ onPhoneMessage %tmp.6 20 59 73 const ];
+        symbol [ onPhoneMessage %tmp.6 15 59 73 const ];
         %tmp.7 = invoke %tmp.3 %tmp.4(%tmp.6);
         invoke %tmp.1 %tmp.2(%tmp.7);
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 21 8 ]
-        symbol [ System %tmp.8 21 8 14 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 16 8 ]
+        symbol [ System %tmp.8 16 8 14 ];
         %tmp.8 = getm $.Toybox.System;
-        symbol [ println %tmp.9 21 15 22 ];
+        symbol [ println %tmp.9 16 15 22 ];
         %tmp.9 = getv function %tmp.8 :println;
         %tmp.10 = "[WAGS] Registered for phone app messages";
         invoke %tmp.8 %tmp.9(%tmp.10);
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_17_28_22_4_stop:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 17 8 ]
+        symbol [ SyncLog %tmp.12 17 8 15 ];
+        %tmp.12 = getv ? :SyncLog;
+        symbol [ add %tmp.13 17 16 19 ];
+        %tmp.13 = getv function %tmp.12 :add;
+        %tmp.14 = "App START, registered msgs";
+        invoke %tmp.12 %tmp.13(%tmp.14);
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_14_28_18_4_stop:
     }
-    //! Return the initial view + delegate.
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 25; @symbol_functiondef = [getInitialView,25,13,27]; ]
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 20; @symbol_functiondef = [getInitialView,20,13,27]; ]
     function getInitialView() {
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_25_30_27_4_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 26 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_20_30_22_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 21 8 ]
         %tmp.1 = newa 2;
-        symbol [ MainMenuView %tmp.5 26 20 32 ];
+        symbol [ MainMenuView %tmp.5 21 20 32 ];
         %tmp.5 = getv ? :MainMenuView;
         %tmp.2 = newc %tmp.5 ();
         %tmp.6 = dup %tmp.1;
         %tmp.7 = aputv %tmp.6 0 %tmp.2;
-        symbol [ MainMenuDelegate %tmp.11 26 40 56 ];
+        symbol [ MainMenuDelegate %tmp.11 21 40 56 ];
         %tmp.11 = getv ? :MainMenuDelegate;
         %tmp.8 = newc %tmp.11 ();
         %tmp.12 = dup %tmp.7;
         %tmp.13 = aputv %tmp.12 1 %tmp.8;
         ret %tmp.13;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_25_30_27_4_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_20_30_22_4_stop:
     }
-    //! Handle incoming messages from the companion phone app.
-    //! Message format: Dictionary with "cmd" key.
-    //!
-    //! Commands:
-    //!   SYNC_REQUEST  -> Phone wants all unsynced holds
-    //!   ACK_HOLD      -> Phone confirms receipt of a hold (includes "holdId")
-    //!   PING          -> Phone checking if watch app is alive
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 36; @symbol_functiondef = [onPhoneMessage,36,13,27]; @symbol_param<0> = [msg,36,28,31]; @symbol_param<0>_type<0> = [Communications,36,35,49]; @symbol_param<0>_type<1> = [PhoneAppMessage,36,50,65]; ]
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 24; @symbol_functiondef = [onPhoneMessage,24,13,27]; @symbol_param<0> = [msg,24,28,31]; @symbol_param<0>_type<0> = [Communications,24,35,49]; @symbol_param<0>_type<1> = [PhoneAppMessage,24,50,65]; ]
     function onPhoneMessage(msg as Communications.PhoneAppMessage) as Void {
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_36_75_58_4_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 37 8 ]
-        symbol [ System %tmp.1 37 8 14 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_24_75_45_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 25 8 ]
+        symbol [ System %tmp.1 25 8 14 ];
         %tmp.1 = getm $.Toybox.System;
-        symbol [ println %tmp.2 37 15 22 ];
+        symbol [ println %tmp.2 25 15 22 ];
         %tmp.2 = getv function %tmp.1 :println;
         %tmp.3 = "[WAGS] Phone message received!";
         invoke %tmp.1 %tmp.2(%tmp.3);
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 39 8 ]
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_39_8_42_8_if_stmt:
-        %tmp.4 = lgetv %msg;
-        symbol [ msg %tmp.4 39 12 15 ];
-        %tmp.5 = null;
-        %tmp.6 = eq %tmp.4 %tmp.5;
-        bf %tmp.6 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_39_8_42_8_if_end;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_39_8_42_8_if_true:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_39_25_42_8_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 40 12 ]
-        symbol [ System %tmp.7 40 12 18 ];
-        %tmp.7 = getm $.Toybox.System;
-        symbol [ println %tmp.8 40 19 26 ];
-        %tmp.8 = getv function %tmp.7 :println;
-        %tmp.9 = "[WAGS] Null message from phone";
-        invoke %tmp.7 %tmp.8(%tmp.9);
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 41 12 ]
-        ret ?;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_39_25_42_8_stop:
-        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_39_8_42_8_if_end;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_39_8_42_8_if_end:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 45 8 ]
-        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_36_75_58_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_36_75_58_4_stop" ]
-        %data.1 = local;
-        symbol [ data %data.1 45 12 16 ];
-        %tmp.10 = lgetv %msg;
-        symbol [ msg %tmp.10 45 19 22 ];
-        symbol [ data %tmp.11 45 23 27 ];
-        %tmp.11 = getv %tmp.10 :data;
-        lputv %data.1 %tmp.11;
-        symbol [ data %data.1 45 12 16 ];
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 46 8 ]
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_46_8_49_8_if_stmt:
-        %tmp.12 = lgetv %data.1;
-        symbol [ data %tmp.12 46 12 16 ];
-        %tmp.13 = null;
-        %tmp.14 = eq %tmp.12 %tmp.13;
-        bf %tmp.14 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_46_8_49_8_if_end;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_46_8_49_8_if_true:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_46_26_49_8_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 47 12 ]
-        symbol [ System %tmp.15 47 12 18 ];
-        %tmp.15 = getm $.Toybox.System;
-        symbol [ println %tmp.16 47 19 26 ];
-        %tmp.16 = getv function %tmp.15 :println;
-        %tmp.17 = "[WAGS] Null data in phone message";
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 26 8 ]
+        symbol [ SyncLog %tmp.5 26 8 15 ];
+        %tmp.5 = getv ? :SyncLog;
+        symbol [ add %tmp.6 26 16 19 ];
+        %tmp.6 = getv function %tmp.5 :add;
+        %tmp.7 = "Phone msg received";
+        invoke %tmp.5 %tmp.6(%tmp.7);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 28 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_28_8_32_8_if_stmt:
+        %tmp.8 = lgetv %msg;
+        symbol [ msg %tmp.8 28 12 15 ];
+        %tmp.9 = null;
+        %tmp.10 = eq %tmp.8 %tmp.9;
+        bf %tmp.10 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_28_8_32_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_28_8_32_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_28_25_32_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 29 12 ]
+        symbol [ System %tmp.11 29 12 18 ];
+        %tmp.11 = getm $.Toybox.System;
+        symbol [ println %tmp.12 29 19 26 ];
+        %tmp.12 = getv function %tmp.11 :println;
+        %tmp.13 = "[WAGS] Null message from phone";
+        invoke %tmp.11 %tmp.12(%tmp.13);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 30 12 ]
+        symbol [ SyncLog %tmp.15 30 12 19 ];
+        %tmp.15 = getv ? :SyncLog;
+        symbol [ add %tmp.16 30 20 23 ];
+        %tmp.16 = getv function %tmp.15 :add;
+        %tmp.17 = "Phone msg ERR null";
         invoke %tmp.15 %tmp.16(%tmp.17);
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 48 12 ]
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 31 12 ]
         ret ?;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_46_26_49_8_stop:
-        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_46_8_49_8_if_end;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_46_8_49_8_if_end:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 51 8 ]
-        symbol [ System %tmp.18 51 8 14 ];
-        %tmp.18 = getm $.Toybox.System;
-        symbol [ println %tmp.19 51 15 22 ];
-        %tmp.19 = getv function %tmp.18 :println;
-        %tmp.20 = "[WAGS] Message data type: ";
-        %tmp.21 = lgetv %data.1;
-        symbol [ data %tmp.21 51 54 58 ];
-        %tmp.22 = add %tmp.20 %tmp.21;
-        invoke %tmp.18 %tmp.19(%tmp.22);
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 53 8 ]
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_53_8_57_8_if_stmt:
-        %tmp.23 = lgetv %data.1;
-        symbol [ data %tmp.23 53 12 16 ];
-        symbol [ Toybox %tmp.25 53 28 34 ];
-        %tmp.25 = getv ? :Toybox;
-        symbol [ Lang %tmp.26 53 35 39 ];
-        %tmp.26 = getv %tmp.25 :Lang;
-        symbol [ Dictionary %tmp.27 53 40 50 ];
-        %tmp.27 = getv %tmp.26 :Dictionary;
-        %tmp.28 = isa %tmp.23 %tmp.27;
-        bf %tmp.28 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_53_8_57_8_if_else_false;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_53_8_57_8_if_true:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_53_52_55_8_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 54 12 ]
-        %tmp.29 = self;
-        symbol [ handleCommand %tmp.30 54 12 25 ];
-        %tmp.30 = getv function %tmp.29 :handleCommand;
-        %tmp.31 = lgetv %data.1;
-        symbol [ data %tmp.31 54 26 30 ];
-        %tmp.32 = as %tmp.31 { (Toybox.Lang.Dictionary) };
-        invoke %tmp.29 %tmp.30(%tmp.32);
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_53_52_55_8_stop:
-        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_53_8_57_8_if_end;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_53_8_57_8_if_else_false:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_55_15_57_8_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 56 12 ]
-        symbol [ System %tmp.33 56 12 18 ];
-        %tmp.33 = getm $.Toybox.System;
-        symbol [ println %tmp.34 56 19 26 ];
-        %tmp.34 = getv function %tmp.33 :println;
-        %tmp.35 = "[WAGS] Unexpected message format: ";
-        %tmp.36 = lgetv %data.1;
-        symbol [ data %tmp.36 56 66 70 ];
-        %tmp.37 = as %tmp.36 { (!Toybox.Lang.Dictionary) };
-        %tmp.38 = add %tmp.35 %tmp.37;
-        invoke %tmp.33 %tmp.34(%tmp.38);
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_55_15_57_8_stop:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_53_8_57_8_if_end:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_36_75_58_4_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_28_25_32_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_28_8_32_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_28_8_32_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 34 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_24_75_45_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_24_75_45_4_stop" ]
+        %data.1 = local;
+        symbol [ data %data.1 34 12 16 ];
+        %tmp.18 = lgetv %msg;
+        symbol [ msg %tmp.18 34 19 22 ];
+        symbol [ data %tmp.19 34 23 27 ];
+        %tmp.19 = getv %tmp.18 :data;
+        lputv %data.1 %tmp.19;
+        symbol [ data %data.1 34 12 16 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 35 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_35_8_38_8_if_stmt:
+        %tmp.20 = lgetv %data.1;
+        symbol [ data %tmp.20 35 12 16 ];
+        %tmp.21 = null;
+        %tmp.22 = eq %tmp.20 %tmp.21;
+        bf %tmp.22 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_35_8_38_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_35_8_38_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_35_26_38_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 36 12 ]
+        symbol [ System %tmp.23 36 12 18 ];
+        %tmp.23 = getm $.Toybox.System;
+        symbol [ println %tmp.24 36 19 26 ];
+        %tmp.24 = getv function %tmp.23 :println;
+        %tmp.25 = "[WAGS] Null data in phone message";
+        invoke %tmp.23 %tmp.24(%tmp.25);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 37 12 ]
+        ret ?;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_35_26_38_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_35_8_38_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_35_8_38_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 40 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_40_8_44_8_if_stmt:
+        %tmp.26 = lgetv %data.1;
+        symbol [ data %tmp.26 40 12 16 ];
+        symbol [ Toybox %tmp.28 40 28 34 ];
+        %tmp.28 = getv ? :Toybox;
+        symbol [ Lang %tmp.29 40 35 39 ];
+        %tmp.29 = getv %tmp.28 :Lang;
+        symbol [ Dictionary %tmp.30 40 40 50 ];
+        %tmp.30 = getv %tmp.29 :Dictionary;
+        %tmp.31 = isa %tmp.26 %tmp.30;
+        bf %tmp.31 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_40_8_44_8_if_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_40_8_44_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_40_52_42_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 41 12 ]
+        %tmp.32 = self;
+        symbol [ handleCommand %tmp.33 41 12 25 ];
+        %tmp.33 = getv function %tmp.32 :handleCommand;
+        %tmp.34 = lgetv %data.1;
+        symbol [ data %tmp.34 41 26 30 ];
+        %tmp.35 = as %tmp.34 { (Toybox.Lang.Dictionary) };
+        invoke %tmp.32 %tmp.33(%tmp.35);
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_40_52_42_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_40_8_44_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_40_8_44_8_if_else_false:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_42_15_44_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 43 12 ]
+        symbol [ System %tmp.36 43 12 18 ];
+        %tmp.36 = getm $.Toybox.System;
+        symbol [ println %tmp.37 43 19 26 ];
+        %tmp.37 = getv function %tmp.36 :println;
+        %tmp.38 = "[WAGS] Unexpected message format: ";
+        %tmp.39 = lgetv %data.1;
+        symbol [ data %tmp.39 43 66 70 ];
+        %tmp.40 = as %tmp.39 { (!Toybox.Lang.Dictionary) };
+        %tmp.41 = add %tmp.38 %tmp.40;
+        invoke %tmp.36 %tmp.37(%tmp.41);
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_42_15_44_8_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_40_8_44_8_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_24_75_45_4_stop:
     }
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 60; @symbol_functiondef = [handleCommand,60,13,26]; @symbol_param<0> = [data,60,27,31]; ]
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 47; @symbol_functiondef = [handleCommand,47,13,26]; @symbol_param<0> = [data,47,27,31]; ]
     function handleCommand(data) {
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_60_33_78_4_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 61 8 ]
-        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_60_33_78_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_60_33_78_4_stop" ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_47_33_66_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 48 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_47_33_66_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_47_33_66_4_stop" ]
         %cmd.1 = local;
-        symbol [ cmd %cmd.1 61 12 15 ];
+        symbol [ cmd %cmd.1 48 12 15 ];
         %tmp.1 = lgetv %data;
-        symbol [ data %tmp.1 61 18 22 ];
-        symbol [ get %tmp.2 61 23 26 ];
+        symbol [ data %tmp.1 48 18 22 ];
+        symbol [ get %tmp.2 48 23 26 ];
         %tmp.2 = getv function %tmp.1 :get;
         %tmp.3 = "cmd";
         %tmp.4 = invoke %tmp.1 %tmp.2(%tmp.3);
         lputv %cmd.1 %tmp.4;
-        symbol [ cmd %cmd.1 61 12 15 ];
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 62 8 ]
-        symbol [ System %tmp.5 62 8 14 ];
+        symbol [ cmd %cmd.1 48 12 15 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 49 8 ]
+        symbol [ System %tmp.5 49 8 14 ];
         %tmp.5 = getm $.Toybox.System;
-        symbol [ println %tmp.6 62 15 22 ];
+        symbol [ println %tmp.6 49 15 22 ];
         %tmp.6 = getv function %tmp.5 :println;
         %tmp.7 = "[WAGS] Command: ";
         %tmp.8 = lgetv %cmd.1;
-        symbol [ cmd %tmp.8 62 44 47 ];
+        symbol [ cmd %tmp.8 49 44 47 ];
         %tmp.9 = add %tmp.7 %tmp.8;
         invoke %tmp.5 %tmp.6(%tmp.9);
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 64 8 ]
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_64_8_67_8_if_stmt:
-        %tmp.10 = lgetv %cmd.1;
-        symbol [ cmd %tmp.10 64 12 15 ];
-        %tmp.11 = null;
-        %tmp.12 = eq %tmp.10 %tmp.11;
-        bf %tmp.12 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_64_8_67_8_if_end;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_64_8_67_8_if_true:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_64_25_67_8_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 65 12 ]
-        symbol [ System %tmp.13 65 12 18 ];
-        %tmp.13 = getm $.Toybox.System;
-        symbol [ println %tmp.14 65 19 26 ];
-        %tmp.14 = getv function %tmp.13 :println;
-        %tmp.15 = "[WAGS] No 'cmd' key in message";
-        invoke %tmp.13 %tmp.14(%tmp.15);
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 66 12 ]
-        ret ?;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_64_25_67_8_stop:
-        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_64_8_67_8_if_end;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_64_8_67_8_if_end:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 69 8 ]
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_69_8_77_8_if_stmt:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 50 8 ]
+        symbol [ SyncLog %tmp.11 50 8 15 ];
+        %tmp.11 = getv ? :SyncLog;
+        symbol [ add %tmp.12 50 16 19 ];
+        %tmp.12 = getv function %tmp.11 :add;
+        %tmp.13 = "CMD: ";
+        %tmp.14 = lgetv %cmd.1;
+        symbol [ cmd %tmp.14 50 30 33 ];
+        %tmp.15 = add %tmp.13 %tmp.14;
+        invoke %tmp.11 %tmp.12(%tmp.15);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 52 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_52_8_55_8_if_stmt:
         %tmp.16 = lgetv %cmd.1;
-        symbol [ cmd %tmp.16 69 12 15 ];
-        symbol [ equals %tmp.17 69 16 22 ];
-        %tmp.17 = getv function %tmp.16 :equals;
-        %tmp.18 = "PING";
-        %tmp.19 = invoke %tmp.16 %tmp.17(%tmp.18);
-        bf %tmp.19 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_69_8_77_8_if_false;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_69_8_77_8_if_true:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_69_32_71_8_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 70 12 ]
-        %tmp.20 = self;
-        symbol [ handlePing %tmp.21 70 12 22 ];
-        %tmp.21 = getv function %tmp.20 :handlePing;
-        invoke %tmp.20 %tmp.21();
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_69_32_71_8_stop:
-        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_69_8_77_8_if_end;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_69_8_77_8_if_false:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 71 15 ]
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_71_15_77_8_if_stmt:
+        symbol [ cmd %tmp.16 52 12 15 ];
+        %tmp.17 = null;
+        %tmp.18 = eq %tmp.16 %tmp.17;
+        bf %tmp.18 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_52_8_55_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_52_8_55_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_52_25_55_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 53 12 ]
+        symbol [ System %tmp.19 53 12 18 ];
+        %tmp.19 = getm $.Toybox.System;
+        symbol [ println %tmp.20 53 19 26 ];
+        %tmp.20 = getv function %tmp.19 :println;
+        %tmp.21 = "[WAGS] No 'cmd' key in message";
+        invoke %tmp.19 %tmp.20(%tmp.21);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 54 12 ]
+        ret ?;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_52_25_55_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_52_8_55_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_52_8_55_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 57 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_57_8_65_8_if_stmt:
         %tmp.22 = lgetv %cmd.1;
-        symbol [ cmd %tmp.22 71 19 22 ];
-        symbol [ equals %tmp.23 71 23 29 ];
+        symbol [ cmd %tmp.22 57 12 15 ];
+        symbol [ equals %tmp.23 57 16 22 ];
         %tmp.23 = getv function %tmp.22 :equals;
-        %tmp.24 = "SYNC_REQUEST";
+        %tmp.24 = "PING";
         %tmp.25 = invoke %tmp.22 %tmp.23(%tmp.24);
-        bf %tmp.25 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_71_15_77_8_if_false;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_71_15_77_8_if_true:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_71_47_73_8_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 72 12 ]
+        bf %tmp.25 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_57_8_65_8_if_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_57_8_65_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_57_32_59_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 58 12 ]
         %tmp.26 = self;
-        symbol [ handleSyncRequest %tmp.27 72 12 29 ];
-        %tmp.27 = getv function %tmp.26 :handleSyncRequest;
+        symbol [ handlePing %tmp.27 58 12 22 ];
+        %tmp.27 = getv function %tmp.26 :handlePing;
         invoke %tmp.26 %tmp.27();
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_71_47_73_8_stop:
-        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_71_15_77_8_if_end;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_71_15_77_8_if_false:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 73 15 ]
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_73_15_77_8_if_stmt:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_57_32_59_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_57_8_65_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_57_8_65_8_if_false:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 59 15 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_59_15_65_8_if_stmt:
         %tmp.28 = lgetv %cmd.1;
-        symbol [ cmd %tmp.28 73 19 22 ];
-        symbol [ equals %tmp.29 73 23 29 ];
+        symbol [ cmd %tmp.28 59 19 22 ];
+        symbol [ equals %tmp.29 59 23 29 ];
         %tmp.29 = getv function %tmp.28 :equals;
-        %tmp.30 = "ACK_HOLD";
+        %tmp.30 = "SYNC_REQUEST";
         %tmp.31 = invoke %tmp.28 %tmp.29(%tmp.30);
-        bf %tmp.31 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_73_15_77_8_if_else_false;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_73_15_77_8_if_true:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_73_43_75_8_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 74 12 ]
+        bf %tmp.31 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_59_15_65_8_if_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_59_15_65_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_59_47_61_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 60 12 ]
         %tmp.32 = self;
-        symbol [ handleAckHold %tmp.33 74 12 25 ];
-        %tmp.33 = getv function %tmp.32 :handleAckHold;
-        %tmp.34 = lgetv %data;
-        symbol [ data %tmp.34 74 26 30 ];
-        invoke %tmp.32 %tmp.33(%tmp.34);
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_73_43_75_8_stop:
-        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_73_15_77_8_if_end;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_73_15_77_8_if_else_false:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_75_15_77_8_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 76 12 ]
-        symbol [ System %tmp.35 76 12 18 ];
-        %tmp.35 = getm $.Toybox.System;
-        symbol [ println %tmp.36 76 19 26 ];
-        %tmp.36 = getv function %tmp.35 :println;
-        %tmp.37 = "[WAGS] Unknown command: ";
-        %tmp.38 = lgetv %cmd.1;
-        symbol [ cmd %tmp.38 76 56 59 ];
-        %tmp.39 = add %tmp.37 %tmp.38;
-        invoke %tmp.35 %tmp.36(%tmp.39);
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_75_15_77_8_stop:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_73_15_77_8_if_end:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_71_15_77_8_if_end:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_69_8_77_8_if_end:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_60_33_78_4_stop:
+        symbol [ handleSyncRequest %tmp.33 60 12 29 ];
+        %tmp.33 = getv function %tmp.32 :handleSyncRequest;
+        invoke %tmp.32 %tmp.33();
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_59_47_61_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_59_15_65_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_59_15_65_8_if_false:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 61 15 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_61_15_65_8_if_stmt:
+        %tmp.34 = lgetv %cmd.1;
+        symbol [ cmd %tmp.34 61 19 22 ];
+        symbol [ equals %tmp.35 61 23 29 ];
+        %tmp.35 = getv function %tmp.34 :equals;
+        %tmp.36 = "ACK_HOLD";
+        %tmp.37 = invoke %tmp.34 %tmp.35(%tmp.36);
+        bf %tmp.37 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_61_15_65_8_if_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_61_15_65_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_61_43_63_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 62 12 ]
+        %tmp.38 = self;
+        symbol [ handleAckHold %tmp.39 62 12 25 ];
+        %tmp.39 = getv function %tmp.38 :handleAckHold;
+        %tmp.40 = lgetv %data;
+        symbol [ data %tmp.40 62 26 30 ];
+        invoke %tmp.38 %tmp.39(%tmp.40);
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_61_43_63_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_61_15_65_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_61_15_65_8_if_else_false:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_63_15_65_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 64 12 ]
+        symbol [ System %tmp.41 64 12 18 ];
+        %tmp.41 = getm $.Toybox.System;
+        symbol [ println %tmp.42 64 19 26 ];
+        %tmp.42 = getv function %tmp.41 :println;
+        %tmp.43 = "[WAGS] Unknown command: ";
+        %tmp.44 = lgetv %cmd.1;
+        symbol [ cmd %tmp.44 64 56 59 ];
+        %tmp.45 = add %tmp.43 %tmp.44;
+        invoke %tmp.41 %tmp.42(%tmp.45);
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_63_15_65_8_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_61_15_65_8_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_59_15_65_8_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_57_8_65_8_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_47_33_66_4_stop:
     }
-    //! Respond to PING with a PONG and unsynced count.
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 81; @symbol_functiondef = [handlePing,81,13,23]; ]
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 68; @symbol_functiondef = [handlePing,68,13,23]; ]
     function handlePing() {
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_81_26_89_4_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 82 8 ]
-        symbol [ System %tmp.1 82 8 14 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_68_26_77_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 69 8 ]
+        symbol [ System %tmp.1 69 8 14 ];
         %tmp.1 = getm $.Toybox.System;
-        symbol [ println %tmp.2 82 15 22 ];
+        symbol [ println %tmp.2 69 15 22 ];
         %tmp.2 = getv function %tmp.1 :println;
         %tmp.3 = "[WAGS] Handling PING";
         invoke %tmp.1 %tmp.2(%tmp.3);
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 83 8 ]
-        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_81_26_89_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_81_26_89_4_stop" ]
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 70 8 ]
+        symbol [ SyncLog %tmp.5 70 8 15 ];
+        %tmp.5 = getv ? :SyncLog;
+        symbol [ add %tmp.6 70 16 19 ];
+        %tmp.6 = getv function %tmp.5 :add;
+        %tmp.7 = "PING rcvd";
+        invoke %tmp.5 %tmp.6(%tmp.7);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 71 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_68_26_77_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_68_26_77_4_stop" ]
         %unsyncedCount.1 = local;
-        symbol [ unsyncedCount %unsyncedCount.1 83 12 25 ];
-        symbol [ HoldStorage %tmp.5 83 28 39 ];
-        %tmp.5 = getv ? :HoldStorage;
-        symbol [ getUnsyncedCount %tmp.6 83 40 56 ];
-        %tmp.6 = getv function %tmp.5 :getUnsyncedCount;
-        %tmp.7 = invoke %tmp.5 %tmp.6();
-        lputv %unsyncedCount.1 %tmp.7;
-        symbol [ unsyncedCount %unsyncedCount.1 83 12 25 ];
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 84 8 ]
-        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_81_26_89_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_81_26_89_4_stop" ]
+        symbol [ unsyncedCount %unsyncedCount.1 71 12 25 ];
+        symbol [ HoldStorage %tmp.9 71 28 39 ];
+        %tmp.9 = getv ? :HoldStorage;
+        symbol [ getUnsyncedCount %tmp.10 71 40 56 ];
+        %tmp.10 = getv function %tmp.9 :getUnsyncedCount;
+        %tmp.11 = invoke %tmp.9 %tmp.10();
+        lputv %unsyncedCount.1 %tmp.11;
+        symbol [ unsyncedCount %unsyncedCount.1 71 12 25 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 72 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_68_26_77_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_68_26_77_4_stop" ]
         %response.2 = local;
-        symbol [ response %response.2 84 12 20 ];
-        %tmp.8 = newd 2;
-        %tmp.9 = "type";
-        %tmp.10 = "PONG";
-        %tmp.11 = dup %tmp.8;
-        %tmp.12 = aputv %tmp.11 %tmp.9 %tmp.10;
-        %tmp.13 = "unsyncedCount";
-        %tmp.14 = lgetv %unsyncedCount.1;
-        symbol [ unsyncedCount %tmp.14 86 31 44 ];
+        symbol [ response %response.2 72 12 20 ];
+        %tmp.12 = newd 2;
+        %tmp.13 = "type";
+        %tmp.14 = "PONG";
         %tmp.15 = dup %tmp.12;
         %tmp.16 = aputv %tmp.15 %tmp.13 %tmp.14;
-        lputv %response.2 %tmp.16;
-        symbol [ response %response.2 84 12 20 ];
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 88 8 ]
-        symbol [ Communications %tmp.17 88 8 22 ];
-        %tmp.17 = getm $.Toybox.Communications;
-        symbol [ transmit %tmp.18 88 23 31 ];
-        %tmp.18 = getv function %tmp.17 :transmit;
-        %tmp.19 = lgetv %response.2;
-        symbol [ response %tmp.19 88 32 40 ];
-        %tmp.20 = null;
-        symbol [ PingConnectionListener %tmp.24 88 52 74 ];
-        %tmp.24 = getv ? :PingConnectionListener;
-        %tmp.21 = newc %tmp.24 ();
-        invoke %tmp.17 %tmp.18(%tmp.19, %tmp.20, %tmp.21);
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_81_26_89_4_stop:
+        %tmp.17 = "unsyncedCount";
+        %tmp.18 = lgetv %unsyncedCount.1;
+        symbol [ unsyncedCount %tmp.18 74 31 44 ];
+        %tmp.19 = dup %tmp.16;
+        %tmp.20 = aputv %tmp.19 %tmp.17 %tmp.18;
+        lputv %response.2 %tmp.20;
+        symbol [ response %response.2 72 12 20 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 76 8 ]
+        symbol [ MessageQueue %tmp.22 76 8 20 ];
+        %tmp.22 = getv ? :MessageQueue;
+        symbol [ enqueue %tmp.23 76 21 28 ];
+        %tmp.23 = getv function %tmp.22 :enqueue;
+        %tmp.24 = lgetv %response.2;
+        symbol [ response %tmp.24 76 29 37 ];
+        invoke %tmp.22 %tmp.23(%tmp.24);
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_68_26_77_4_stop:
     }
-    //! Send all unsynced holds to the phone, one at a time.
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 92; @symbol_functiondef = [handleSyncRequest,92,13,30]; ]
-    function handleSyncRequest() {
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_92_33_124_4_start:
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 79; @symbol_functiondef = [buildSummary,79,13,25]; @symbol_param<0> = [hold,79,26,30]; @symbol_param<1> = [batchCount,79,32,42]; ]
+    function buildSummary(hold, batchCount) {
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_79_44_114_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 80 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_79_44_114_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_79_44_114_4_stop" ]
+        %summary.1 = local;
+        symbol [ summary %summary.1 80 12 19 ];
+        %tmp.1 = newd 7;
+        %tmp.2 = "type";
+        %tmp.3 = "FREE_HOLD_RESULT";
+        %tmp.4 = dup %tmp.1;
+        %tmp.5 = aputv %tmp.4 %tmp.2 %tmp.3;
+        %tmp.6 = "id";
+        %tmp.7 = lgetv %hold;
+        symbol [ hold %tmp.7 82 28 32 ];
+        symbol [ get %tmp.8 82 33 36 ];
+        %tmp.8 = getv function %tmp.7 :get;
+        %tmp.9 = "id";
+        %tmp.10 = invoke %tmp.7 %tmp.8(%tmp.9);
+        %tmp.11 = dup %tmp.5;
+        %tmp.12 = aputv %tmp.11 %tmp.6 %tmp.10;
+        %tmp.13 = "durationMs";
+        %tmp.14 = lgetv %hold;
+        symbol [ hold %tmp.14 83 28 32 ];
+        symbol [ get %tmp.15 83 33 36 ];
+        %tmp.15 = getv function %tmp.14 :get;
+        %tmp.16 = "durationMs";
+        %tmp.17 = invoke %tmp.14 %tmp.15(%tmp.16);
+        %tmp.18 = dup %tmp.12;
+        %tmp.19 = aputv %tmp.18 %tmp.13 %tmp.17;
+        %tmp.20 = "lungVolume";
+        %tmp.21 = lgetv %hold;
+        symbol [ hold %tmp.21 84 28 32 ];
+        symbol [ get %tmp.22 84 33 36 ];
+        %tmp.22 = getv function %tmp.21 :get;
+        %tmp.23 = "lungVolume";
+        %tmp.24 = invoke %tmp.21 %tmp.22(%tmp.23);
+        %tmp.25 = dup %tmp.19;
+        %tmp.26 = aputv %tmp.25 %tmp.20 %tmp.24;
+        %tmp.27 = "prepType";
+        %tmp.28 = lgetv %hold;
+        symbol [ hold %tmp.28 85 28 32 ];
+        symbol [ get %tmp.29 85 33 36 ];
+        %tmp.29 = getv function %tmp.28 :get;
+        %tmp.30 = "prepType";
+        %tmp.31 = invoke %tmp.28 %tmp.29(%tmp.30);
+        %tmp.32 = dup %tmp.26;
+        %tmp.33 = aputv %tmp.32 %tmp.27 %tmp.31;
+        %tmp.34 = "timeOfDay";
+        %tmp.35 = lgetv %hold;
+        symbol [ hold %tmp.35 86 28 32 ];
+        symbol [ get %tmp.36 86 33 36 ];
+        %tmp.36 = getv function %tmp.35 :get;
+        %tmp.37 = "timeOfDay";
+        %tmp.38 = invoke %tmp.35 %tmp.36(%tmp.37);
+        %tmp.39 = dup %tmp.33;
+        %tmp.40 = aputv %tmp.39 %tmp.34 %tmp.38;
+        %tmp.41 = "sampleCount";
+        %tmp.42 = lgetv %hold;
+        symbol [ hold %tmp.42 87 28 32 ];
+        symbol [ get %tmp.43 87 33 36 ];
+        %tmp.43 = getv function %tmp.42 :get;
+        %tmp.44 = "sampleCount";
+        %tmp.45 = invoke %tmp.42 %tmp.43(%tmp.44);
+        %tmp.46 = dup %tmp.40;
+        %tmp.47 = aputv %tmp.46 %tmp.41 %tmp.45;
+        lputv %summary.1 %tmp.47;
+        symbol [ summary %summary.1 80 12 19 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 90 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_79_44_114_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_79_44_114_4_stop" ]
+        %fc.2 = local;
+        symbol [ fc %fc.2 90 12 14 ];
+        %tmp.48 = lgetv %hold;
+        symbol [ hold %tmp.48 90 17 21 ];
+        symbol [ get %tmp.49 90 22 25 ];
+        %tmp.49 = getv function %tmp.48 :get;
+        %tmp.50 = "firstContractionMs";
+        %tmp.51 = invoke %tmp.48 %tmp.49(%tmp.50);
+        lputv %fc.2 %tmp.51;
+        symbol [ fc %fc.2 90 12 14 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 91 8 ]
+        %tmp.52 = lgetv %summary.1;
+        symbol [ summary %tmp.52 91 8 15 ];
+        symbol [ put %tmp.53 91 16 19 ];
+        %tmp.53 = getv function %tmp.52 :put;
+        %tmp.54 = "firstContractionMs";
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_91_42_91_63_begin:
+        %tmp.55 = lgetv %fc.2;
+        symbol [ fc %tmp.55 91 43 45 ];
+        %tmp.56 = null;
+        %tmp.57 = ne %tmp.55 %tmp.56;
+        bf %tmp.57 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_91_42_91_63_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_91_42_91_63_true:
+        %tmp.58 = lgetv %fc.2;
+        symbol [ fc %tmp.58 91 57 59 ];
+        %tmp.59 = as %tmp.58 { (!Null) };
+        push %tmp.59;
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_91_42_91_63_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_91_42_91_63_else_false:
+        %tmp.60 = -1;
+        push %tmp.60;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_91_42_91_63_end:
+        %tmp.61 = phi [%tmp.57 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_91_42_91_63_begin] [%tmp.59 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_91_42_91_63_true] [%tmp.60 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_91_42_91_63_else_false] [%tmp.61 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_91_42_91_63_end];
+        invoke %tmp.52 %tmp.53(%tmp.54, %tmp.61);
 [ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 93 8 ]
-        symbol [ System %tmp.1 93 8 14 ];
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_79_44_114_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_79_44_114_4_stop" ]
+        %ct.3 = local;
+        symbol [ ct %ct.3 93 12 14 ];
+        %tmp.62 = lgetv %hold;
+        symbol [ hold %tmp.62 93 17 21 ];
+        symbol [ get %tmp.63 93 22 25 ];
+        %tmp.63 = getv function %tmp.62 :get;
+        %tmp.64 = "contractions";
+        %tmp.65 = invoke %tmp.62 %tmp.63(%tmp.64);
+        lputv %ct.3 %tmp.65;
+        symbol [ ct %ct.3 93 12 14 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 94 8 ]
+        %tmp.66 = lgetv %summary.1;
+        symbol [ summary %tmp.66 94 8 15 ];
+        symbol [ put %tmp.67 94 16 19 ];
+        %tmp.67 = getv function %tmp.66 :put;
+        %tmp.68 = "contractions";
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_94_36_94_57_begin:
+        %tmp.69 = lgetv %ct.3;
+        symbol [ ct %tmp.69 94 37 39 ];
+        %tmp.70 = null;
+        %tmp.71 = ne %tmp.69 %tmp.70;
+        bf %tmp.71 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_94_36_94_57_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_94_36_94_57_true:
+        %tmp.72 = lgetv %ct.3;
+        symbol [ ct %tmp.72 94 51 53 ];
+        %tmp.73 = as %tmp.72 { (!Null) };
+        push %tmp.73;
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_94_36_94_57_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_94_36_94_57_else_false:
+        %tmp.74 = newa 0;
+        push %tmp.74;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_94_36_94_57_end:
+        %tmp.75 = phi [%tmp.71 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_94_36_94_57_begin] [%tmp.73 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_94_36_94_57_true] [%tmp.74 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_94_36_94_57_else_false] [%tmp.75 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_94_36_94_57_end];
+        invoke %tmp.66 %tmp.67(%tmp.68, %tmp.75);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 96 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_79_44_114_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_79_44_114_4_stop" ]
+        %startSec.4 = local;
+        symbol [ startSec %startSec.4 96 12 20 ];
+        %tmp.76 = lgetv %hold;
+        symbol [ hold %tmp.76 96 23 27 ];
+        symbol [ get %tmp.77 96 28 31 ];
+        %tmp.77 = getv function %tmp.76 :get;
+        %tmp.78 = "startEpochSec";
+        %tmp.79 = invoke %tmp.76 %tmp.77(%tmp.78);
+        lputv %startSec.4 %tmp.79;
+        symbol [ startSec %startSec.4 96 12 20 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 97 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_97_8_100_8_if_stmt:
+        %tmp.80 = lgetv %startSec.4;
+        symbol [ startSec %tmp.80 97 12 20 ];
+        %tmp.81 = null;
+        %tmp.82 = eq %tmp.80 %tmp.81;
+        bf %tmp.82 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_97_8_100_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_97_8_100_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_97_30_100_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 98 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_97_30_100_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_97_30_100_8_stop" ]
+        %startMs.5 = local;
+        symbol [ startMs %startMs.5 98 16 23 ];
+        %tmp.83 = lgetv %hold;
+        symbol [ hold %tmp.83 98 26 30 ];
+        symbol [ get %tmp.84 98 31 34 ];
+        %tmp.84 = getv function %tmp.83 :get;
+        %tmp.85 = "startEpochMs";
+        %tmp.86 = invoke %tmp.83 %tmp.84(%tmp.85);
+        lputv %startMs.5 %tmp.86;
+        symbol [ startMs %startMs.5 98 16 23 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 99 12 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_99_23_99_62_begin:
+        %tmp.87 = lgetv %startMs.5;
+        symbol [ startMs %tmp.87 99 24 31 ];
+        %tmp.88 = null;
+        %tmp.89 = ne %tmp.87 %tmp.88;
+        bf %tmp.89 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_99_23_99_62_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_99_23_99_62_true:
+        %tmp.90 = lgetv %startMs.5;
+        symbol [ startMs %tmp.90 99 44 51 ];
+        %tmp.91 = as %tmp.90 { (!Null) };
+        %tmp.92 = 1000;
+        %tmp.93 = div %tmp.91 %tmp.92;
+        push %tmp.93;
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_99_23_99_62_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_99_23_99_62_else_false:
+        %tmp.94 = 0;
+        push %tmp.94;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_99_23_99_62_end:
+        %tmp.95 = phi [%tmp.89 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_99_23_99_62_begin] [%tmp.93 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_99_23_99_62_true] [%tmp.94 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_99_23_99_62_else_false] [%tmp.95 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_99_23_99_62_end];
+        lputv %startSec.4 %tmp.95;
+        symbol [ startSec %startSec.4 99 12 20 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_97_30_100_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_97_8_100_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_97_8_100_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 101 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_79_44_114_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_79_44_114_4_stop" ]
+        %endSec.6 = local;
+        symbol [ endSec %endSec.6 101 12 18 ];
+        %tmp.96 = lgetv %hold;
+        symbol [ hold %tmp.96 101 21 25 ];
+        symbol [ get %tmp.97 101 26 29 ];
+        %tmp.97 = getv function %tmp.96 :get;
+        %tmp.98 = "endEpochSec";
+        %tmp.99 = invoke %tmp.96 %tmp.97(%tmp.98);
+        lputv %endSec.6 %tmp.99;
+        symbol [ endSec %endSec.6 101 12 18 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 102 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_102_8_105_8_if_stmt:
+        %tmp.100 = lgetv %endSec.6;
+        symbol [ endSec %tmp.100 102 12 18 ];
+        %tmp.101 = null;
+        %tmp.102 = eq %tmp.100 %tmp.101;
+        bf %tmp.102 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_102_8_105_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_102_8_105_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_102_28_105_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 103 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_102_28_105_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_102_28_105_8_stop" ]
+        %endMs.7 = local;
+        symbol [ endMs %endMs.7 103 16 21 ];
+        %tmp.103 = lgetv %hold;
+        symbol [ hold %tmp.103 103 24 28 ];
+        symbol [ get %tmp.104 103 29 32 ];
+        %tmp.104 = getv function %tmp.103 :get;
+        %tmp.105 = "endEpochMs";
+        %tmp.106 = invoke %tmp.103 %tmp.104(%tmp.105);
+        lputv %endMs.7 %tmp.106;
+        symbol [ endMs %endMs.7 103 16 21 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 104 12 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_104_21_104_56_begin:
+        %tmp.107 = lgetv %endMs.7;
+        symbol [ endMs %tmp.107 104 22 27 ];
+        %tmp.108 = null;
+        %tmp.109 = ne %tmp.107 %tmp.108;
+        bf %tmp.109 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_104_21_104_56_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_104_21_104_56_true:
+        %tmp.110 = lgetv %endMs.7;
+        symbol [ endMs %tmp.110 104 40 45 ];
+        %tmp.111 = as %tmp.110 { (!Null) };
+        %tmp.112 = 1000;
+        %tmp.113 = div %tmp.111 %tmp.112;
+        push %tmp.113;
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_104_21_104_56_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_104_21_104_56_else_false:
+        %tmp.114 = 0;
+        push %tmp.114;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_104_21_104_56_end:
+        %tmp.115 = phi [%tmp.109 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_104_21_104_56_begin] [%tmp.113 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_104_21_104_56_true] [%tmp.114 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_104_21_104_56_else_false] [%tmp.115 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_104_21_104_56_end];
+        lputv %endSec.6 %tmp.115;
+        symbol [ endSec %endSec.6 104 12 18 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_102_28_105_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_102_8_105_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_102_8_105_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 106 8 ]
+        %tmp.116 = lgetv %summary.1;
+        symbol [ summary %tmp.116 106 8 15 ];
+        symbol [ put %tmp.117 106 16 19 ];
+        %tmp.117 = getv function %tmp.116 :put;
+        %tmp.118 = "startEpochSec";
+        %tmp.119 = lgetv %startSec.4;
+        symbol [ startSec %tmp.119 106 37 45 ];
+        invoke %tmp.116 %tmp.117(%tmp.118, %tmp.119);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 107 8 ]
+        %tmp.120 = lgetv %summary.1;
+        symbol [ summary %tmp.120 107 8 15 ];
+        symbol [ put %tmp.121 107 16 19 ];
+        %tmp.121 = getv function %tmp.120 :put;
+        %tmp.122 = "endEpochSec";
+        %tmp.123 = lgetv %endSec.6;
+        symbol [ endSec %tmp.123 107 35 41 ];
+        invoke %tmp.120 %tmp.121(%tmp.122, %tmp.123);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 109 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_8_111_8_if_stmt:
+        %tmp.124 = lgetv %batchCount;
+        symbol [ batchCount %tmp.124 109 12 22 ];
+        %tmp.125 = 0;
+        %tmp.126 = gt %tmp.124 %tmp.125;
+        bf %tmp.126 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_8_111_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_8_111_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_28_111_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 110 12 ]
+        %tmp.127 = lgetv %summary.1;
+        symbol [ summary %tmp.127 110 12 19 ];
+        symbol [ put %tmp.128 110 20 23 ];
+        %tmp.128 = getv function %tmp.127 :put;
+        %tmp.129 = "batchCount";
+        %tmp.130 = lgetv %batchCount;
+        symbol [ batchCount %tmp.130 110 38 48 ];
+        invoke %tmp.127 %tmp.128(%tmp.129, %tmp.130);
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_28_111_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_8_111_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_8_111_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 113 8 ]
+        %tmp.131 = lgetv %summary.1;
+        symbol [ summary %tmp.131 113 15 22 ];
+        ret %tmp.131;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_79_44_114_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 116; @symbol_functiondef = [handleSyncRequest,116,13,30]; ]
+    function handleSyncRequest() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_116_33_145_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 117 8 ]
+        symbol [ System %tmp.1 117 8 14 ];
         %tmp.1 = getm $.Toybox.System;
-        symbol [ println %tmp.2 93 15 22 ];
+        symbol [ println %tmp.2 117 15 22 ];
         %tmp.2 = getv function %tmp.1 :println;
         %tmp.3 = "[WAGS] Handling SYNC_REQUEST";
         invoke %tmp.1 %tmp.2(%tmp.3);
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 94 8 ]
-        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_92_33_124_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_92_33_124_4_stop" ]
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 118 8 ]
+        symbol [ SyncLog %tmp.5 118 8 15 ];
+        %tmp.5 = getv ? :SyncLog;
+        symbol [ add %tmp.6 118 16 19 ];
+        %tmp.6 = getv function %tmp.5 :add;
+        %tmp.7 = "SYNC_REQ from phone";
+        invoke %tmp.5 %tmp.6(%tmp.7);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 119 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_116_33_145_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_116_33_145_4_stop" ]
         %unsynced.1 = local;
-        symbol [ unsynced %unsynced.1 94 12 20 ];
-        symbol [ HoldStorage %tmp.5 94 23 34 ];
-        %tmp.5 = getv ? :HoldStorage;
-        symbol [ getUnsyncedHolds %tmp.6 94 35 51 ];
-        %tmp.6 = getv function %tmp.5 :getUnsyncedHolds;
-        %tmp.7 = invoke %tmp.5 %tmp.6();
-        lputv %unsynced.1 %tmp.7;
-        symbol [ unsynced %unsynced.1 94 12 20 ];
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 96 8 ]
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_96_8_104_8_if_stmt:
-        %tmp.8 = lgetv %unsynced.1;
-        symbol [ unsynced %tmp.8 96 12 20 ];
-        symbol [ size %tmp.9 96 21 25 ];
-        %tmp.9 = getv function %tmp.8 :size;
-        %tmp.10 = invoke %tmp.8 %tmp.9();
-        %tmp.11 = 0;
-        %tmp.12 = eq %tmp.10 %tmp.11;
-        bf %tmp.12 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_96_8_104_8_if_end;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_96_8_104_8_if_true:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_96_34_104_8_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 97 12 ]
-        symbol [ System %tmp.13 97 12 18 ];
-        %tmp.13 = getm $.Toybox.System;
-        symbol [ println %tmp.14 97 19 26 ];
-        %tmp.14 = getv function %tmp.13 :println;
-        %tmp.15 = "[WAGS] No unsynced holds to send";
-        invoke %tmp.13 %tmp.14(%tmp.15);
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 98 12 ]
-        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_96_34_104_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_96_34_104_8_stop" ]
-        %response.2 = local;
-        symbol [ response %response.2 98 16 24 ];
-        %tmp.16 = newd 2;
-        %tmp.17 = "type";
-        %tmp.18 = "SYNC_COMPLETE";
-        %tmp.19 = dup %tmp.16;
-        %tmp.20 = aputv %tmp.19 %tmp.17 %tmp.18;
-        %tmp.21 = "count";
-        %tmp.22 = 0;
-        %tmp.23 = dup %tmp.20;
-        %tmp.24 = aputv %tmp.23 %tmp.21 %tmp.22;
-        lputv %response.2 %tmp.24;
-        symbol [ response %response.2 98 16 24 ];
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 102 12 ]
-        symbol [ Communications %tmp.25 102 12 26 ];
-        %tmp.25 = getm $.Toybox.Communications;
-        symbol [ transmit %tmp.26 102 27 35 ];
-        %tmp.26 = getv function %tmp.25 :transmit;
-        %tmp.27 = lgetv %response.2;
-        symbol [ response %tmp.27 102 36 44 ];
-        %tmp.28 = null;
-        symbol [ SyncConnectionListener %tmp.32 102 56 78 ];
-        %tmp.32 = getv ? :SyncConnectionListener;
-        %tmp.29 = newc %tmp.32 ();
-        invoke %tmp.25 %tmp.26(%tmp.27, %tmp.28, %tmp.29);
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 103 12 ]
+        symbol [ unsynced %unsynced.1 119 12 20 ];
+        symbol [ HoldStorage %tmp.9 119 23 34 ];
+        %tmp.9 = getv ? :HoldStorage;
+        symbol [ getUnsyncedHolds %tmp.10 119 35 51 ];
+        %tmp.10 = getv function %tmp.9 :getUnsyncedHolds;
+        %tmp.11 = invoke %tmp.9 %tmp.10();
+        lputv %unsynced.1 %tmp.11;
+        symbol [ unsynced %unsynced.1 119 12 20 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 121 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_121_8_126_8_if_stmt:
+        %tmp.12 = lgetv %unsynced.1;
+        symbol [ unsynced %tmp.12 121 12 20 ];
+        symbol [ size %tmp.13 121 21 25 ];
+        %tmp.13 = getv function %tmp.12 :size;
+        %tmp.14 = invoke %tmp.12 %tmp.13();
+        %tmp.15 = 0;
+        %tmp.16 = eq %tmp.14 %tmp.15;
+        bf %tmp.16 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_121_8_126_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_121_8_126_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_121_34_126_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 122 12 ]
+        symbol [ System %tmp.17 122 12 18 ];
+        %tmp.17 = getm $.Toybox.System;
+        symbol [ println %tmp.18 122 19 26 ];
+        %tmp.18 = getv function %tmp.17 :println;
+        %tmp.19 = "[WAGS] No unsynced holds to send";
+        invoke %tmp.17 %tmp.18(%tmp.19);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 123 12 ]
+        symbol [ SyncLog %tmp.21 123 12 19 ];
+        %tmp.21 = getv ? :SyncLog;
+        symbol [ add %tmp.22 123 20 23 ];
+        %tmp.22 = getv function %tmp.21 :add;
+        %tmp.23 = "SYNC: 0 holds to send";
+        invoke %tmp.21 %tmp.22(%tmp.23);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 124 12 ]
+        symbol [ MessageQueue %tmp.25 124 12 24 ];
+        %tmp.25 = getv ? :MessageQueue;
+        symbol [ enqueue %tmp.26 124 25 32 ];
+        %tmp.26 = getv function %tmp.25 :enqueue;
+        %tmp.27 = newd 2;
+        %tmp.28 = "type";
+        %tmp.29 = "SYNC_COMPLETE";
+        %tmp.30 = dup %tmp.27;
+        %tmp.31 = aputv %tmp.30 %tmp.28 %tmp.29;
+        %tmp.32 = "count";
+        %tmp.33 = 0;
+        %tmp.34 = dup %tmp.31;
+        %tmp.35 = aputv %tmp.34 %tmp.32 %tmp.33;
+        invoke %tmp.25 %tmp.26(%tmp.35);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 125 12 ]
         ret ?;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_96_34_104_8_stop:
-        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_96_8_104_8_if_end;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_96_8_104_8_if_end:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 106 8 ]
-        symbol [ System %tmp.33 106 8 14 ];
-        %tmp.33 = getm $.Toybox.System;
-        symbol [ println %tmp.34 106 15 22 ];
-        %tmp.34 = getv function %tmp.33 :println;
-        %tmp.35 = "[WAGS] Sending ";
-        %tmp.36 = lgetv %unsynced.1;
-        symbol [ unsynced %tmp.36 106 43 51 ];
-        symbol [ size %tmp.37 106 52 56 ];
-        %tmp.37 = getv function %tmp.36 :size;
-        %tmp.38 = invoke %tmp.36 %tmp.37();
-        %tmp.39 = add %tmp.35 %tmp.38;
-        %tmp.40 = " unsynced holds";
-        %tmp.41 = add %tmp.39 %tmp.40;
-        invoke %tmp.33 %tmp.34(%tmp.41);
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 109 8 ]
-        for @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_8_123_8_for_test @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_8_123_8_for_incr @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_8_123_8_for_end;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_8_123_8_for_init:
-        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_8_123_8_for_begin" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_8_123_8_for_end" ]
-        %i.3 = local;
-        symbol [ i %i.3 109 17 18 ];
-        %tmp.42 = 0;
-        lputv %i.3 %tmp.42;
-        symbol [ i %i.3 109 17 18 ];
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_8_123_8_for_test:
-        %tmp.43 = lgetv %i.3;
-        symbol [ i %tmp.43 109 24 25 ];
-        %tmp.44 = lgetv %unsynced.1;
-        symbol [ unsynced %tmp.44 109 28 36 ];
-        symbol [ size %tmp.45 109 37 41 ];
-        %tmp.45 = getv function %tmp.44 :size;
-        %tmp.46 = invoke %tmp.44 %tmp.45();
-        %tmp.47 = lt %tmp.43 %tmp.46;
-        bf %tmp.47 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_8_123_8_for_end;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_8_123_8_for_begin:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_50_123_8_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 110 12 ]
-        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_50_123_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_50_123_8_stop" ]
-        %hold.4 = local;
-        symbol [ hold %hold.4 110 16 20 ];
-        %tmp.48 = lgetv %unsynced.1;
-        symbol [ unsynced %tmp.48 110 23 31 ];
-        %tmp.49 = lgetv %i.3;
-        symbol [ i %tmp.49 110 32 33 ];
-        %tmp.50 = agetv %tmp.48 %tmp.49;
-        lputv %hold.4 %tmp.50;
-        symbol [ hold %hold.4 110 16 20 ];
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 112 12 ]
-        %tmp.51 = lgetv %hold.4;
-        symbol [ hold %tmp.51 112 12 16 ];
-        symbol [ put %tmp.52 112 17 20 ];
-        %tmp.52 = getv function %tmp.51 :put;
-        %tmp.53 = "type";
-        %tmp.54 = "FREE_HOLD_RESULT";
-        invoke %tmp.51 %tmp.52(%tmp.53, %tmp.54);
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 115 12 ]
-        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_50_123_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_50_123_8_stop" ]
-        %samples.5 = local;
-        symbol [ samples %samples.5 115 16 23 ];
-        %tmp.55 = lgetv %hold.4;
-        symbol [ hold %tmp.55 115 26 30 ];
-        symbol [ get %tmp.56 115 31 34 ];
-        %tmp.56 = getv function %tmp.55 :get;
-        %tmp.57 = "packedSamples";
-        %tmp.58 = invoke %tmp.55 %tmp.56(%tmp.57);
-        lputv %samples.5 %tmp.58;
-        symbol [ samples %samples.5 115 16 23 ];
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 116 12 ]
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_116_12_122_12_if_stmt:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_116_16_116_52_begin:
-        %tmp.59 = lgetv %samples.5;
-        symbol [ samples %tmp.59 116 16 23 ];
-        %tmp.60 = null;
-        %tmp.61 = ne %tmp.59 %tmp.60;
-        bf %tmp.61 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_116_12_122_12_if_else_false;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_116_35_116_52_true:
-        %tmp.62 = lgetv %samples.5;
-        symbol [ samples %tmp.62 116 35 42 ];
-        %tmp.63 = as %tmp.62 { (!Null) };
-        symbol [ size %tmp.64 116 43 47 ];
-        %tmp.64 = getv function %tmp.63 :size;
-        %tmp.65 = invoke %tmp.63 %tmp.64();
-        %tmp.66 = 50;
-        %tmp.67 = gt %tmp.65 %tmp.66;
-        push %tmp.67;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_116_35_116_52_end:
-        %tmp.68 = phi [%tmp.61 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_116_16_116_52_begin] [%tmp.67 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_116_35_116_52_true] [%tmp.68 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_116_35_116_52_end];
-        bf %tmp.68 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_116_12_122_12_if_else_false;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_116_12_122_12_if_true:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_116_56_119_12_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 118 16 ]
-        %tmp.69 = self;
-        symbol [ sendHoldBatched %tmp.70 118 16 31 ];
-        %tmp.70 = getv function %tmp.69 :sendHoldBatched;
-        %tmp.71 = lgetv %hold.4;
-        symbol [ hold %tmp.71 118 32 36 ];
-        invoke %tmp.69 %tmp.70(%tmp.71);
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_116_56_119_12_stop:
-        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_116_12_122_12_if_end;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_116_12_122_12_if_else_false:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_119_19_122_12_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 120 16 ]
-        symbol [ System %tmp.72 120 16 22 ];
-        %tmp.72 = getm $.Toybox.System;
-        symbol [ println %tmp.73 120 23 30 ];
-        %tmp.73 = getv function %tmp.72 :println;
-        %tmp.74 = "[WAGS] Sending hold ";
-        %tmp.75 = lgetv %hold.4;
-        symbol [ hold %tmp.75 120 56 60 ];
-        symbol [ get %tmp.76 120 61 64 ];
-        %tmp.76 = getv function %tmp.75 :get;
-        %tmp.77 = "id";
-        %tmp.78 = invoke %tmp.75 %tmp.76(%tmp.77);
-        %tmp.79 = add %tmp.74 %tmp.78;
-        %tmp.80 = " (single message)";
-        %tmp.81 = add %tmp.79 %tmp.80;
-        invoke %tmp.72 %tmp.73(%tmp.81);
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 121 16 ]
-        symbol [ Communications %tmp.82 121 16 30 ];
-        %tmp.82 = getm $.Toybox.Communications;
-        symbol [ transmit %tmp.83 121 31 39 ];
-        %tmp.83 = getv function %tmp.82 :transmit;
-        %tmp.84 = lgetv %hold.4;
-        symbol [ hold %tmp.84 121 40 44 ];
-        %tmp.85 = null;
-        symbol [ SyncConnectionListener %tmp.89 121 56 78 ];
-        %tmp.89 = getv ? :SyncConnectionListener;
-        %tmp.86 = newc %tmp.89 ();
-        invoke %tmp.82 %tmp.83(%tmp.84, %tmp.85, %tmp.86);
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_119_19_122_12_stop:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_116_12_122_12_if_end:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_50_123_8_stop:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_8_123_8_for_incr:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 109 ]
-        %tmp.92 = lgetv %i.3;
-        symbol [ i %tmp.92 109 45 46 ];
-        %tmp.93 = add %tmp.92 1;
-        lputv %i.3 %tmp.93;
-        symbol [ i %i.3 109 45 46 ];
-        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_8_123_8_for_test;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_109_8_123_8_for_end:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_92_33_124_4_stop:
-    }
-    //! Send a hold with large sample data in batches.
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 127; @symbol_functiondef = [sendHoldBatched,127,13,28]; @symbol_param<0> = [hold,127,29,33]; ]
-    function sendHoldBatched(hold) {
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_127_35_173_4_start:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_121_34_126_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_121_8_126_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_121_8_126_8_if_end:
 [ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 128 8 ]
-        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_127_35_173_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_127_35_173_4_stop" ]
+        symbol [ System %tmp.36 128 8 14 ];
+        %tmp.36 = getm $.Toybox.System;
+        symbol [ println %tmp.37 128 15 22 ];
+        %tmp.37 = getv function %tmp.36 :println;
+        %tmp.38 = "[WAGS] Sending ";
+        %tmp.39 = lgetv %unsynced.1;
+        symbol [ unsynced %tmp.39 128 43 51 ];
+        symbol [ size %tmp.40 128 52 56 ];
+        %tmp.40 = getv function %tmp.39 :size;
+        %tmp.41 = invoke %tmp.39 %tmp.40();
+        %tmp.42 = add %tmp.38 %tmp.41;
+        %tmp.43 = " unsynced holds";
+        %tmp.44 = add %tmp.42 %tmp.43;
+        invoke %tmp.36 %tmp.37(%tmp.44);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 129 8 ]
+        symbol [ SyncLog %tmp.46 129 8 15 ];
+        %tmp.46 = getv ? :SyncLog;
+        symbol [ add %tmp.47 129 16 19 ];
+        %tmp.47 = getv function %tmp.46 :add;
+        %tmp.48 = "SEND ";
+        %tmp.49 = lgetv %unsynced.1;
+        symbol [ unsynced %tmp.49 129 30 38 ];
+        symbol [ size %tmp.50 129 39 43 ];
+        %tmp.50 = getv function %tmp.49 :size;
+        %tmp.51 = invoke %tmp.49 %tmp.50();
+        %tmp.52 = add %tmp.48 %tmp.51;
+        %tmp.53 = " holds";
+        %tmp.54 = add %tmp.52 %tmp.53;
+        invoke %tmp.46 %tmp.47(%tmp.54);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 131 8 ]
+        for @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_131_8_144_8_for_test @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_131_8_144_8_for_incr @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_131_8_144_8_for_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_131_8_144_8_for_init:
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_131_8_144_8_for_begin" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_131_8_144_8_for_end" ]
+        %i.2 = local;
+        symbol [ i %i.2 131 17 18 ];
+        %tmp.55 = 0;
+        lputv %i.2 %tmp.55;
+        symbol [ i %i.2 131 17 18 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_131_8_144_8_for_test:
+        %tmp.56 = lgetv %i.2;
+        symbol [ i %tmp.56 131 24 25 ];
+        %tmp.57 = lgetv %unsynced.1;
+        symbol [ unsynced %tmp.57 131 28 36 ];
+        symbol [ size %tmp.58 131 37 41 ];
+        %tmp.58 = getv function %tmp.57 :size;
+        %tmp.59 = invoke %tmp.57 %tmp.58();
+        %tmp.60 = lt %tmp.56 %tmp.59;
+        bf %tmp.60 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_131_8_144_8_for_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_131_8_144_8_for_begin:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_131_50_144_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 132 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_131_50_144_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_131_50_144_8_stop" ]
+        %hold.3 = local;
+        symbol [ hold %hold.3 132 16 20 ];
+        %tmp.61 = lgetv %unsynced.1;
+        symbol [ unsynced %tmp.61 132 23 31 ];
+        %tmp.62 = lgetv %i.2;
+        symbol [ i %tmp.62 132 32 33 ];
+        %tmp.63 = agetv %tmp.61 %tmp.62;
+        lputv %hold.3 %tmp.63;
+        symbol [ hold %hold.3 132 16 20 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 133 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_131_50_144_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_131_50_144_8_stop" ]
+        %samples.4 = local;
+        symbol [ samples %samples.4 133 16 23 ];
+        %tmp.64 = lgetv %hold.3;
+        symbol [ hold %tmp.64 133 26 30 ];
+        symbol [ get %tmp.65 133 31 34 ];
+        %tmp.65 = getv function %tmp.64 :get;
+        %tmp.66 = "packedSamples";
+        %tmp.67 = invoke %tmp.64 %tmp.65(%tmp.66);
+        lputv %samples.4 %tmp.67;
+        symbol [ samples %samples.4 133 16 23 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 134 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_131_50_144_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_131_50_144_8_stop" ]
+        %sampleCount.5 = local;
+        symbol [ sampleCount %sampleCount.5 134 16 27 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_134_30_134_67_begin:
+        %tmp.68 = lgetv %samples.4;
+        symbol [ samples %tmp.68 134 31 38 ];
+        %tmp.69 = null;
+        %tmp.70 = ne %tmp.68 %tmp.69;
+        bf %tmp.70 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_134_30_134_67_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_134_30_134_67_true:
+        %tmp.71 = lgetv %samples.4;
+        symbol [ samples %tmp.71 134 50 57 ];
+        %tmp.72 = as %tmp.71 { (!Null) };
+        symbol [ size %tmp.73 134 58 62 ];
+        %tmp.73 = getv function %tmp.72 :size;
+        %tmp.74 = invoke %tmp.72 %tmp.73();
+        push %tmp.74;
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_134_30_134_67_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_134_30_134_67_else_false:
+        %tmp.75 = 0;
+        push %tmp.75;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_134_30_134_67_end:
+        %tmp.76 = phi [%tmp.70 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_134_30_134_67_begin] [%tmp.74 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_134_30_134_67_true] [%tmp.75 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_134_30_134_67_else_false] [%tmp.76 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_134_30_134_67_end];
+        lputv %sampleCount.5 %tmp.76;
+        symbol [ sampleCount %sampleCount.5 134 16 27 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 136 12 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_136_12_143_12_if_stmt:
+        %tmp.77 = lgetv %sampleCount.5;
+        symbol [ sampleCount %tmp.77 136 16 27 ];
+        %tmp.78 = 30;
+        %tmp.79 = gt %tmp.77 %tmp.78;
+        bf %tmp.79 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_136_12_143_12_if_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_136_12_143_12_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_136_34_138_12_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 137 16 ]
+        %tmp.80 = self;
+        symbol [ queueHoldBatched %tmp.81 137 16 32 ];
+        %tmp.81 = getv function %tmp.80 :queueHoldBatched;
+        %tmp.82 = lgetv %hold.3;
+        symbol [ hold %tmp.82 137 33 37 ];
+        invoke %tmp.80 %tmp.81(%tmp.82);
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_136_34_138_12_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_136_12_143_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_136_12_143_12_if_else_false:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_138_19_143_12_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 139 16 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_138_19_143_12_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_138_19_143_12_stop" ]
+        %summary.6 = local;
+        symbol [ summary %summary.6 139 20 27 ];
+        %tmp.83 = self;
+        symbol [ buildSummary %tmp.84 139 30 42 ];
+        %tmp.84 = getv function %tmp.83 :buildSummary;
+        %tmp.85 = lgetv %hold.3;
+        symbol [ hold %tmp.85 139 43 47 ];
+        %tmp.86 = 0;
+        %tmp.87 = invoke %tmp.83 %tmp.84(%tmp.85, %tmp.86);
+        lputv %summary.6 %tmp.87;
+        symbol [ summary %summary.6 139 20 27 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 140 16 ]
+        %tmp.88 = lgetv %summary.6;
+        symbol [ summary %tmp.88 140 16 23 ];
+        symbol [ put %tmp.89 140 24 27 ];
+        %tmp.89 = getv function %tmp.88 :put;
+        %tmp.90 = "packedSamples";
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_140_45_140_95_begin:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_140_46_140_79_begin:
+        %tmp.91 = lgetv %samples.4;
+        symbol [ samples %tmp.91 140 46 53 ];
+        %tmp.92 = null;
+        %tmp.93 = ne %tmp.91 %tmp.92;
+        bf %tmp.93 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_140_45_140_95_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_140_65_140_79_true:
+        %tmp.94 = lgetv %sampleCount.5;
+        symbol [ sampleCount %tmp.94 140 65 76 ];
+        %tmp.95 = 0;
+        %tmp.96 = gt %tmp.94 %tmp.95;
+        push %tmp.96;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_140_65_140_79_end:
+        %tmp.97 = phi [%tmp.93 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_140_46_140_79_begin] [%tmp.96 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_140_65_140_79_true] [%tmp.97 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_140_65_140_79_end];
+        bf %tmp.97 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_140_45_140_95_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_140_45_140_95_true:
+        %tmp.98 = lgetv %samples.4;
+        symbol [ samples %tmp.98 140 84 91 ];
+        %tmp.99 = as %tmp.98 { (!Null) };
+        push %tmp.99;
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_140_45_140_95_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_140_45_140_95_else_false:
+        %tmp.100 = newa 0;
+        push %tmp.100;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_140_45_140_95_end:
+        %tmp.101 = phi [%tmp.97 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_140_45_140_95_begin] [%tmp.99 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_140_45_140_95_true] [%tmp.100 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_140_45_140_95_else_false] [%tmp.101 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_140_45_140_95_end];
+        invoke %tmp.88 %tmp.89(%tmp.90, %tmp.101);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 141 16 ]
+        symbol [ SyncLog %tmp.103 141 16 23 ];
+        %tmp.103 = getv ? :SyncLog;
+        symbol [ add %tmp.104 141 24 27 ];
+        %tmp.104 = getv function %tmp.103 :add;
+        %tmp.105 = "Q hold #";
+        %tmp.106 = lgetv %hold.3;
+        symbol [ hold %tmp.106 141 41 45 ];
+        symbol [ get %tmp.107 141 46 49 ];
+        %tmp.107 = getv function %tmp.106 :get;
+        %tmp.108 = "id";
+        %tmp.109 = invoke %tmp.106 %tmp.107(%tmp.108);
+        %tmp.110 = add %tmp.105 %tmp.109;
+        %tmp.111 = " ";
+        %tmp.112 = add %tmp.110 %tmp.111;
+        %tmp.113 = lgetv %sampleCount.5;
+        symbol [ sampleCount %tmp.113 141 64 75 ];
+        %tmp.114 = add %tmp.112 %tmp.113;
+        %tmp.115 = "smp";
+        %tmp.116 = add %tmp.114 %tmp.115;
+        invoke %tmp.103 %tmp.104(%tmp.116);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 142 16 ]
+        symbol [ MessageQueue %tmp.118 142 16 28 ];
+        %tmp.118 = getv ? :MessageQueue;
+        symbol [ enqueue %tmp.119 142 29 36 ];
+        %tmp.119 = getv function %tmp.118 :enqueue;
+        %tmp.120 = lgetv %summary.6;
+        symbol [ summary %tmp.120 142 37 44 ];
+        invoke %tmp.118 %tmp.119(%tmp.120);
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_138_19_143_12_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_136_12_143_12_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_131_50_144_8_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_131_8_144_8_for_incr:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 131 ]
+        %tmp.123 = lgetv %i.2;
+        symbol [ i %tmp.123 131 45 46 ];
+        %tmp.124 = add %tmp.123 1;
+        lputv %i.2 %tmp.124;
+        symbol [ i %i.2 131 45 46 ];
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_131_8_144_8_for_test;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_131_8_144_8_for_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_116_33_145_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 147; @symbol_functiondef = [queueHoldBatched,147,13,29]; @symbol_param<0> = [hold,147,30,34]; ]
+    function queueHoldBatched(hold) {
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_147_36_175_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 148 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_147_36_175_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_147_36_175_4_stop" ]
         %samples.1 = local;
-        symbol [ samples %samples.1 128 12 19 ];
+        symbol [ samples %samples.1 148 12 19 ];
         %tmp.1 = lgetv %hold;
-        symbol [ hold %tmp.1 128 22 26 ];
-        symbol [ get %tmp.2 128 27 30 ];
+        symbol [ hold %tmp.1 148 22 26 ];
+        symbol [ get %tmp.2 148 27 30 ];
         %tmp.2 = getv function %tmp.1 :get;
         %tmp.3 = "packedSamples";
         %tmp.4 = invoke %tmp.1 %tmp.2(%tmp.3);
         lputv %samples.1 %tmp.4;
-        symbol [ samples %samples.1 128 12 19 ];
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 129 8 ]
-        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_127_35_173_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_127_35_173_4_stop" ]
+        symbol [ samples %samples.1 148 12 19 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 149 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_147_36_175_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_147_36_175_4_stop" ]
         %totalSamples.2 = local;
-        symbol [ totalSamples %totalSamples.2 129 12 24 ];
+        symbol [ totalSamples %totalSamples.2 149 12 24 ];
         %tmp.5 = lgetv %samples.1;
-        symbol [ samples %tmp.5 129 27 34 ];
-        symbol [ size %tmp.6 129 35 39 ];
+        symbol [ samples %tmp.5 149 27 34 ];
+        symbol [ size %tmp.6 149 35 39 ];
         %tmp.6 = getv function %tmp.5 :size;
         %tmp.7 = invoke %tmp.5 %tmp.6();
         lputv %totalSamples.2 %tmp.7;
-        symbol [ totalSamples %totalSamples.2 129 12 24 ];
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 130 8 ]
-        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_127_35_173_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_127_35_173_4_stop" ]
+        symbol [ totalSamples %totalSamples.2 149 12 24 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 150 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_147_36_175_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_147_36_175_4_stop" ]
         %batchSize.3 = local;
-        symbol [ batchSize %batchSize.3 130 12 21 ];
-        %tmp.8 = 50;
+        symbol [ batchSize %batchSize.3 150 12 21 ];
+        %tmp.8 = 30;
         lputv %batchSize.3 %tmp.8;
-        symbol [ batchSize %batchSize.3 130 12 21 ];
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 131 8 ]
-        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_127_35_173_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_127_35_173_4_stop" ]
+        symbol [ batchSize %batchSize.3 150 12 21 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 151 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_147_36_175_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_147_36_175_4_stop" ]
         %holdId.4 = local;
-        symbol [ holdId %holdId.4 131 12 18 ];
+        symbol [ holdId %holdId.4 151 12 18 ];
         %tmp.9 = lgetv %hold;
-        symbol [ hold %tmp.9 131 21 25 ];
-        symbol [ get %tmp.10 131 26 29 ];
+        symbol [ hold %tmp.9 151 21 25 ];
+        symbol [ get %tmp.10 151 26 29 ];
         %tmp.10 = getv function %tmp.9 :get;
         %tmp.11 = "id";
         %tmp.12 = invoke %tmp.9 %tmp.10(%tmp.11);
         lputv %holdId.4 %tmp.12;
-        symbol [ holdId %holdId.4 131 12 18 ];
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 133 8 ]
-        symbol [ System %tmp.13 133 8 14 ];
-        %tmp.13 = getm $.Toybox.System;
-        symbol [ println %tmp.14 133 15 22 ];
-        %tmp.14 = getv function %tmp.13 :println;
-        %tmp.15 = "[WAGS] Sending hold ";
-        %tmp.16 = lgetv %holdId.4;
-        symbol [ holdId %tmp.16 133 48 54 ];
-        %tmp.17 = add %tmp.15 %tmp.16;
-        %tmp.18 = " batched (";
-        %tmp.19 = add %tmp.17 %tmp.18;
-        %tmp.20 = lgetv %totalSamples.2;
-        symbol [ totalSamples %tmp.20 133 72 84 ];
-        %tmp.21 = add %tmp.19 %tmp.20;
-        %tmp.22 = " samples)";
-        %tmp.23 = add %tmp.21 %tmp.22;
-        invoke %tmp.13 %tmp.14(%tmp.23);
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 135 8 ]
-        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_127_35_173_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_127_35_173_4_stop" ]
+        symbol [ holdId %holdId.4 151 12 18 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 153 8 ]
+        symbol [ SyncLog %tmp.14 153 8 15 ];
+        %tmp.14 = getv ? :SyncLog;
+        symbol [ add %tmp.15 153 16 19 ];
+        %tmp.15 = getv function %tmp.14 :add;
+        %tmp.16 = "Q hold #";
+        %tmp.17 = lgetv %holdId.4;
+        symbol [ holdId %tmp.17 153 33 39 ];
+        %tmp.18 = add %tmp.16 %tmp.17;
+        %tmp.19 = " batched ";
+        %tmp.20 = add %tmp.18 %tmp.19;
+        %tmp.21 = lgetv %totalSamples.2;
+        symbol [ totalSamples %tmp.21 153 56 68 ];
+        %tmp.22 = add %tmp.20 %tmp.21;
+        %tmp.23 = "smp";
+        %tmp.24 = add %tmp.22 %tmp.23;
+        invoke %tmp.14 %tmp.15(%tmp.24);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 155 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_147_36_175_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_147_36_175_4_stop" ]
         %batchIndex.5 = local;
-        symbol [ batchIndex %batchIndex.5 135 12 22 ];
-        %tmp.24 = 0;
-        lputv %batchIndex.5 %tmp.24;
-        symbol [ batchIndex %batchIndex.5 135 12 22 ];
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 136 8 ]
-        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_127_35_173_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_127_35_173_4_stop" ]
-        %offset.6 = local;
-        symbol [ offset %offset.6 136 12 18 ];
+        symbol [ batchIndex %batchIndex.5 155 12 22 ];
         %tmp.25 = 0;
-        lputv %offset.6 %tmp.25;
-        symbol [ offset %offset.6 136 12 18 ];
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 137 8 ]
-        while @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_137_8_155_8_while_test @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_137_8_155_8_while_end;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_137_8_155_8_while_test:
-        %tmp.26 = lgetv %offset.6;
-        symbol [ offset %tmp.26 137 15 21 ];
-        %tmp.27 = lgetv %totalSamples.2;
-        symbol [ totalSamples %tmp.27 137 24 36 ];
-        %tmp.28 = lt %tmp.26 %tmp.27;
-        bf %tmp.28 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_137_8_155_8_while_end;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_137_8_155_8_while_begin:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_137_38_155_8_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 138 12 ]
-        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_137_38_155_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_137_38_155_8_stop" ]
+        lputv %batchIndex.5 %tmp.25;
+        symbol [ batchIndex %batchIndex.5 155 12 22 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 156 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_147_36_175_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_147_36_175_4_stop" ]
+        %offset.6 = local;
+        symbol [ offset %offset.6 156 12 18 ];
+        %tmp.26 = 0;
+        lputv %offset.6 %tmp.26;
+        symbol [ offset %offset.6 156 12 18 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 157 8 ]
+        while @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_157_8_171_8_while_test @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_157_8_171_8_while_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_157_8_171_8_while_test:
+        %tmp.27 = lgetv %offset.6;
+        symbol [ offset %tmp.27 157 15 21 ];
+        %tmp.28 = lgetv %totalSamples.2;
+        symbol [ totalSamples %tmp.28 157 24 36 ];
+        %tmp.29 = lt %tmp.27 %tmp.28;
+        bf %tmp.29 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_157_8_171_8_while_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_157_8_171_8_while_begin:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_157_38_171_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 158 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_157_38_171_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_157_38_171_8_stop" ]
         %end.7 = local;
-        symbol [ end %end.7 138 16 19 ];
-        %tmp.29 = lgetv %offset.6;
-        symbol [ offset %tmp.29 138 22 28 ];
-        %tmp.30 = lgetv %batchSize.3;
-        symbol [ batchSize %tmp.30 138 31 40 ];
-        %tmp.31 = add %tmp.29 %tmp.30;
-        lputv %end.7 %tmp.31;
-        symbol [ end %end.7 138 16 19 ];
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 139 12 ]
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_139_12_141_12_if_stmt:
-        %tmp.32 = lgetv %end.7;
-        symbol [ end %tmp.32 139 16 19 ];
-        %tmp.33 = lgetv %totalSamples.2;
-        symbol [ totalSamples %tmp.33 139 22 34 ];
-        %tmp.34 = gt %tmp.32 %tmp.33;
-        bf %tmp.34 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_139_12_141_12_if_end;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_139_12_141_12_if_true:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_139_36_141_12_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 140 16 ]
-        %tmp.35 = lgetv %totalSamples.2;
-        symbol [ totalSamples %tmp.35 140 22 34 ];
-        lputv %end.7 %tmp.35;
-        symbol [ end %end.7 140 16 19 ];
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_139_36_141_12_stop:
-        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_139_12_141_12_if_end;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_139_12_141_12_if_end:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 143 12 ]
-        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_137_38_155_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_137_38_155_8_stop" ]
+        symbol [ end %end.7 158 16 19 ];
+        %tmp.30 = lgetv %offset.6;
+        symbol [ offset %tmp.30 158 22 28 ];
+        %tmp.31 = lgetv %batchSize.3;
+        symbol [ batchSize %tmp.31 158 31 40 ];
+        %tmp.32 = add %tmp.30 %tmp.31;
+        lputv %end.7 %tmp.32;
+        symbol [ end %end.7 158 16 19 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 159 12 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_159_12_159_58_if_stmt:
+        %tmp.33 = lgetv %end.7;
+        symbol [ end %tmp.33 159 16 19 ];
+        %tmp.34 = lgetv %totalSamples.2;
+        symbol [ totalSamples %tmp.34 159 22 34 ];
+        %tmp.35 = gt %tmp.33 %tmp.34;
+        bf %tmp.35 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_159_12_159_58_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_159_12_159_58_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_159_36_159_58_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 159 38 ]
+        %tmp.36 = lgetv %totalSamples.2;
+        symbol [ totalSamples %tmp.36 159 44 56 ];
+        lputv %end.7 %tmp.36;
+        symbol [ end %end.7 159 38 41 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_159_36_159_58_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_159_12_159_58_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_159_12_159_58_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 161 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_157_38_171_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_157_38_171_8_stop" ]
         %chunk.8 = local;
-        symbol [ chunk %chunk.8 143 16 21 ];
-        %tmp.36 = lgetv %samples.1;
-        symbol [ samples %tmp.36 143 24 31 ];
-        symbol [ slice %tmp.37 143 32 37 ];
-        %tmp.37 = getv function %tmp.36 :slice;
-        %tmp.38 = lgetv %offset.6;
-        symbol [ offset %tmp.38 143 38 44 ];
-        %tmp.39 = lgetv %end.7;
-        symbol [ end %tmp.39 143 46 49 ];
-        %tmp.40 = invoke %tmp.36 %tmp.37(%tmp.38, %tmp.39);
-        lputv %chunk.8 %tmp.40;
-        symbol [ chunk %chunk.8 143 16 21 ];
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 144 12 ]
-        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_137_38_155_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_137_38_155_8_stop" ]
-        %batchPayload.9 = local;
-        symbol [ batchPayload %batchPayload.9 144 16 28 ];
-        %tmp.41 = newd 5;
-        %tmp.42 = "type";
-        %tmp.43 = "TELEMETRY_BATCH";
-        %tmp.44 = dup %tmp.41;
-        %tmp.45 = aputv %tmp.44 %tmp.42 %tmp.43;
-        %tmp.46 = "holdId";
-        %tmp.47 = lgetv %holdId.4;
-        symbol [ holdId %tmp.47 146 32 38 ];
+        symbol [ chunk %chunk.8 161 16 21 ];
+        %tmp.37 = lgetv %samples.1;
+        symbol [ samples %tmp.37 161 24 31 ];
+        symbol [ slice %tmp.38 161 32 37 ];
+        %tmp.38 = getv function %tmp.37 :slice;
+        %tmp.39 = lgetv %offset.6;
+        symbol [ offset %tmp.39 161 38 44 ];
+        %tmp.40 = lgetv %end.7;
+        symbol [ end %tmp.40 161 46 49 ];
+        %tmp.41 = invoke %tmp.37 %tmp.38(%tmp.39, %tmp.40);
+        lputv %chunk.8 %tmp.41;
+        symbol [ chunk %chunk.8 161 16 21 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 162 12 ]
+        symbol [ MessageQueue %tmp.43 162 12 24 ];
+        %tmp.43 = getv ? :MessageQueue;
+        symbol [ enqueue %tmp.44 162 25 32 ];
+        %tmp.44 = getv function %tmp.43 :enqueue;
+        %tmp.45 = newd 5;
+        %tmp.46 = "type";
+        %tmp.47 = "TELEMETRY_BATCH";
         %tmp.48 = dup %tmp.45;
         %tmp.49 = aputv %tmp.48 %tmp.46 %tmp.47;
-        %tmp.50 = "batchIndex";
-        %tmp.51 = lgetv %batchIndex.5;
-        symbol [ batchIndex %tmp.51 147 32 42 ];
+        %tmp.50 = "holdId";
+        %tmp.51 = lgetv %holdId.4;
+        symbol [ holdId %tmp.51 164 32 38 ];
         %tmp.52 = dup %tmp.49;
         %tmp.53 = aputv %tmp.52 %tmp.50 %tmp.51;
-        %tmp.54 = "offset";
-        %tmp.55 = lgetv %offset.6;
-        symbol [ offset %tmp.55 148 32 38 ];
+        %tmp.54 = "batchIndex";
+        %tmp.55 = lgetv %batchIndex.5;
+        symbol [ batchIndex %tmp.55 165 32 42 ];
         %tmp.56 = dup %tmp.53;
         %tmp.57 = aputv %tmp.56 %tmp.54 %tmp.55;
-        %tmp.58 = "samples";
-        %tmp.59 = lgetv %chunk.8;
-        symbol [ chunk %tmp.59 149 32 37 ];
+        %tmp.58 = "offset";
+        %tmp.59 = lgetv %offset.6;
+        symbol [ offset %tmp.59 166 32 38 ];
         %tmp.60 = dup %tmp.57;
         %tmp.61 = aputv %tmp.60 %tmp.58 %tmp.59;
-        lputv %batchPayload.9 %tmp.61;
-        symbol [ batchPayload %batchPayload.9 144 16 28 ];
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 152 12 ]
-        symbol [ Communications %tmp.62 152 12 26 ];
-        %tmp.62 = getm $.Toybox.Communications;
-        symbol [ transmit %tmp.63 152 27 35 ];
-        %tmp.63 = getv function %tmp.62 :transmit;
-        %tmp.64 = lgetv %batchPayload.9;
-        symbol [ batchPayload %tmp.64 152 36 48 ];
-        %tmp.65 = null;
-        symbol [ SyncConnectionListener %tmp.69 152 60 82 ];
-        %tmp.69 = getv ? :SyncConnectionListener;
-        %tmp.66 = newc %tmp.69 ();
-        invoke %tmp.62 %tmp.63(%tmp.64, %tmp.65, %tmp.66);
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 153 12 ]
-        %tmp.70 = lgetv %end.7;
-        symbol [ end %tmp.70 153 21 24 ];
-        lputv %offset.6 %tmp.70;
-        symbol [ offset %offset.6 153 12 18 ];
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 154 12 ]
-        %tmp.73 = lgetv %batchIndex.5;
-        symbol [ batchIndex %tmp.73 154 12 22 ];
-        %tmp.74 = add %tmp.73 1;
-        lputv %batchIndex.5 %tmp.74;
-        symbol [ batchIndex %batchIndex.5 154 12 22 ];
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_137_38_155_8_stop:
-        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_137_8_155_8_while_test;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_137_8_155_8_while_end:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 158 8 ]
-        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_127_35_173_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_127_35_173_4_stop" ]
-        %summary.10 = local;
-        symbol [ summary %summary.10 158 12 19 ];
-        %tmp.75 = newd 12;
-        %tmp.76 = "type";
-        %tmp.77 = "FREE_HOLD_RESULT";
-        %tmp.78 = dup %tmp.75;
-        %tmp.79 = aputv %tmp.78 %tmp.76 %tmp.77;
-        %tmp.80 = "id";
-        %tmp.81 = lgetv %holdId.4;
-        symbol [ holdId %tmp.81 160 36 42 ];
-        %tmp.82 = dup %tmp.79;
-        %tmp.83 = aputv %tmp.82 %tmp.80 %tmp.81;
-        %tmp.84 = "durationMs";
-        %tmp.85 = lgetv %hold;
-        symbol [ hold %tmp.85 161 36 40 ];
-        symbol [ get %tmp.86 161 41 44 ];
-        %tmp.86 = getv function %tmp.85 :get;
-        %tmp.87 = "durationMs";
-        %tmp.88 = invoke %tmp.85 %tmp.86(%tmp.87);
-        %tmp.89 = dup %tmp.83;
-        %tmp.90 = aputv %tmp.89 %tmp.84 %tmp.88;
-        %tmp.91 = "lungVolume";
-        %tmp.92 = lgetv %hold;
-        symbol [ hold %tmp.92 162 36 40 ];
-        symbol [ get %tmp.93 162 41 44 ];
-        %tmp.93 = getv function %tmp.92 :get;
-        %tmp.94 = "lungVolume";
-        %tmp.95 = invoke %tmp.92 %tmp.93(%tmp.94);
-        %tmp.96 = dup %tmp.90;
-        %tmp.97 = aputv %tmp.96 %tmp.91 %tmp.95;
-        %tmp.98 = "prepType";
-        %tmp.99 = lgetv %hold;
-        symbol [ hold %tmp.99 163 36 40 ];
-        symbol [ get %tmp.100 163 41 44 ];
-        %tmp.100 = getv function %tmp.99 :get;
-        %tmp.101 = "prepType";
-        %tmp.102 = invoke %tmp.99 %tmp.100(%tmp.101);
-        %tmp.103 = dup %tmp.97;
-        %tmp.104 = aputv %tmp.103 %tmp.98 %tmp.102;
-        %tmp.105 = "timeOfDay";
-        %tmp.106 = lgetv %hold;
-        symbol [ hold %tmp.106 164 36 40 ];
-        symbol [ get %tmp.107 164 41 44 ];
-        %tmp.107 = getv function %tmp.106 :get;
-        %tmp.108 = "timeOfDay";
-        %tmp.109 = invoke %tmp.106 %tmp.107(%tmp.108);
-        %tmp.110 = dup %tmp.104;
-        %tmp.111 = aputv %tmp.110 %tmp.105 %tmp.109;
-        %tmp.112 = "firstContractionMs";
-        %tmp.113 = lgetv %hold;
-        symbol [ hold %tmp.113 165 36 40 ];
-        symbol [ get %tmp.114 165 41 44 ];
-        %tmp.114 = getv function %tmp.113 :get;
-        %tmp.115 = "firstContractionMs";
-        %tmp.116 = invoke %tmp.113 %tmp.114(%tmp.115);
-        %tmp.117 = dup %tmp.111;
-        %tmp.118 = aputv %tmp.117 %tmp.112 %tmp.116;
-        %tmp.119 = "contractions";
-        %tmp.120 = lgetv %hold;
-        symbol [ hold %tmp.120 166 36 40 ];
-        symbol [ get %tmp.121 166 41 44 ];
-        %tmp.121 = getv function %tmp.120 :get;
-        %tmp.122 = "contractions";
-        %tmp.123 = invoke %tmp.120 %tmp.121(%tmp.122);
-        %tmp.124 = dup %tmp.118;
-        %tmp.125 = aputv %tmp.124 %tmp.119 %tmp.123;
-        %tmp.126 = "sampleCount";
-        %tmp.127 = lgetv %hold;
-        symbol [ hold %tmp.127 167 36 40 ];
-        symbol [ get %tmp.128 167 41 44 ];
-        %tmp.128 = getv function %tmp.127 :get;
-        %tmp.129 = "sampleCount";
-        %tmp.130 = invoke %tmp.127 %tmp.128(%tmp.129);
-        %tmp.131 = dup %tmp.125;
-        %tmp.132 = aputv %tmp.131 %tmp.126 %tmp.130;
-        %tmp.133 = "startEpochMs";
-        %tmp.134 = lgetv %hold;
-        symbol [ hold %tmp.134 168 36 40 ];
-        symbol [ get %tmp.135 168 41 44 ];
-        %tmp.135 = getv function %tmp.134 :get;
-        %tmp.136 = "startEpochMs";
-        %tmp.137 = invoke %tmp.134 %tmp.135(%tmp.136);
-        %tmp.138 = dup %tmp.132;
-        %tmp.139 = aputv %tmp.138 %tmp.133 %tmp.137;
-        %tmp.140 = "endEpochMs";
-        %tmp.141 = lgetv %hold;
-        symbol [ hold %tmp.141 169 36 40 ];
-        symbol [ get %tmp.142 169 41 44 ];
-        %tmp.142 = getv function %tmp.141 :get;
-        %tmp.143 = "endEpochMs";
-        %tmp.144 = invoke %tmp.141 %tmp.142(%tmp.143);
-        %tmp.145 = dup %tmp.139;
-        %tmp.146 = aputv %tmp.145 %tmp.140 %tmp.144;
-        %tmp.147 = "batchCount";
-        %tmp.148 = lgetv %batchIndex.5;
-        symbol [ batchIndex %tmp.148 170 36 46 ];
-        %tmp.149 = dup %tmp.146;
-        %tmp.150 = aputv %tmp.149 %tmp.147 %tmp.148;
-        lputv %summary.10 %tmp.150;
-        symbol [ summary %summary.10 158 12 19 ];
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 172 8 ]
-        symbol [ Communications %tmp.151 172 8 22 ];
-        %tmp.151 = getm $.Toybox.Communications;
-        symbol [ transmit %tmp.152 172 23 31 ];
-        %tmp.152 = getv function %tmp.151 :transmit;
-        %tmp.153 = lgetv %summary.10;
-        symbol [ summary %tmp.153 172 32 39 ];
-        %tmp.154 = null;
-        symbol [ SyncConnectionListener %tmp.158 172 51 73 ];
-        %tmp.158 = getv ? :SyncConnectionListener;
-        %tmp.155 = newc %tmp.158 ();
-        invoke %tmp.151 %tmp.152(%tmp.153, %tmp.154, %tmp.155);
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_127_35_173_4_stop:
+        %tmp.62 = "samples";
+        %tmp.63 = lgetv %chunk.8;
+        symbol [ chunk %tmp.63 167 32 37 ];
+        %tmp.64 = dup %tmp.61;
+        %tmp.65 = aputv %tmp.64 %tmp.62 %tmp.63;
+        invoke %tmp.43 %tmp.44(%tmp.65);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 169 12 ]
+        %tmp.66 = lgetv %end.7;
+        symbol [ end %tmp.66 169 21 24 ];
+        lputv %offset.6 %tmp.66;
+        symbol [ offset %offset.6 169 12 18 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 170 12 ]
+        %tmp.69 = lgetv %batchIndex.5;
+        symbol [ batchIndex %tmp.69 170 12 22 ];
+        %tmp.70 = add %tmp.69 1;
+        lputv %batchIndex.5 %tmp.70;
+        symbol [ batchIndex %batchIndex.5 170 12 22 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_157_38_171_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_157_8_171_8_while_test;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_157_8_171_8_while_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 173 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_147_36_175_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_147_36_175_4_stop" ]
+        %summary.9 = local;
+        symbol [ summary %summary.9 173 12 19 ];
+        %tmp.71 = self;
+        symbol [ buildSummary %tmp.72 173 22 34 ];
+        %tmp.72 = getv function %tmp.71 :buildSummary;
+        %tmp.73 = lgetv %hold;
+        symbol [ hold %tmp.73 173 35 39 ];
+        %tmp.74 = lgetv %batchIndex.5;
+        symbol [ batchIndex %tmp.74 173 41 51 ];
+        %tmp.75 = invoke %tmp.71 %tmp.72(%tmp.73, %tmp.74);
+        lputv %summary.9 %tmp.75;
+        symbol [ summary %summary.9 173 12 19 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 174 8 ]
+        symbol [ MessageQueue %tmp.77 174 8 20 ];
+        %tmp.77 = getv ? :MessageQueue;
+        symbol [ enqueue %tmp.78 174 21 28 ];
+        %tmp.78 = getv function %tmp.77 :enqueue;
+        %tmp.79 = lgetv %summary.9;
+        symbol [ summary %tmp.79 174 29 36 ];
+        invoke %tmp.77 %tmp.78(%tmp.79);
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_147_36_175_4_stop:
     }
-    //! Mark a hold as synced after phone confirms receipt.
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 176; @symbol_functiondef = [handleAckHold,176,13,26]; @symbol_param<0> = [data,176,27,31]; ]
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 177; @symbol_functiondef = [handleAckHold,177,13,26]; @symbol_param<0> = [data,177,27,31]; ]
     function handleAckHold(data) {
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_176_33_182_4_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 177 8 ]
-        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_176_33_182_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_176_33_182_4_stop" ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_177_33_184_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 178 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_177_33_184_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_177_33_184_4_stop" ]
         %holdId.1 = local;
-        symbol [ holdId %holdId.1 177 12 18 ];
+        symbol [ holdId %holdId.1 178 12 18 ];
         %tmp.1 = lgetv %data;
-        symbol [ data %tmp.1 177 21 25 ];
-        symbol [ get %tmp.2 177 26 29 ];
+        symbol [ data %tmp.1 178 21 25 ];
+        symbol [ get %tmp.2 178 26 29 ];
         %tmp.2 = getv function %tmp.1 :get;
         %tmp.3 = "holdId";
         %tmp.4 = invoke %tmp.1 %tmp.2(%tmp.3);
         lputv %holdId.1 %tmp.4;
-        symbol [ holdId %holdId.1 177 12 18 ];
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 178 8 ]
-        symbol [ System %tmp.5 178 8 14 ];
+        symbol [ holdId %holdId.1 178 12 18 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 179 8 ]
+        symbol [ System %tmp.5 179 8 14 ];
         %tmp.5 = getm $.Toybox.System;
-        symbol [ println %tmp.6 178 15 22 ];
+        symbol [ println %tmp.6 179 15 22 ];
         %tmp.6 = getv function %tmp.5 :println;
         %tmp.7 = "[WAGS] Handling ACK_HOLD for id=";
         %tmp.8 = lgetv %holdId.1;
-        symbol [ holdId %tmp.8 178 60 66 ];
+        symbol [ holdId %tmp.8 179 60 66 ];
         %tmp.9 = add %tmp.7 %tmp.8;
         invoke %tmp.5 %tmp.6(%tmp.9);
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 179 8 ]
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_179_8_181_8_if_stmt:
-        %tmp.10 = lgetv %holdId.1;
-        symbol [ holdId %tmp.10 179 12 18 ];
-        %tmp.11 = null;
-        %tmp.12 = ne %tmp.10 %tmp.11;
-        bf %tmp.12 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_179_8_181_8_if_end;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_179_8_181_8_if_true:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_179_28_181_8_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 180 12 ]
-        symbol [ HoldStorage %tmp.14 180 12 23 ];
-        %tmp.14 = getv ? :HoldStorage;
-        symbol [ markSynced %tmp.15 180 24 34 ];
-        %tmp.15 = getv function %tmp.14 :markSynced;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 180 8 ]
+        symbol [ SyncLog %tmp.11 180 8 15 ];
+        %tmp.11 = getv ? :SyncLog;
+        symbol [ add %tmp.12 180 16 19 ];
+        %tmp.12 = getv function %tmp.11 :add;
+        %tmp.13 = "ACK hold #";
+        %tmp.14 = lgetv %holdId.1;
+        symbol [ holdId %tmp.14 180 35 41 ];
+        %tmp.15 = add %tmp.13 %tmp.14;
+        invoke %tmp.11 %tmp.12(%tmp.15);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 181 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_181_8_183_8_if_stmt:
         %tmp.16 = lgetv %holdId.1;
-        symbol [ holdId %tmp.16 180 35 41 ];
-        %tmp.17 = as %tmp.16 { (!Null) };
-        invoke %tmp.14 %tmp.15(%tmp.17);
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_179_28_181_8_stop:
-        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_179_8_181_8_if_end;
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_179_8_181_8_if_end:
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_176_33_182_4_stop:
+        symbol [ holdId %tmp.16 181 12 18 ];
+        %tmp.17 = null;
+        %tmp.18 = ne %tmp.16 %tmp.17;
+        bf %tmp.18 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_181_8_183_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_181_8_183_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_181_28_183_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 182 12 ]
+        symbol [ HoldStorage %tmp.20 182 12 23 ];
+        %tmp.20 = getv ? :HoldStorage;
+        symbol [ markSynced %tmp.21 182 24 34 ];
+        %tmp.21 = getv function %tmp.20 :markSynced;
+        %tmp.22 = lgetv %holdId.1;
+        symbol [ holdId %tmp.22 182 35 41 ];
+        %tmp.23 = as %tmp.22 { (!Null) };
+        invoke %tmp.20 %tmp.21(%tmp.23);
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_181_28_183_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_181_8_183_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_181_8_183_8_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_177_33_184_4_stop:
     }
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 184; @symbol_functiondef = [onStop,184,13,19]; @symbol_param<0> = [state,184,20,25]; ]
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 186; @symbol_functiondef = [onStop,186,13,19]; @symbol_param<0> = [state,186,20,25]; ]
     function onStop(state) {
     }
 }
-//! ConnectionListener for ping responses.
-[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 189; @symbol_classdef = [PingConnectionListener,189,6,28]; @symbol_extends<0> = [Communications,189,37,51]; @symbol_extends<1> = [ConnectionListener,189,52,70]; ]
-class PingConnectionListener extends Communications.ConnectionListener {
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 189; ]
+//! Message queue for sequential transmit.
+//! CIQ only supports ONE transmit() in flight at a time (max 3 in BLE queue).
+//! This module queues messages and sends them one at a time, waiting for
+//! onComplete/onError before sending the next.
+//! CRITICAL: options parameter MUST be null (not {}) to avoid firmware crash on fenix6.
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 195; @symbol_moduledef = [MessageQueue,195,7,19]; ]
+module MessageQueue {
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 195; ]
     <init> {
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 196 8 ]
+        %tmp.1 = newa 0;
+        putv self :_queue %tmp.1;
     }
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 189; ]
-    static
-    <init> {
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 196; @position = 8; @symbol_vardef = [_queue,196,8,14]; ]
+    var _queue;
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 197; @position = 8; @symbol_vardef = [_sending,197,8,16]; ]
+    var _sending = false;
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 198; @position = 8; @symbol_vardef = [_retryCount,198,8,19]; ]
+    var _retryCount = 0;
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 200; @symbol_functiondef = [enqueue,200,13,20]; @symbol_param<0> = [payload,200,21,28]; ]
+    function enqueue(payload) {
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_200_30_206_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 201 8 ]
+        symbol [ _queue %tmp.2 201 8 14 ];
+        %tmp.2 = getv ? :_queue;
+        symbol [ add %tmp.3 201 15 18 ];
+        %tmp.3 = getv function %tmp.2 :add;
+        %tmp.4 = lgetv %payload;
+        symbol [ payload %tmp.4 201 19 26 ];
+        invoke %tmp.2 %tmp.3(%tmp.4);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 202 8 ]
+        symbol [ System %tmp.5 202 8 14 ];
+        %tmp.5 = getm $.Toybox.System;
+        symbol [ println %tmp.6 202 15 22 ];
+        %tmp.6 = getv function %tmp.5 :println;
+        %tmp.7 = "[WAGS] MQ enqueue, qSize=";
+        symbol [ _queue %tmp.9 202 53 59 ];
+        %tmp.9 = getv ? :_queue;
+        symbol [ size %tmp.10 202 60 64 ];
+        %tmp.10 = getv function %tmp.9 :size;
+        %tmp.11 = invoke %tmp.9 %tmp.10();
+        %tmp.12 = add %tmp.7 %tmp.11;
+        %tmp.13 = " sending=";
+        %tmp.14 = add %tmp.12 %tmp.13;
+        symbol [ _sending %tmp.16 202 83 91 ];
+        %tmp.16 = getv ? :_sending;
+        %tmp.17 = add %tmp.14 %tmp.16;
+        invoke %tmp.5 %tmp.6(%tmp.17);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 203 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_203_8_205_8_if_stmt:
+        symbol [ _sending %tmp.19 203 13 21 ];
+        %tmp.19 = getv ? :_sending;
+        %tmp.20 = not %tmp.19;
+        bf %tmp.20 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_203_8_205_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_203_8_205_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_203_23_205_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 204 12 ]
+        %tmp.21 = self;
+        symbol [ _doSend %tmp.22 204 12 19 ];
+        %tmp.22 = getv function %tmp.21 :_doSend;
+        invoke %tmp.21 %tmp.22();
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_203_23_205_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_203_8_205_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_203_8_205_8_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_200_30_206_4_stop:
     }
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 190; @symbol_functiondef = [initialize,190,13,23]; ]
-    function initialize() as Void {
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_190_26_192_4_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 191 8 ]
-        symbol [ ConnectionListener %tmp.2 191 8 26 ];
-        %tmp.2 = getv ? :ConnectionListener;
-        symbol [ initialize %tmp.3 191 27 37 ];
-        %tmp.3 = getv function %tmp.2 :initialize;
-        invoke %tmp.2 %tmp.3();
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_190_26_192_4_stop:
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 208; @symbol_functiondef = [_doSend,208,13,20]; ]
+    function _doSend() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_208_23_228_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 209 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_209_8_214_8_if_stmt:
+        symbol [ _queue %tmp.2 209 12 18 ];
+        %tmp.2 = getv ? :_queue;
+        symbol [ size %tmp.3 209 19 23 ];
+        %tmp.3 = getv function %tmp.2 :size;
+        %tmp.4 = invoke %tmp.2 %tmp.3();
+        %tmp.5 = 0;
+        %tmp.6 = eq %tmp.4 %tmp.5;
+        bf %tmp.6 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_209_8_214_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_209_8_214_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_209_32_214_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 210 12 ]
+        %tmp.7 = false;
+        symbol [ _sending ? 210 12 20 ];
+        putv self :_sending %tmp.7;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 211 12 ]
+        symbol [ SyncLog %tmp.9 211 12 19 ];
+        %tmp.9 = getv ? :SyncLog;
+        symbol [ add %tmp.10 211 20 23 ];
+        %tmp.10 = getv function %tmp.9 :add;
+        %tmp.11 = "MQ done q=0";
+        invoke %tmp.9 %tmp.10(%tmp.11);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 212 12 ]
+        symbol [ System %tmp.12 212 12 18 ];
+        %tmp.12 = getm $.Toybox.System;
+        symbol [ println %tmp.13 212 19 26 ];
+        %tmp.13 = getv function %tmp.12 :println;
+        %tmp.14 = "[WAGS] MQ done, queue empty";
+        invoke %tmp.12 %tmp.13(%tmp.14);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 213 12 ]
+        ret ?;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_209_32_214_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_209_8_214_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_209_8_214_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 216 8 ]
+        %tmp.15 = true;
+        symbol [ _sending ? 216 8 16 ];
+        putv self :_sending %tmp.15;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 217 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_208_23_228_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_208_23_228_4_stop" ]
+        %payload.1 = local;
+        symbol [ payload %payload.1 217 12 19 ];
+        symbol [ _queue %tmp.17 217 22 28 ];
+        %tmp.17 = getv ? :_queue;
+        %tmp.18 = 0;
+        %tmp.19 = agetv %tmp.17 %tmp.18;
+        lputv %payload.1 %tmp.19;
+        symbol [ payload %payload.1 217 12 19 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 218 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_208_23_228_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_208_23_228_4_stop" ]
+        %pType.2 = local;
+        symbol [ pType %pType.2 218 12 17 ];
+        %tmp.20 = "?";
+        lputv %pType.2 %tmp.20;
+        symbol [ pType %pType.2 218 12 17 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 219 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_219_8_222_8_if_stmt:
+        %tmp.21 = lgetv %payload.1;
+        symbol [ payload %tmp.21 219 12 19 ];
+        symbol [ Toybox %tmp.23 219 31 37 ];
+        %tmp.23 = getv ? :Toybox;
+        symbol [ Lang %tmp.24 219 38 42 ];
+        %tmp.24 = getv %tmp.23 :Lang;
+        symbol [ Dictionary %tmp.25 219 43 53 ];
+        %tmp.25 = getv %tmp.24 :Dictionary;
+        %tmp.26 = isa %tmp.21 %tmp.25;
+        bf %tmp.26 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_219_8_222_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_219_8_222_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_219_55_222_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 220 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_219_55_222_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_219_55_222_8_stop" ]
+        %t.3 = local;
+        symbol [ t %t.3 220 16 17 ];
+        %tmp.27 = lgetv %payload.1;
+        symbol [ payload %tmp.27 220 20 27 ];
+        %tmp.28 = as %tmp.27 { (Toybox.Lang.Dictionary) };
+        symbol [ get %tmp.29 220 28 31 ];
+        %tmp.29 = getv function %tmp.28 :get;
+        %tmp.30 = "type";
+        %tmp.31 = invoke %tmp.28 %tmp.29(%tmp.30);
+        lputv %t.3 %tmp.31;
+        symbol [ t %t.3 220 16 17 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 221 12 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_221_12_221_40_if_stmt:
+        %tmp.32 = lgetv %t.3;
+        symbol [ t %tmp.32 221 16 17 ];
+        %tmp.33 = null;
+        %tmp.34 = ne %tmp.32 %tmp.33;
+        bf %tmp.34 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_221_12_221_40_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_221_12_221_40_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_221_27_221_40_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 221 29 ]
+        %tmp.35 = lgetv %t.3;
+        symbol [ t %tmp.35 221 37 38 ];
+        %tmp.36 = as %tmp.35 { (!Null) };
+        lputv %pType.2 %tmp.36;
+        symbol [ pType %pType.2 221 29 34 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_221_27_221_40_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_221_12_221_40_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_221_12_221_40_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_219_55_222_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_219_8_222_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_219_8_222_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 223 8 ]
+        symbol [ SyncLog %tmp.38 223 8 15 ];
+        %tmp.38 = getv ? :SyncLog;
+        symbol [ add %tmp.39 223 16 19 ];
+        %tmp.39 = getv function %tmp.38 :add;
+        %tmp.40 = "MQ TX ";
+        %tmp.41 = lgetv %pType.2;
+        symbol [ pType %tmp.41 223 31 36 ];
+        %tmp.42 = add %tmp.40 %tmp.41;
+        %tmp.43 = " q=";
+        %tmp.44 = add %tmp.42 %tmp.43;
+        symbol [ _queue %tmp.46 223 47 53 ];
+        %tmp.46 = getv ? :_queue;
+        symbol [ size %tmp.47 223 54 58 ];
+        %tmp.47 = getv function %tmp.46 :size;
+        %tmp.48 = invoke %tmp.46 %tmp.47();
+        %tmp.49 = add %tmp.44 %tmp.48;
+        invoke %tmp.38 %tmp.39(%tmp.49);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 224 8 ]
+        symbol [ System %tmp.50 224 8 14 ];
+        %tmp.50 = getm $.Toybox.System;
+        symbol [ println %tmp.51 224 15 22 ];
+        %tmp.51 = getv function %tmp.50 :println;
+        %tmp.52 = "[WAGS] MQ TX ";
+        %tmp.53 = lgetv %pType.2;
+        symbol [ pType %tmp.53 224 41 46 ];
+        %tmp.54 = add %tmp.52 %tmp.53;
+        %tmp.55 = " q=";
+        %tmp.56 = add %tmp.54 %tmp.55;
+        symbol [ _queue %tmp.58 224 57 63 ];
+        %tmp.58 = getv ? :_queue;
+        symbol [ size %tmp.59 224 64 68 ];
+        %tmp.59 = getv function %tmp.58 :size;
+        %tmp.60 = invoke %tmp.58 %tmp.59();
+        %tmp.61 = add %tmp.56 %tmp.60;
+        invoke %tmp.50 %tmp.51(%tmp.61);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 227 8 ]
+        symbol [ Communications %tmp.62 227 8 22 ];
+        %tmp.62 = getm $.Toybox.Communications;
+        symbol [ transmit %tmp.63 227 23 31 ];
+        %tmp.63 = getv function %tmp.62 :transmit;
+        %tmp.64 = lgetv %payload.1;
+        symbol [ payload %tmp.64 227 32 39 ];
+        %tmp.65 = null;
+        symbol [ QueueListener %tmp.69 227 51 64 ];
+        %tmp.69 = getv ? :QueueListener;
+        %tmp.66 = newc %tmp.69 ();
+        invoke %tmp.62 %tmp.63(%tmp.64, %tmp.65, %tmp.66);
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_208_23_228_4_stop:
     }
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 193; @symbol_functiondef = [onComplete,193,13,23]; ]
-    function onComplete() {
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_193_26_195_4_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 194 8 ]
-        symbol [ System %tmp.1 194 8 14 ];
-        %tmp.1 = getm $.Toybox.System;
-        symbol [ println %tmp.2 194 15 22 ];
-        %tmp.2 = getv function %tmp.1 :println;
-        %tmp.3 = "[WAGS] PONG sent OK";
-        invoke %tmp.1 %tmp.2(%tmp.3);
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_193_26_195_4_stop:
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 230; @symbol_functiondef = [onOK,230,13,17]; ]
+    function onOK() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_230_20_239_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 231 8 ]
+        symbol [ SyncLog %tmp.2 231 8 15 ];
+        %tmp.2 = getv ? :SyncLog;
+        symbol [ add %tmp.3 231 16 19 ];
+        %tmp.3 = getv function %tmp.2 :add;
+        %tmp.4 = "MQ TX OK";
+        invoke %tmp.2 %tmp.3(%tmp.4);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 232 8 ]
+        symbol [ System %tmp.5 232 8 14 ];
+        %tmp.5 = getm $.Toybox.System;
+        symbol [ println %tmp.6 232 15 22 ];
+        %tmp.6 = getv function %tmp.5 :println;
+        %tmp.7 = "[WAGS] MQ TX OK";
+        invoke %tmp.5 %tmp.6(%tmp.7);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 233 8 ]
+        %tmp.8 = 0;
+        symbol [ _retryCount ? 233 8 19 ];
+        putv self :_retryCount %tmp.8;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 234 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_234_8_236_8_if_stmt:
+        symbol [ _queue %tmp.10 234 12 18 ];
+        %tmp.10 = getv ? :_queue;
+        symbol [ size %tmp.11 234 19 23 ];
+        %tmp.11 = getv function %tmp.10 :size;
+        %tmp.12 = invoke %tmp.10 %tmp.11();
+        %tmp.13 = 0;
+        %tmp.14 = gt %tmp.12 %tmp.13;
+        bf %tmp.14 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_234_8_236_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_234_8_236_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_234_31_236_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 235 12 ]
+        symbol [ _queue %tmp.16 235 21 27 ];
+        %tmp.16 = getv ? :_queue;
+        symbol [ slice %tmp.17 235 28 33 ];
+        %tmp.17 = getv function %tmp.16 :slice;
+        %tmp.18 = 1;
+        %tmp.19 = null;
+        %tmp.20 = invoke %tmp.16 %tmp.17(%tmp.18, %tmp.19);
+        symbol [ _queue ? 235 12 18 ];
+        putv self :_queue %tmp.20;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_234_31_236_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_234_8_236_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_234_8_236_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 238 8 ]
+        symbol [ MQTimer %tmp.22 238 8 15 ];
+        %tmp.22 = getv ? :MQTimer;
+        symbol [ start %tmp.23 238 16 21 ];
+        %tmp.23 = getv function %tmp.22 :start;
+        %tmp.24 = 200;
+        %tmp.25 = false;
+        invoke %tmp.22 %tmp.23(%tmp.24, %tmp.25);
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_230_20_239_4_stop:
     }
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 196; @symbol_functiondef = [onError,196,13,20]; ]
-    function onError() {
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_196_23_198_4_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 197 8 ]
-        symbol [ System %tmp.1 197 8 14 ];
-        %tmp.1 = getm $.Toybox.System;
-        symbol [ println %tmp.2 197 15 22 ];
-        %tmp.2 = getv function %tmp.1 :println;
-        %tmp.3 = "[WAGS] PONG send failed";
-        invoke %tmp.1 %tmp.2(%tmp.3);
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_196_23_198_4_stop:
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 241; @symbol_functiondef = [onFail,241,13,19]; ]
+    function onFail() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_241_22_260_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 242 8 ]
+        symbol [ _retryCount %tmp.2 242 22 33 ];
+        %tmp.2 = getv ? :_retryCount;
+        %tmp.3 = 1;
+        %tmp.4 = add %tmp.2 %tmp.3;
+        symbol [ _retryCount ? 242 8 19 ];
+        putv self :_retryCount %tmp.4;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 243 8 ]
+        symbol [ SyncLog %tmp.6 243 8 15 ];
+        %tmp.6 = getv ? :SyncLog;
+        symbol [ add %tmp.7 243 16 19 ];
+        %tmp.7 = getv function %tmp.6 :add;
+        %tmp.8 = "MQ FAIL #";
+        symbol [ _retryCount %tmp.10 243 34 45 ];
+        %tmp.10 = getv ? :_retryCount;
+        %tmp.11 = add %tmp.8 %tmp.10;
+        invoke %tmp.6 %tmp.7(%tmp.11);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 244 8 ]
+        symbol [ System %tmp.12 244 8 14 ];
+        %tmp.12 = getm $.Toybox.System;
+        symbol [ println %tmp.13 244 15 22 ];
+        %tmp.13 = getv function %tmp.12 :println;
+        %tmp.14 = "[WAGS] MQ FAIL #";
+        symbol [ _retryCount %tmp.16 244 44 55 ];
+        %tmp.16 = getv ? :_retryCount;
+        %tmp.17 = add %tmp.14 %tmp.16;
+        invoke %tmp.12 %tmp.13(%tmp.17);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 246 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_246_8_259_8_if_stmt:
+        symbol [ _retryCount %tmp.19 246 12 23 ];
+        %tmp.19 = getv ? :_retryCount;
+        %tmp.20 = 3;
+        %tmp.21 = lte %tmp.19 %tmp.20;
+        bf %tmp.21 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_246_8_259_8_if_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_246_8_259_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_246_30_251_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 248 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_246_30_251_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_246_30_251_8_stop" ]
+        %delay.1 = local;
+        symbol [ delay %delay.1 248 16 21 ];
+        %tmp.22 = 500;
+        symbol [ _retryCount %tmp.24 248 30 41 ];
+        %tmp.24 = getv ? :_retryCount;
+        %tmp.25 = mul %tmp.22 %tmp.24;
+        lputv %delay.1 %tmp.25;
+        symbol [ delay %delay.1 248 16 21 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 249 12 ]
+        symbol [ SyncLog %tmp.27 249 12 19 ];
+        %tmp.27 = getv ? :SyncLog;
+        symbol [ add %tmp.28 249 20 23 ];
+        %tmp.28 = getv function %tmp.27 :add;
+        %tmp.29 = "MQ retry in ";
+        %tmp.30 = lgetv %delay.1;
+        symbol [ delay %tmp.30 249 41 46 ];
+        %tmp.31 = add %tmp.29 %tmp.30;
+        %tmp.32 = "ms";
+        %tmp.33 = add %tmp.31 %tmp.32;
+        invoke %tmp.27 %tmp.28(%tmp.33);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 250 12 ]
+        symbol [ MQTimer %tmp.35 250 12 19 ];
+        %tmp.35 = getv ? :MQTimer;
+        symbol [ start %tmp.36 250 20 25 ];
+        %tmp.36 = getv function %tmp.35 :start;
+        %tmp.37 = lgetv %delay.1;
+        symbol [ delay %tmp.37 250 26 31 ];
+        %tmp.38 = true;
+        invoke %tmp.35 %tmp.36(%tmp.37, %tmp.38);
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_246_30_251_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_246_8_259_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_246_8_259_8_if_else_false:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_251_15_259_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 252 12 ]
+        symbol [ SyncLog %tmp.40 252 12 19 ];
+        %tmp.40 = getv ? :SyncLog;
+        symbol [ add %tmp.41 252 20 23 ];
+        %tmp.41 = getv function %tmp.40 :add;
+        %tmp.42 = "MQ SKIP after ";
+        symbol [ _retryCount %tmp.44 252 43 54 ];
+        %tmp.44 = getv ? :_retryCount;
+        %tmp.45 = add %tmp.42 %tmp.44;
+        %tmp.46 = " fails";
+        %tmp.47 = add %tmp.45 %tmp.46;
+        invoke %tmp.40 %tmp.41(%tmp.47);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 253 12 ]
+        symbol [ System %tmp.48 253 12 18 ];
+        %tmp.48 = getm $.Toybox.System;
+        symbol [ println %tmp.49 253 19 26 ];
+        %tmp.49 = getv function %tmp.48 :println;
+        %tmp.50 = "[WAGS] MQ SKIP after ";
+        symbol [ _retryCount %tmp.52 253 53 64 ];
+        %tmp.52 = getv ? :_retryCount;
+        %tmp.53 = add %tmp.50 %tmp.52;
+        %tmp.54 = " retries";
+        %tmp.55 = add %tmp.53 %tmp.54;
+        invoke %tmp.48 %tmp.49(%tmp.55);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 254 12 ]
+        %tmp.56 = 0;
+        symbol [ _retryCount ? 254 12 23 ];
+        putv self :_retryCount %tmp.56;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 255 12 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_255_12_257_12_if_stmt:
+        symbol [ _queue %tmp.58 255 16 22 ];
+        %tmp.58 = getv ? :_queue;
+        symbol [ size %tmp.59 255 23 27 ];
+        %tmp.59 = getv function %tmp.58 :size;
+        %tmp.60 = invoke %tmp.58 %tmp.59();
+        %tmp.61 = 0;
+        %tmp.62 = gt %tmp.60 %tmp.61;
+        bf %tmp.62 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_255_12_257_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_255_12_257_12_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_255_35_257_12_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 256 16 ]
+        symbol [ _queue %tmp.64 256 25 31 ];
+        %tmp.64 = getv ? :_queue;
+        symbol [ slice %tmp.65 256 32 37 ];
+        %tmp.65 = getv function %tmp.64 :slice;
+        %tmp.66 = 1;
+        %tmp.67 = null;
+        %tmp.68 = invoke %tmp.64 %tmp.65(%tmp.66, %tmp.67);
+        symbol [ _queue ? 256 16 22 ];
+        putv self :_queue %tmp.68;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_255_35_257_12_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_255_12_257_12_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_255_12_257_12_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 258 12 ]
+        symbol [ MQTimer %tmp.70 258 12 19 ];
+        %tmp.70 = getv ? :MQTimer;
+        symbol [ start %tmp.71 258 20 25 ];
+        %tmp.71 = getv function %tmp.70 :start;
+        %tmp.72 = 200;
+        %tmp.73 = false;
+        invoke %tmp.70 %tmp.71(%tmp.72, %tmp.73);
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_251_15_259_8_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_246_8_259_8_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_241_22_260_4_stop:
     }
 }
-//! ConnectionListener for sync data transmissions.
-[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 202; @symbol_classdef = [SyncConnectionListener,202,6,28]; @symbol_extends<0> = [Communications,202,37,51]; @symbol_extends<1> = [ConnectionListener,202,52,70]; ]
-class SyncConnectionListener extends Communications.ConnectionListener {
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 202; ]
+//! Helper class that owns a Timer and provides a proper method(:callback) for MessageQueue.
+//! Modules can't use method() references, so we use this class instead.
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 265; @symbol_classdef = [MQTimer,265,6,13]; ]
+class MQTimer {
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 265; ]
     <init> {
     }
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 202; ]
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 265; ]
     static
     <init> {
     }
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 203; @symbol_functiondef = [initialize,203,13,23]; ]
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 266; @position = 15; @symbol_vardef = [_instance,266,15,24]; ]
+    static
+    var _instance = null;
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 267; @position = 8; @symbol_vardef = [_timer,267,8,14]; ]
+    var _timer;
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 268; @position = 8; @symbol_vardef = [_isRetry,268,8,16]; ]
+    var _isRetry = false;
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 270; @symbol_functiondef = [initialize,270,13,23]; ]
     function initialize() as Void {
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_203_26_205_4_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 204 8 ]
-        symbol [ ConnectionListener %tmp.2 204 8 26 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_270_26_273_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 271 8 ]
+        symbol [ Timer %tmp.3 271 21 26 ];
+        %tmp.3 = getm $.Toybox.Timer;
+        symbol [ Timer %tmp.4 271 27 32 ];
+        %tmp.4 = getv function ? %tmp.3 :Timer;
+        %tmp.1 = newc %tmp.4 ();
+        symbol [ _timer ? 271 8 14 ];
+        putv self :_timer %tmp.1;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 272 8 ]
+        %tmp.5 = false;
+        symbol [ _isRetry ? 272 8 16 ];
+        putv self :_isRetry %tmp.5;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_270_26_273_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 275; @symbol_functiondef = [start,275,20,25]; @symbol_param<0> = [ms,275,26,28]; @symbol_param<1> = [isRetry,275,30,37]; ]
+    static
+    function start(ms, isRetry) {
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_275_39_281_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 276 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_276_8_278_8_if_stmt:
+        symbol [ _instance %tmp.2 276 12 21 ];
+        %tmp.2 = getv ? :_instance;
+        %tmp.3 = null;
+        %tmp.4 = eq %tmp.2 %tmp.3;
+        bf %tmp.4 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_276_8_278_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_276_8_278_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_276_31_278_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 277 12 ]
+        symbol [ MQTimer %tmp.8 277 28 35 ];
+        %tmp.8 = getv ? :MQTimer;
+        %tmp.5 = newc %tmp.8 ();
+        symbol [ _instance ? 277 12 21 ];
+        putv self :_instance %tmp.5;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_276_31_278_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_276_8_278_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_276_8_278_8_if_end:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 279 8 ]
+        symbol [ _instance %tmp.9 279 8 17 ];
+        %tmp.9 = getv self :_instance;
+        %tmp.10 = lgetv %isRetry;
+        symbol [ isRetry %tmp.10 279 29 36 ];
+        symbol [ _isRetry ? 279 18 26 ];
+        putv %tmp.9 :_isRetry %tmp.10;
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 280 8 ]
+        symbol [ _instance %tmp.12 280 8 17 ];
+        %tmp.12 = getv ? :_instance;
+        symbol [ _timer %tmp.13 280 18 24 ];
+        %tmp.13 = getv %tmp.12 :_timer;
+        symbol [ start %tmp.14 280 25 30 ];
+        %tmp.14 = getv function %tmp.13 :start;
+        symbol [ _instance %tmp.16 280 31 40 ];
+        %tmp.16 = getv ? :_instance;
+        symbol [ method %tmp.17 280 41 47 ];
+        %tmp.17 = getv function %tmp.16 :method;
+        %tmp.19 = const :onTimer;
+        symbol [ onTimer %tmp.19 280 49 56 const ];
+        %tmp.20 = invoke %tmp.16 %tmp.17(%tmp.19);
+        %tmp.21 = lgetv %ms;
+        symbol [ ms %tmp.21 280 59 61 ];
+        %tmp.22 = false;
+        invoke %tmp.13 %tmp.14(%tmp.20, %tmp.21, %tmp.22);
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_275_39_281_4_stop:
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 283; @symbol_functiondef = [onTimer,283,13,20]; ]
+    function onTimer() {
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_283_23_293_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 284 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_284_8_292_8_if_stmt:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_284_12_284_53_begin:
+        symbol [ _isRetry %tmp.2 284 12 20 ];
+        %tmp.2 = getv ? :_isRetry;
+        bf %tmp.2 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_284_8_292_8_if_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_284_24_284_53_true:
+        symbol [ MessageQueue %tmp.4 284 24 36 ];
+        %tmp.4 = getv ? :MessageQueue;
+        symbol [ _queue %tmp.5 284 37 43 ];
+        %tmp.5 = getv %tmp.4 :_queue;
+        symbol [ size %tmp.6 284 44 48 ];
+        %tmp.6 = getv function %tmp.5 :size;
+        %tmp.7 = invoke %tmp.5 %tmp.6();
+        %tmp.8 = 0;
+        %tmp.9 = gt %tmp.7 %tmp.8;
+        push %tmp.9;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_284_24_284_53_end:
+        %tmp.10 = phi [%tmp.2 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_284_12_284_53_begin] [%tmp.9 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_284_24_284_53_true] [%tmp.10 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_284_24_284_53_end];
+        bf %tmp.10 @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_284_8_292_8_if_else_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_284_8_292_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_284_56_290_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 286 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_284_56_290_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_284_56_290_8_stop" ]
+        %payload.1 = local;
+        symbol [ payload %payload.1 286 16 23 ];
+        symbol [ MessageQueue %tmp.12 286 26 38 ];
+        %tmp.12 = getv ? :MessageQueue;
+        symbol [ _queue %tmp.13 286 39 45 ];
+        %tmp.13 = getv %tmp.12 :_queue;
+        %tmp.14 = 0;
+        %tmp.15 = agetv %tmp.13 %tmp.14;
+        lputv %payload.1 %tmp.15;
+        symbol [ payload %payload.1 286 16 23 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 287 12 ]
+        symbol [ SyncLog %tmp.17 287 12 19 ];
+        %tmp.17 = getv ? :SyncLog;
+        symbol [ add %tmp.18 287 20 23 ];
+        %tmp.18 = getv function %tmp.17 :add;
+        %tmp.19 = "MQ RETRY TX";
+        invoke %tmp.17 %tmp.18(%tmp.19);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 288 12 ]
+        symbol [ System %tmp.20 288 12 18 ];
+        %tmp.20 = getm $.Toybox.System;
+        symbol [ println %tmp.21 288 19 26 ];
+        %tmp.21 = getv function %tmp.20 :println;
+        %tmp.22 = "[WAGS] MQ RETRY TX";
+        invoke %tmp.20 %tmp.21(%tmp.22);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 289 12 ]
+        symbol [ Communications %tmp.23 289 12 26 ];
+        %tmp.23 = getm $.Toybox.Communications;
+        symbol [ transmit %tmp.24 289 27 35 ];
+        %tmp.24 = getv function %tmp.23 :transmit;
+        %tmp.25 = lgetv %payload.1;
+        symbol [ payload %tmp.25 289 36 43 ];
+        %tmp.26 = null;
+        symbol [ QueueListener %tmp.30 289 55 68 ];
+        %tmp.30 = getv ? :QueueListener;
+        %tmp.27 = newc %tmp.30 ();
+        invoke %tmp.23 %tmp.24(%tmp.25, %tmp.26, %tmp.27);
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_284_56_290_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_284_8_292_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_284_8_292_8_if_else_false:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_290_15_292_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 291 12 ]
+        symbol [ MessageQueue %tmp.32 291 12 24 ];
+        %tmp.32 = getv ? :MessageQueue;
+        symbol [ _doSend %tmp.33 291 25 32 ];
+        %tmp.33 = getv function %tmp.32 :_doSend;
+        invoke %tmp.32 %tmp.33();
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_290_15_292_8_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_284_8_292_8_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_283_23_293_4_stop:
+    }
+}
+//! ConnectionListener for the message queue.
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 297; @symbol_classdef = [QueueListener,297,6,19]; @symbol_extends<0> = [Communications,297,28,42]; @symbol_extends<1> = [ConnectionListener,297,43,61]; ]
+class QueueListener extends Communications.ConnectionListener {
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 297; ]
+    <init> {
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 297; ]
+    static
+    <init> {
+    }
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 298; @symbol_functiondef = [initialize,298,13,23]; ]
+    function initialize() as Void {
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_298_26_300_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 299 8 ]
+        symbol [ ConnectionListener %tmp.2 299 8 26 ];
         %tmp.2 = getv ? :ConnectionListener;
-        symbol [ initialize %tmp.3 204 27 37 ];
+        symbol [ initialize %tmp.3 299 27 37 ];
         %tmp.3 = getv function %tmp.2 :initialize;
         invoke %tmp.2 %tmp.3();
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_203_26_205_4_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_298_26_300_4_stop:
     }
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 206; @symbol_functiondef = [onComplete,206,13,23]; ]
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 301; @symbol_functiondef = [onComplete,301,13,23]; ]
     function onComplete() {
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_206_26_208_4_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 207 8 ]
-        symbol [ System %tmp.1 207 8 14 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_301_26_304_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 302 8 ]
+        symbol [ System %tmp.1 302 8 14 ];
         %tmp.1 = getm $.Toybox.System;
-        symbol [ println %tmp.2 207 15 22 ];
+        symbol [ println %tmp.2 302 15 22 ];
         %tmp.2 = getv function %tmp.1 :println;
-        %tmp.3 = "[WAGS] Sync data sent OK";
+        %tmp.3 = "[WAGS] QueueListener.onComplete()";
         invoke %tmp.1 %tmp.2(%tmp.3);
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_206_26_208_4_stop:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 303 8 ]
+        symbol [ MessageQueue %tmp.5 303 8 20 ];
+        %tmp.5 = getv ? :MessageQueue;
+        symbol [ onOK %tmp.6 303 21 25 ];
+        %tmp.6 = getv function %tmp.5 :onOK;
+        invoke %tmp.5 %tmp.6();
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_301_26_304_4_stop:
     }
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 209; @symbol_functiondef = [onError,209,13,20]; ]
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 305; @symbol_functiondef = [onError,305,13,20]; ]
     function onError() {
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_209_23_211_4_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 210 8 ]
-        symbol [ System %tmp.1 210 8 14 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_305_23_308_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 306 8 ]
+        symbol [ System %tmp.1 306 8 14 ];
         %tmp.1 = getm $.Toybox.System;
-        symbol [ println %tmp.2 210 15 22 ];
+        symbol [ println %tmp.2 306 15 22 ];
         %tmp.2 = getv function %tmp.1 :println;
-        %tmp.3 = "[WAGS] Sync data send FAILED";
+        %tmp.3 = "[WAGS] QueueListener.onError()";
         invoke %tmp.1 %tmp.2(%tmp.3);
-_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_209_23_211_4_stop:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" 307 8 ]
+        symbol [ MessageQueue %tmp.5 307 8 20 ];
+        %tmp.5 = getv ? :MessageQueue;
+        symbol [ onFail %tmp.6 307 21 27 ];
+        %tmp.6 = getv function %tmp.5 :onFail;
+        invoke %tmp.5 %tmp.6();
+_home_twain_AndroidStudioProjects_wags_garmin_source_WagsApp_mc_305_23_308_4_stop:
     }
 }
 [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc"; @line = 1; ]

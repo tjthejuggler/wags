@@ -67,6 +67,7 @@ module HoldStorage {
         Storage.setValue(KEY_NEXT_ID, nextId + 1);
 
         System.println("[WAGS] Hold saved: id=" + nextId + " total=" + holds.size());
+        SyncLog.add("SAVED hold #" + nextId + " total=" + holds.size());
         return nextId;
     }
 
@@ -89,6 +90,7 @@ module HoldStorage {
             }
         }
         System.println("[WAGS] Unsynced holds: " + unsynced.size() + " of " + holds.size());
+        SyncLog.add("Unsynced: " + unsynced.size() + "/" + holds.size());
         return unsynced;
     }
 
@@ -112,10 +114,12 @@ module HoldStorage {
                 holds[i].put("synced", true);
                 Storage.setValue(KEY_HOLDS, holds);
                 System.println("[WAGS] Hold " + holdId + " marked as synced");
+                SyncLog.add("SYNCED hold #" + holdId + " OK");
                 return true;
             }
         }
         System.println("[WAGS] Hold " + holdId + " not found for sync marking");
+        SyncLog.add("SYNCED hold #" + holdId + " ERR not found");
         return false;
     }
 

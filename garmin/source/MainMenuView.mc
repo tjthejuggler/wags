@@ -52,6 +52,14 @@ class MainMenuDelegate extends WatchUi.BehaviorDelegate {
         var menu = new WatchUi.Menu2({:title => "WAGS"});
         menu.addItem(new WatchUi.MenuItem("Apnea", "Free Hold & Tables", :menuApnea, null));
         menu.addItem(new WatchUi.MenuItem("Resonance", "Coming Soon", :menuResonance, null));
+        var logCount = SyncLog.getStoredCount();
+        var unsyncedCount = HoldStorage.getUnsyncedCount();
+        menu.addItem(new WatchUi.MenuItem(
+            "Sync Log",
+            logCount + " entries | " + unsyncedCount + " unsynced",
+            :menuSyncLog,
+            null
+        ));
         WatchUi.pushView(menu, new MainMenuItemDelegate(), WatchUi.SLIDE_LEFT);
         return true;
     }
@@ -89,6 +97,9 @@ class MainMenuItemDelegate extends WatchUi.Menu2InputDelegate {
                 new ResonancePlaceholderDelegate(),
                 WatchUi.SLIDE_LEFT
             );
+        } else if (id == :menuSyncLog) {
+            var view = new SyncLogView();
+            WatchUi.pushView(view, new SyncLogDelegate(view), WatchUi.SLIDE_LEFT);
         }
     }
 

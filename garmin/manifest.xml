@@ -7,7 +7,7 @@
 <iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq"
              version="3">
     <iq:application
-        id="a3421bee-d798-4dc2-b397-12345abcde00"
+        id="3affcd49-44e9-497d-a64f-dd8b28e6f6a9"
         type="watch-app"
         name="@Strings.AppName"
         entry="WagsApp"

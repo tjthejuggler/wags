@@ -21,7 +21,11 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -48,7 +52,7 @@ class GarminManager @Inject constructor(
 ) {
     companion object {
         private const val TAG = "GarminManager"
-        const val WAGS_CIQ_APP_ID = "a3421bee-d798-4dc2-b397-12345abcde00"
+        const val WAGS_CIQ_APP_ID = "3affcd49-44e9-497d-a64f-dd8b28e6f6a9"
 
         // SharedPreferences keys for remembering paired device
         private const val PREFS_NAME = "garmin_prefs"
@@ -73,6 +77,27 @@ class GarminManager @Inject constructor(
     /** Emits toast messages to show to the user. */
     private val _toastMessages = MutableSharedFlow<String>(extraBufferCapacity = 10)
     val toastMessages: SharedFlow<String> = _toastMessages.asSharedFlow()
+
+    /** Sync log entries for debugging — newest first in the list. */
+    private val _syncLog = MutableStateFlow<List<String>>(emptyList())
+    val syncLog: StateFlow<List<String>> = _syncLog.asStateFlow()
+
+    private val logTimeFmt = SimpleDateFormat("HH:mm:ss", Locale.US)
+
+    /** Add a timestamped entry to the sync log (max 100 entries). */
+    fun addSyncLog(message: String) {
+        val ts = logTimeFmt.format(Date())
+        val entry = "$ts $message"
+        Log.d(TAG, "[SyncLog] $entry")
+        _syncLog.update { current ->
+            (listOf(entry) + current).take(100)
+        }
+    }
+
+    /** Clear all sync log entries. */
+    fun clearSyncLog() {
+        _syncLog.value = emptyList()
+    }
 
     private var connectIQ: ConnectIQ? = null
     private var connectedDevice: IQDevice? = null
@@ -123,6 +148,7 @@ class GarminManager @Inject constructor(
     fun initialize(connectType: IQConnectType = IQConnectType.WIRELESS) {
         val currentState = _connectionState.value
         Log.w(TAG, "initialize() called. Current state: $currentState")
+        addSyncLog("SDK init (state=$currentState)")
 
         if (currentState is GarminConnectionState.Connected) {
             Log.w(TAG, "Already connected, triggering sync")
@@ -150,6 +176,7 @@ class GarminManager @Inject constructor(
             ciq.initialize(context, true, object : ConnectIQListener {
                 override fun onSdkReady() {
                     Log.w(TAG, ">>> onSdkReady()")
+                    addSyncLog("SDK ready OK")
                     _connectionState.value = GarminConnectionState.SdkReady
                     discoverDevices()
                 }
@@ -157,6 +184,7 @@ class GarminManager @Inject constructor(
                 override fun onInitializeError(status: IQSdkErrorStatus?) {
                     val msg = "Connect IQ init error: ${status?.name ?: "unknown"}"
                     Log.e(TAG, msg)
+                    addSyncLog("SDK init FAIL: ${status?.name}")
                     _connectionState.value = GarminConnectionState.Error(msg)
                     // Retry after delay
                     scope.launch {
@@ -251,6 +279,7 @@ class GarminManager @Inject constructor(
         connectedDevice = device
         val name = device.friendlyName ?: "Garmin Watch"
         Log.i(TAG, "Device connected: $name (${device.deviceIdentifier})")
+        addSyncLog("Device connected: $name")
 
         // Save for auto-reconnect
         savePairedDevice(device)
@@ -288,9 +317,11 @@ class GarminManager @Inject constructor(
                     status: ConnectIQ.IQMessageStatus?
                 ) {
                     Log.w(TAG, ">>> onMessageReceived! status=$status, size=${message?.size}")
+                    addSyncLog("RX msg status=$status size=${message?.size}")
 
                     if (status != ConnectIQ.IQMessageStatus.SUCCESS || message == null) {
                         Log.w(TAG, "Message failed: $status")
+                        addSyncLog("RX FAIL: $status")
                         return
                     }
 
@@ -326,6 +357,7 @@ class GarminManager @Inject constructor(
 
         isSyncing = true
         Log.w(TAG, ">>> Sending SYNC_REQUEST to watch")
+        addSyncLog("SEND SYNC_REQUEST")
 
         try {
             val syncRequest = mapOf("cmd" to "SYNC_REQUEST") as Any
@@ -340,7 +372,9 @@ class GarminManager @Inject constructor(
                         status: ConnectIQ.IQMessageStatus?
                     ) {
                         Log.w(TAG, "SYNC_REQUEST send status: $status")
+                        addSyncLog("SYNC_REQUEST status=$status")
                         if (status != ConnectIQ.IQMessageStatus.SUCCESS) {
+                            addSyncLog("SYNC_REQUEST FAIL")
                             isSyncing = false
                         }
                         // Timeout the sync flag after a delay
@@ -353,6 +387,7 @@ class GarminManager @Inject constructor(
             )
         } catch (e: Exception) {
             Log.e(TAG, "Error sending SYNC_REQUEST", e)
+            addSyncLog("SYNC_REQUEST ERR: ${e.message}")
             isSyncing = false
         }
     }
@@ -366,6 +401,7 @@ class GarminManager @Inject constructor(
         val ciq = connectIQ ?: return
 
         Log.w(TAG, "Sending ACK_HOLD for holdId=$holdId")
+        addSyncLog("SEND ACK_HOLD #$holdId")
 
         try {
             val ack = mapOf("cmd" to "ACK_HOLD", "holdId" to holdId) as Any
@@ -380,6 +416,7 @@ class GarminManager @Inject constructor(
                         status: ConnectIQ.IQMessageStatus?
                     ) {
                         Log.w(TAG, "ACK_HOLD send status: $status")
+                        addSyncLog("ACK_HOLD #$holdId status=$status")
                     }
                 }
             )
@@ -406,11 +443,13 @@ class GarminManager @Inject constructor(
         }
 
         Log.w(TAG, "Message type: $type")
+        addSyncLog("RX type=$type")
 
         when (type) {
             "PONG" -> {
                 val unsyncedCount = (message["unsyncedCount"] as? Number)?.toInt() ?: 0
                 Log.w(TAG, "PONG received: $unsyncedCount unsynced holds")
+                addSyncLog("PONG: $unsyncedCount unsynced")
                 if (unsyncedCount > 0) {
                     requestSync()
                 }
@@ -419,6 +458,7 @@ class GarminManager @Inject constructor(
             "SYNC_COMPLETE" -> {
                 val count = (message["count"] as? Number)?.toInt() ?: 0
                 Log.w(TAG, "SYNC_COMPLETE: $count holds")
+                addSyncLog("SYNC_COMPLETE: $count holds")
                 isSyncing = false
             }
 
@@ -428,6 +468,7 @@ class GarminManager @Inject constructor(
                 val packedSamples = samples.mapNotNull { (it as? Number)?.toInt() }
                 telemetryBatches[batchIndex] = packedSamples
                 Log.w(TAG, "Telemetry batch $batchIndex: ${packedSamples.size} samples")
+                addSyncLog("RX batch #$batchIndex (${packedSamples.size} smp)")
             }
 
             "FREE_HOLD_RESULT" -> {
@@ -439,15 +480,17 @@ class GarminManager @Inject constructor(
                     Log.w(TAG, "Decoded: duration=${payload.durationMs}ms, " +
                             "samples=${payload.telemetrySamples.size}")
 
+                    val durationSec = payload.durationMs / 1000
+                    val min = durationSec / 60
+                    val sec = durationSec % 60
+                    val timeStr = if (min > 0) "${min}m ${sec}s" else "${sec}s"
+                    addSyncLog("SYNCED hold #$holdId OK $timeStr ${payload.telemetrySamples.size}smp")
+
                     scope.launch {
                         _freeHoldPayloads.emit(payload)
                         Log.w(TAG, "Payload emitted to flow")
 
                         // Show toast
-                        val durationSec = payload.durationMs / 1000
-                        val min = durationSec / 60
-                        val sec = durationSec % 60
-                        val timeStr = if (min > 0) "${min}m ${sec}s" else "${sec}s"
                         _toastMessages.emit("Garmin hold synced: $timeStr")
                     }
 
@@ -457,6 +500,7 @@ class GarminManager @Inject constructor(
                     }
                 } else {
                     Log.e(TAG, "Failed to decode FREE_HOLD_RESULT")
+                    addSyncLog("DECODE FAIL hold #$holdId")
                 }
 
                 telemetryBatches.clear()
@@ -476,11 +520,29 @@ class GarminManager @Inject constructor(
             val lungVolume = message["lungVolume"] as? String ?: "FULL"
             val prepType = message["prepType"] as? String ?: "NO_PREP"
             val timeOfDay = message["timeOfDay"] as? String ?: "DAY"
-            val firstContractionMs = (message["firstContractionMs"] as? Number)?.toLong()
-            val startEpochMs = (message["startEpochMs"] as? Number)?.toLong()
-                ?: (System.currentTimeMillis() - durationMs)
-            val endEpochMs = (message["endEpochMs"] as? Number)?.toLong()
-                ?: System.currentTimeMillis()
+
+            // Watch sends -1 instead of null for no contraction
+            val rawFc = (message["firstContractionMs"] as? Number)?.toLong()
+            val firstContractionMs = if (rawFc != null && rawFc >= 0) rawFc else null
+
+            // Watch now sends epoch as seconds; fall back to ms keys for backward compat
+            val startEpochSec = (message["startEpochSec"] as? Number)?.toLong()
+            val endEpochSec = (message["endEpochSec"] as? Number)?.toLong()
+            val startEpochMs: Long
+            val endEpochMs: Long
+
+            if (startEpochSec != null && startEpochSec > 0) {
+                startEpochMs = startEpochSec * 1000L
+            } else {
+                startEpochMs = (message["startEpochMs"] as? Number)?.toLong()
+                    ?: (System.currentTimeMillis() - durationMs)
+            }
+            if (endEpochSec != null && endEpochSec > 0) {
+                endEpochMs = endEpochSec * 1000L
+            } else {
+                endEpochMs = (message["endEpochMs"] as? Number)?.toLong()
+                    ?: System.currentTimeMillis()
+            }
 
             val rawContractions = message["contractions"] as? List<*> ?: emptyList<Any>()
             val contractionTimesMs = rawContractions.mapNotNull { (it as? Number)?.toLong() }

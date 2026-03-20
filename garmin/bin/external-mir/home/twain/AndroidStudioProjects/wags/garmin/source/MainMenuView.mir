@@ -292,9 +292,9 @@ _home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_47_26_49_4_
     }
     [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc"; @line = 51; @symbol_functiondef = [onSelect,51,13,21]; ]
     function onSelect() {
-_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_51_24_57_4_start:
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_51_24_65_4_start:
 [ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 52 8 ]
-        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_51_24_57_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_51_24_57_4_stop" ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_51_24_65_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_51_24_65_4_stop" ]
         %menu.1 = local;
         symbol [ menu %menu.1 52 12 16 ];
         symbol [ WatchUi %tmp.3 52 23 30 ];
@@ -343,233 +343,319 @@ _home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_51_24_57_4_
         %tmp.24 = newc %tmp.27 (%tmp.28, %tmp.29, %tmp.31, %tmp.32);
         invoke %tmp.22 %tmp.23(%tmp.24);
 [ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 55 8 ]
-        symbol [ WatchUi %tmp.33 55 8 15 ];
-        %tmp.33 = getm $.Toybox.WatchUi;
-        symbol [ pushView %tmp.34 55 16 24 ];
-        %tmp.34 = getv function %tmp.33 :pushView;
-        %tmp.35 = lgetv %menu.1;
-        symbol [ menu %tmp.35 55 25 29 ];
-        symbol [ MainMenuItemDelegate %tmp.39 55 35 55 ];
-        %tmp.39 = getv ? :MainMenuItemDelegate;
-        %tmp.36 = newc %tmp.39 ();
-        symbol [ WatchUi %tmp.40 55 59 66 ];
-        %tmp.40 = getm $.Toybox.WatchUi;
-        symbol [ SLIDE_LEFT %tmp.41 55 67 77 ];
-        %tmp.41 = getv %tmp.40 :SLIDE_LEFT;
-        invoke %tmp.33 %tmp.34(%tmp.35, %tmp.36, %tmp.41);
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_51_24_65_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_51_24_65_4_stop" ]
+        %logCount.2 = local;
+        symbol [ logCount %logCount.2 55 12 20 ];
+        symbol [ SyncLog %tmp.34 55 23 30 ];
+        %tmp.34 = getv ? :SyncLog;
+        symbol [ getStoredCount %tmp.35 55 31 45 ];
+        %tmp.35 = getv function %tmp.34 :getStoredCount;
+        %tmp.36 = invoke %tmp.34 %tmp.35();
+        lputv %logCount.2 %tmp.36;
+        symbol [ logCount %logCount.2 55 12 20 ];
 [ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 56 8 ]
-        %tmp.42 = true;
-        ret %tmp.42;
-_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_51_24_57_4_stop:
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_51_24_65_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_51_24_65_4_stop" ]
+        %unsyncedCount.3 = local;
+        symbol [ unsyncedCount %unsyncedCount.3 56 12 25 ];
+        symbol [ HoldStorage %tmp.38 56 28 39 ];
+        %tmp.38 = getv ? :HoldStorage;
+        symbol [ getUnsyncedCount %tmp.39 56 40 56 ];
+        %tmp.39 = getv function %tmp.38 :getUnsyncedCount;
+        %tmp.40 = invoke %tmp.38 %tmp.39();
+        lputv %unsyncedCount.3 %tmp.40;
+        symbol [ unsyncedCount %unsyncedCount.3 56 12 25 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 57 8 ]
+        %tmp.41 = lgetv %menu.1;
+        symbol [ menu %tmp.41 57 8 12 ];
+        symbol [ addItem %tmp.42 57 13 20 ];
+        %tmp.42 = getv function %tmp.41 :addItem;
+        symbol [ WatchUi %tmp.45 57 25 32 ];
+        %tmp.45 = getm $.Toybox.WatchUi;
+        symbol [ MenuItem %tmp.46 57 33 41 ];
+        %tmp.46 = getv function ? %tmp.45 :MenuItem;
+        %tmp.47 = "Sync Log";
+        %tmp.48 = lgetv %logCount.2;
+        symbol [ logCount %tmp.48 59 12 20 ];
+        %tmp.49 = " entries | ";
+        %tmp.50 = add %tmp.48 %tmp.49;
+        %tmp.51 = lgetv %unsyncedCount.3;
+        symbol [ unsyncedCount %tmp.51 59 39 52 ];
+        %tmp.52 = add %tmp.50 %tmp.51;
+        %tmp.53 = " unsynced";
+        %tmp.54 = add %tmp.52 %tmp.53;
+        %tmp.56 = const :menuSyncLog;
+        symbol [ menuSyncLog %tmp.56 60 13 24 const ];
+        %tmp.57 = null;
+        %tmp.43 = newc %tmp.46 (%tmp.47, %tmp.54, %tmp.56, %tmp.57);
+        invoke %tmp.41 %tmp.42(%tmp.43);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 63 8 ]
+        symbol [ WatchUi %tmp.58 63 8 15 ];
+        %tmp.58 = getm $.Toybox.WatchUi;
+        symbol [ pushView %tmp.59 63 16 24 ];
+        %tmp.59 = getv function %tmp.58 :pushView;
+        %tmp.60 = lgetv %menu.1;
+        symbol [ menu %tmp.60 63 25 29 ];
+        symbol [ MainMenuItemDelegate %tmp.64 63 35 55 ];
+        %tmp.64 = getv ? :MainMenuItemDelegate;
+        %tmp.61 = newc %tmp.64 ();
+        symbol [ WatchUi %tmp.65 63 59 66 ];
+        %tmp.65 = getm $.Toybox.WatchUi;
+        symbol [ SLIDE_LEFT %tmp.66 63 67 77 ];
+        %tmp.66 = getv %tmp.65 :SLIDE_LEFT;
+        invoke %tmp.58 %tmp.59(%tmp.60, %tmp.61, %tmp.66);
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 64 8 ]
+        %tmp.67 = true;
+        ret %tmp.67;
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_51_24_65_4_stop:
     }
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc"; @line = 59; @symbol_functiondef = [onBack,59,13,19]; ]
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc"; @line = 67; @symbol_functiondef = [onBack,67,13,19]; ]
     function onBack() {
-_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_59_22_62_4_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 60 8 ]
-        symbol [ System %tmp.1 60 8 14 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_67_22_70_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 68 8 ]
+        symbol [ System %tmp.1 68 8 14 ];
         %tmp.1 = getm $.Toybox.System;
-        symbol [ exit %tmp.2 60 15 19 ];
+        symbol [ exit %tmp.2 68 15 19 ];
         %tmp.2 = getv function %tmp.1 :exit;
         invoke %tmp.1 %tmp.2();
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 61 8 ]
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 69 8 ]
         %tmp.3 = true;
         ret %tmp.3;
-_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_59_22_62_4_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_67_22_70_4_stop:
     }
 }
 //! Handles selection from the top-level menu items.
-[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc"; @line = 66; @symbol_classdef = [MainMenuItemDelegate,66,6,26]; @symbol_extends<0> = [WatchUi,66,35,42]; @symbol_extends<1> = [Menu2InputDelegate,66,43,61]; ]
+[ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc"; @line = 74; @symbol_classdef = [MainMenuItemDelegate,74,6,26]; @symbol_extends<0> = [WatchUi,74,35,42]; @symbol_extends<1> = [Menu2InputDelegate,74,43,61]; ]
 class MainMenuItemDelegate extends WatchUi.Menu2InputDelegate {
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc"; @line = 66; ]
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc"; @line = 74; ]
     <init> {
     }
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc"; @line = 66; ]
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc"; @line = 74; ]
     static
     <init> {
     }
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc"; @line = 68; @symbol_functiondef = [initialize,68,13,23]; ]
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc"; @line = 76; @symbol_functiondef = [initialize,76,13,23]; ]
     function initialize() as Void {
-_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_68_26_70_4_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 69 8 ]
-        symbol [ Menu2InputDelegate %tmp.2 69 8 26 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_76_26_78_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 77 8 ]
+        symbol [ Menu2InputDelegate %tmp.2 77 8 26 ];
         %tmp.2 = getv ? :Menu2InputDelegate;
-        symbol [ initialize %tmp.3 69 27 37 ];
+        symbol [ initialize %tmp.3 77 27 37 ];
         %tmp.3 = getv function %tmp.2 :initialize;
         invoke %tmp.2 %tmp.3();
-_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_68_26_70_4_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_76_26_78_4_stop:
     }
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc"; @line = 72; @symbol_functiondef = [onSelect,72,13,21]; @symbol_param<0> = [item,72,22,26]; ]
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc"; @line = 80; @symbol_functiondef = [onSelect,80,13,21]; @symbol_param<0> = [item,80,22,26]; ]
     function onSelect(item) {
-_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_72_28_93_4_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 73 8 ]
-        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_72_28_93_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_72_28_93_4_stop" ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_80_28_104_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 81 8 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_80_28_104_4_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_80_28_104_4_stop" ]
         %id.1 = local;
-        symbol [ id %id.1 73 12 14 ];
+        symbol [ id %id.1 81 12 14 ];
         %tmp.1 = lgetv %item;
-        symbol [ item %tmp.1 73 17 21 ];
-        symbol [ getId %tmp.2 73 22 27 ];
+        symbol [ item %tmp.1 81 17 21 ];
+        symbol [ getId %tmp.2 81 22 27 ];
         %tmp.2 = getv function %tmp.1 :getId;
         %tmp.3 = invoke %tmp.1 %tmp.2();
         lputv %id.1 %tmp.3;
-        symbol [ id %id.1 73 12 14 ];
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 74 8 ]
-_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_74_8_92_8_if_stmt:
+        symbol [ id %id.1 81 12 14 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 82 8 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_82_8_103_8_if_stmt:
         %tmp.4 = lgetv %id.1;
-        symbol [ id %tmp.4 74 12 14 ];
+        symbol [ id %tmp.4 82 12 14 ];
         %tmp.6 = const :menuApnea;
-        symbol [ menuApnea %tmp.6 74 19 28 const ];
+        symbol [ menuApnea %tmp.6 82 19 28 const ];
         %tmp.7 = eq %tmp.4 %tmp.6;
-        bf %tmp.7 @_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_74_8_92_8_if_false;
-_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_74_8_92_8_if_true:
-_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_74_30_86_8_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 75 12 ]
-        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_74_30_86_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_74_30_86_8_stop" ]
+        bf %tmp.7 @_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_82_8_103_8_if_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_82_8_103_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_82_30_94_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 83 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_82_30_94_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_82_30_94_8_stop" ]
         %menu.2 = local;
-        symbol [ menu %menu.2 75 16 20 ];
-        symbol [ WatchUi %tmp.10 75 27 34 ];
+        symbol [ menu %menu.2 83 16 20 ];
+        symbol [ WatchUi %tmp.10 83 27 34 ];
         %tmp.10 = getm $.Toybox.WatchUi;
-        symbol [ Menu2 %tmp.11 75 35 40 ];
+        symbol [ Menu2 %tmp.11 83 35 40 ];
         %tmp.11 = getv function ? %tmp.10 :Menu2;
         %tmp.12 = newd 1;
         %tmp.14 = const :title;
-        symbol [ title %tmp.14 75 43 48 const ];
+        symbol [ title %tmp.14 83 43 48 const ];
         %tmp.15 = "Apnea";
         %tmp.16 = dup %tmp.12;
         %tmp.17 = aputv %tmp.16 %tmp.14 %tmp.15;
         %tmp.8 = newc %tmp.11 (%tmp.17);
         lputv %menu.2 %tmp.8;
-        symbol [ menu %menu.2 75 16 20 ];
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 76 12 ]
+        symbol [ menu %menu.2 83 16 20 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 84 12 ]
         %tmp.18 = lgetv %menu.2;
-        symbol [ menu %tmp.18 76 12 16 ];
-        symbol [ addItem %tmp.19 76 17 24 ];
+        symbol [ menu %tmp.18 84 12 16 ];
+        symbol [ addItem %tmp.19 84 17 24 ];
         %tmp.19 = getv function %tmp.18 :addItem;
-        symbol [ WatchUi %tmp.22 76 29 36 ];
+        symbol [ WatchUi %tmp.22 84 29 36 ];
         %tmp.22 = getm $.Toybox.WatchUi;
-        symbol [ MenuItem %tmp.23 76 37 45 ];
+        symbol [ MenuItem %tmp.23 84 37 45 ];
         %tmp.23 = getv function ? %tmp.22 :MenuItem;
         %tmp.24 = "Free Hold";
         %tmp.25 = "Start a breath hold";
         %tmp.27 = const :menuFreeHold;
-        symbol [ menuFreeHold %tmp.27 76 83 95 const ];
+        symbol [ menuFreeHold %tmp.27 84 83 95 const ];
         %tmp.28 = null;
         %tmp.20 = newc %tmp.23 (%tmp.24, %tmp.25, %tmp.27, %tmp.28);
         invoke %tmp.18 %tmp.19(%tmp.20);
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 77 12 ]
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 85 12 ]
         %tmp.29 = lgetv %menu.2;
-        symbol [ menu %tmp.29 77 12 16 ];
-        symbol [ addItem %tmp.30 77 17 24 ];
+        symbol [ menu %tmp.29 85 12 16 ];
+        symbol [ addItem %tmp.30 85 17 24 ];
         %tmp.30 = getv function %tmp.29 :addItem;
-        symbol [ WatchUi %tmp.33 77 29 36 ];
+        symbol [ WatchUi %tmp.33 85 29 36 ];
         %tmp.33 = getm $.Toybox.WatchUi;
-        symbol [ MenuItem %tmp.34 77 37 45 ];
+        symbol [ MenuItem %tmp.34 85 37 45 ];
         %tmp.34 = getv function ? %tmp.33 :MenuItem;
         %tmp.35 = "Settings";
-        symbol [ SettingsManager %tmp.37 79 16 31 ];
+        symbol [ SettingsManager %tmp.37 87 16 31 ];
         %tmp.37 = getv ? :SettingsManager;
-        symbol [ lungVolumeLabel %tmp.38 79 32 47 ];
+        symbol [ lungVolumeLabel %tmp.38 87 32 47 ];
         %tmp.38 = getv function %tmp.37 :lungVolumeLabel;
-        symbol [ SettingsManager %tmp.40 79 48 63 ];
+        symbol [ SettingsManager %tmp.40 87 48 63 ];
         %tmp.40 = getv ? :SettingsManager;
-        symbol [ getLungVolume %tmp.41 79 64 77 ];
+        symbol [ getLungVolume %tmp.41 87 64 77 ];
         %tmp.41 = getv function %tmp.40 :getLungVolume;
         %tmp.42 = invoke %tmp.40 %tmp.41();
         %tmp.43 = invoke %tmp.37 %tmp.38(%tmp.42);
         %tmp.44 = " | ";
         %tmp.45 = add %tmp.43 %tmp.44;
-        symbol [ SettingsManager %tmp.47 80 16 31 ];
+        symbol [ SettingsManager %tmp.47 88 16 31 ];
         %tmp.47 = getv ? :SettingsManager;
-        symbol [ prepTypeLabel %tmp.48 80 32 45 ];
+        symbol [ prepTypeLabel %tmp.48 88 32 45 ];
         %tmp.48 = getv function %tmp.47 :prepTypeLabel;
-        symbol [ SettingsManager %tmp.50 80 46 61 ];
+        symbol [ SettingsManager %tmp.50 88 46 61 ];
         %tmp.50 = getv ? :SettingsManager;
-        symbol [ getPrepType %tmp.51 80 62 73 ];
+        symbol [ getPrepType %tmp.51 88 62 73 ];
         %tmp.51 = getv function %tmp.50 :getPrepType;
         %tmp.52 = invoke %tmp.50 %tmp.51();
         %tmp.53 = invoke %tmp.47 %tmp.48(%tmp.52);
         %tmp.54 = add %tmp.45 %tmp.53;
         %tmp.55 = " | ";
         %tmp.56 = add %tmp.54 %tmp.55;
-        symbol [ SettingsManager %tmp.58 81 16 31 ];
+        symbol [ SettingsManager %tmp.58 89 16 31 ];
         %tmp.58 = getv ? :SettingsManager;
-        symbol [ timeOfDayLabel %tmp.59 81 32 46 ];
+        symbol [ timeOfDayLabel %tmp.59 89 32 46 ];
         %tmp.59 = getv function %tmp.58 :timeOfDayLabel;
-        symbol [ SettingsManager %tmp.61 81 47 62 ];
+        symbol [ SettingsManager %tmp.61 89 47 62 ];
         %tmp.61 = getv ? :SettingsManager;
-        symbol [ getTimeOfDay %tmp.62 81 63 75 ];
+        symbol [ getTimeOfDay %tmp.62 89 63 75 ];
         %tmp.62 = getv function %tmp.61 :getTimeOfDay;
         %tmp.63 = invoke %tmp.61 %tmp.62();
         %tmp.64 = invoke %tmp.58 %tmp.59(%tmp.63);
         %tmp.65 = add %tmp.56 %tmp.64;
         %tmp.67 = const :menuSettings;
-        symbol [ menuSettings %tmp.67 82 17 29 const ];
+        symbol [ menuSettings %tmp.67 90 17 29 const ];
         %tmp.68 = null;
         %tmp.31 = newc %tmp.34 (%tmp.35, %tmp.65, %tmp.67, %tmp.68);
         invoke %tmp.29 %tmp.30(%tmp.31);
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 85 12 ]
-        symbol [ WatchUi %tmp.69 85 12 19 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 93 12 ]
+        symbol [ WatchUi %tmp.69 93 12 19 ];
         %tmp.69 = getm $.Toybox.WatchUi;
-        symbol [ pushView %tmp.70 85 20 28 ];
+        symbol [ pushView %tmp.70 93 20 28 ];
         %tmp.70 = getv function %tmp.69 :pushView;
         %tmp.71 = lgetv %menu.2;
-        symbol [ menu %tmp.71 85 29 33 ];
-        symbol [ ApneaMenuDelegate %tmp.75 85 39 56 ];
+        symbol [ menu %tmp.71 93 29 33 ];
+        symbol [ ApneaMenuDelegate %tmp.75 93 39 56 ];
         %tmp.75 = getv ? :ApneaMenuDelegate;
         %tmp.72 = newc %tmp.75 ();
-        symbol [ WatchUi %tmp.76 85 60 67 ];
+        symbol [ WatchUi %tmp.76 93 60 67 ];
         %tmp.76 = getm $.Toybox.WatchUi;
-        symbol [ SLIDE_LEFT %tmp.77 85 68 78 ];
+        symbol [ SLIDE_LEFT %tmp.77 93 68 78 ];
         %tmp.77 = getv %tmp.76 :SLIDE_LEFT;
         invoke %tmp.69 %tmp.70(%tmp.71, %tmp.72, %tmp.77);
-_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_74_30_86_8_stop:
-        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_74_8_92_8_if_end;
-_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_74_8_92_8_if_false:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 86 15 ]
-_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_86_15_92_8_if_stmt:
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_82_30_94_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_82_8_103_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_82_8_103_8_if_false:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 94 15 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_94_15_103_8_if_stmt:
         %tmp.78 = lgetv %id.1;
-        symbol [ id %tmp.78 86 19 21 ];
+        symbol [ id %tmp.78 94 19 21 ];
         %tmp.80 = const :menuResonance;
-        symbol [ menuResonance %tmp.80 86 26 39 const ];
+        symbol [ menuResonance %tmp.80 94 26 39 const ];
         %tmp.81 = eq %tmp.78 %tmp.80;
-        bf %tmp.81 @_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_86_15_92_8_if_end;
-_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_86_15_92_8_if_true:
-_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_86_41_92_8_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 87 12 ]
-        symbol [ WatchUi %tmp.82 87 12 19 ];
+        bf %tmp.81 @_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_94_15_103_8_if_false;
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_94_15_103_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_94_41_100_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 95 12 ]
+        symbol [ WatchUi %tmp.82 95 12 19 ];
         %tmp.82 = getm $.Toybox.WatchUi;
-        symbol [ pushView %tmp.83 87 20 28 ];
+        symbol [ pushView %tmp.83 95 20 28 ];
         %tmp.83 = getv function %tmp.82 :pushView;
-        symbol [ ResonancePlaceholderView %tmp.87 88 20 44 ];
+        symbol [ ResonancePlaceholderView %tmp.87 96 20 44 ];
         %tmp.87 = getv ? :ResonancePlaceholderView;
         %tmp.84 = newc %tmp.87 ();
-        symbol [ ResonancePlaceholderDelegate %tmp.91 89 20 48 ];
+        symbol [ ResonancePlaceholderDelegate %tmp.91 97 20 48 ];
         %tmp.91 = getv ? :ResonancePlaceholderDelegate;
         %tmp.88 = newc %tmp.91 ();
-        symbol [ WatchUi %tmp.92 90 16 23 ];
+        symbol [ WatchUi %tmp.92 98 16 23 ];
         %tmp.92 = getm $.Toybox.WatchUi;
-        symbol [ SLIDE_LEFT %tmp.93 90 24 34 ];
+        symbol [ SLIDE_LEFT %tmp.93 98 24 34 ];
         %tmp.93 = getv %tmp.92 :SLIDE_LEFT;
         invoke %tmp.82 %tmp.83(%tmp.84, %tmp.88, %tmp.93);
-_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_86_41_92_8_stop:
-        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_86_15_92_8_if_end;
-_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_86_15_92_8_if_end:
-_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_74_8_92_8_if_end:
-_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_72_28_93_4_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_94_41_100_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_94_15_103_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_94_15_103_8_if_false:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 100 15 ]
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_100_15_103_8_if_stmt:
+        %tmp.94 = lgetv %id.1;
+        symbol [ id %tmp.94 100 19 21 ];
+        %tmp.96 = const :menuSyncLog;
+        symbol [ menuSyncLog %tmp.96 100 26 37 const ];
+        %tmp.97 = eq %tmp.94 %tmp.96;
+        bf %tmp.97 @_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_100_15_103_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_100_15_103_8_if_true:
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_100_39_103_8_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 101 12 ]
+        [ "_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_100_39_103_8_start" "_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_100_39_103_8_stop" ]
+        %view.3 = local;
+        symbol [ view %view.3 101 16 20 ];
+        symbol [ SyncLogView %tmp.101 101 27 38 ];
+        %tmp.101 = getv ? :SyncLogView;
+        %tmp.98 = newc %tmp.101 ();
+        lputv %view.3 %tmp.98;
+        symbol [ view %view.3 101 16 20 ];
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 102 12 ]
+        symbol [ WatchUi %tmp.102 102 12 19 ];
+        %tmp.102 = getm $.Toybox.WatchUi;
+        symbol [ pushView %tmp.103 102 20 28 ];
+        %tmp.103 = getv function %tmp.102 :pushView;
+        %tmp.104 = lgetv %view.3;
+        symbol [ view %tmp.104 102 29 33 ];
+        symbol [ SyncLogDelegate %tmp.108 102 39 54 ];
+        %tmp.108 = getv ? :SyncLogDelegate;
+        %tmp.109 = lgetv %view.3;
+        symbol [ view %tmp.109 102 55 59 ];
+        %tmp.105 = newc %tmp.108 (%tmp.109);
+        symbol [ WatchUi %tmp.110 102 62 69 ];
+        %tmp.110 = getm $.Toybox.WatchUi;
+        symbol [ SLIDE_LEFT %tmp.111 102 70 80 ];
+        %tmp.111 = getv %tmp.110 :SLIDE_LEFT;
+        invoke %tmp.102 %tmp.103(%tmp.104, %tmp.105, %tmp.111);
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_100_39_103_8_stop:
+        goto @_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_100_15_103_8_if_end;
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_100_15_103_8_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_94_15_103_8_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_82_8_103_8_if_end:
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_80_28_104_4_stop:
     }
-    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc"; @line = 95; @symbol_functiondef = [onBack,95,13,19]; ]
+    [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc"; @line = 106; @symbol_functiondef = [onBack,106,13,19]; ]
     function onBack() {
-_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_95_22_97_4_start:
-[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 96 8 ]
-        symbol [ WatchUi %tmp.1 96 8 15 ];
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_106_22_108_4_start:
+[ "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" 107 8 ]
+        symbol [ WatchUi %tmp.1 107 8 15 ];
         %tmp.1 = getm $.Toybox.WatchUi;
-        symbol [ popView %tmp.2 96 16 23 ];
+        symbol [ popView %tmp.2 107 16 23 ];
         %tmp.2 = getv function %tmp.1 :popView;
-        symbol [ WatchUi %tmp.3 96 24 31 ];
+        symbol [ WatchUi %tmp.3 107 24 31 ];
         %tmp.3 = getm $.Toybox.WatchUi;
-        symbol [ SLIDE_RIGHT %tmp.4 96 32 43 ];
+        symbol [ SLIDE_RIGHT %tmp.4 107 32 43 ];
         %tmp.4 = getv %tmp.3 :SLIDE_RIGHT;
         invoke %tmp.1 %tmp.2(%tmp.4);
-_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_95_22_97_4_stop:
+_home_twain_AndroidStudioProjects_wags_garmin_source_MainMenuView_mc_106_22_108_4_stop:
     }
 }
 [ @file = "/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc"; @line = 1; ]

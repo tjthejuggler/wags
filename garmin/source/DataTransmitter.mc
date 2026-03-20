@@ -1,58 +1,15 @@
 using Toybox.Communications;
 using Toybox.System;
 
-//! ConnectionListener for batch transmissions.
-class BatchConnectionListener extends Communications.ConnectionListener {
-    function initialize() {
-        ConnectionListener.initialize();
-    }
-
-    function onComplete() {
-        System.println("[WAGS] Batch transmit OK");
-    }
-
-    function onError() {
-        System.println("[WAGS] Batch transmit FAILED");
-    }
-}
-
-//! ConnectionListener for the main/summary transmission.
-class MainConnectionListener extends Communications.ConnectionListener {
-    function initialize() {
-        ConnectionListener.initialize();
-    }
-
-    function onComplete() {
-        System.println("[WAGS] Main transmit OK — data sent to phone!");
-        DataTransmitter._pendingPayload = null;
-        DataTransmitter._retryCount = 0;
-    }
-
-    function onError() {
-        System.println("[WAGS] Main transmit FAILED");
-        DataTransmitter._retryCount++;
-        if (DataTransmitter._retryCount < DataTransmitter.MAX_RETRIES) {
-            System.println("[WAGS] Retrying... attempt " + DataTransmitter._retryCount);
-            DataTransmitter.doTransmit();
-        } else {
-            System.println("[WAGS] Max retries reached, giving up.");
-            DataTransmitter._pendingPayload = null;
-            DataTransmitter._retryCount = 0;
-        }
-    }
-}
-
 //! Handles transmitting session data from the watch to the companion phone app.
+//! Uses the MessageQueue for sequential delivery (CIQ only supports one
+//! transmit() in flight at a time).
 module DataTransmitter {
 
-    var _retryCount = 0;
-    var _pendingPayload = null;
-    const MAX_RETRIES = 3;
-
+    //! Transmit a hold payload to the phone via the message queue.
+    //! Handles batching for large sample sets.
     function transmit(payload) {
         System.println("[WAGS] DataTransmitter.transmit() called");
-        _pendingPayload = payload;
-        _retryCount = 0;
 
         // Log payload details
         var pType = payload.get("type");
@@ -60,33 +17,47 @@ module DataTransmitter {
         var pSamples = payload.get("packedSamples");
         var sampleCount = (pSamples != null) ? pSamples.size() : 0;
         System.println("[WAGS] Payload: type=" + pType + " duration=" + pDur + " samples=" + sampleCount);
+        SyncLog.add("TX START dur=" + pDur + " smp=" + sampleCount);
 
-        doTransmit();
-    }
-
-    function doTransmit() {
-        if (_pendingPayload == null) {
-            System.println("[WAGS] doTransmit: no pending payload");
-            return;
-        }
-
-        var payload = _pendingPayload;
-        var samples = payload.get("packedSamples");
-
-        if (samples != null && samples.size() > 60) {
-            System.println("[WAGS] Sending batched (" + samples.size() + " samples)");
+        if (sampleCount > 30) {
+            System.println("[WAGS] Queuing batched (" + sampleCount + " samples)");
             transmitBatched(payload);
         } else {
-            System.println("[WAGS] Sending single message (samples=" +
-                ((samples != null) ? samples.size() : 0) + ")");
-            Communications.transmit(payload, null, new MainConnectionListener());
+            // Build a clean single-message payload without null values
+            var fc = payload.get("firstContractionMs");
+            if (fc == null) { fc = -1; }
+            var ct = payload.get("contractions");
+            if (ct == null) { ct = []; }
+            var startSec = payload.get("startEpochSec");
+            if (startSec == null) { startSec = 0; }
+            var endSec = payload.get("endEpochSec");
+            if (endSec == null) { endSec = 0; }
+
+            var cleanPayload = {
+                "type"               => payload.get("type"),
+                "id"                 => payload.get("id"),
+                "durationMs"         => payload.get("durationMs"),
+                "lungVolume"         => payload.get("lungVolume"),
+                "prepType"           => payload.get("prepType"),
+                "timeOfDay"          => payload.get("timeOfDay"),
+                "firstContractionMs" => fc,
+                "contractions"       => ct,
+                "sampleCount"        => payload.get("sampleCount"),
+                "startEpochSec"      => startSec,
+                "endEpochSec"        => endSec,
+                "packedSamples"      => (pSamples != null) ? pSamples : []
+            };
+
+            System.println("[WAGS] Queuing single message (samples=" + sampleCount + ")");
+            MessageQueue.enqueue(cleanPayload);
         }
     }
 
     function transmitBatched(payload) {
         var samples = payload.get("packedSamples");
         var totalSamples = samples.size();
-        var batchSize = 60;
+        var batchSize = 30;
+        var holdId = payload.get("id");
 
         var batchIndex = 0;
         var offset = 0;
@@ -99,32 +70,43 @@ module DataTransmitter {
             var chunk = samples.slice(offset, end);
             var batchPayload = {
                 "type"       => "TELEMETRY_BATCH",
+                "holdId"     => holdId,
                 "batchIndex" => batchIndex,
                 "offset"     => offset,
                 "samples"    => chunk
             };
 
-            System.println("[WAGS] Sending batch " + batchIndex + " (offset=" + offset + ", size=" + chunk.size() + ")");
-            Communications.transmit(batchPayload, null, new BatchConnectionListener());
+            System.println("[WAGS] Queuing batch " + batchIndex + " (offset=" + offset + ", size=" + chunk.size() + ")");
+            MessageQueue.enqueue(batchPayload);
             offset = end;
             batchIndex++;
         }
 
+        // Build clean summary without null values
+        var fc = payload.get("firstContractionMs");
+        if (fc == null) { fc = -1; }
+        var ct = payload.get("contractions");
+        if (ct == null) { ct = []; }
+        var startSec = payload.get("startEpochSec");
+        if (startSec == null) { startSec = 0; }
+        var endSec = payload.get("endEpochSec");
+        if (endSec == null) { endSec = 0; }
+
         var summary = {
             "type"               => payload.get("type"),
-            "id"                 => payload.get("id"),
+            "id"                 => holdId,
             "durationMs"         => payload.get("durationMs"),
             "lungVolume"         => payload.get("lungVolume"),
             "prepType"           => payload.get("prepType"),
             "timeOfDay"          => payload.get("timeOfDay"),
-            "firstContractionMs" => payload.get("firstContractionMs"),
-            "contractions"       => payload.get("contractions"),
+            "firstContractionMs" => fc,
+            "contractions"       => ct,
             "sampleCount"        => payload.get("sampleCount"),
-            "startEpochMs"       => payload.get("startEpochMs"),
-            "endEpochMs"         => payload.get("endEpochMs"),
+            "startEpochSec"      => startSec,
+            "endEpochSec"        => endSec,
             "batchCount"         => batchIndex
         };
-        System.println("[WAGS] Sending summary message (batchCount=" + batchIndex + ")");
-        Communications.transmit(summary, null, new MainConnectionListener());
+        System.println("[WAGS] Queuing summary message (batchCount=" + batchIndex + ")");
+        MessageQueue.enqueue(summary);
     }
 }

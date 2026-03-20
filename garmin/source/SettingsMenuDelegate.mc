@@ -52,7 +52,11 @@ class LungVolumeDelegate extends WatchUi.Menu2InputDelegate {
         } else if (id == :lvPartial) {
             SettingsManager.setLungVolume("PARTIAL");
         }
+        // Pop the lung volume picker, then pop the stale settings menu
+        // and push a fresh one so subtitles reflect the new value.
         WatchUi.popView(WatchUi.SLIDE_RIGHT);
+        WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
+        _pushFreshSettingsMenu();
     }
 
     function onBack() {
@@ -74,12 +78,41 @@ class PrepTypeDelegate extends WatchUi.Menu2InputDelegate {
         } else if (id == :ptHyper) {
             SettingsManager.setPrepType("HYPER");
         }
+        // Pop the prep type picker, then pop the stale settings menu
+        // and push a fresh one so subtitles reflect the new value.
         WatchUi.popView(WatchUi.SLIDE_RIGHT);
+        WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
+        _pushFreshSettingsMenu();
     }
 
     function onBack() {
         WatchUi.popView(WatchUi.SLIDE_RIGHT);
     }
+}
+
+//! Helper to push a fresh Settings menu with up-to-date subtitles.
+//! Called after changing a setting so the parent menu reflects the change.
+function _pushFreshSettingsMenu() {
+    var menu = new WatchUi.Menu2({:title => "Settings"});
+    menu.addItem(new WatchUi.MenuItem(
+        "Lung Volume",
+        SettingsManager.lungVolumeLabel(SettingsManager.getLungVolume()),
+        :menuLungVolume,
+        null
+    ));
+    menu.addItem(new WatchUi.MenuItem(
+        "Prep Type",
+        SettingsManager.prepTypeLabel(SettingsManager.getPrepType()),
+        :menuPrepType,
+        null
+    ));
+    menu.addItem(new WatchUi.MenuItem(
+        "Time of Day",
+        SettingsManager.timeOfDayLabel(SettingsManager.getTimeOfDay()) + " (auto)",
+        :menuTimeOfDay,
+        null
+    ));
+    WatchUi.pushView(menu, new SettingsMenuDelegate(), WatchUi.SLIDE_IMMEDIATE);
 }
 
 class TimeOfDayInfoView extends WatchUi.View {

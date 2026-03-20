@@ -1,147 +1,109 @@
-# WAGS Garmin Connect IQ App
+# WAGS Garmin Connect IQ Watch App
 
 ## Overview
+Companion watch app for the WAGS Android app. Runs on Garmin fenix 6X Pro.
+Records free-dive breath holds with HR/SpO2 telemetry and syncs data to the phone.
 
-This is the Garmin watch companion app for WAGS (Wellness & Apnea Guidance System).
-It runs on the **Garmin fēnix 6X Pro** and communicates with the Android app via
-the Garmin Connect Mobile (GCM) bridge.
+## Architecture
+- **Watch → Phone**: `Communications.transmit()` pushes hold data to the Android companion app
+- **Phone → Watch**: `ConnectIQ.sendMessage()` sends commands (SYNC_REQUEST, ACK_HOLD, PING)
+- **Local Storage**: `Application.Storage` persists holds until synced
+- **Message Queue**: Sequential transmit with retry logic (max 3 in BLE queue)
 
-## Target Device
+## ⚠️ CRITICAL: Beta App Deployment Required
 
-- **Device:** Garmin fēnix 6X Pro (`fenix6xpro`)
-- **API Level:** 3.4.0 (maximum supported by fēnix 6X)
-- **SDK Version:** Connect IQ SDK 9.1.0+
+**`Communications.transmit()` does NOT work with sideloaded .prg files.**
 
-## App Structure
+When a CIQ app is sideloaded via USB, Garmin Connect Mobile (GCM) cannot route
+`transmit()` messages because the app UUID is not registered in Garmin's cloud.
+GCM immediately rejects the payload → `onError()` fires instantly on the watch.
 
-```
-garmin/
-├── manifest.xml              # App manifest (permissions, target device)
-├── monkey.jungle             # Build configuration
-├── resources/
-│   ├── strings/strings.xml   # App name and string resources
-│   ├── drawables/            # Launcher icon
-│   └── menus/                # XML menu definitions
-└── source/
-    ├── WagsApp.mc            # Main app entry point
-    ├── MainMenuView.mc       # Top-level menu (Apnea | Resonance)
-    ├── ApneaMenuDelegate.mc  # Apnea sub-menu (Free Hold | Settings)
-    ├── SettingsMenuDelegate.mc # Settings sub-menus (Lung Volume, Prep Type, Time of Day)
-    ├── SettingsManager.mc    # Persistent settings storage
-    ├── FreeHoldView.mc       # Free Hold breath-hold screen
-    ├── DataTransmitter.mc    # BLE data transmission to phone
-    └── ResonancePlaceholderView.mc # Placeholder for future Resonance section
-```
+Phone→Watch (`sendMessage()`) works fine for sideloaded apps because the watch OS
+doesn't validate cloud identity for incoming messages. But Watch→Phone requires
+cloud registration.
 
-## Navigation Flow
+### How to Deploy as Beta App
 
-```
-Main Menu
-├── Apnea
-│   ├── Free Hold → FreeHoldView (START → HOLDING → DONE)
-│   └── Settings
-│       ├── Lung Volume (Full / Empty / Partial) — persisted
-│       ├── Prep Type (No Prep / Resonance / Hyper) — persisted
-│       └── Time of Day (Morning / Day / Night) — auto-detected from clock
-└── Resonance (Coming Soon)
-```
+1. **Create a Garmin Developer Account** at https://developer.garmin.com/
+2. **Log in to the Connect IQ Developer Dashboard**: https://apps.garmin.com/developer/
+3. **Create a new app**:
+   - Click "Create App"
+   - App Type: "Watch App"
+   - Name: "WAGS"
+   - Upload the compiled `.prg` file from `garmin/bin/wags.prg`
+   - Set supported devices: fenix 6X Pro
+   - **Important**: The UUID in `manifest.xml` must match what you upload
+4. **Publish as Beta**:
+   - In the release settings, choose "Beta" release type
+   - Beta apps are hidden from public store search
+   - Only your account (and whitelisted testers) can see/install it
+   - Beta apps go live immediately — no review process
+5. **Install via Garmin Connect Mobile**:
+   - Open GCM on your phone
+   - Go to Connect IQ Store → My Apps
+   - Find WAGS (it will appear for your account)
+   - Install it to your fenix 6X Pro
+   - **This registers the UUID with GCM's routing tables**
+6. **Verify**: After installing via GCM, `Communications.transmit()` will work.
+   The watch sync log should show "MQ TX OK" instead of "MQ FAIL".
 
-## Free Hold Controls
-
-| State    | SELECT Button        | BACK Button    |
-|----------|---------------------|----------------|
-| READY    | Start the hold      | Exit to menu   |
-| HOLDING  | Record contraction  | Stop the hold  |
-| DONE     | Return to menu      | Return to menu |
-
-### Haptic Feedback
-- **Start:** Single vibration (200ms)
-- **Contraction:** Short vibration (100ms)
-- **Stop:** Double vibration (200ms + 100ms gap + 200ms)
-
-## Data Protocol
-
-### Payload Format (Watch → Phone)
-
-The watch sends a `Dictionary` to the phone via `Communications.transmit()`:
-
-```
-{
-    "type": "FREE_HOLD_RESULT",
-    "durationMs": Long,
-    "lungVolume": String,        // "FULL" | "EMPTY" | "PARTIAL"
-    "prepType": String,          // "NO_PREP" | "RESONANCE" | "HYPER"
-    "timeOfDay": String,         // "MORNING" | "DAY" | "NIGHT"
-    "firstContractionMs": Long?, // null if no contraction
-    "contractions": Array<Long>, // elapsed ms values
-    "packedSamples": Array<Int>, // bit-packed HR/SpO2
-    "sampleCount": Int,
-    "startEpochMs": Long,
-    "endEpochMs": Long
-}
-```
-
-### Bit-Packing Protocol
-
-Each telemetry sample is packed into a 16-bit integer:
-```
-packed = (HR << 8) | SpO2
-```
-- HR = 0 means null (no reading available)
-- SpO2 = 255 means null (no reading available)
-
-### Batched Transmission
-
-For holds longer than 60 seconds, samples are sent in batches of 60:
-1. `TELEMETRY_BATCH` messages (batchIndex, offset, samples)
-2. Final `FREE_HOLD_RESULT` summary (with batchCount instead of packedSamples)
-
-## Settings Persistence
-
-| Setting     | Storage                    | Behavior                          |
-|-------------|---------------------------|-----------------------------------|
-| Lung Volume | Application.Storage        | Remembered across sessions        |
-| Prep Type   | Application.Storage        | Remembered across sessions        |
-| Time of Day | System.getClockTime()      | Auto-detected, matches Android app|
-
-Time of Day buckets (matching Android `TimeOfDay.fromCurrentTime()`):
-- Morning: 03:00 – 10:59
-- Day: 11:00 – 17:59
-- Night: 18:00 – 02:59
+### Why This Matters
+- Sideloaded apps: `transmit()` → immediate `onError()` (GCM drops the payload)
+- Beta/Store apps: `transmit()` → `onComplete()` (GCM routes to companion app)
+- Phone→Watch works either way (no cloud validation needed for incoming)
 
 ## Building
 
-### Prerequisites
-1. Install the Connect IQ SDK Manager
-2. Download CIQ SDK 9.1.0+
-3. Install VS Code with the Monkey C extension
-4. Configure the SDK path in VS Code settings
-
-### Build Commands
 ```bash
-# Build for simulator
-monkeyc -d fenix6xpro -f monkey.jungle -o bin/wags.prg
-
-# Build for device (release)
-monkeyc -d fenix6xpro -f monkey.jungle -o bin/wags.prg -r
+# From the garmin/ directory:
+/path/to/connectiq-sdk/bin/monkeyc \
+  -d fenix6xpro \
+  -f monkey.jungle \
+  -o bin/wags.prg \
+  -y /path/to/developer_key
 ```
 
-### Deploy to Simulator
-1. Start the Connect IQ simulator
-2. Load `bin/wags.prg`
-3. For Android testing: `adb forward tcp:7381 tcp:7381`
+## Project Structure
 
-### Deploy to Device
-1. Connect the fēnix 6X via USB
-2. Copy `bin/wags.prg` to `GARMIN/APPS/` on the watch
-3. Eject and disconnect
+```
+garmin/
+├── manifest.xml          # App manifest (UUID, permissions, target device)
+├── monkey.jungle         # Build configuration
+├── source/
+│   ├── WagsApp.mc        # Main app + MessageQueue module + QueueListener
+│   ├── FreeHoldView.mc   # Breath hold UI and session recording
+│   ├── DataTransmitter.mc # Builds clean payloads and enqueues for transmit
+│   ├── HoldStorage.mc    # Persistent hold storage (Application.Storage)
+│   ├── MainMenuView.mc   # Main menu with Sync Log entry
+│   ├── SyncLog.mc        # Persistent circular log buffer (40 entries)
+│   ├── SyncLogView.mc    # Scrollable log display view
+│   ├── SettingsManager.mc # User settings (lung volume, prep type, etc.)
+│   ├── SettingsMenuDelegate.mc # Settings menu handler
+│   ├── ApneaMenuDelegate.mc   # Apnea sub-menu handler
+│   └── ResonancePlaceholderView.mc # Placeholder view
+├── resources/
+│   ├── drawables/        # Icons
+│   ├── menus/            # XML menu definitions
+│   └── strings/          # String resources
+└── bin/
+    └── wags.prg          # Compiled output
+```
 
-## Android Integration
+## Sync Protocol
 
-The Android app needs:
-1. **Garmin Connect Mobile** installed on the phone
-2. **Connect IQ Companion SDK** AAR in `app/libs/`
-3. The `GarminManager` class handles SDK initialization and message reception
-4. The `GarminApneaRepository` bridges watch data into the existing apnea database
+1. Phone sends `{cmd: "SYNC_REQUEST"}` to watch
+2. Watch reads unsynced holds from `Application.Storage`
+3. For each hold:
+   - If ≤30 samples: single `FREE_HOLD_RESULT` message with all data
+   - If >30 samples: multiple `TELEMETRY_BATCH` messages + final `FREE_HOLD_RESULT` summary
+4. Phone receives data via `registerForAppEvents()` callback
+5. Phone sends `{cmd: "ACK_HOLD", holdId: N}` to confirm receipt
+6. Watch marks hold as synced in storage
 
-See `app/src/main/java/com/example/wags/data/garmin/` for the Android-side code.
+## Key Technical Notes
+
+- **Options parameter**: `Communications.transmit(payload, null, listener)` — MUST be `null`, not `{}`. Empty dict crashes fenix 6 firmware.
+- **BLE queue limit**: Max 3 messages in flight. MessageQueue enforces 1-at-a-time with retry.
+- **Epoch format**: Stored as seconds (not milliseconds) to avoid Long overflow in CIQ.
+- **No null values**: CIQ dictionaries cannot contain null values. Use -1 sentinel for missing firstContractionMs.
+- **Module-level vars**: Used for MessageQueue state (persists across calls, no `static` keyword issues).

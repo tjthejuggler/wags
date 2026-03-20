@@ -203,6 +203,7 @@ class FreeHoldView extends WatchUi.View {
         contractionTimesMs = [];
         hrSamples = [];
         spo2Samples = [];
+        SyncLog.add("Hold START");
 
         if (Attention has :vibrate) {
             Attention.vibrate([new Attention.VibeProfile(100, 200)]);
@@ -233,6 +234,8 @@ class FreeHoldView extends WatchUi.View {
         holdEndMs = System.getTimer();
         holdState = 2; // STATE_DONE
         refreshTimer.stop();
+        var durSec = (holdEndMs - holdStartMs) / 1000;
+        SyncLog.add("Hold STOP " + durSec + "s hr=" + hrSamples.size() + " smp");
 
         if (Attention has :vibrate) {
             Attention.vibrate([
@@ -263,7 +266,8 @@ class FreeHoldView extends WatchUi.View {
             contractions.add(contractionTimesMs[i]);
         }
 
-        var firstContractionMs = null;
+        // Use -1 instead of null to avoid CIQ serialization issues
+        var firstContractionMs = -1;
         if (contractionTimesMs.size() > 0) {
             firstContractionMs = contractionTimesMs[0];
         }
@@ -279,19 +283,21 @@ class FreeHoldView extends WatchUi.View {
             packedSamples.add((hrVal << 8) | spVal);
         }
 
-        var nowEpoch = Time.now().value() * 1000;
+        // Store epoch as seconds (not ms) to avoid Long overflow in CIQ
+        var nowEpochSec = Time.now().value();
+        var durationSec = durationMs / 1000;
 
         var holdData = {
-            "durationMs"        => durationMs,
-            "lungVolume"        => SettingsManager.getLungVolume(),
-            "prepType"          => SettingsManager.getPrepType(),
-            "timeOfDay"         => SettingsManager.getTimeOfDay(),
+            "durationMs"         => durationMs,
+            "lungVolume"         => SettingsManager.getLungVolume(),
+            "prepType"           => SettingsManager.getPrepType(),
+            "timeOfDay"          => SettingsManager.getTimeOfDay(),
             "firstContractionMs" => firstContractionMs,
-            "contractions"      => contractions,
-            "packedSamples"     => packedSamples,
-            "sampleCount"       => hrSamples.size(),
-            "startEpochMs"      => nowEpoch - durationMs,
-            "endEpochMs"        => nowEpoch
+            "contractions"       => contractions,
+            "packedSamples"      => packedSamples,
+            "sampleCount"        => hrSamples.size(),
+            "startEpochSec"      => nowEpochSec - durationSec,
+            "endEpochSec"        => nowEpochSec
         };
 
         // 1. Save locally for persistence
