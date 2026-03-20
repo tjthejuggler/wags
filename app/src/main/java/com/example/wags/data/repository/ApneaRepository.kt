@@ -101,6 +101,20 @@ class ApneaRepository @Inject constructor(
         }
     }
 
+    /**
+     * Fetches a page of free-hold records that were personal bests at the time they happened.
+     * A record qualifies if no earlier free-hold (same settings) had a longer duration.
+     */
+    suspend fun getPagedPersonalBestFreeHolds(
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        pageSize: Int,
+        offset: Int
+    ): List<ApneaRecordEntity> = withContext(ioDispatcher) {
+        dao.getPagedPersonalBestFreeHolds(lungVolume, prepType, timeOfDay, pageSize, offset)
+    }
+
     suspend fun getById(recordId: Long): ApneaRecordEntity? =
         dao.getById(recordId)
 

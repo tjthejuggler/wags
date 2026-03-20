@@ -1,5 +1,6 @@
 package com.example.wags.ui.apnea
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,9 +15,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -192,17 +201,19 @@ fun AllApneaRecordsScreen(
                                     style = MaterialTheme.typography.labelMedium,
                                     color = TextSecondary
                                 )
-                                // Select All button
-                                val allSelected = state.selectedEventTypes.size == ApneaEventType.ALL.size
+                                // Select All / Deselect All — includes every type including PB sentinel
+                                val allSelected = ApneaEventType.ALL
+                                    .all { state.selectedEventTypes.contains(it.tableTypeValue) }
+                                val allRealSelected = allSelected
                                 TextButton(
                                     onClick = {
-                                        if (allSelected) viewModel.clearAllEventTypes()
+                                        if (allRealSelected) viewModel.clearAllEventTypes()
                                         else viewModel.selectAllEventTypes()
                                     },
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                                 ) {
                                     Text(
-                                        if (allSelected) "Deselect All" else "Select All",
+                                        if (allRealSelected) "Deselect All" else "Select All",
                                         style = MaterialTheme.typography.labelMedium,
                                         color = EcgCyan
                                     )
@@ -238,6 +249,21 @@ fun AllApneaRecordsScreen(
                         }
 
                         HorizontalDivider(color = SurfaceVariant)
+                    }
+                }
+            }
+
+            // ── Progress chart (shown only when exactly one event type selected) ──
+            state.chartPoints?.let { points ->
+                if (points.isNotEmpty()) {
+                    item {
+                        ApneaProgressChart(
+                            points = points,
+                            yLabel = state.chartYLabel,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
                     }
                 }
             }
@@ -312,6 +338,189 @@ fun AllApneaRecordsScreen(
             }
         }
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Progress chart composable
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A simple Canvas-based line chart that plots [points] (oldest→newest left→right).
+ * The Y axis is labelled with [yLabel].
+ *
+ * For "Hold duration" the Y values are in milliseconds; we display them as
+ * human-readable time strings on the axis.
+ */
+@Composable
+private fun ApneaProgressChart(
+    points: List<ChartPoint>,
+    yLabel: String,
+    modifier: Modifier = Modifier
+) {
+    if (points.size < 2) {
+        // Single point — just show a note
+        Card(
+            modifier = modifier,
+            colors = CardDefaults.cardColors(containerColor = SurfaceDark)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "Not enough data to plot a chart yet.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
+        }
+        return
+    }
+
+    val isDuration = yLabel == "Hold duration"
+
+    val lineColor   = EcgCyan
+    val dotColor    = EcgCyan
+    val axisColor   = TextSecondary
+    val gridColor   = SurfaceVariant.copy(alpha = 0.5f)
+    val labelColor  = TextSecondary
+
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            // Title row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Progress",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = EcgCyan
+                )
+                Text(
+                    yLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            val minY = points.minOf { it.y }
+            val maxY = points.maxOf { it.y }
+            val yRange = (maxY - minY).coerceAtLeast(1f)
+
+            val minX = points.first().x
+            val maxX = points.last().x
+            val xRange = (maxX - minX).coerceAtLeast(1L).toFloat()
+
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp)
+            ) {
+                val leftPad   = 64f
+                val rightPad  = 16f
+                val topPad    = 16f
+                val bottomPad = 32f
+
+                val chartW = size.width  - leftPad - rightPad
+                val chartH = size.height - topPad  - bottomPad
+
+                // ── Grid lines (4 horizontal) ──────────────────────────────
+                val gridSteps = 4
+                for (i in 0..gridSteps) {
+                    val fraction = i.toFloat() / gridSteps
+                    val y = topPad + chartH * (1f - fraction)
+                    drawLine(
+                        color = gridColor,
+                        start = Offset(leftPad, y),
+                        end   = Offset(leftPad + chartW, y),
+                        strokeWidth = 1f
+                    )
+                    // Y axis label
+                    val yVal = minY + yRange * fraction
+                    val labelText = if (isDuration) formatChartMs(yVal.toLong()) else "%.1f".format(yVal)
+                    drawContext.canvas.nativeCanvas.drawText(
+                        labelText,
+                        leftPad - 4f,
+                        y + 4f,
+                        android.graphics.Paint().apply {
+                            color     = labelColor.toArgb()
+                            textSize  = 22f
+                            textAlign = android.graphics.Paint.Align.RIGHT
+                            isAntiAlias = true
+                        }
+                    )
+                }
+
+                // ── X axis ────────────────────────────────────────────────
+                drawLine(
+                    color = axisColor,
+                    start = Offset(leftPad, topPad + chartH),
+                    end   = Offset(leftPad + chartW, topPad + chartH),
+                    strokeWidth = 1.5f
+                )
+
+                // ── Line path ─────────────────────────────────────────────
+                val path = Path()
+                points.forEachIndexed { idx, pt ->
+                    val px = leftPad + ((pt.x - minX).toFloat() / xRange) * chartW
+                    val py = topPad  + chartH * (1f - (pt.y - minY) / yRange)
+                    if (idx == 0) path.moveTo(px, py) else path.lineTo(px, py)
+                }
+                drawPath(
+                    path  = path,
+                    color = lineColor,
+                    style = Stroke(
+                        width     = 2.5f,
+                        cap       = StrokeCap.Round,
+                        join      = StrokeJoin.Round
+                    )
+                )
+
+                // ── Dots ──────────────────────────────────────────────────
+                points.forEach { pt ->
+                    val px = leftPad + ((pt.x - minX).toFloat() / xRange) * chartW
+                    val py = topPad  + chartH * (1f - (pt.y - minY) / yRange)
+                    drawCircle(color = dotColor, radius = 4f, center = Offset(px, py))
+                    drawCircle(color = BackgroundDark, radius = 2f, center = Offset(px, py))
+                }
+
+                // ── X axis date labels (first and last) ───────────────────
+                val dateFmt = SimpleDateFormat("MMM d", Locale.getDefault())
+                val firstLabel = dateFmt.format(Date(points.first().x))
+                val lastLabel  = dateFmt.format(Date(points.last().x))
+                val xLabelY    = topPad + chartH + 22f
+                val paint = android.graphics.Paint().apply {
+                    color       = labelColor.toArgb()
+                    textSize    = 22f
+                    isAntiAlias = true
+                }
+                drawContext.canvas.nativeCanvas.drawText(firstLabel, leftPad, xLabelY, paint.apply {
+                    textAlign = android.graphics.Paint.Align.LEFT
+                })
+                drawContext.canvas.nativeCanvas.drawText(lastLabel, leftPad + chartW, xLabelY, paint.apply {
+                    textAlign = android.graphics.Paint.Align.RIGHT
+                })
+            }
+        }
+    }
+}
+
+/** Format milliseconds as a compact time string for chart axis labels. */
+private fun formatChartMs(ms: Long): String {
+    val totalSecs = ms / 1000L
+    val mins = totalSecs / 60
+    val secs = totalSecs % 60
+    return if (mins > 0) "${mins}m${secs}s" else "${secs}s"
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

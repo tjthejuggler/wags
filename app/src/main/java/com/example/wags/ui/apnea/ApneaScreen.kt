@@ -294,7 +294,14 @@ fun ApneaScreen(
                     RecentRecordsContent(
                         records = state.recentRecords,
                         onAllRecordsClick = {
-                            navController.navigate(WagsRoutes.APNEA_ALL_RECORDS)
+                            navController.navigate(
+                                WagsRoutes.apneaAllRecords(
+                                    lungVolume = state.selectedLungVolume,
+                                    prepType   = state.prepType.name,
+                                    timeOfDay  = state.timeOfDay.name,
+                                    eventTypes = "ALL"
+                                )
+                            )
                         },
                         onRecordClick = { record ->
                             navController.navigate(WagsRoutes.apneaRecordDetail(record.recordId))

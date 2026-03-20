@@ -224,6 +224,39 @@ interface ApneaRecordDao {
         offset: Int
     ): List<ApneaRecordEntity>
 
+    // ── Personal-best free holds (records that were a PB when they happened) ─
+
+    /**
+     * Returns free-hold records that were a personal best at the time they were recorded.
+     * A record is a PB if no earlier free-hold record (same settings) had a longer duration.
+     * Pass "" for any filter to match all values.
+     */
+    @Query("""
+        SELECT r.* FROM apnea_records r
+        WHERE r.tableType IS NULL
+          AND (:lungVolume = '' OR r.lungVolume = :lungVolume)
+          AND (:prepType   = '' OR r.prepType   = :prepType)
+          AND (:timeOfDay  = '' OR r.timeOfDay  = :timeOfDay)
+          AND NOT EXISTS (
+              SELECT 1 FROM apnea_records older
+              WHERE older.tableType IS NULL
+                AND (:lungVolume = '' OR older.lungVolume = :lungVolume)
+                AND (:prepType   = '' OR older.prepType   = :prepType)
+                AND (:timeOfDay  = '' OR older.timeOfDay  = :timeOfDay)
+                AND older.timestamp < r.timestamp
+                AND older.durationMs >= r.durationMs
+          )
+        ORDER BY r.timestamp DESC
+        LIMIT :limit OFFSET :offset
+    """)
+    suspend fun getPagedPersonalBestFreeHolds(
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        limit: Int,
+        offset: Int
+    ): List<ApneaRecordEntity>
+
     // ── Stats queries (all settings combined) ────────────────────────────────
 
     @Query("SELECT COUNT(*) FROM apnea_records WHERE tableType IS NULL")

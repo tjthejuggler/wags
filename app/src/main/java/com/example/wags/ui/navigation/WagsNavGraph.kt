@@ -58,7 +58,7 @@ object WagsRoutes {
     const val RF_ASSESSMENT_RESULT = "rf_assessment_result/{sessionTimestamp}"
     const val APNEA_HISTORY = "apnea_history/{lungVolume}/{prepType}/{timeOfDay}"
     const val APNEA_RECORD_DETAIL = "apnea_record_detail/{recordId}"
-    const val APNEA_ALL_RECORDS = "apnea_all_records"
+    const val APNEA_ALL_RECORDS = "apnea_all_records/{lungVolume}/{prepType}/{timeOfDay}/{eventTypes}"
     const val FREE_HOLD_ACTIVE = "free_hold_active/{lungVolume}/{prepType}/{timeOfDay}/{showTimer}"
     // ── Meditation / NSDR ──────────────────────────────────────────────────────
     // ── Garmin Watch ─────────────────────────────────────────────────────────
@@ -82,6 +82,18 @@ object WagsRoutes {
     fun freeHoldActive(lungVolume: String, prepType: String, timeOfDay: String, showTimer: Boolean) =
         "free_hold_active/$lungVolume/$prepType/$timeOfDay/$showTimer"
     fun meditationSessionDetail(sessionId: Long) = "meditation_session_detail/$sessionId"
+
+    /**
+     * Navigate to All Records pre-filtered to the given settings.
+     * [eventTypes] is a comma-separated list of tableType values; use "FREE_HOLD" for free holds,
+     * or "ALL" to select every event type.
+     */
+    fun apneaAllRecords(
+        lungVolume: String = "",
+        prepType: String = "",
+        timeOfDay: String = "",
+        eventTypes: String = "ALL"
+    ) = "apnea_all_records/$lungVolume/$prepType/$timeOfDay/$eventTypes"
 }
 
 @Composable
@@ -194,7 +206,15 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
         composable(WagsRoutes.SESSION_ANALYTICS_HISTORY) {
             SessionAnalyticsHistoryScreen(navController = navController)
         }
-        composable(WagsRoutes.APNEA_ALL_RECORDS) {
+        composable(
+            route = WagsRoutes.APNEA_ALL_RECORDS,
+            arguments = listOf(
+                navArgument("lungVolume") { type = NavType.StringType; defaultValue = "" },
+                navArgument("prepType")   { type = NavType.StringType; defaultValue = "" },
+                navArgument("timeOfDay")  { type = NavType.StringType; defaultValue = "" },
+                navArgument("eventTypes") { type = NavType.StringType; defaultValue = "ALL" }
+            )
+        ) {
             AllApneaRecordsScreen(navController = navController)
         }
         composable(
