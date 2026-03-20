@@ -1,5 +1,9 @@
 package com.example.wags.ui.meditation
 
+import android.content.Context
+import android.media.MediaPlayer
+import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.HrDataSource
@@ -17,6 +21,7 @@ import com.example.wags.domain.usecase.hrv.ArtifactCorrectionUseCase
 import com.example.wags.domain.usecase.session.HrSonificationEngine
 import com.example.wags.domain.usecase.session.NsdrAnalyticsCalculator
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -86,6 +91,7 @@ data class MeditationUiState(
 
 @HiltViewModel
 class MeditationViewModel @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     private val repository: MeditationRepository,
     private val bleManager: PolarBleManager,
     private val oximeterBleManager: OximeterBleManager,
@@ -113,6 +119,9 @@ class MeditationViewModel @Inject constructor(
     private var sessionJob: Job? = null
     private var sessionStartMs = 0L
     private val hrTimeSeries = mutableListOf<Float>()
+
+    // ── Audio playback ─────────────────────────────────────────────────────────
+    private var mediaPlayer: MediaPlayer? = null
 
     init {
         // Observe HR device connection
@@ -257,6 +266,12 @@ class MeditationViewModel @Inject constructor(
         hrTimeSeries.clear()
         sessionStartMs = System.currentTimeMillis()
 
+        // ── Start audio playback ───────────────────────────────────────────────
+        val audio = _uiState.value.selectedAudio
+        if (audio != null && !audio.isNone) {
+            startAudioPlayback(audio)
+        }
+
         _uiState.update {
             it.copy(
                 sessionState      = MeditationSessionState.ACTIVE,
@@ -313,6 +328,7 @@ class MeditationViewModel @Inject constructor(
     fun stopSession() {
         sessionJob?.cancel()
         sonificationEngine.stop()
+        stopAudioPlayback()
         val durationMs = System.currentTimeMillis() - sessionStartMs
         processSession(durationMs)
     }
@@ -336,7 +352,47 @@ class MeditationViewModel @Inject constructor(
         }
     }
 
+    override fun onCleared() {
+        super.onCleared()
+        stopAudioPlayback()
+    }
+
     // ── Private helpers ────────────────────────────────────────────────────────
+
+    /**
+     * Builds a SAF document URI for [audio] inside the stored audio directory,
+     * then starts MediaPlayer on it. Silently ignores any failure so a missing
+     * file never crashes the session.
+     */
+    private fun startAudioPlayback(audio: MeditationAudioEntity) {
+        stopAudioPlayback()
+        val dirUriString = repository.getAudioDirUri()
+        if (dirUriString.isBlank()) return
+        try {
+            val dirUri = Uri.parse(dirUriString)
+            val treeDocId = DocumentsContract.getTreeDocumentId(dirUri)
+            val childDocId = "$treeDocId/${audio.fileName}"
+            val fileUri = DocumentsContract.buildDocumentUriUsingTree(dirUri, childDocId)
+            val mp = MediaPlayer().apply {
+                setDataSource(appContext, fileUri)
+                isLooping = true
+                prepare()
+                start()
+            }
+            mediaPlayer = mp
+        } catch (_: Exception) {
+            // File may not exist or SAF permission revoked — session continues silently
+            mediaPlayer = null
+        }
+    }
+
+    private fun stopAudioPlayback() {
+        mediaPlayer?.runCatching {
+            if (isPlaying) stop()
+            release()
+        }
+        mediaPlayer = null
+    }
 
     private fun computeLiveRmssd(rr: List<Double>): Float? {
         if (rr.size < 2) return null

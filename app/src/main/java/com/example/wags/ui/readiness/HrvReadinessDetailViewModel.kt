@@ -13,7 +13,8 @@ import javax.inject.Inject
 
 data class HrvReadinessDetailUiState(
     val reading: DailyReadingEntity? = null,
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val isDeleted: Boolean = false
 )
 
 @HiltViewModel
@@ -31,6 +32,13 @@ class HrvReadinessDetailViewModel @Inject constructor(
         viewModelScope.launch {
             val reading = repository.getById(readingId)
             _uiState.value = HrvReadinessDetailUiState(reading = reading, isLoading = false)
+        }
+    }
+
+    fun deleteReading() {
+        viewModelScope.launch {
+            repository.deleteReading(readingId)
+            _uiState.value = _uiState.value.copy(isDeleted = true)
         }
     }
 }

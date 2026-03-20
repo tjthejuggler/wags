@@ -24,6 +24,9 @@ interface DailyReadingDao {
     @Query("SELECT * FROM daily_readings WHERE readingId = :id LIMIT 1")
     suspend fun getById(id: Long): DailyReadingEntity?
 
+    @Query("DELETE FROM daily_readings WHERE readingId = :id")
+    suspend fun deleteById(id: Long)
+
     @Query("DELETE FROM daily_readings WHERE timestamp < :beforeTimestamp")
     suspend fun deleteOlderThan(beforeTimestamp: Long)
 }

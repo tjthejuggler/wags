@@ -35,6 +35,40 @@ import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+// ── Shared mini-chart composables (reused by detail screen) ───────────────────
+
+/**
+ * A single-series line chart identical in style to the history graphs,
+ * but sized for embedding inside a detail card.
+ */
+@Composable
+internal fun MeditationDetailLineChart(
+    points: List<Pair<Float, Float>>,   // (x-index, value)
+    lineColor: Color,
+    modifier: Modifier = Modifier,
+    showZeroLine: Boolean = false
+) {
+    if (points.size < 2) {
+        Canvas(modifier = modifier) {
+            drawCircle(color = lineColor, radius = 6f, center = Offset(size.width / 2f, size.height / 2f))
+        }
+        return
+    }
+    val values = points.map { it.second }
+    val yMin = values.min()
+    val yMax = values.max()
+    val yPad = ((yMax - yMin) * 0.15f).coerceAtLeast(0.1f)
+    LineChartCanvas(
+        points = points,
+        lineColor = lineColor,
+        fillAlpha = 0.12f,
+        yMin = yMin - yPad,
+        yMax = yMax + yPad,
+        zeroLine = if (showZeroLine) 0f else null,
+        modifier = modifier
+    )
+}
+
 // ── Tab definitions ────────────────────────────────────────────────────────────
 
 private enum class MeditationHistoryTab(val label: String) {
@@ -92,13 +126,19 @@ fun MeditationHistoryScreen(
                 contentColor = EcgCyan
             ) {
                 MeditationHistoryTab.entries.forEach { tab ->
+                    val isSelected = selectedTab == tab
                     Tab(
-                        selected = selectedTab == tab,
+                        selected = isSelected,
                         onClick = { selectedTab = tab },
+                        modifier = Modifier.background(
+                            if (isSelected) EcgCyan.copy(alpha = 0.15f)
+                            else Color.Transparent
+                        ),
                         text = {
                             Text(
                                 tab.label,
-                                color = if (selectedTab == tab) EcgCyan else TextDisabled
+                                color = if (isSelected) EcgCyan else TextDisabled,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                             )
                         }
                     )

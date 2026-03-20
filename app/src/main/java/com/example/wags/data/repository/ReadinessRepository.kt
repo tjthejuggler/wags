@@ -33,4 +33,7 @@ class ReadinessRepository @Inject constructor(
 
     suspend fun saveReading(entity: DailyReadingEntity): Long =
         dao.insert(entity)
+
+    suspend fun deleteReading(id: Long) =
+        dao.deleteById(id)
 }
