@@ -72,6 +72,47 @@ fun HrvReadinessDetailScreen(
     viewModel: HrvReadinessDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
+    // Navigate back automatically once the record has been deleted
+    LaunchedEffect(uiState.isDeleted) {
+        if (uiState.isDeleted) onNavigateBack()
+    }
+
+    // ── Delete confirmation dialog ─────────────────────────────────────────────
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            containerColor = SurfaceVariant,
+            title = {
+                Text(
+                    "Delete Reading?",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextPrimary
+                )
+            },
+            text = {
+                Text(
+                    "This HRV readiness reading will be permanently deleted and cannot be recovered.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteDialog = false
+                    viewModel.deleteReading()
+                }) {
+                    Text("Delete", color = ReadinessRed, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            }
+        )
+    }
 
     Scaffold(
         containerColor = BackgroundDark,
@@ -83,11 +124,26 @@ fun HrvReadinessDetailScreen(
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
                     }
                 },
+                actions = {
+                    if (uiState.reading != null) {
+                        IconButton(onClick = { showDeleteDialog = true }) {
+                            Text(
+                                "🗑",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = ReadinessRed
+                            )
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )
         }
     ) { padding ->
         when {
+            uiState.isDeleted -> {
+                // Brief blank while LaunchedEffect fires the back navigation
+                Box(modifier = Modifier.fillMaxSize().padding(padding))
+            }
             uiState.isLoading -> {
                 Box(
                     modifier = Modifier
