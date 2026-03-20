@@ -84,6 +84,9 @@ fun BreathingScreen(
                 },
                 actions = {
                     LiveSensorActions(liveHr = state.liveHr, liveSpO2 = state.liveSpO2)
+                    TextButton(onClick = onNavigateToHistory) {
+                        Text("History", color = EcgCyan)
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )
@@ -131,15 +134,6 @@ fun BreathingScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("RF Assessment")
-                    }
-
-                    // Assessment History navigation
-                    OutlinedButton(
-                        onClick = onNavigateToHistory,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = EcgCyan)
-                    ) {
-                        Text("Assessment History")
                     }
                 }
 
