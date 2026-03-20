@@ -1,10 +1,12 @@
 package com.example.wags.ui.breathing
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -41,11 +43,30 @@ private val ChartLine  = Color(0xFFD0D0D0)
 private val ChartDot   = Color(0xFFFFFFFF)
 private val ChartGlow  = Color(0xFF909090)
 
+// ── Coherence zone colors ─────────────────────────────────────────────────────
+private val CoherenceZoneRed = Color(0xFFE53935)
+private val CoherenceZoneBlue = Color(0xFF42A5F5)
+private val CoherenceZoneGreen = Color(0xFF66BB6A)
+private val GoldAccent = Color(0xFFFFD700)
+
+private fun coherenceZoneColor(ratio: Float): Color = when {
+    ratio >= 3f -> CoherenceZoneGreen
+    ratio >= 1f -> CoherenceZoneBlue
+    else -> CoherenceZoneRed
+}
+
+private fun coherenceZoneLabel(ratio: Float): String = when {
+    ratio >= 3f -> "HIGH COHERENCE"
+    ratio >= 1f -> "MEDIUM COHERENCE"
+    else -> "LOW COHERENCE"
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BreathingScreen(
     navController: NavController,
     onNavigateToRfAssessment: () -> Unit = {},
+    onNavigateToHistory: () -> Unit = {},
     viewModel: BreathingViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -111,6 +132,15 @@ fun BreathingScreen(
                     ) {
                         Text("RF Assessment")
                     }
+
+                    // Assessment History navigation
+                    OutlinedButton(
+                        onClick = onNavigateToHistory,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = EcgCyan)
+                    ) {
+                        Text("Assessment History")
+                    }
                 }
 
                 BreathingSessionPhase.PREPARING -> {
@@ -128,8 +158,17 @@ fun BreathingScreen(
                         isInhaling = state.isInhaling
                     )
 
-                    // Coherence score
-                    CoherenceDisplay(score = state.coherenceScore)
+                    // Coherence Zone Traffic Light
+                    CoherenceZoneIndicator(
+                        coherenceRatio = state.liveCoherenceRatio
+                    )
+
+                    // Session points & timer row
+                    SessionStatsRow(
+                        points = state.sessionPoints,
+                        elapsedSeconds = state.sessionElapsedSeconds,
+                        coherenceRatio = state.liveCoherenceRatio
+                    )
 
                     // Live HRV metrics row
                     HrvLiveMetricsRow(
@@ -138,6 +177,16 @@ fun BreathingScreen(
                         sdnn = state.liveSdnn?.toDouble(),
                         rrCount = state.rrCount
                     )
+
+                    // Coherence over time mini-chart
+                    if (state.coherenceHistory.size >= 2) {
+                        CoherenceHistoryChart(
+                            history = state.coherenceHistory,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(80.dp)
+                        )
+                    }
 
                     // Scrolling RR chart
                     RrIntervalChart(
@@ -154,8 +203,385 @@ fun BreathingScreen(
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
                     ) { Text("Stop Session") }
                 }
+
+                BreathingSessionPhase.COMPLETE -> {
+                    SessionCompleteContent(
+                        summary = state.sessionSummary,
+                        onDismiss = { viewModel.dismissSessionComplete() }
+                    )
+                }
             }
         }
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  SESSION COMPLETE CONTENT (inline in BreathingScreen)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@Composable
+private fun SessionCompleteContent(
+    summary: SessionSummary?,
+    onDismiss: () -> Unit
+) {
+    if (summary == null) {
+        Text("No session data available.", color = TextSecondary)
+        Button(onClick = onDismiss) { Text("Back") }
+        return
+    }
+
+    // Hero card
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0D2818)),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp).fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "SESSION COMPLETE",
+                style = MaterialTheme.typography.labelMedium,
+                color = GoldAccent,
+                letterSpacing = 3.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "%.0f".format(summary.totalPoints),
+                style = MaterialTheme.typography.displayLarge.copy(
+                    fontSize = 56.sp,
+                    fontWeight = FontWeight.Bold
+                ),
+                color = Color.White
+            )
+            Text(
+                text = "points earned",
+                style = MaterialTheme.typography.titleMedium,
+                color = Silver
+            )
+            Text(
+                text = "%.1f BPM  •  %s".format(
+                    summary.breathingRateBpm,
+                    formatDuration(summary.durationSeconds)
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Ash
+            )
+        }
+    }
+
+    // Coherence zone breakdown
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                "Coherence Zone Breakdown",
+                style = MaterialTheme.typography.titleSmall,
+                color = Silver,
+                letterSpacing = 2.sp
+            )
+            val totalSec = (summary.timeInHighCoherence + summary.timeInMediumCoherence + summary.timeInLowCoherence)
+                .coerceAtLeast(1)
+            ZoneBar(
+                label = "HIGH",
+                seconds = summary.timeInHighCoherence,
+                totalSeconds = totalSec,
+                color = CoherenceZoneGreen
+            )
+            ZoneBar(
+                label = "MEDIUM",
+                seconds = summary.timeInMediumCoherence,
+                totalSeconds = totalSec,
+                color = CoherenceZoneBlue
+            )
+            ZoneBar(
+                label = "LOW",
+                seconds = summary.timeInLowCoherence,
+                totalSeconds = totalSec,
+                color = CoherenceZoneRed
+            )
+        }
+    }
+
+    // Coherence over time chart
+    if (summary.coherenceHistory.size >= 2) {
+        Text(
+            "Coherence Over Time",
+            style = MaterialTheme.typography.titleSmall,
+            color = Silver,
+            letterSpacing = 2.sp,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+        CoherenceHistoryChart(
+            history = summary.coherenceHistory,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+        )
+    }
+
+    // Metrics table
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            SessionMetricRow("Duration", formatDuration(summary.durationSeconds))
+            HorizontalDivider(color = SurfaceVariant, modifier = Modifier.padding(vertical = 4.dp))
+            SessionMetricRow("Total Beats", "${summary.totalBeats}")
+            HorizontalDivider(color = SurfaceVariant, modifier = Modifier.padding(vertical = 4.dp))
+            SessionMetricRow("Mean Coherence", "%.1f".format(summary.meanCoherenceRatio))
+            HorizontalDivider(color = SurfaceVariant, modifier = Modifier.padding(vertical = 4.dp))
+            SessionMetricRow("Max Coherence", "%.1f".format(summary.maxCoherenceRatio))
+            HorizontalDivider(color = SurfaceVariant, modifier = Modifier.padding(vertical = 4.dp))
+            SessionMetricRow("Mean RMSSD", "%.1f ms".format(summary.meanRmssdMs))
+            HorizontalDivider(color = SurfaceVariant, modifier = Modifier.padding(vertical = 4.dp))
+            SessionMetricRow("Mean SDNN", "%.1f ms".format(summary.meanSdnnMs))
+            HorizontalDivider(color = SurfaceVariant, modifier = Modifier.padding(vertical = 4.dp))
+            SessionMetricRow("Artifact %", "%.1f%%".format(summary.artifactPercent))
+        }
+    }
+
+    // Done button
+    Button(
+        onClick = onDismiss,
+        modifier = Modifier.fillMaxWidth(),
+        colors = ButtonDefaults.buttonColors(containerColor = ButtonPrimary)
+    ) {
+        Text("Done")
+    }
+}
+
+@Composable
+private fun ZoneBar(label: String, seconds: Int, totalSeconds: Int, color: Color) {
+    val fraction = seconds.toFloat() / totalSeconds.coerceAtLeast(1)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(color)
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp,
+            modifier = Modifier.width(60.dp)
+        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(12.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Graphite)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(fraction)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(color.copy(alpha = 0.7f))
+            )
+        }
+        Text(
+            text = formatDuration(seconds),
+            style = MaterialTheme.typography.labelSmall,
+            color = Ash,
+            modifier = Modifier.width(40.dp),
+            textAlign = TextAlign.End
+        )
+    }
+}
+
+@Composable
+private fun SessionMetricRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyLarge,
+            color = EcgCyan,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+private fun formatDuration(seconds: Int): String {
+    val mins = seconds / 60
+    val secs = seconds % 60
+    return "%d:%02d".format(mins, secs)
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  COHERENCE ZONE INDICATOR (Traffic Light)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@Composable
+private fun CoherenceZoneIndicator(coherenceRatio: Float) {
+    val zoneColor by animateColorAsState(
+        targetValue = coherenceZoneColor(coherenceRatio),
+        animationSpec = tween(durationMillis = 1000),
+        label = "zone_color"
+    )
+    val label = coherenceZoneLabel(coherenceRatio)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = zoneColor.copy(alpha = 0.15f)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(16.dp)
+                    .clip(CircleShape)
+                    .background(zoneColor)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = zoneColor,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp
+                )
+                Text(
+                    text = "Ratio: %.1f".format(coherenceRatio),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
+        }
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  SESSION STATS ROW (points, timer, coherence)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@Composable
+private fun SessionStatsRow(points: Float, elapsedSeconds: Int, coherenceRatio: Float) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(SurfaceVariant)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SessionStatCell(value = "%.0f".format(points), label = "POINTS", color = GoldAccent)
+        SessionStatCell(value = formatDuration(elapsedSeconds), label = "TIME", color = Bone)
+        SessionStatCell(value = "%.1f".format(coherenceRatio), label = "COHERENCE", color = EcgCyan)
+    }
+}
+
+@Composable
+private fun SessionStatCell(value: String, label: String, color: Color) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.widthIn(min = 60.dp)
+    ) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            color = color,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = Ash,
+            letterSpacing = 1.sp
+        )
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  COHERENCE HISTORY MINI-CHART
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@Composable
+private fun CoherenceHistoryChart(history: List<Float>, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(Brush.verticalGradient(listOf(Ink, Charcoal.copy(alpha = 0.3f), Ink)))
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize().padding(8.dp)) {
+            if (history.size < 2) return@Canvas
+            val w = size.width
+            val h = size.height
+
+            val maxVal = history.max().coerceAtLeast(1f)
+
+            // Zone threshold lines
+            val highY = h - (3f / maxVal * h).coerceIn(0f, h)
+            val medY = h - (1f / maxVal * h).coerceIn(0f, h)
+            drawLine(CoherenceZoneGreen.copy(alpha = 0.3f), Offset(0f, highY), Offset(w, highY), strokeWidth = 1f)
+            drawLine(CoherenceZoneBlue.copy(alpha = 0.3f), Offset(0f, medY), Offset(w, medY), strokeWidth = 1f)
+
+            // Draw coherence line
+            val path = Path()
+            history.forEachIndexed { idx, value ->
+                val x = idx.toFloat() / (history.size - 1) * w
+                val y = h - (value / maxVal * h).coerceIn(0f, h)
+                if (idx == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+            drawPath(
+                path,
+                EcgCyan,
+                style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+            )
+
+            // Dots at each sample
+            history.forEachIndexed { idx, value ->
+                val x = idx.toFloat() / (history.size - 1) * w
+                val y = h - (value / maxVal * h).coerceIn(0f, h)
+                val dotColor = when {
+                    value >= 3f -> CoherenceZoneGreen
+                    value >= 1f -> CoherenceZoneBlue
+                    else -> CoherenceZoneRed
+                }
+                drawCircle(dotColor, radius = 3.dp.toPx(), center = Offset(x, y))
+            }
+        }
+
+        // Label
+        Text(
+            text = "Coherence Ratio Over Time",
+            style = MaterialTheme.typography.labelSmall,
+            color = Ash,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 2.dp)
+        )
     }
 }
 

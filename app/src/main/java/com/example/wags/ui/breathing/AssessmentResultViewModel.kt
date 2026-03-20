@@ -6,8 +6,11 @@ import androidx.lifecycle.viewModelScope
 import com.example.wags.data.db.entity.RfAssessmentEntity
 import com.example.wags.data.repository.RfAssessmentRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -31,6 +34,10 @@ class AssessmentResultViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
+    /** Emits Unit when the session has been deleted — the screen should pop back. */
+    private val _deleted = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val deleted: SharedFlow<Unit> = _deleted.asSharedFlow()
+
     init {
         viewModelScope.launch {
             val best = repository.getBestSession()
@@ -49,5 +56,12 @@ class AssessmentResultViewModel @Inject constructor(
 
     fun selectTab(index: Int) {
         _uiState.value = _uiState.value.copy(selectedTab = index)
+    }
+
+    fun deleteSession() {
+        viewModelScope.launch {
+            repository.deleteByTimestamp(sessionTimestamp)
+            _deleted.emit(Unit)
+        }
     }
 }

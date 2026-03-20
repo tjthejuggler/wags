@@ -9,12 +9,16 @@ import com.example.wags.data.db.entity.RfAssessmentEntity
 import com.example.wags.data.ipc.HabitIntegrationRepository
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.data.repository.RfAssessmentRepository
+import com.example.wags.domain.usecase.breathing.CoherenceScoreCalculator
 import com.example.wags.domain.usecase.breathing.ContinuousPacerEngine
 import com.example.wags.domain.usecase.breathing.RfAssessmentOrchestrator
 import com.example.wags.domain.usecase.breathing.RfEpochResult
 import com.example.wags.domain.usecase.breathing.RfOrchestratorState
 import com.example.wags.domain.usecase.breathing.RfPhase
 import com.example.wags.domain.usecase.breathing.RfProtocol
+import com.example.wags.domain.usecase.breathing.SlidingWindowResult
+import com.example.wags.domain.usecase.hrv.ArtifactCorrectionUseCase
+import com.example.wags.domain.usecase.hrv.TimeDomainHrvCalculator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -33,6 +37,9 @@ class AssessmentRunViewModel @Inject constructor(
     private val pacerEngine: ContinuousPacerEngine,
     private val hrDataSource: HrDataSource,
     private val habitRepo: HabitIntegrationRepository,
+    private val coherenceCalc: CoherenceScoreCalculator,
+    private val artifactCorrection: ArtifactCorrectionUseCase,
+    private val timeDomainCalc: TimeDomainHrvCalculator,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -54,7 +61,13 @@ class AssessmentRunViewModel @Inject constructor(
         val latestEpochScore: RfEpochResult? = null,
         val qualityWarning: String? = null,
         val isComplete: Boolean = false,
-        val sessionId: Long? = null
+        val sessionId: Long? = null,
+        /** Live coherence ratio (updated every 5s during assessment). */
+        val liveCoherenceRatio: Float = 0f,
+        /** Live HR from sensor. */
+        val liveHr: Int? = null,
+        /** Count of RR intervals collected so far. */
+        val rrCount: Int = 0
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -62,6 +75,7 @@ class AssessmentRunViewModel @Inject constructor(
 
     private var rrPollingJob: Job? = null
     private var pacerJob: Job? = null
+    private var coherenceJob: Job? = null
 
     // Tracks the current pacer rate/ratio so the pacer loop can read them
     @Volatile private var pacerRateBpm: Float = 5.5f
@@ -71,12 +85,17 @@ class AssessmentRunViewModel @Inject constructor(
     // Captured when the session starts so the device label is stored even if it disconnects
     private val sessionHrDeviceLabel: String? = hrDataSource.activeHrDeviceLabel()
 
+    // Track all RR intervals for post-session analytics
+    private val allSessionRrIntervals = mutableListOf<Double>()
+    private val sessionStartTimeMs = System.currentTimeMillis()
+
     init {
         pacerEngine.reset()
         orchestrator.start(protocol = protocol, scope = viewModelScope)
         collectOrchestratorState()
         startRrPolling()
         startPacerLoop()
+        startLiveCoherenceLoop()
     }
 
     // -------------------------------------------------------------------------
@@ -142,17 +161,8 @@ class AssessmentRunViewModel @Inject constructor(
 
                     is RfOrchestratorState.SlidingDone -> {
                         val result = orchState.result
-                        val entity = RfAssessmentEntity(
-                            timestamp       = System.currentTimeMillis(),
-                            protocolType    = protocol.name,
-                            optimalBpm      = result.resonanceFrequencyBpm,
-                            optimalIeRatio  = 1.0f,
-                            compositeScore  = result.peakResonanceIndex,
-                            isValid         = result.isValid,
-                            leaderboardJson = buildSlidingLeaderboardJson(result),
-                            hrDeviceId      = sessionHrDeviceLabel
-                        )
-                        val id = saveEntity(entity)
+                        val enrichedEntity = buildEnrichedSlidingEntity(result)
+                        val id = saveEntity(enrichedEntity)
                         // Signal the Habit app that a Resonance Breathing assessment completed
                         habitRepo.sendHabitIncrement(Slot.RESONANCE_BREATHING)
                         _uiState.value = _uiState.value.copy(
@@ -173,21 +183,98 @@ class AssessmentRunViewModel @Inject constructor(
     private suspend fun saveSteppedSession(epochs: List<RfEpochResult>) {
         val validEpochs = epochs.filter { it.isValid }
         val best = validEpochs.maxByOrNull { it.compositeScore } ?: epochs.firstOrNull()
+
+        // Compute enriched metrics from all collected RR intervals
+        val rrSnapshot = allSessionRrIntervals.toDoubleArray()
+        val correctionResult = if (rrSnapshot.size >= 10) artifactCorrection.execute(rrSnapshot.toList()) else null
+        val correctedNn = correctionResult?.correctedNn ?: rrSnapshot
+        val artifactPct = if (rrSnapshot.isNotEmpty() && correctionResult != null)
+            correctionResult.artifactCount.toFloat() / rrSnapshot.size * 100f else 0f
+
+        val timeDomain = if (correctedNn.size >= 4) timeDomainCalc.calculate(correctedNn) else null
+        val coherenceResult = coherenceCalc.calculateCoherenceRatio(correctedNn)
+        val absLfPower = coherenceCalc.calculateAbsoluteLfPower(correctedNn)
+        val powerSpectrum = coherenceCalc.extractPowerSpectrum(correctedNn)
+
+        val durationSec = ((System.currentTimeMillis() - sessionStartTimeMs) / 1000).toInt()
+
+        // Build resonance curve JSON from epochs
+        val resonanceCurveJson = buildResonanceCurveJson(epochs)
+
+        // Build HR waveform from the best epoch's RR data (approximate from all data)
+        val hrWaveformJson = buildHrWaveformJson(correctedNn)
+
+        // Build power spectrum JSON
+        val powerSpectrumJson = buildPowerSpectrumJson(powerSpectrum)
+
         val entity = RfAssessmentEntity(
-            timestamp       = System.currentTimeMillis(),
-            protocolType    = protocol.name,
-            optimalBpm      = best?.rateBpm ?: 0f,
-            optimalIeRatio  = best?.ieRatio ?: 1.0f,
-            compositeScore  = best?.compositeScore ?: 0f,
-            isValid         = best?.isValid ?: false,
-            leaderboardJson = buildSteppedLeaderboardJson(epochs),
-            hrDeviceId      = sessionHrDeviceLabel
+            timestamp           = System.currentTimeMillis(),
+            protocolType        = protocol.name,
+            optimalBpm          = best?.rateBpm ?: 0f,
+            optimalIeRatio      = best?.ieRatio ?: 1.0f,
+            compositeScore      = best?.compositeScore ?: 0f,
+            isValid             = best?.isValid ?: false,
+            leaderboardJson     = buildSteppedLeaderboardJson(epochs),
+            hrDeviceId          = sessionHrDeviceLabel,
+            peakToTroughBpm     = best?.ptAmplitude ?: 0f,
+            maxLfPowerMs2       = absLfPower,
+            maxCoherenceRatio   = coherenceResult.coherenceRatio,
+            meanRmssdMs         = timeDomain?.rmssdMs?.toFloat() ?: 0f,
+            meanSdnnMs          = timeDomain?.sdnnMs?.toFloat() ?: 0f,
+            durationSeconds     = durationSec,
+            totalBeats          = rrSnapshot.size,
+            artifactPercent     = artifactPct,
+            resonanceCurveJson  = resonanceCurveJson,
+            hrWaveformJson      = hrWaveformJson,
+            powerSpectrumJson   = powerSpectrumJson
         )
         val id = saveEntity(entity)
         _uiState.value = _uiState.value.copy(
             phase      = "COMPLETE",
             isComplete = true,
             sessionId  = id
+        )
+    }
+
+    private fun buildEnrichedSlidingEntity(result: SlidingWindowResult): RfAssessmentEntity {
+        val rrSnapshot = allSessionRrIntervals.toDoubleArray()
+        val correctionResult = if (rrSnapshot.size >= 10) artifactCorrection.execute(rrSnapshot.toList()) else null
+        val correctedNn = correctionResult?.correctedNn ?: rrSnapshot
+        val artifactPct = if (rrSnapshot.isNotEmpty() && correctionResult != null)
+            correctionResult.artifactCount.toFloat() / rrSnapshot.size * 100f else 0f
+
+        val timeDomain = if (correctedNn.size >= 4) timeDomainCalc.calculate(correctedNn) else null
+        val coherenceResult = coherenceCalc.calculateCoherenceRatio(correctedNn)
+        val absLfPower = coherenceCalc.calculateAbsoluteLfPower(correctedNn)
+        val powerSpectrum = coherenceCalc.extractPowerSpectrum(correctedNn)
+
+        val durationSec = ((System.currentTimeMillis() - sessionStartTimeMs) / 1000).toInt()
+
+        // Build resonance curve from sliding window series
+        val resonanceCurveJson = buildSlidingResonanceCurveJson(result)
+        val hrWaveformJson = buildHrWaveformJson(correctedNn)
+        val powerSpectrumJson = buildPowerSpectrumJson(powerSpectrum)
+
+        return RfAssessmentEntity(
+            timestamp           = System.currentTimeMillis(),
+            protocolType        = protocol.name,
+            optimalBpm          = result.resonanceFrequencyBpm,
+            optimalIeRatio      = 1.0f,
+            compositeScore      = result.peakResonanceIndex,
+            isValid             = result.isValid,
+            leaderboardJson     = buildSlidingLeaderboardJson(result),
+            hrDeviceId          = sessionHrDeviceLabel,
+            peakToTroughBpm     = if (result.ptAmpSeries.isNotEmpty()) result.ptAmpSeries.max() / 10f else 0f,
+            maxLfPowerMs2       = absLfPower,
+            maxCoherenceRatio   = coherenceResult.coherenceRatio,
+            meanRmssdMs         = timeDomain?.rmssdMs?.toFloat() ?: 0f,
+            meanSdnnMs          = timeDomain?.sdnnMs?.toFloat() ?: 0f,
+            durationSeconds     = durationSec,
+            totalBeats          = rrSnapshot.size,
+            artifactPercent     = artifactPct,
+            resonanceCurveJson  = resonanceCurveJson,
+            hrWaveformJson      = hrWaveformJson,
+            powerSpectrumJson   = powerSpectrumJson
         )
     }
 
@@ -201,18 +288,55 @@ class AssessmentRunViewModel @Inject constructor(
     }
 
     // -------------------------------------------------------------------------
-    // JSON serialization (minimal, no external library needed)
+    // JSON serialization
     // -------------------------------------------------------------------------
 
     private fun buildSteppedLeaderboardJson(epochs: List<RfEpochResult>): String {
         val entries = epochs.joinToString(",") { e ->
-            """{"bpm":${e.rateBpm},"ie":${e.ieRatio},"score":${e.compositeScore},"valid":${e.isValid}}"""
+            """{"bpm":${e.rateBpm},"ie":${e.ieRatio},"score":${e.compositeScore},"valid":${e.isValid},"ptAmp":${e.ptAmplitude},"lfNu":${e.lfNu},"phase":${e.phaseSynchrony}}"""
         }
         return "[$entries]"
     }
 
-    private fun buildSlidingLeaderboardJson(result: com.example.wags.domain.usecase.breathing.SlidingWindowResult): String {
+    private fun buildSlidingLeaderboardJson(result: SlidingWindowResult): String {
         return """{"resonanceBpm":${result.resonanceFrequencyBpm},"peakIndex":${result.peakResonanceIndex},"peakPlv":${result.peakPlv},"valid":${result.isValid}}"""
+    }
+
+    private fun buildResonanceCurveJson(epochs: List<RfEpochResult>): String {
+        val entries = epochs.joinToString(",") { e ->
+            """{"bpm":${e.rateBpm},"score":${e.compositeScore},"ptAmp":${e.ptAmplitude},"lfNu":${e.lfNu},"phase":${e.phaseSynchrony},"valid":${e.isValid}}"""
+        }
+        return "[$entries]"
+    }
+
+    private fun buildSlidingResonanceCurveJson(result: SlidingWindowResult): String {
+        if (result.timeGrid.isEmpty()) return "[]"
+        val entries = result.timeGrid.indices.joinToString(",") { i ->
+            """{"bpm":${result.pacingBpmSeries[i]},"lfPower":${result.lfPowerSeries[i]},"ptAmp":${result.ptAmpSeries[i]},"plv":${result.plvSeries[i]}}"""
+        }
+        return "[$entries]"
+    }
+
+    private fun buildHrWaveformJson(correctedNn: DoubleArray): String {
+        if (correctedNn.size < 4) return "[]"
+        // Take last 60 seconds worth of data (approx 60-80 beats)
+        val beatsFor60s = minOf(correctedNn.size, 80)
+        val slice = correctedNn.takeLast(beatsFor60s)
+        var timeMs = 0.0
+        val entries = slice.joinToString(",") { rr ->
+            val hrBpm = 60000.0 / rr.coerceAtLeast(1.0)
+            timeMs += rr
+            """{"t":${timeMs.toInt()},"hr":${"%.1f".format(hrBpm)}}"""
+        }
+        return "[$entries]"
+    }
+
+    private fun buildPowerSpectrumJson(spectrum: List<com.example.wags.domain.usecase.breathing.PowerSpectrumPoint>): String {
+        if (spectrum.isEmpty()) return "[]"
+        val entries = spectrum.joinToString(",") { p ->
+            """{"f":${p.frequencyHz},"p":${p.powerMs2}}"""
+        }
+        return "[$entries]"
     }
 
     // -------------------------------------------------------------------------
@@ -227,10 +351,38 @@ class AssessmentRunViewModel @Inject constructor(
                 val currentCount = bleManager.rrBuffer.size()
                 val newCount = currentCount - lastSeenCount
                 if (newCount > 0) {
-                    bleManager.rrBuffer.readLast(newCount).forEach { rrMs ->
+                    val newBeats = bleManager.rrBuffer.readLast(newCount)
+                    newBeats.forEach { rrMs ->
                         orchestrator.feedRr(rrMs.toFloat())
+                        allSessionRrIntervals.add(rrMs)
                     }
                     lastSeenCount = currentCount
+                    _uiState.value = _uiState.value.copy(
+                        rrCount = allSessionRrIntervals.size,
+                        liveHr = hrDataSource.liveHr.value
+                    )
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Live coherence loop — updates every 5 seconds
+    // -------------------------------------------------------------------------
+
+    private fun startLiveCoherenceLoop() {
+        coherenceJob = viewModelScope.launch {
+            while (isActive) {
+                delay(5_000L)
+                val rrSnapshot = synchronized(allSessionRrIntervals) {
+                    if (allSessionRrIntervals.size >= 32) allSessionRrIntervals.takeLast(256).toDoubleArray()
+                    else null
+                }
+                if (rrSnapshot != null) {
+                    val result = coherenceCalc.calculateCoherenceRatio(rrSnapshot)
+                    _uiState.value = _uiState.value.copy(
+                        liveCoherenceRatio = result.coherenceRatio
+                    )
                 }
             }
         }
@@ -263,6 +415,7 @@ class AssessmentRunViewModel @Inject constructor(
     fun cancel() {
         rrPollingJob?.cancel()
         pacerJob?.cancel()
+        coherenceJob?.cancel()
         orchestrator.stop()
     }
 
@@ -270,6 +423,7 @@ class AssessmentRunViewModel @Inject constructor(
         super.onCleared()
         rrPollingJob?.cancel()
         pacerJob?.cancel()
+        coherenceJob?.cancel()
         orchestrator.stop()
     }
 

@@ -30,4 +30,16 @@ class RfAssessmentRepository @Inject constructor(
     /** Check if any sessions exist (used to enable/disable TARGETED protocol). */
     suspend fun hasAnySession(): Boolean =
         dao.hasAnySession()
+
+    /** Get a session by its timestamp. */
+    suspend fun getByTimestamp(timestamp: Long): RfAssessmentEntity? =
+        dao.getByTimestamp(timestamp)
+
+    /** Observe all sessions (newest first) as a Flow. */
+    fun observeAll(): Flow<List<RfAssessmentEntity>> =
+        dao.observeAll()
+
+    /** Delete a session by its timestamp. */
+    suspend fun deleteByTimestamp(timestamp: Long) =
+        dao.deleteByTimestamp(timestamp)
 }

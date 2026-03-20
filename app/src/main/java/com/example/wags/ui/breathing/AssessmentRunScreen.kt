@@ -1,7 +1,11 @@
 package com.example.wags.ui.breathing
 
-import androidx.compose.foundation.Canvas
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Warning
@@ -9,8 +13,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wags.domain.usecase.breathing.RfProtocol
@@ -30,6 +38,26 @@ private fun RfProtocol.displayName(): String = when (this) {
 }
 
 private fun RfProtocol.isStepped(): Boolean = this != RfProtocol.SLIDING_WINDOW
+
+// ---------------------------------------------------------------------------
+// Coherence zone colors
+// ---------------------------------------------------------------------------
+
+private val CoherenceZoneRed = Color(0xFFE53935)
+private val CoherenceZoneBlue = Color(0xFF42A5F5)
+private val CoherenceZoneGreen = Color(0xFF66BB6A)
+
+private fun coherenceZoneColor(ratio: Float): Color = when {
+    ratio >= 3f -> CoherenceZoneGreen
+    ratio >= 1f -> CoherenceZoneBlue
+    else -> CoherenceZoneRed
+}
+
+private fun coherenceZoneLabel(ratio: Float): String = when {
+    ratio >= 3f -> "HIGH COHERENCE"
+    ratio >= 1f -> "MEDIUM COHERENCE"
+    else -> "LOW COHERENCE"
+}
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -52,6 +80,13 @@ fun AssessmentRunScreen(
             onSessionComplete(id)
         }
     }
+
+    // Animate background tint based on coherence zone
+    val zoneColor by animateColorAsState(
+        targetValue = coherenceZoneColor(uiState.liveCoherenceRatio),
+        animationSpec = tween(durationMillis = 1000),
+        label = "zone_color"
+    )
 
     Scaffold(
         containerColor = BackgroundDark,
@@ -78,14 +113,11 @@ fun AssessmentRunScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Pacer visual — unified circle for all protocols
             if (protocol.isStepped()) {
-                // For stepped protocols, derive isInhaling from refWave
-                // refWave goes 0→1 (inhale) then 1→0 (exhale)
-                val isInhale = uiState.refWave > uiState.lastRefWave || uiState.refWave > 0.95f
                 val overlayLabel = when {
                     uiState.phase == "BASELINE" || uiState.phase == "WASHOUT" -> uiState.phase
                     else -> null
@@ -93,15 +125,14 @@ fun AssessmentRunScreen(
                 BreathingPacerCircle(
                     progress = uiState.refWave,
                     isInhaling = uiState.isInhaling,
-                    size = 240.dp,
+                    size = 220.dp,
                     overlayLabel = overlayLabel
                 )
             } else {
-                // Sliding window — use the same circle
                 BreathingPacerCircle(
                     progress = uiState.refWave,
                     isInhaling = uiState.isInhaling,
-                    size = 240.dp
+                    size = 220.dp
                 )
             }
 
@@ -110,6 +141,19 @@ fun AssessmentRunScreen(
                 phase            = uiState.phase,
                 currentBpm       = uiState.currentBpm,
                 remainingSeconds = uiState.remainingSeconds
+            )
+
+            // Coherence Zone Traffic Light
+            CoherenceZoneIndicator(
+                coherenceRatio = uiState.liveCoherenceRatio,
+                zoneColor = zoneColor
+            )
+
+            // Live stats row
+            LiveStatsRow(
+                hr = uiState.liveHr,
+                rrCount = uiState.rrCount,
+                coherenceRatio = uiState.liveCoherenceRatio
             )
 
             // Overall progress
@@ -139,6 +183,107 @@ fun AssessmentRunScreen(
             ) {
                 Text("Cancel Assessment")
             }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Coherence Zone Indicator (Traffic Light)
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun CoherenceZoneIndicator(
+    coherenceRatio: Float,
+    zoneColor: Color
+) {
+    val label = coherenceZoneLabel(coherenceRatio)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = zoneColor.copy(alpha = 0.15f)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Glowing dot
+            Box(
+                modifier = Modifier
+                    .size(16.dp)
+                    .clip(CircleShape)
+                    .background(zoneColor)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = zoneColor,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp
+                )
+                Text(
+                    text = "Ratio: %.1f".format(coherenceRatio),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Live Stats Row
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun LiveStatsRow(
+    hr: Int?,
+    rrCount: Int,
+    coherenceRatio: Float
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(SurfaceVariant)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        StatCell(value = hr?.toString() ?: "—", label = "HR", unit = "bpm")
+        StatCell(value = rrCount.toString(), label = "BEATS", unit = "")
+        StatCell(value = "%.1f".format(coherenceRatio), label = "COHERENCE", unit = "ratio")
+    }
+}
+
+@Composable
+private fun StatCell(value: String, label: String, unit: String) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.widthIn(min = 60.dp)
+    ) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            color = TextPrimary,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = TextSecondary,
+            letterSpacing = 1.sp
+        )
+        if (unit.isNotEmpty()) {
+            Text(
+                text = unit,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                color = TextSecondary.copy(alpha = 0.6f)
+            )
         }
     }
 }

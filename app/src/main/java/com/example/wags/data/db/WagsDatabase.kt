@@ -23,7 +23,7 @@ import com.example.wags.data.db.entity.*
         MeditationSessionEntity::class,
         MorningReadinessTelemetryEntity::class
     ],
-    version = 15,
+    version = 16,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -463,6 +463,25 @@ abstract class WagsDatabase : RoomDatabase() {
 
                 db.execSQL("DROP TABLE `morning_readiness`")
                 db.execSQL("ALTER TABLE `morning_readiness_new` RENAME TO `morning_readiness`")
+            }
+        }
+
+        /**
+         * v15 → v16: Add richer assessment data columns to rf_assessments.
+         */
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE rf_assessments ADD COLUMN peakToTroughBpm REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE rf_assessments ADD COLUMN maxLfPowerMs2 REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE rf_assessments ADD COLUMN maxCoherenceRatio REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE rf_assessments ADD COLUMN meanRmssdMs REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE rf_assessments ADD COLUMN meanSdnnMs REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE rf_assessments ADD COLUMN durationSeconds INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE rf_assessments ADD COLUMN totalBeats INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE rf_assessments ADD COLUMN artifactPercent REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE rf_assessments ADD COLUMN resonanceCurveJson TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE rf_assessments ADD COLUMN hrWaveformJson TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE rf_assessments ADD COLUMN powerSpectrumJson TEXT NOT NULL DEFAULT ''")
             }
         }
     }

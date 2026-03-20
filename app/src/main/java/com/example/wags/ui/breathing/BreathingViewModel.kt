@@ -16,6 +16,8 @@ import com.example.wags.domain.usecase.breathing.RfOrchestratorState
 import com.example.wags.domain.usecase.breathing.RfPhase
 import com.example.wags.domain.usecase.breathing.RfProtocol
 import com.example.wags.domain.usecase.breathing.SlidingWindowResult
+import com.example.wags.domain.usecase.hrv.ArtifactCorrectionUseCase
+import com.example.wags.domain.usecase.hrv.TimeDomainHrvCalculator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
@@ -40,7 +42,9 @@ enum class BreathingSessionPhase {
     /** 10-second countdown before breathing begins */
     PREPARING,
     /** Active guided breathing session */
-    BREATHING
+    BREATHING,
+    /** Session complete — showing summary before navigating */
+    COMPLETE
 }
 
 data class BreathingUiState(
@@ -65,7 +69,42 @@ data class BreathingUiState(
     val liveSdnn: Float? = null,
     val rrCount: Int = 0,
     /** Recent RR intervals (ms) for the scrolling chart — last ~45 values. */
-    val liveRrIntervals: List<Double> = emptyList()
+    val liveRrIntervals: List<Double> = emptyList(),
+
+    // ── Coherence ratio (real-time) ──────────────────────────────────────────
+    /** Live coherence ratio updated every 5 seconds during session. */
+    val liveCoherenceRatio: Float = 0f,
+    /** History of coherence ratio samples for the coherence-over-time chart. */
+    val coherenceHistory: List<Float> = emptyList(),
+
+    // ── Session points / gamification ────────────────────────────────────────
+    /** Accumulated session points (1 pt per second in high coherence, 0.5 in medium). */
+    val sessionPoints: Float = 0f,
+    /** Elapsed session time in seconds. */
+    val sessionElapsedSeconds: Int = 0,
+
+    // ── Session complete data ────────────────────────────────────────────────
+    /** Summary data available when sessionPhase == COMPLETE. */
+    val sessionSummary: SessionSummary? = null
+)
+
+/**
+ * Summary of a completed breathing session.
+ */
+data class SessionSummary(
+    val durationSeconds: Int,
+    val totalBeats: Int,
+    val meanCoherenceRatio: Float,
+    val maxCoherenceRatio: Float,
+    val timeInHighCoherence: Int,
+    val timeInMediumCoherence: Int,
+    val timeInLowCoherence: Int,
+    val meanRmssdMs: Float,
+    val meanSdnnMs: Float,
+    val artifactPercent: Float,
+    val totalPoints: Float,
+    val coherenceHistory: List<Float>,
+    val breathingRateBpm: Float
 )
 
 @HiltViewModel
@@ -77,6 +116,8 @@ class BreathingViewModel @Inject constructor(
     private val coherenceCalculator: CoherenceScoreCalculator,
     private val rfOrchestrator: RfAssessmentOrchestrator,
     private val habitRepo: HabitIntegrationRepository,
+    private val artifactCorrection: ArtifactCorrectionUseCase,
+    private val timeDomainCalc: TimeDomainHrvCalculator,
     @MathDispatcher private val mathDispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
@@ -101,9 +142,20 @@ class BreathingViewModel @Inject constructor(
     private var rfCollectorJob: Job? = null
     private var prepJob: Job? = null
     private var rrPollingJob: Job? = null
+    private var timerJob: Job? = null
 
     /** Buffer size at the moment the session started — used to ignore pre-session RR intervals */
     private var rrBufferSizeAtStart: Int = 0
+
+    /** All RR intervals collected during this session (for post-session analytics). */
+    private val allSessionRrIntervals = mutableListOf<Double>()
+    private var sessionStartTimeMs = 0L
+
+    // Coherence zone time tracking
+    private var highCoherenceSeconds = 0
+    private var mediumCoherenceSeconds = 0
+    private var lowCoherenceSeconds = 0
+    private var sessionPoints = 0f
 
     fun setBreathingRate(rateBpm: Float) {
         _uiState.update { it.copy(breathingRateBpm = rateBpm.coerceIn(4.0f, 7.0f)) }
@@ -118,6 +170,12 @@ class BreathingViewModel @Inject constructor(
         bleManager.startRrStream(deviceId)
         rrBufferSizeAtStart = bleManager.rrBuffer.size()
         pacerEngine.reset()
+        allSessionRrIntervals.clear()
+        sessionStartTimeMs = System.currentTimeMillis()
+        highCoherenceSeconds = 0
+        mediumCoherenceSeconds = 0
+        lowCoherenceSeconds = 0
+        sessionPoints = 0f
         _uiState.update {
             it.copy(
                 isSessionActive = true,
@@ -126,7 +184,12 @@ class BreathingViewModel @Inject constructor(
                 liveRmssd = null,
                 liveSdnn = null,
                 rrCount = 0,
-                liveRrIntervals = emptyList()
+                liveRrIntervals = emptyList(),
+                liveCoherenceRatio = 0f,
+                coherenceHistory = emptyList(),
+                sessionPoints = 0f,
+                sessionElapsedSeconds = 0,
+                sessionSummary = null
             )
         }
         startPreparationCountdown()
@@ -139,6 +202,7 @@ class BreathingViewModel @Inject constructor(
                 delay(1_000L)
             }
             // Preparation complete — start breathing
+            sessionStartTimeMs = System.currentTimeMillis()
             _uiState.update {
                 it.copy(
                     sessionPhase = BreathingSessionPhase.BREATHING,
@@ -148,6 +212,7 @@ class BreathingViewModel @Inject constructor(
             startPacerLoop()
             startCoherenceLoop()
             startRrPollingLoop()
+            startSessionTimer()
         }
     }
 
@@ -156,14 +221,73 @@ class BreathingViewModel @Inject constructor(
         pacerJob?.cancel()
         coherenceJob?.cancel()
         rrPollingJob?.cancel()
-        _uiState.update {
-            it.copy(
-                isSessionActive = false,
-                sessionPhase = BreathingSessionPhase.IDLE
-            )
+        timerJob?.cancel()
+
+        val currentState = _uiState.value
+
+        // If we were actually breathing (not just preparing), compute summary
+        if (currentState.sessionPhase == BreathingSessionPhase.BREATHING && allSessionRrIntervals.size >= 10) {
+            val summary = computeSessionSummary(currentState)
+            _uiState.update {
+                it.copy(
+                    isSessionActive = false,
+                    sessionPhase = BreathingSessionPhase.COMPLETE,
+                    sessionSummary = summary
+                )
+            }
+        } else {
+            _uiState.update {
+                it.copy(
+                    isSessionActive = false,
+                    sessionPhase = BreathingSessionPhase.IDLE
+                )
+            }
         }
+
         // Signal the Habit app that a Resonance Breathing session was completed
         habitRepo.sendHabitIncrement(Slot.RESONANCE_BREATHING)
+    }
+
+    /** Called from the session complete screen to return to idle. */
+    fun dismissSessionComplete() {
+        _uiState.update {
+            it.copy(
+                sessionPhase = BreathingSessionPhase.IDLE,
+                sessionSummary = null
+            )
+        }
+    }
+
+    private fun computeSessionSummary(currentState: BreathingUiState): SessionSummary {
+        val rrSnapshot = allSessionRrIntervals.toDoubleArray()
+        val correctionResult = if (rrSnapshot.size >= 10) artifactCorrection.execute(rrSnapshot.toList()) else null
+        val correctedNn = correctionResult?.correctedNn ?: rrSnapshot
+        val artifactPct = if (rrSnapshot.isNotEmpty() && correctionResult != null)
+            correctionResult.artifactCount.toFloat() / rrSnapshot.size * 100f else 0f
+
+        val timeDomain = if (correctedNn.size >= 4) timeDomainCalc.calculate(correctedNn) else null
+
+        val coherenceHistory = currentState.coherenceHistory
+        val meanCoherence = if (coherenceHistory.isNotEmpty()) coherenceHistory.average().toFloat() else 0f
+        val maxCoherence = if (coherenceHistory.isNotEmpty()) coherenceHistory.max() else 0f
+
+        val durationSec = ((System.currentTimeMillis() - sessionStartTimeMs) / 1000).toInt()
+
+        return SessionSummary(
+            durationSeconds = durationSec,
+            totalBeats = rrSnapshot.size,
+            meanCoherenceRatio = meanCoherence,
+            maxCoherenceRatio = maxCoherence,
+            timeInHighCoherence = highCoherenceSeconds,
+            timeInMediumCoherence = mediumCoherenceSeconds,
+            timeInLowCoherence = lowCoherenceSeconds,
+            meanRmssdMs = timeDomain?.rmssdMs?.toFloat() ?: 0f,
+            meanSdnnMs = timeDomain?.sdnnMs?.toFloat() ?: 0f,
+            artifactPercent = artifactPct,
+            totalPoints = sessionPoints,
+            coherenceHistory = coherenceHistory,
+            breathingRateBpm = currentState.breathingRateBpm
+        )
     }
 
     private fun startPacerLoop() {
@@ -188,26 +312,85 @@ class BreathingViewModel @Inject constructor(
     private fun startCoherenceLoop() {
         coherenceJob = viewModelScope.launch {
             while (isActive) {
-                delay(1_000L)
+                delay(5_000L)
                 val now = System.currentTimeMillis()
-                if (now - lastCoherenceUpdateMs < 1_000L) continue
                 lastCoherenceUpdateMs = now
 
-                val rrSnapshot = bleManager.rrBuffer.readLast(256)
-                if (rrSnapshot.size < 32) continue
-
-                val newScore = withContext(mathDispatcher) {
-                    val state = _uiState.value
-                    val targetFreq = accEngine.breathRateBpm.value?.let { it / 60f }
-                        ?: (state.breathingRateBpm / 60f)
-                    coherenceCalculator.calculateFft(
-                        nn = rrSnapshot.toDoubleArray(),
-                        targetFreqHz = targetFreq.toDouble()
-                    )
+                val rrSnapshot = synchronized(allSessionRrIntervals) {
+                    if (allSessionRrIntervals.size >= 32) allSessionRrIntervals.takeLast(256).toDoubleArray()
+                    else null
                 }
 
-                if (newScore > 0f) lastCoherenceScore = newScore
-                _uiState.update { it.copy(coherenceScore = lastCoherenceScore) }
+                if (rrSnapshot != null) {
+                    val result = withContext(mathDispatcher) {
+                        coherenceCalculator.calculateCoherenceRatio(rrSnapshot)
+                    }
+                    val ratio = result.coherenceRatio
+
+                    // Also compute the old FFT-based score for backward compat display
+                    val fftScore = withContext(mathDispatcher) {
+                        val state = _uiState.value
+                        val targetFreq = accEngine.breathRateBpm.value?.let { it / 60f }
+                            ?: (state.breathingRateBpm / 60f)
+                        coherenceCalculator.calculateFft(
+                            nn = rrSnapshot,
+                            targetFreqHz = targetFreq.toDouble()
+                        )
+                    }
+                    if (fftScore > 0f) lastCoherenceScore = fftScore
+
+                    // Track coherence zone time (5 seconds per update)
+                    when {
+                        ratio >= 3f -> {
+                            highCoherenceSeconds += 5
+                            sessionPoints += 5f  // 1 pt/sec in high
+                        }
+                        ratio >= 1f -> {
+                            mediumCoherenceSeconds += 5
+                            sessionPoints += 2.5f  // 0.5 pt/sec in medium
+                        }
+                        else -> {
+                            lowCoherenceSeconds += 5
+                            // No points in low coherence
+                        }
+                    }
+
+                    _uiState.update {
+                        it.copy(
+                            coherenceScore = lastCoherenceScore,
+                            liveCoherenceRatio = ratio,
+                            coherenceHistory = it.coherenceHistory + ratio,
+                            sessionPoints = sessionPoints
+                        )
+                    }
+                } else {
+                    // Not enough data yet — still update FFT score
+                    val rrAll = bleManager.rrBuffer.readLast(256)
+                    if (rrAll.size >= 32) {
+                        val newScore = withContext(mathDispatcher) {
+                            val state = _uiState.value
+                            val targetFreq = accEngine.breathRateBpm.value?.let { it / 60f }
+                                ?: (state.breathingRateBpm / 60f)
+                            coherenceCalculator.calculateFft(
+                                nn = rrAll.toDoubleArray(),
+                                targetFreqHz = targetFreq.toDouble()
+                            )
+                        }
+                        if (newScore > 0f) lastCoherenceScore = newScore
+                        _uiState.update { it.copy(coherenceScore = lastCoherenceScore) }
+                    }
+                }
+            }
+        }
+    }
+
+    /** Tracks elapsed session time. */
+    private fun startSessionTimer() {
+        timerJob = viewModelScope.launch {
+            while (isActive) {
+                delay(1_000L)
+                val elapsed = ((System.currentTimeMillis() - sessionStartTimeMs) / 1000).toInt()
+                _uiState.update { it.copy(sessionElapsedSeconds = elapsed) }
             }
         }
     }
@@ -217,19 +400,29 @@ class BreathingViewModel @Inject constructor(
      */
     private fun startRrPollingLoop() {
         rrPollingJob = viewModelScope.launch {
+            var lastSeenCount = bleManager.rrBuffer.size()
             while (isActive) {
                 delay(500L) // 2 Hz for smooth chart updates
-                val totalInBuffer = bleManager.rrBuffer.size()
-                val newCount = totalInBuffer - rrBufferSizeAtStart
-                val snapshot = if (newCount > 0) bleManager.rrBuffer.readLast(newCount) else emptyList()
+                val currentCount = bleManager.rrBuffer.size()
+                val newCount = currentCount - lastSeenCount
+                if (newCount > 0) {
+                    val newBeats = bleManager.rrBuffer.readLast(newCount)
+                    synchronized(allSessionRrIntervals) {
+                        newBeats.forEach { rrMs -> allSessionRrIntervals.add(rrMs) }
+                    }
+                    lastSeenCount = currentCount
+                }
+
+                val totalNew = currentCount - rrBufferSizeAtStart
+                val snapshot = if (totalNew > 0) bleManager.rrBuffer.readLast(totalNew) else emptyList()
                 val liveRmssd = computeLiveRmssd(snapshot)
                 val liveSdnn = computeLiveSdnn(snapshot)
-                val chartRr = if (newCount > 0) bleManager.rrBuffer.readLast(45.coerceAtMost(newCount)) else emptyList()
+                val chartRr = if (totalNew > 0) bleManager.rrBuffer.readLast(45.coerceAtMost(totalNew)) else emptyList()
                 _uiState.update {
                     it.copy(
                         liveRmssd = liveRmssd,
                         liveSdnn = liveSdnn,
-                        rrCount = snapshot.size,
+                        rrCount = allSessionRrIntervals.size,
                         liveRrIntervals = chartRr
                     )
                 }
@@ -331,6 +524,7 @@ class BreathingViewModel @Inject constructor(
         coherenceJob?.cancel()
         rfCollectorJob?.cancel()
         rrPollingJob?.cancel()
+        timerJob?.cancel()
         rfOrchestrator.stop()
     }
 }

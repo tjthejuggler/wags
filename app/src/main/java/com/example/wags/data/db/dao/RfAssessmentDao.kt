@@ -20,4 +20,13 @@ interface RfAssessmentDao {
 
     @Query("SELECT COUNT(*) > 0 FROM rf_assessments")
     suspend fun hasAnySession(): Boolean
+
+    @Query("SELECT * FROM rf_assessments WHERE timestamp = :timestamp LIMIT 1")
+    suspend fun getByTimestamp(timestamp: Long): RfAssessmentEntity?
+
+    @Query("SELECT * FROM rf_assessments ORDER BY timestamp DESC")
+    fun observeAll(): Flow<List<RfAssessmentEntity>>
+
+    @Query("DELETE FROM rf_assessments WHERE timestamp = :timestamp")
+    suspend fun deleteByTimestamp(timestamp: Long)
 }
