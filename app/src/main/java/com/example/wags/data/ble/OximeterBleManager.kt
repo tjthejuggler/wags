@@ -84,14 +84,20 @@ class OximeterBleManager @Inject constructor(
 
     fun startScan() {
         val scanner: BluetoothLeScanner = bluetoothAdapter?.bluetoothLeScanner ?: return
+        // Cancel any previous UI scan job but keep a fresh callback instance so
+        // stopScan(uiScanCallback) never accidentally kills a background scan.
         scanJob?.cancel()
+        try { bluetoothAdapter?.bluetoothLeScanner?.stopScan(uiScanCallback) } catch (_: Exception) {}
         _scanResults.value = emptyList()
         _connectionState.value = OximeterConnectionState.Scanning(0)
 
         scanJob = scope.launch {
-            scanner.startScan(scanCallback)
+            val settings = ScanSettings.Builder()
+                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                .build()
+            scanner.startScan(null, settings, uiScanCallback)
             delay(SCAN_TIMEOUT_MS)
-            scanner.stopScan(scanCallback)
+            try { scanner.stopScan(uiScanCallback) } catch (_: Exception) {}
             if (_connectionState.value is OximeterConnectionState.Scanning) {
                 _connectionState.value = OximeterConnectionState.Disconnected
             }
@@ -101,15 +107,25 @@ class OximeterBleManager @Inject constructor(
     fun stopScan() {
         scanJob?.cancel()
         scanJob = null
-        bluetoothAdapter?.bluetoothLeScanner?.stopScan(scanCallback)
+        try { bluetoothAdapter?.bluetoothLeScanner?.stopScan(uiScanCallback) } catch (_: Exception) {}
         if (_connectionState.value is OximeterConnectionState.Scanning) {
             _connectionState.value = OximeterConnectionState.Disconnected
         }
     }
 
-    private val scanCallback = object : ScanCallback() {
+    /**
+     * Dedicated callback for the user-initiated scan (Scan button).
+     * Kept separate from the background-scan callback so [stopScan] never
+     * accidentally kills an in-progress background scan.
+     *
+     * Polar devices (name starts with "Polar ") are excluded — they are handled
+     * exclusively by [PolarBleManager] and must never appear in the oximeter list.
+     */
+    private val uiScanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             val name = result.device.name?.takeIf { it.isNotBlank() } ?: return
+            // Exclude Polar devices — they belong in the Polar section only
+            if (name.startsWith("Polar ", ignoreCase = true)) return
             val current = _scanResults.value.toMutableList()
             if (current.none { it.device.address == result.device.address }) {
                 Log.d(TAG, "Found BLE device: $name  ${result.device.address}")
@@ -124,6 +140,9 @@ class OximeterBleManager @Inject constructor(
             _connectionState.value = OximeterConnectionState.Error("Scan failed: $errorCode")
         }
     }
+
+    // Keep the old name as an alias so existing call-sites in connect() still compile
+    private val scanCallback get() = uiScanCallback
 
     // ── Background scan ───────────────────────────────────────────────────────
 
