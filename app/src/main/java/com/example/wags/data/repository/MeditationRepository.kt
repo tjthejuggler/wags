@@ -149,6 +149,8 @@ class MeditationRepository @Inject constructor(
     suspend fun insertSession(session: MeditationSessionEntity): Long =
         sessionDao.insert(session)
 
+    suspend fun deleteSessionById(id: Long) = sessionDao.deleteById(id)
+
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     private fun isAudioExtension(name: String): Boolean {

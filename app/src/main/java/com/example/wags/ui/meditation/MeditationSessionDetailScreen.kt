@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -28,6 +29,44 @@ fun MeditationSessionDetailScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // Pop back automatically once the session has been deleted
+    LaunchedEffect(state.deleted) {
+        if (state.deleted) navController.popBackStack()
+    }
+
+    // Delete confirmation dialog
+    if (state.showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelDelete() },
+            containerColor   = SurfaceVariant,
+            title = {
+                Text(
+                    "Delete this session?",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextPrimary
+                )
+            },
+            text = {
+                Text(
+                    "This will permanently remove the meditation session record. This cannot be undone.",
+                    style     = MaterialTheme.typography.bodySmall,
+                    color     = TextSecondary,
+                    textAlign = TextAlign.Start
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.confirmDelete() }) {
+                    Text("Delete", color = ReadinessRed, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.cancelDelete() }) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            }
+        )
+    }
+
     Scaffold(
         containerColor = BackgroundDark,
         topBar = {
@@ -40,6 +79,18 @@ fun MeditationSessionDetailScreen(
                             contentDescription = "Back",
                             tint = EcgCyan
                         )
+                    }
+                },
+                actions = {
+                    // Only show delete when a session is loaded
+                    if (state.session != null) {
+                        IconButton(onClick = { viewModel.requestDelete() }) {
+                            Text(
+                                "🗑",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = ReadinessRed
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)

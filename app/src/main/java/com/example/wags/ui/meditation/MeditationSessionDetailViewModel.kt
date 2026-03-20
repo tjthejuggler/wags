@@ -10,13 +10,18 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class MeditationSessionDetailUiState(
     val session: MeditationSessionEntity? = null,
     val audio: MeditationAudioEntity? = null,
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    /** True while the delete-confirmation dialog is visible. */
+    val showDeleteConfirm: Boolean = false,
+    /** Set to true after the record has been successfully deleted — screen should pop. */
+    val deleted: Boolean = false
 )
 
 @HiltViewModel
@@ -39,6 +44,21 @@ class MeditationSessionDetailViewModel @Inject constructor(
                 audio = audio,
                 isLoading = false
             )
+        }
+    }
+
+    fun requestDelete() {
+        _uiState.update { it.copy(showDeleteConfirm = true) }
+    }
+
+    fun cancelDelete() {
+        _uiState.update { it.copy(showDeleteConfirm = false) }
+    }
+
+    fun confirmDelete() {
+        viewModelScope.launch {
+            repository.deleteSessionById(sessionId)
+            _uiState.update { it.copy(showDeleteConfirm = false, deleted = true) }
         }
     }
 }
