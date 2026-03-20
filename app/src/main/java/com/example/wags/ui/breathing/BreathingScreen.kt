@@ -96,9 +96,9 @@ fun BreathingScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             when (state.sessionPhase) {
@@ -106,7 +106,8 @@ fun BreathingScreen(
                     // Breathing pacer circle (static preview)
                     BreathingPacerCircle(
                         progress = state.pacerRadius,
-                        isInhaling = state.isInhaling
+                        isInhaling = state.isInhaling,
+                        size = 200.dp
                     )
 
                     // Coherence score
@@ -680,7 +681,7 @@ private fun PreparationContent(
 private fun CoherenceDisplay(score: Float) {
     Card(colors = CardDefaults.cardColors(containerColor = SurfaceVariant)) {
         Row(
-            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -707,8 +708,8 @@ private fun BreathingControls(
 ) {
     Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text("Breathing Rate: ${String.format("%.1f", rateBpm)} BPM",
                 style = MaterialTheme.typography.bodyLarge)
