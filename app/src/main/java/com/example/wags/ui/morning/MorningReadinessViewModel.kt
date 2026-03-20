@@ -163,14 +163,28 @@ class MorningReadinessViewModel @Inject constructor(
                 val snapshot = bleManager.rrBuffer.readLast(60)
                 val currentSize = bleManager.rrBuffer.readLast(512).size
 
-                // Feed new intervals to FSM
+                // Feed new intervals to FSM with reconstructed timestamps.
+                // The BLE buffer only stores raw RR interval durations (ms), not
+                // wall-clock timestamps. We reconstruct proper timestamps by
+                // working backwards from "now": the last beat in the batch ends
+                // at the current time, and each preceding beat's timestamp is
+                // offset by the cumulative RR durations that follow it.
+                // This is critical for the OhrrCalculator which needs accurate
+                // timestamps to find HR at 20 s and 60 s post-peak.
                 if (currentSize > lastRrBufferSize) {
                     val newCount = currentSize - lastRrBufferSize
                     val allRecent = bleManager.rrBuffer.readLast(newCount.coerceAtMost(512))
+                    val now = System.currentTimeMillis()
+                    // Total duration of all intervals in this batch
+                    val totalDurationMs = allRecent.sumOf { it }.toLong()
+                    // The first beat's timestamp = now - totalDuration;
+                    // each subsequent beat advances by its own interval.
+                    var cumulativeMs = now - totalDurationMs
                     allRecent.forEach { rrMs ->
+                        cumulativeMs += rrMs.toLong()
                         fsm.addRrInterval(
                             RrInterval(
-                                timestampMs = System.currentTimeMillis(),
+                                timestampMs = cumulativeMs,
                                 intervalMs = rrMs
                             )
                         )

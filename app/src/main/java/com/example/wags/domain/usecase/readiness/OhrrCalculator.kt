@@ -24,14 +24,20 @@ class OhrrCalculator @Inject constructor() {
         peakStandHr: Int,
         standingRrIntervals: List<RrInterval>
     ): OrthostasisMetrics {
-        val validBeats = standingRrIntervals.filter { !it.isArtifact }
+        // Reconstruct timestamps from RR interval durations if the original
+        // timestamps look unreliable (e.g. all clustered within a few ms because
+        // they were assigned at polling time rather than at actual beat time).
+        // This is a safety net — the ViewModel should now assign proper timestamps,
+        // but older data or edge cases may still have bad timestamps.
+        val beats = ensureMonotonicTimestamps(standingRrIntervals)
+        val validBeats = beats.filter { !it.isArtifact }
 
         // Peak beat: shortest RR in beats 6–24 (indices 5–23)
         val peakWindow = if (validBeats.size >= 24) validBeats.subList(5, 24) else validBeats
         val peakBeat = peakWindow.minByOrNull { it.intervalMs }
 
         val shortestRrMs = peakBeat?.intervalMs
-        val peakTimestampMs = peakBeat?.timestampMs
+        val peakIdx = if (peakBeat != null) validBeats.indexOf(peakBeat) else -1
 
         // Vagal rebound: longest RR in beats 21–39 (indices 20–38)
         val longestRrMs = if (validBeats.size >= 39) {
@@ -42,7 +48,8 @@ class OhrrCalculator @Inject constructor() {
             (longestRrMs / shortestRrMs).toFloat()
         } else null
 
-        // HR at 20 s and 60 s post-peak
+        // HR at 20 s and 60 s post-peak using reconstructed timestamps
+        val peakTimestampMs = if (peakIdx >= 0) validBeats[peakIdx].timestampMs else null
         val hrAt20s = peakTimestampMs?.let { findHrAtOffset(validBeats, it, offsetMs = 20_000L) }
         val hrAt60s = peakTimestampMs?.let { findHrAtOffset(validBeats, it, offsetMs = 60_000L) }
 
@@ -66,6 +73,43 @@ class OhrrCalculator @Inject constructor() {
     }
 
     /**
+     * Ensures timestamps are monotonically increasing and properly spaced.
+     *
+     * If the existing timestamps look unreliable (many beats share the same
+     * timestamp, or timestamps are not monotonically increasing), we reconstruct
+     * them by accumulating RR interval durations from the first beat's timestamp.
+     *
+     * Detection heuristic: if more than 30% of consecutive beat pairs have
+     * identical timestamps (within 5 ms), the timestamps are considered unreliable.
+     */
+    private fun ensureMonotonicTimestamps(intervals: List<RrInterval>): List<RrInterval> {
+        if (intervals.size < 2) return intervals
+
+        // Check how many consecutive pairs have near-identical timestamps
+        var duplicateCount = 0
+        for (i in 1 until intervals.size) {
+            if (abs(intervals[i].timestampMs - intervals[i - 1].timestampMs) < 5L) {
+                duplicateCount++
+            }
+        }
+        val duplicateRatio = duplicateCount.toFloat() / (intervals.size - 1)
+
+        // If timestamps look reasonable, use them as-is
+        if (duplicateRatio < 0.30f) return intervals
+
+        // Reconstruct: use the first beat's timestamp as the anchor, then
+        // accumulate each RR interval duration to get subsequent timestamps.
+        val result = ArrayList<RrInterval>(intervals.size)
+        var cumulativeTs = intervals[0].timestampMs
+        result.add(intervals[0])
+        for (i in 1 until intervals.size) {
+            cumulativeTs += intervals[i].intervalMs.toLong()
+            result.add(intervals[i].copy(timestampMs = cumulativeTs))
+        }
+        return result
+    }
+
+    /**
      * Finds the HR (bpm) at [offsetMs] milliseconds after [peakTimestampMs]
      * by locating the closest beat to the target timestamp.
      */
@@ -79,6 +123,9 @@ class OhrrCalculator @Inject constructor() {
             .filter { it.timestampMs >= peakTimestampMs }
             .minByOrNull { abs(it.timestampMs - targetTs) }
             ?: return null
+        // Reject if the closest beat is more than 5 seconds away from the target
+        // (indicates insufficient data coverage at that time point)
+        if (abs(beat.timestampMs - targetTs) > 5_000L) return null
         if (beat.intervalMs <= 0) return null
         return (60_000.0 / beat.intervalMs).toInt()
     }
