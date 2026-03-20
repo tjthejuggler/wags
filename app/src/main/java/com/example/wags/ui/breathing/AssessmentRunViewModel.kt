@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.HrDataSource
 import com.example.wags.data.ble.PolarBleManager
 import com.example.wags.data.db.entity.RfAssessmentEntity
+import com.example.wags.data.ipc.HabitIntegrationRepository
+import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.data.repository.RfAssessmentRepository
 import com.example.wags.domain.usecase.breathing.ContinuousPacerEngine
 import com.example.wags.domain.usecase.breathing.RfAssessmentOrchestrator
@@ -30,6 +32,7 @@ class AssessmentRunViewModel @Inject constructor(
     private val bleManager: PolarBleManager,
     private val pacerEngine: ContinuousPacerEngine,
     private val hrDataSource: HrDataSource,
+    private val habitRepo: HabitIntegrationRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -133,6 +136,8 @@ class AssessmentRunViewModel @Inject constructor(
                     is RfOrchestratorState.Complete -> {
                         pacerActive = false
                         saveSteppedSession(orchState.epochs)
+                        // Signal the Habit app that a Resonance Breathing assessment completed
+                        habitRepo.sendHabitIncrement(Slot.RESONANCE_BREATHING)
                     }
 
                     is RfOrchestratorState.SlidingDone -> {
@@ -148,6 +153,8 @@ class AssessmentRunViewModel @Inject constructor(
                             hrDeviceId      = sessionHrDeviceLabel
                         )
                         val id = saveEntity(entity)
+                        // Signal the Habit app that a Resonance Breathing assessment completed
+                        habitRepo.sendHabitIncrement(Slot.RESONANCE_BREATHING)
                         _uiState.value = _uiState.value.copy(
                             phase      = "COMPLETE",
                             isComplete = true,
