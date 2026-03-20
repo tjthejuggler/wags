@@ -57,6 +57,7 @@ private val ChartDot = Color(0xFFFFFFFF)      // Dot accent — pure white
 private val ChartGlow = Color(0xFF909090)     // Subtle glow under chart line
 private val ArcFill = Color(0xFFCCCCCC)       // Countdown arc — bright
 private val ArcTrack = Color(0xFF2A2A2A)      // Countdown arc track — barely visible
+private val SkipButtonBg = Color(0xFF8B0000)   // Dark red for skip standing button
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -161,7 +162,7 @@ fun MorningReadinessScreen(
                 MorningReadinessState.STAND_PROMPT ->
                     StandPromptContent(onSkipStanding = { viewModel.skipStanding() })
                 MorningReadinessState.STANDING ->
-                    StandingContent(uiState)
+                    StandingContent(uiState, onSkipStanding = { viewModel.skipStanding() })
                 MorningReadinessState.QUESTIONNAIRE ->
                     QuestionnaireContent(uiState, viewModel)
                 MorningReadinessState.CALCULATING ->
@@ -354,23 +355,7 @@ private fun StandPromptContent(onSkipStanding: () -> Unit) {
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(8.dp))
-        OutlinedButton(
-            onClick = onSkipStanding,
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Ash),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Ash.copy(alpha = 0.4f))
-        ) {
-            Text(
-                "No Standing",
-                style = MaterialTheme.typography.bodyMedium,
-                letterSpacing = 1.sp
-            )
-        }
-        Text(
-            "Skip the standing phase and save results without orthostatic data",
-            style = MaterialTheme.typography.bodySmall,
-            color = Ash.copy(alpha = 0.6f),
-            textAlign = TextAlign.Center
-        )
+        SkipStandingButton(onSkipStanding)
     }
 }
 
@@ -379,7 +364,7 @@ private fun StandPromptContent(onSkipStanding: () -> Unit) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 @Composable
-private fun StandingContent(uiState: MorningReadinessUiState) {
+private fun StandingContent(uiState: MorningReadinessUiState, onSkipStanding: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -427,7 +412,44 @@ private fun StandingContent(uiState: MorningReadinessUiState) {
             color = Ash,
             letterSpacing = 2.sp
         )
+
+        Spacer(Modifier.height(8.dp))
+
+        // ── Skip standing button — visible throughout the entire standing phase ──
+        SkipStandingButton(onSkipStanding)
     }
+}
+
+/**
+ * Prominent "Skip Standing" button shown during both STAND_PROMPT and STANDING phases.
+ * Large, clearly visible, with explanatory text below.
+ */
+@Composable
+private fun SkipStandingButton(onSkipStanding: () -> Unit) {
+    Button(
+        onClick = onSkipStanding,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = SkipButtonBg,
+            contentColor = Bone
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Text(
+            "SKIP STANDING",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 2.sp
+        )
+    }
+    Text(
+        "End test now — results saved without orthostatic data",
+        style = MaterialTheme.typography.bodySmall,
+        color = Ash.copy(alpha = 0.7f),
+        textAlign = TextAlign.Center
+    )
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -830,7 +852,10 @@ private fun MetricCell(
     unit: String,
     highlight: Boolean = false
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.widthIn(min = 48.dp)
+    ) {
         Text(
             text = value,
             style = MaterialTheme.typography.titleLarge.copy(
@@ -839,20 +864,20 @@ private fun MetricCell(
             ),
             color = if (highlight) Bone else Silver
         )
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
+            color = Ash,
+            letterSpacing = 1.sp,
+            textAlign = TextAlign.Center
+        )
+        if (unit.isNotEmpty()) {
             Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                color = Ash,
-                letterSpacing = 1.sp
+                text = unit,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                color = Ash.copy(alpha = 0.6f),
+                textAlign = TextAlign.Center
             )
-            if (unit.isNotEmpty()) {
-                Text(
-                    text = " $unit",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
-                    color = Ash.copy(alpha = 0.6f)
-                )
-            }
         }
     }
 }
@@ -868,23 +893,164 @@ private fun ThinDivider() {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  ✦  SCROLLING RR INTERVAL CHART
-//  A smooth Catmull-Rom spline through the last ~30 s of RR intervals.
-//  No axes, no labels — just a luminous line with subtle dots at each beat.
+//  ✦  TIME-BASED STRIP CHART FOR RR INTERVALS
 //
-//  Smooth-scroll approach:
-//  The ViewModel delivers data in ~500 ms polling chunks. To avoid the chart
-//  "jumping" when new beats arrive, we keep a stable Y-range that animates
-//  smoothly and use a fractional scroll offset that animates from 0→1 each
-//  time a new batch of points is appended. This makes new beats appear to
-//  slide in from the right rather than snapping into place.
+//  Behaves like a classic strip-chart recorder / ECG monitor:
+//  • Fixed 30-second time window — the X axis always represents 30 s.
+//  • Each RR interval is plotted at its cumulative time position.
+//  • A continuously-advancing cursor (driven by withFrameNanos) moves the
+//    "now" edge smoothly to the right, so the line grows at real-time speed.
+//  • Once the line fills the window, old data scrolls off the left edge.
+//  • Data arrives in ~500 ms polling chunks but the cursor moves every frame,
+//    producing perfectly smooth motion.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/** Time window the chart displays, in milliseconds. */
+private const val CHART_WINDOW_MS = 30_000.0
+
+/**
+ * A single RR beat with its cumulative time offset from the first beat.
+ * [timeMs] = sum of all preceding RR intervals (0 for the first beat).
+ * [valueMs] = the RR interval duration in ms (used for Y axis).
+ */
+private data class TimedBeat(val timeMs: Double, val valueMs: Double)
+
+/**
+ * Holds the strip-chart state. Converts raw RR intervals into time-positioned
+ * beats and tracks a smoothly-advancing "now" cursor.
+ *
+ * The ViewModel provides a **sliding window** of the last ~45 RR intervals
+ * from a circular buffer. The list size caps at ~45 and old values drop off
+ * the front as new ones are appended. We detect new beats by comparing the
+ * last value in our internal buffer with the tail of the source list.
+ */
+@Stable
+private class StripChartState {
+    /** All beats with cumulative time positions. */
+    val beats = mutableStateListOf<TimedBeat>()
+
+    /** The cumulative time of the last beat (ms from first beat). */
+    var cumulativeTimeMs by mutableDoubleStateOf(0.0)
+        private set
+
+    /** Wall-clock nanos when the first beat was added — used for cursor. */
+    var firstBeatNanos: Long = 0L
+        private set
+
+    /** Whether we have received any beats yet. */
+    var started by mutableStateOf(false)
+        private set
+
+    /** Fingerprint of the last source list we processed: (size, lastValue). */
+    private var lastSourceSize = 0
+    private var lastSourceTail = 0.0
+
+    /**
+     * Ingest beats from the source sliding-window list.
+     *
+     * The source is a sliding window (last ~45 RR intervals). We figure out
+     * how many new beats were appended by comparing the source tail with our
+     * previous snapshot. New beats are those at the end of the source list
+     * that weren't there before.
+     */
+    fun ingest(source: List<Double>, nowNanos: Long) {
+        if (source.isEmpty()) return
+        if (!started) {
+            started = true
+            firstBeatNanos = nowNanos
+        }
+
+        // Determine how many new beats appeared at the end of the source.
+        // The source is a sliding window: old beats drop off the front, new
+        // ones appear at the back. We find the overlap between our previous
+        // snapshot and the current source to identify truly new beats.
+        val newBeatsCount: Int
+        if (beats.isEmpty()) {
+            // First time: ingest everything
+            newBeatsCount = source.size
+        } else {
+            // The source grew by (source.size - lastSourceSize) if it hasn't
+            // hit the cap yet. Once capped, each new beat adds 1 and removes 1
+            // from the front, so source.size stays the same but content shifts.
+            // We detect new beats by finding where our last-known tail value
+            // appears in the new source list and taking everything after it.
+            val lastKnownValue = lastSourceTail
+            // Search backwards from the end for our last known value
+            var overlapIndex = -1
+            for (i in source.size - 1 downTo 0) {
+                if (source[i] == lastKnownValue) {
+                    overlapIndex = i
+                    break
+                }
+            }
+            newBeatsCount = if (overlapIndex >= 0) {
+                source.size - overlapIndex - 1
+            } else {
+                // Can't find overlap — source changed completely, ingest all
+                source.size
+            }
+        }
+
+        if (newBeatsCount <= 0) {
+            lastSourceSize = source.size
+            lastSourceTail = source.last()
+            return
+        }
+
+        // Append the new beats
+        val startIdx = source.size - newBeatsCount
+        for (i in startIdx until source.size) {
+            val rrMs = source[i]
+            if (beats.isNotEmpty()) {
+                cumulativeTimeMs += rrMs
+            }
+            beats.add(TimedBeat(timeMs = cumulativeTimeMs, valueMs = rrMs))
+        }
+
+        lastSourceSize = source.size
+        lastSourceTail = source.last()
+
+        // Trim beats that are too old (more than 2× window behind the latest)
+        val cutoff = cumulativeTimeMs - CHART_WINDOW_MS * 2
+        while (beats.size > 2 && beats.first().timeMs < cutoff) {
+            beats.removeAt(0)
+        }
+    }
+}
 
 @Composable
 private fun RrIntervalChart(
     rrIntervals: List<Double>,
     modifier: Modifier = Modifier
 ) {
+    val state = remember { StripChartState() }
+
+    // Smoothly advancing cursor time (ms from first beat).
+    // Driven by withFrameNanos for 60fps updates.
+    var cursorTimeMs by remember { mutableDoubleStateOf(0.0) }
+
+    // Ingest new data whenever the source list changes (content or size).
+    // We use a content-based key so we detect changes even when the list
+    // size stays the same (sliding window at capacity).
+    val sourceFingerprint = remember(rrIntervals) {
+        if (rrIntervals.isEmpty()) 0L
+        else rrIntervals.size.toLong() * 1_000_000L + rrIntervals.last().toLong()
+    }
+    LaunchedEffect(sourceFingerprint) {
+        state.ingest(rrIntervals, System.nanoTime())
+    }
+
+    // Continuous frame loop: advances the cursor at real-time speed
+    LaunchedEffect(Unit) {
+        while (true) {
+            withFrameNanos { nanos ->
+                if (state.started) {
+                    cursorTimeMs = (nanos - state.firstBeatNanos) / 1_000_000.0
+                }
+            }
+        }
+    }
+
     // ── Shimmer ──
     val infiniteTransition = rememberInfiniteTransition(label = "chart_shimmer")
     val shimmerPhase by infiniteTransition.animateFloat(
@@ -897,32 +1063,10 @@ private fun RrIntervalChart(
         label = "shimmer"
     )
 
-    // ── Smooth-scroll state ──
-    // scrollOffset animates 0→1 whenever a new beat is appended.
-    // At 0 the newest point is just entering the right edge; at 1 it has
-    // settled into its final position and the chart is ready for the next beat.
-    val prevCount = remember { androidx.compose.runtime.mutableIntStateOf(rrIntervals.size) }
-    val scrollOffset = remember { androidx.compose.animation.core.Animatable(1f) }
-
-    LaunchedEffect(rrIntervals.size) {
-        val newCount = rrIntervals.size
-        if (newCount > prevCount.intValue) {
-            // New beats arrived — snap offset to 0 (new point at right edge) then
-            // animate to 1 (settled) over ~400 ms so the slide-in is visible but snappy.
-            scrollOffset.snapTo(0f)
-            scrollOffset.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing)
-            )
-        }
-        prevCount.intValue = newCount
-    }
-
     // ── Animated Y-range ──
-    // Compute the target min/max from the current data and animate toward it
-    // so the vertical scale doesn't jump when an outlier beat arrives.
-    val targetMinRr = if (rrIntervals.isEmpty()) 600.0 else rrIntervals.min()
-    val targetMaxRr = if (rrIntervals.isEmpty()) 1000.0 else rrIntervals.max()
+    val beats = state.beats
+    val targetMinRr = if (beats.isEmpty()) 600.0 else beats.minOf { it.valueMs }
+    val targetMaxRr = if (beats.isEmpty()) 1000.0 else beats.maxOf { it.valueMs }
     val targetRange = (targetMaxRr - targetMinRr).coerceAtLeast(50.0)
     val targetPaddedMin = targetMinRr - targetRange * 0.15
     val targetPaddedMax = targetMaxRr + targetRange * 0.15
@@ -943,27 +1087,27 @@ private fun RrIntervalChart(
             .clip(RoundedCornerShape(16.dp))
             .background(
                 Brush.verticalGradient(
-                    colors = listOf(
-                        Ink,
-                        Charcoal.copy(alpha = 0.3f),
-                        Ink
-                    )
+                    colors = listOf(Ink, Charcoal.copy(alpha = 0.3f), Ink)
                 )
             )
     ) {
-        if (rrIntervals.size >= 2) {
-            val scrollOffsetValue = scrollOffset.value
-            Canvas(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 12.dp)) {
-                drawRrChart(
-                    rrIntervals = rrIntervals,
+        if (beats.size >= 2) {
+            val beatSnapshot = beats.toList()
+            val cursor = cursorTimeMs
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp, vertical = 12.dp)
+            ) {
+                drawStripChart(
+                    beats = beatSnapshot,
+                    cursorTimeMs = cursor,
                     shimmerPhase = shimmerPhase,
-                    scrollOffset = scrollOffsetValue,
                     paddedMin = animatedPaddedMin.toDouble(),
                     paddedMax = animatedPaddedMax.toDouble()
                 )
             }
         } else {
-            // Waiting for data — show a subtle placeholder
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -980,43 +1124,46 @@ private fun RrIntervalChart(
 }
 
 /**
- * Draws the RR interval chart using Catmull-Rom spline interpolation.
+ * Draws the time-based strip chart.
  *
- * [scrollOffset] is a value in [0, 1]:
- *   0 = newest point is just entering from the right edge (mid-scroll)
- *   1 = all points are in their final positions (scroll complete)
+ * The visible window is [windowStart, windowEnd] where:
+ *   windowEnd = cursorTimeMs  (the "now" edge is always at the right)
+ *   windowStart = cursorTimeMs - CHART_WINDOW_MS
  *
- * When scrollOffset < 1, the entire chart is shifted left by one point-spacing
- * worth of pixels, scaled by (1 - scrollOffset). This creates the illusion of
- * the waveform continuously scrolling left as new beats arrive.
+ * Before 30 s of data exists, the left portion of the chart is empty and
+ * the line appears partway across, growing toward the right edge.
+ * After 30 s, old data scrolls off the left as new data enters from the right.
  */
-private fun DrawScope.drawRrChart(
-    rrIntervals: List<Double>,
+private fun DrawScope.drawStripChart(
+    beats: List<TimedBeat>,
+    cursorTimeMs: Double,
     shimmerPhase: Float,
-    scrollOffset: Float,
     paddedMin: Double,
     paddedMax: Double
 ) {
-    val n = rrIntervals.size
-    if (n < 2) return
+    if (beats.size < 2) return
 
     val w = size.width
     val h = size.height
-
     val yRange = (paddedMax - paddedMin).coerceAtLeast(1.0)
 
-    // The spacing between adjacent points in the final (settled) layout
-    val pointSpacing = w / (n - 1).toFloat()
+    // The right edge is always "now". The left edge is 30 s before "now".
+    // This means early on (cursor < 30s), windowStart is negative and
+    // beats at time 0 appear partway across the chart (not at the left edge).
+    val windowEnd = cursorTimeMs
+    val windowStart = cursorTimeMs - CHART_WINDOW_MS
 
-    // Horizontal shift: when scrollOffset=0 the chart is shifted left by one
-    // full point-spacing (new point just off the right edge). As scrollOffset→1
-    // the shift reduces to 0 (settled). This gives the smooth slide-in effect.
-    val shiftX = pointSpacing * (1f - scrollOffset)
+    fun xAt(timeMs: Double): Float =
+        ((timeMs - windowStart) / CHART_WINDOW_MS * w).toFloat()
 
-    fun xAt(index: Int): Float = index.toFloat() * pointSpacing - shiftX
-    fun yAt(value: Double): Float = h - ((value - paddedMin) / yRange * h).toFloat()
+    fun yAt(valueMs: Double): Float =
+        h - ((valueMs - paddedMin) / yRange * h).toFloat()
 
-    val points = rrIntervals.mapIndexed { i, rr -> Offset(xAt(i), yAt(rr)) }
+    // Only draw beats within (or near) the visible window
+    val visibleBeats = beats.filter { it.timeMs >= windowStart - 2000 && it.timeMs <= windowEnd + 2000 }
+    if (visibleBeats.size < 2) return
+
+    val points = visibleBeats.map { Offset(xAt(it.timeMs), yAt(it.valueMs)) }
 
     // ── Draw subtle glow line (wider, dimmer) ──
     val glowPath = Path()
@@ -1037,16 +1184,15 @@ private fun DrawScope.drawRrChart(
     )
 
     // ── Draw dots at each data point ──
-    points.forEachIndexed { i, pt ->
-        // Fade out dots on the left edge (first 20% of chart)
-        val fadeAlpha = (i.toFloat() / (n * 0.2f)).coerceIn(0f, 1f)
-        // Subtle shimmer: dots near the shimmer phase glow brighter
-        val shimmerDist = kotlin.math.abs(i.toFloat() / n - shimmerPhase)
+    points.forEachIndexed { _, pt ->
+        if (pt.x < -10f || pt.x > w + 10f) return@forEachIndexed
+        val normalizedX = (pt.x / w).coerceIn(0f, 1f)
+        // Fade out dots near the left edge
+        val fadeAlpha = if (normalizedX < 0.15f) normalizedX / 0.15f else 1f
+        val shimmerDist = kotlin.math.abs(normalizedX - shimmerPhase)
         val shimmerBoost = (1f - (shimmerDist * 4f).coerceIn(0f, 1f)) * 0.4f
-
         val dotAlpha = (0.3f + shimmerBoost) * fadeAlpha
         val dotRadius = (1.8f + shimmerBoost * 2f).dp.toPx()
-
         drawCircle(
             color = ChartDot.copy(alpha = dotAlpha),
             radius = dotRadius,
@@ -1055,29 +1201,14 @@ private fun DrawScope.drawRrChart(
     }
 
     // ── Left-edge fade overlay ──
-    // Covers the left 15% to hide points scrolling off-screen and give the
-    // "scrolling off" effect. Also clips the right edge during slide-in.
-    val fadeWidth = w * 0.15f
     drawRect(
         brush = Brush.horizontalGradient(
             colors = listOf(Ink, Ink.copy(alpha = 0f)),
             startX = 0f,
-            endX = fadeWidth
+            endX = w * 0.12f
         ),
         size = size
     )
-    // Right-edge fade: hides the incoming point before it fully slides in
-    if (scrollOffset < 1f) {
-        val rightFadeStart = w * (1f - (1f - scrollOffset) * 0.3f)
-        drawRect(
-            brush = Brush.horizontalGradient(
-                colors = listOf(Ink.copy(alpha = 0f), Ink),
-                startX = rightFadeStart,
-                endX = w
-            ),
-            size = size
-        )
-    }
 }
 
 /**
