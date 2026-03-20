@@ -44,6 +44,10 @@ class AssessmentRunViewModel @Inject constructor(
         val remainingSeconds: Int = 0,
         val progress: Float = 0f,
         val refWave: Float = 0f,
+        /** Previous refWave value — used to determine direction (inhale vs exhale). */
+        val lastRefWave: Float = 0f,
+        /** Whether the pacer is currently in the inhale phase. */
+        val isInhaling: Boolean = true,
         val latestEpochScore: RfEpochResult? = null,
         val qualityWarning: String? = null,
         val isComplete: Boolean = false,
@@ -114,11 +118,15 @@ class AssessmentRunViewModel @Inject constructor(
 
                     is RfOrchestratorState.SlidingTick -> {
                         pacerActive = false   // sliding window drives its own refWave
+                        val prevWave = _uiState.value.refWave
+                        val newWave = orchState.pacerState.refWave
                         _uiState.value = _uiState.value.copy(
                             phase            = "TESTING %.1f BPM".format(orchState.pacerState.instantBpm),
                             currentBpm       = orchState.pacerState.instantBpm,
                             progress         = orchState.progress,
-                            refWave          = orchState.pacerState.refWave
+                            lastRefWave      = prevWave,
+                            refWave          = newWave,
+                            isInhaling       = newWave > prevWave || newWave > 0.95f
                         )
                     }
 
@@ -234,7 +242,13 @@ class AssessmentRunViewModel @Inject constructor(
                 val ie   = pacerIeRatio
                 pacerEngine.tick(rate, ie)
                 val wave = pacerEngine.getPacerRadius(ie)
-                _uiState.value = _uiState.value.copy(refWave = wave)
+                val prevWave = _uiState.value.refWave
+                val isInhaling = pacerEngine.breathPhaseLabel.value == "INHALE"
+                _uiState.value = _uiState.value.copy(
+                    lastRefWave = prevWave,
+                    refWave = wave,
+                    isInhaling = isInhaling
+                )
             }
         }
     }

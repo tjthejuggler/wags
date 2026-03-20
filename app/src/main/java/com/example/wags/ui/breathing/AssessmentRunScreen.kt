@@ -1,7 +1,5 @@
 package com.example.wags.ui.breathing
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -83,14 +81,28 @@ fun AssessmentRunScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Pacer visual
+            // Pacer visual — unified circle for all protocols
             if (protocol.isStepped()) {
-                SteppedPacerCircle(
-                    refWave = uiState.refWave,
-                    phase   = uiState.phase
+                // For stepped protocols, derive isInhaling from refWave
+                // refWave goes 0→1 (inhale) then 1→0 (exhale)
+                val isInhale = uiState.refWave > uiState.lastRefWave || uiState.refWave > 0.95f
+                val overlayLabel = when {
+                    uiState.phase == "BASELINE" || uiState.phase == "WASHOUT" -> uiState.phase
+                    else -> null
+                }
+                BreathingPacerCircle(
+                    progress = uiState.refWave,
+                    isInhaling = uiState.isInhaling,
+                    size = 240.dp,
+                    overlayLabel = overlayLabel
                 )
             } else {
-                SlidingWindowBar(refWave = uiState.refWave)
+                // Sliding window — use the same circle
+                BreathingPacerCircle(
+                    progress = uiState.refWave,
+                    isInhaling = uiState.isInhaling,
+                    size = 240.dp
+                )
             }
 
             // HUD
@@ -126,84 +138,6 @@ fun AssessmentRunScreen(
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
             ) {
                 Text("Cancel Assessment")
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Stepped pacer circle
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun SteppedPacerCircle(refWave: Float, phase: String) {
-    val animatedScale by animateFloatAsState(
-        targetValue  = 0.6f + 0.4f * refWave.coerceIn(0f, 1f),
-        animationSpec = tween(durationMillis = 300),
-        label        = "pacerScale"
-    )
-    val isInhale = refWave > 0.5f
-    val color = if (isInhale) PacerInhale else PacerExhale
-
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier.size(240.dp)
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val maxRadius = size.minDimension / 2f
-            drawCircle(
-                color  = color.copy(alpha = 0.12f),
-                radius = maxRadius
-            )
-            drawCircle(
-                color  = color,
-                radius = maxRadius * animatedScale
-            )
-        }
-        Text(
-            text  = if (phase == "BASELINE" || phase == "WASHOUT") phase else if (isInhale) "INHALE" else "EXHALE",
-            style = MaterialTheme.typography.titleMedium,
-            color = color
-        )
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Sliding window horizontal bar
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun SlidingWindowBar(refWave: Float) {
-    val animatedFill by animateFloatAsState(
-        targetValue   = refWave.coerceIn(0f, 1f),
-        animationSpec = tween(durationMillis = 300),
-        label         = "slidingBarFill"
-    )
-    val color = if (animatedFill > 0.5f) PacerInhale else PacerExhale
-
-    Column(
-        modifier            = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text(
-            text  = if (animatedFill > 0.5f) "INHALE" else "EXHALE",
-            style = MaterialTheme.typography.titleMedium,
-            color = color,
-            modifier = Modifier.align(Alignment.CenterHorizontally)
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
-        ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                // Track
-                drawRect(color = color.copy(alpha = 0.15f))
-                // Fill
-                drawRect(
-                    color = color,
-                    size  = size.copy(width = size.width * animatedFill)
-                )
             }
         }
     }

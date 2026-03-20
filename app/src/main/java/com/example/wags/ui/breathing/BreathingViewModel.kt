@@ -23,7 +23,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -32,20 +31,41 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
+/**
+ * Session phase for the resonance breathing screen.
+ */
+enum class BreathingSessionPhase {
+    /** Not started yet — controls visible */
+    IDLE,
+    /** 10-second countdown before breathing begins */
+    PREPARING,
+    /** Active guided breathing session */
+    BREATHING
+}
+
 data class BreathingUiState(
     val breathingRateBpm: Float = 5.5f,
     val ieRatio: Float = 1.0f,
     val pacerRadius: Float = 0f,
+    val isInhaling: Boolean = true,
     val breathPhaseLabel: String = "INHALE",
     val coherenceScore: Float = 0f,
     val isSessionActive: Boolean = false,
+    val sessionPhase: BreathingSessionPhase = BreathingSessionPhase.IDLE,
+    val prepCountdownSeconds: Int = 0,
     val rfPhase: RfPhase = RfPhase.IDLE,
     val currentTestRateBpm: Float = 0f,
     val remainingSeconds: Long = 0L,
     val epochResults: List<RfEpochResult> = emptyList(),
     val slidingWindowResult: SlidingWindowResult? = null,
     val liveHr: Int? = null,
-    val liveSpO2: Int? = null
+    val liveSpO2: Int? = null,
+    // Live HRV metrics (computed from RR intervals during session)
+    val liveRmssd: Float? = null,
+    val liveSdnn: Float? = null,
+    val rrCount: Int = 0,
+    /** Recent RR intervals (ms) for the scrolling chart — last ~45 values. */
+    val liveRrIntervals: List<Double> = emptyList()
 )
 
 @HiltViewModel
@@ -79,6 +99,11 @@ class BreathingViewModel @Inject constructor(
     private var pacerJob: Job? = null
     private var coherenceJob: Job? = null
     private var rfCollectorJob: Job? = null
+    private var prepJob: Job? = null
+    private var rrPollingJob: Job? = null
+
+    /** Buffer size at the moment the session started — used to ignore pre-session RR intervals */
+    private var rrBufferSizeAtStart: Int = 0
 
     fun setBreathingRate(rateBpm: Float) {
         _uiState.update { it.copy(breathingRateBpm = rateBpm.coerceIn(4.0f, 7.0f)) }
@@ -91,16 +116,52 @@ class BreathingViewModel @Inject constructor(
     fun startSession(deviceId: String) {
         if (_uiState.value.isSessionActive) return
         bleManager.startRrStream(deviceId)
+        rrBufferSizeAtStart = bleManager.rrBuffer.size()
         pacerEngine.reset()
-        _uiState.update { it.copy(isSessionActive = true) }
-        startPacerLoop()
-        startCoherenceLoop()
+        _uiState.update {
+            it.copy(
+                isSessionActive = true,
+                sessionPhase = BreathingSessionPhase.PREPARING,
+                prepCountdownSeconds = 10,
+                liveRmssd = null,
+                liveSdnn = null,
+                rrCount = 0,
+                liveRrIntervals = emptyList()
+            )
+        }
+        startPreparationCountdown()
+    }
+
+    private fun startPreparationCountdown() {
+        prepJob = viewModelScope.launch {
+            for (i in 10 downTo 1) {
+                _uiState.update { it.copy(prepCountdownSeconds = i) }
+                delay(1_000L)
+            }
+            // Preparation complete — start breathing
+            _uiState.update {
+                it.copy(
+                    sessionPhase = BreathingSessionPhase.BREATHING,
+                    prepCountdownSeconds = 0
+                )
+            }
+            startPacerLoop()
+            startCoherenceLoop()
+            startRrPollingLoop()
+        }
     }
 
     fun stopSession() {
+        prepJob?.cancel()
         pacerJob?.cancel()
         coherenceJob?.cancel()
-        _uiState.update { it.copy(isSessionActive = false) }
+        rrPollingJob?.cancel()
+        _uiState.update {
+            it.copy(
+                isSessionActive = false,
+                sessionPhase = BreathingSessionPhase.IDLE
+            )
+        }
         // Signal the Habit app that a Resonance Breathing session was completed
         habitRepo.sendHabitIncrement(Slot.RESONANCE_BREATHING)
     }
@@ -111,10 +172,13 @@ class BreathingViewModel @Inject constructor(
                 delay(16L) // ~60 FPS
                 val state = _uiState.value
                 pacerEngine.tick(state.breathingRateBpm, state.ieRatio)
+                val radius = pacerEngine.getPacerRadius(state.ieRatio)
+                val label = pacerEngine.breathPhaseLabel.value
                 _uiState.update {
                     it.copy(
-                        pacerRadius = pacerEngine.getPacerRadius(state.ieRatio),
-                        breathPhaseLabel = pacerEngine.breathPhaseLabel.value
+                        pacerRadius = radius,
+                        isInhaling = label == "INHALE",
+                        breathPhaseLabel = label
                     )
                 }
             }
@@ -146,6 +210,44 @@ class BreathingViewModel @Inject constructor(
                 _uiState.update { it.copy(coherenceScore = lastCoherenceScore) }
             }
         }
+    }
+
+    /**
+     * Polls the BLE RR buffer at 2 Hz to update live HRV metrics and the RR chart.
+     */
+    private fun startRrPollingLoop() {
+        rrPollingJob = viewModelScope.launch {
+            while (isActive) {
+                delay(500L) // 2 Hz for smooth chart updates
+                val totalInBuffer = bleManager.rrBuffer.size()
+                val newCount = totalInBuffer - rrBufferSizeAtStart
+                val snapshot = if (newCount > 0) bleManager.rrBuffer.readLast(newCount) else emptyList()
+                val liveRmssd = computeLiveRmssd(snapshot)
+                val liveSdnn = computeLiveSdnn(snapshot)
+                val chartRr = if (newCount > 0) bleManager.rrBuffer.readLast(45.coerceAtMost(newCount)) else emptyList()
+                _uiState.update {
+                    it.copy(
+                        liveRmssd = liveRmssd,
+                        liveSdnn = liveSdnn,
+                        rrCount = snapshot.size,
+                        liveRrIntervals = chartRr
+                    )
+                }
+            }
+        }
+    }
+
+    private fun computeLiveRmssd(rr: List<Double>): Float? {
+        if (rr.size < 2) return null
+        val diffs = (1 until rr.size).map { rr[it] - rr[it - 1] }
+        return Math.sqrt(diffs.sumOf { it * it } / diffs.size).toFloat()
+    }
+
+    private fun computeLiveSdnn(rr: List<Double>): Float? {
+        if (rr.size < 2) return null
+        val mean = rr.average()
+        val variance = rr.sumOf { (it - mean) * (it - mean) } / rr.size
+        return Math.sqrt(variance).toFloat()
     }
 
     fun startRfAssessment(protocol: RfProtocol, deviceId: String) {
@@ -224,9 +326,11 @@ class BreathingViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
+        prepJob?.cancel()
         pacerJob?.cancel()
         coherenceJob?.cancel()
         rfCollectorJob?.cancel()
+        rrPollingJob?.cancel()
         rfOrchestrator.stop()
     }
 }
