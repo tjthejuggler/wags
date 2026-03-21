@@ -9,6 +9,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
@@ -18,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -41,6 +44,27 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var permissionDenied by remember { mutableStateOf(false) }
+    var showImportConfirmDialog by remember { mutableStateOf(false) }
+    var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
+
+    // SAF file picker for export (create a new ZIP file)
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.exportData(uri)
+        }
+    }
+
+    // SAF file picker for import (open an existing ZIP file)
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            pendingImportUri = uri
+            showImportConfirmDialog = true
+        }
+    }
 
     // SAF directory picker for meditation audio folder
     val meditationDirLauncher = rememberLauncherForActivityResult(
@@ -323,7 +347,78 @@ fun SettingsScreen(
                     onRefresh               = { viewModel.loadHabits() }
                 )
             }
+
+            // ── Data Export / Import ──────────────────────────────────────
+            item {
+                DataExportImportCard(
+                    isExporting = state.isExporting,
+                    isImporting = state.isImporting,
+                    message = state.exportImportMessage,
+                    error = state.exportImportError,
+                    onExport = {
+                        exportLauncher.launch(viewModel.getExportFileName())
+                    },
+                    onImport = {
+                        importLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
+                    },
+                    onDismissMessage = { viewModel.clearExportImportMessage() }
+                )
+            }
         }
+    }
+
+    // ── Import confirmation dialog ───────────────────────────────────────────
+    if (showImportConfirmDialog && pendingImportUri != null) {
+        AlertDialog(
+            onDismissRequest = {
+                showImportConfirmDialog = false
+                pendingImportUri = null
+            },
+            containerColor = SurfaceDark,
+            title = {
+                Text(
+                    "Restore Backup?",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Color.White
+                )
+            },
+            text = {
+                Text(
+                    "This will replace ALL existing data with the backup contents. " +
+                        "All current readings, sessions, records, and settings will be overwritten.\n\n" +
+                        "The app will need to be restarted after import.\n\n" +
+                        "Are you sure you want to continue?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        pendingImportUri?.let { viewModel.importData(it) }
+                        showImportConfirmDialog = false
+                        pendingImportUri = null
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ButtonDanger,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text("Restore")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = {
+                        showImportConfirmDialog = false
+                        pendingImportUri = null
+                    },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
@@ -845,6 +940,162 @@ private fun HabitPickerRow(
             )
             if (isSelected) {
                 Text("✓", style = MaterialTheme.typography.bodyMedium, color = EcgCyan)
+            }
+        }
+    }
+}
+
+// ── Data Export / Import card ──────────────────────────────────────────────────
+
+@Composable
+private fun DataExportImportCard(
+    isExporting: Boolean,
+    isImporting: Boolean,
+    message: String?,
+    error: String?,
+    onExport: () -> Unit,
+    onImport: () -> Unit,
+    onDismissMessage: () -> Unit
+) {
+    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Data Backup & Restore", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Export all your data (readings, sessions, records, settings, device history) " +
+                    "to a backup file. Import a backup to restore everything.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
+
+            HorizontalDivider(color = SurfaceVariant)
+
+            // ── Export button ────────────────────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Export Data", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Save all data to a ZIP file",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                }
+                if (isExporting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = EcgCyan,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Button(
+                        onClick = onExport,
+                        enabled = !isImporting,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = EcgCyan,
+                            contentColor = Color.Black
+                        )
+                    ) {
+                        Text("Export")
+                    }
+                }
+            }
+
+            HorizontalDivider(color = SurfaceVariant)
+
+            // ── Import button ────────────────────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Import Data", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Restore from a backup file",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                }
+                if (isImporting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = EcgCyan,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    OutlinedButton(
+                        onClick = onImport,
+                        enabled = !isExporting,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                    ) {
+                        Text("Import")
+                    }
+                }
+            }
+
+            // ── Result / error messages ──────────────────────────────────────
+            if (message != null) {
+                HorizontalDivider(color = SurfaceVariant)
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = ReadinessGreen.copy(alpha = 0.15f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp)
+                    ) {
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ReadinessGreen
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        TextButton(
+                            onClick = onDismissMessage,
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            Text("Dismiss", color = ReadinessGreen)
+                        }
+                    }
+                }
+            }
+
+            if (error != null) {
+                HorizontalDivider(color = SurfaceVariant)
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = ReadinessRed.copy(alpha = 0.15f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp)
+                    ) {
+                        Text(
+                            text = error,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ReadinessRed
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        TextButton(
+                            onClick = onDismissMessage,
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            Text("Dismiss", color = ReadinessRed)
+                        }
+                    }
+                }
             }
         }
     }

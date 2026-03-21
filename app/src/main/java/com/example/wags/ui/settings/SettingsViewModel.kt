@@ -1,6 +1,7 @@
 package com.example.wags.ui.settings
 
 import android.bluetooth.le.ScanResult
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.DevicePreferencesRepository
@@ -10,6 +11,7 @@ import com.example.wags.data.garmin.GarminConnectionState
 import com.example.wags.data.garmin.GarminManager
 import com.example.wags.data.ipc.HabitIntegrationRepository
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
+import com.example.wags.data.repository.DataExportImportRepository
 import com.example.wags.domain.model.BleConnectionState
 import com.example.wags.domain.model.HabitEntry
 import com.example.wags.domain.model.OximeterConnectionState
@@ -64,7 +66,14 @@ data class SettingsUiState(
     val tableTrainingHabit: HabitSlotSelection = HabitSlotSelection(),
     val morningReadinessHabit: HabitSlotSelection = HabitSlotSelection(),
     val hrvReadinessHabit: HabitSlotSelection = HabitSlotSelection(),
-    val resonanceBreathingHabit: HabitSlotSelection = HabitSlotSelection()
+    val resonanceBreathingHabit: HabitSlotSelection = HabitSlotSelection(),
+    // ── Data Export / Import ────────────────────────────────────────────────────
+    val isExporting: Boolean = false,
+    val isImporting: Boolean = false,
+    val exportImportMessage: String? = null,
+    val exportImportError: String? = null,
+    /** Suggested filename for the export (set when user taps Export). */
+    val exportFileName: String = ""
 )
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
@@ -76,12 +85,16 @@ class SettingsViewModel @Inject constructor(
     private val oximeterBleManager: OximeterBleManager,
     private val habitRepo: HabitIntegrationRepository,
     private val meditationRepository: com.example.wags.data.repository.MeditationRepository,
-    private val garminManager: GarminManager
+    private val garminManager: GarminManager,
+    private val dataExportImportRepo: DataExportImportRepository
 ) : ViewModel() {
 
     // Separate MutableStateFlow for habit-specific state so it doesn't need to
     // be folded into the BLE combine below.
     private val _habitState = MutableStateFlow(buildInitialHabitState())
+
+    // Export/import state tracked separately
+    private val _exportImportState = MutableStateFlow(ExportImportPartialState())
 
     val uiState: StateFlow<SettingsUiState> = combine(
         bleManager.h10State,
@@ -131,6 +144,13 @@ class SettingsViewModel @Inject constructor(
             morningReadinessHabit   = habit.morningReadinessHabit,
             hrvReadinessHabit       = habit.hrvReadinessHabit,
             resonanceBreathingHabit = habit.resonanceBreathingHabit
+        )
+    }.combine(_exportImportState) { state, exportImport ->
+        state.copy(
+            isExporting          = exportImport.isExporting,
+            isImporting          = exportImport.isImporting,
+            exportImportMessage  = exportImport.exportImportMessage,
+            exportImportError    = exportImport.exportImportError
         )
     }.stateIn(
         scope = viewModelScope,
@@ -240,6 +260,46 @@ class SettingsViewModel @Inject constructor(
         _habitState.update { it.copySlot(slot, HabitSlotSelection()) }
     }
 
+    // ── Data Export / Import ───────────────────────────────────────────────────
+
+    /** Returns a suggested filename for the export. */
+    fun getExportFileName(): String = dataExportImportRepo.generateExportFileName()
+
+    /** Exports all data to the given URI (chosen by the user via SAF). */
+    fun exportData(uri: Uri) {
+        viewModelScope.launch {
+            _exportImportState.update { it.copy(isExporting = true, exportImportMessage = null, exportImportError = null) }
+            try {
+                val summary = dataExportImportRepo.exportData(uri)
+                _exportImportState.update { it.copy(isExporting = false, exportImportMessage = summary) }
+            } catch (e: Exception) {
+                _exportImportState.update {
+                    it.copy(isExporting = false, exportImportError = "Export failed: ${e.message}")
+                }
+            }
+        }
+    }
+
+    /** Imports all data from the given URI (chosen by the user via SAF). */
+    fun importData(uri: Uri) {
+        viewModelScope.launch {
+            _exportImportState.update { it.copy(isImporting = true, exportImportMessage = null, exportImportError = null) }
+            try {
+                val summary = dataExportImportRepo.importData(uri)
+                _exportImportState.update { it.copy(isImporting = false, exportImportMessage = summary) }
+            } catch (e: Exception) {
+                _exportImportState.update {
+                    it.copy(isImporting = false, exportImportError = "Import failed: ${e.message}")
+                }
+            }
+        }
+    }
+
+    /** Clears the export/import result message. */
+    fun clearExportImportMessage() {
+        _exportImportState.update { it.copy(exportImportMessage = null, exportImportError = null) }
+    }
+
     override fun onCleared() {
         stopScan()
         super.onCleared()
@@ -285,3 +345,12 @@ private data class HabitPartialState(
         HabitIntegrationRepository.Slot.RESONANCE_BREATHING -> copy(resonanceBreathingHabit = value)
     }
 }
+
+// ── Export/Import sub-state ───────────────────────────────────────────────────
+
+private data class ExportImportPartialState(
+    val isExporting: Boolean = false,
+    val isImporting: Boolean = false,
+    val exportImportMessage: String? = null,
+    val exportImportError: String? = null
+)
