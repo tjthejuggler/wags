@@ -14,13 +14,17 @@ data class MorningReadinessEntity(
     val supineSdnnMs: Double,
     val supineRhr: Int,
 
-    // Standing HRV
-    val standingRmssdMs: Double,
-    val standingLnRmssd: Double,
-    val standingSdnnMs: Double,
+    // Standing HRV — null when the user skipped the standing phase
+    @androidx.room.ColumnInfo(defaultValue = "NULL")
+    val standingRmssdMs: Double?,
+    @androidx.room.ColumnInfo(defaultValue = "NULL")
+    val standingLnRmssd: Double?,
+    @androidx.room.ColumnInfo(defaultValue = "NULL")
+    val standingSdnnMs: Double?,
 
-    // Orthostatic metrics
-    val peakStandHr: Int,
+    // Orthostatic metrics — peakStandHr null when standing was skipped
+    @androidx.room.ColumnInfo(defaultValue = "NULL")
+    val peakStandHr: Int?,
     val thirtyFifteenRatio: Float?,
     val ohrrAt20sPercent: Float?,
     val ohrrAt60sPercent: Float?,

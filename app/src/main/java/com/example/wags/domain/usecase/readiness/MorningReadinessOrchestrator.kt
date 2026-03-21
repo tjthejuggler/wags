@@ -2,6 +2,7 @@ package com.example.wags.domain.usecase.readiness
 
 import com.example.wags.data.repository.MorningReadinessRepository
 import com.example.wags.domain.model.HooperIndex
+import com.example.wags.domain.model.HrvMetrics
 import com.example.wags.domain.model.MorningReadinessResult
 import com.example.wags.domain.model.RrInterval
 import com.example.wags.domain.usecase.hrv.ArtifactCorrectionUseCase
@@ -40,19 +41,22 @@ class MorningReadinessOrchestrator @Inject constructor(
     )
 
     suspend fun compute(input: Input): MorningReadinessResult {
+        val standingSkipped = input.standingBuffer.isEmpty()
+
         // 1. Artifact correction
         val supineCorrected = artifactCorrection.execute(
             input.supineBuffer.map { it.intervalMs }
         )
-        val standingCorrected = artifactCorrection.execute(
-            input.standingBuffer.map { it.intervalMs }
-        )
+        // Only run artifact correction on standing data if the user actually stood.
+        val standingCorrected = if (!standingSkipped) {
+            artifactCorrection.execute(input.standingBuffer.map { it.intervalMs })
+        } else null
 
         val supineArtifactPct = if (input.supineBuffer.isNotEmpty()) {
             supineCorrected.artifactCount.toFloat() / input.supineBuffer.size * 100f
         } else 0f
 
-        val standingArtifactPct = if (input.standingBuffer.isNotEmpty()) {
+        val standingArtifactPct = if (standingCorrected != null && input.standingBuffer.isNotEmpty()) {
             standingCorrected.artifactCount.toFloat() / input.standingBuffer.size * 100f
         } else 0f
 
@@ -61,10 +65,14 @@ class MorningReadinessOrchestrator @Inject constructor(
             supineCorrected.correctedNn,
             supineCorrected.artifactMask
         )
-        val standingHrv = timeDomainCalculator.calculate(
-            standingCorrected.correctedNn,
-            standingCorrected.artifactMask
-        )
+        // Standing HRV is null when the user skipped standing — we must not fabricate
+        // zero-valued metrics that would pollute history charts and comparisons.
+        val standingHrv: HrvMetrics? = if (standingCorrected != null) {
+            timeDomainCalculator.calculate(
+                standingCorrected.correctedNn,
+                standingCorrected.artifactMask
+            )
+        } else null
 
         // 3. Supine RHR (mean RR → bpm)
         val supineRhr = if (supineCorrected.correctedNn.isNotEmpty()) {
@@ -72,14 +80,17 @@ class MorningReadinessOrchestrator @Inject constructor(
             if (meanRr > 0) (60_000.0 / meanRr).toInt() else 60
         } else 60
 
-        // 4. Orthostatic metrics (rebuild RrIntervals with corrected values)
-        val correctedStandingRr = rebuildRrIntervals(
-            input.standingBuffer, standingCorrected.correctedNn
-        )
-        val orthostasisMetrics = ohrrCalculator.calculate(
-            peakStandHr = input.peakStandHr,
-            standingRrIntervals = correctedStandingRr
-        )
+        // 4. Orthostatic metrics — only when standing data exists.
+        // peakStandHr is also null when skipped so the score calculator treats it as unknown.
+        val orthostasisMetrics = if (!standingSkipped && standingCorrected != null) {
+            val correctedStandingRr = rebuildRrIntervals(
+                input.standingBuffer, standingCorrected.correctedNn
+            )
+            ohrrCalculator.calculate(
+                peakStandHr = input.peakStandHr ?: 0,
+                standingRrIntervals = correctedStandingRr
+            )
+        } else null
 
         // 5. Respiratory rate (from supine buffer)
         val respResult = respiratoryRateCalculator.calculate(input.supineBuffer)
@@ -90,11 +101,14 @@ class MorningReadinessOrchestrator @Inject constructor(
         val rhrHistory     = repository.getSupineRhr90Days()
 
         // 7. Score calculation
+        // peakStandHr is null when standing was skipped — pass null so the score calculator
+        // and result record correctly reflect that no standing data was collected.
+        val peakStandHrOrNull: Int? = if (standingSkipped) null else input.peakStandHr.takeIf { it > 0 }
         val scoreInput = MorningReadinessScoreCalculator.Input(
             supineHrvMetrics          = supineHrv,
             standingHrvMetrics        = standingHrv,
             supineRhr                 = supineRhr,
-            peakStandHr               = input.peakStandHr,
+            peakStandHr               = peakStandHrOrNull,
             orthostasisMetrics        = orthostasisMetrics,
             hooperIndex               = input.hooperIndex,
             respiratoryRateBpm        = respResult?.respiratoryRateBpm,
@@ -113,10 +127,10 @@ class MorningReadinessOrchestrator @Inject constructor(
             supineHrvMetrics         = supineHrv,
             standingHrvMetrics       = standingHrv,
             supineRhr                = supineRhr,
-            peakStandHr              = input.peakStandHr,
-            thirtyFifteenRatio       = orthostasisMetrics.thirtyFifteenRatio,
-            ohrrAt20s                = orthostasisMetrics.ohrrAt20sPercent,
-            ohrrAt60s                = orthostasisMetrics.ohrrAt60sPercent,
+            peakStandHr              = peakStandHrOrNull,
+            thirtyFifteenRatio       = orthostasisMetrics?.thirtyFifteenRatio,
+            ohrrAt20s                = orthostasisMetrics?.ohrrAt20sPercent,
+            ohrrAt60s                = orthostasisMetrics?.ohrrAt60sPercent,
             respiratoryRateBpm       = respResult?.respiratoryRateBpm,
             slowBreathingFlagged     = respResult?.slowBreathingFlagged ?: false,
             hooperIndex              = input.hooperIndex?.total,

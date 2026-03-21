@@ -44,7 +44,7 @@ data class MorningReadinessUiState(
     val liveRmssd: Double = 0.0,
     val liveSdnn: Double = 0.0,
     val rrCount: Int = 0,
-    val peakStandHr: Int = 0,
+    val peakStandHr: Int? = null,
     val hooperSleep: Float = 50f,
     val hooperFatigue: Float = 50f,
     val hooperSoreness: Float = 50f,
@@ -205,7 +205,7 @@ class MorningReadinessViewModel @Inject constructor(
                         liveRmssd = liveRmssd,
                         liveSdnn = liveSdnn,
                         rrCount = fsm.supineBuffer.size + fsm.standingBuffer.size,
-                        peakStandHr = fsm.peakStandHr,
+                        peakStandHr = fsm.peakStandHr.takeIf { it > 0 },
                         liveRrIntervals = chartRr
                     )
                 }
@@ -431,9 +431,9 @@ private fun MorningReadinessResult.toEntity(
     supineLnRmssd = supineHrvMetrics.lnRmssd,
     supineSdnnMs = supineHrvMetrics.sdnnMs,
     supineRhr = supineRhr,
-    standingRmssdMs = standingHrvMetrics.rmssdMs,
-    standingLnRmssd = standingHrvMetrics.lnRmssd,
-    standingSdnnMs = standingHrvMetrics.sdnnMs,
+    standingRmssdMs = standingHrvMetrics?.rmssdMs,
+    standingLnRmssd = standingHrvMetrics?.lnRmssd,
+    standingSdnnMs = standingHrvMetrics?.sdnnMs,
     peakStandHr = peakStandHr,
     thirtyFifteenRatio = thirtyFifteenRatio,
     ohrrAt20sPercent = ohrrAt20s,

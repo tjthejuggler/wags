@@ -387,7 +387,7 @@ private fun StandingContent(uiState: MorningReadinessUiState, onSkipStanding: ()
             rmssd = uiState.liveRmssd,
             sdnn = uiState.liveSdnn,
             rrCount = uiState.rrCount,
-            peakHr = uiState.peakStandHr.takeIf { it > 0 }
+            peakHr = uiState.peakStandHr
         )
 
         Spacer(Modifier.height(4.dp))

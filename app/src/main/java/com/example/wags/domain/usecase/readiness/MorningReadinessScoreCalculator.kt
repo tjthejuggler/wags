@@ -23,9 +23,11 @@ class MorningReadinessScoreCalculator @Inject constructor() {
 
     data class Input(
         val supineHrvMetrics: HrvMetrics,
-        val standingHrvMetrics: HrvMetrics,
+        /** Null when the user skipped the standing phase. */
+        val standingHrvMetrics: HrvMetrics?,
         val supineRhr: Int,
-        val peakStandHr: Int,
+        /** Null when the user skipped the standing phase. */
+        val peakStandHr: Int?,
         val orthostasisMetrics: OrthostasisMetrics?,
         val hooperIndex: HooperIndex?,
         val respiratoryRateBpm: Float?,

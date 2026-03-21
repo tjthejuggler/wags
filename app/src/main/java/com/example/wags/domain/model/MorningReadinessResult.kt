@@ -3,9 +3,11 @@ package com.example.wags.domain.model
 data class MorningReadinessResult(
     val timestamp: Long,
     val supineHrvMetrics: HrvMetrics,
-    val standingHrvMetrics: HrvMetrics,
+    /** Null when the user skipped the standing phase. */
+    val standingHrvMetrics: HrvMetrics?,
     val supineRhr: Int,                    // Resting HR in bpm (supine)
-    val peakStandHr: Int,                  // Peak HR during orthostatic stand
+    /** Null when the user skipped the standing phase. */
+    val peakStandHr: Int?,                 // Peak HR during orthostatic stand
     val thirtyFifteenRatio: Float?,        // Longest RR (beat ~30) / Shortest RR (beat ~15); null if insufficient data
     val ohrrAt20s: Float?,                 // % HR drop at 20s post-peak; null if not captured
     val ohrrAt60s: Float?,                 // % HR drop at 60s post-peak; null if not captured

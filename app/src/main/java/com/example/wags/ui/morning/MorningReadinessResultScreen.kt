@@ -98,11 +98,13 @@ fun MorningReadinessResultScreen(
             metrics = result.supineHrvMetrics,
             showSupineVsStandingHelp = false
         )
-        HrvCard(
-            title = "Standing HRV",
-            metrics = result.standingHrvMetrics,
-            showSupineVsStandingHelp = true
-        )
+        result.standingHrvMetrics?.let { standingMetrics ->
+            HrvCard(
+                title = "Standing HRV",
+                metrics = standingMetrics,
+                showSupineVsStandingHelp = true
+            )
+        }
 
         OrthostaticCard(result)
 
@@ -254,7 +256,7 @@ private fun OrthostaticCard(result: MorningReadinessResult) {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text("Orthostatic Response", style = MaterialTheme.typography.titleMedium, color = EcgCyan)
-            SimpleMetricRow("Peak Stand HR", "${result.peakStandHr} bpm")
+            result.peakStandHr?.let { SimpleMetricRow("Peak Stand HR", "$it bpm") }
 
             result.thirtyFifteenRatio?.let { ratio ->
                 MetricRowWithHelp(

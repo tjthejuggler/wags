@@ -148,10 +148,12 @@ class MorningReadinessHistoryViewModel @Inject constructor(
             supineHrvScore.add(ChartPoint(x, (e.supineLnRmssd * 20).toFloat(), label))
             supineSdnn.add(ChartPoint(x, e.supineSdnnMs.toFloat(), label))
             restingHr.add(ChartPoint(x, e.supineRhr.toFloat(), label))
-            standingRmssd.add(ChartPoint(x, e.standingRmssdMs.toFloat(), label))
-            standingHrvScore.add(ChartPoint(x, (e.standingLnRmssd * 20).toFloat(), label))
-            standingSdnn.add(ChartPoint(x, e.standingSdnnMs.toFloat(), label))
-            peakStandHr.add(ChartPoint(x, e.peakStandHr.toFloat(), label))
+            // Standing metrics are null when the user skipped the standing phase —
+            // omit those sessions from standing charts so they don't pollute trends.
+            e.standingRmssdMs?.let { standingRmssd.add(ChartPoint(x, it.toFloat(), label)) }
+            e.standingLnRmssd?.let { standingHrvScore.add(ChartPoint(x, (it * 20).toFloat(), label)) }
+            e.standingSdnnMs?.let { standingSdnn.add(ChartPoint(x, it.toFloat(), label)) }
+            e.peakStandHr?.let { peakStandHr.add(ChartPoint(x, it.toFloat(), label)) }
             e.thirtyFifteenRatio?.let { thirtyFifteen.add(ChartPoint(x, it, label)) }
             e.ohrrAt60sPercent?.let { ohrr60s.add(ChartPoint(x, it, label)) }
             e.respiratoryRateBpm?.let { respRate.add(ChartPoint(x, it, label)) }

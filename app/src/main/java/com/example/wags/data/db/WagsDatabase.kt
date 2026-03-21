@@ -23,7 +23,7 @@ import com.example.wags.data.db.entity.*
         MeditationSessionEntity::class,
         MorningReadinessTelemetryEntity::class
     ],
-    version = 16,
+    version = 17,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -482,6 +482,77 @@ abstract class WagsDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE rf_assessments ADD COLUMN resonanceCurveJson TEXT NOT NULL DEFAULT ''")
                 db.execSQL("ALTER TABLE rf_assessments ADD COLUMN hrWaveformJson TEXT NOT NULL DEFAULT ''")
                 db.execSQL("ALTER TABLE rf_assessments ADD COLUMN powerSpectrumJson TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        /**
+         * v16 → v17: Make standing HRV columns and peakStandHr nullable in morning_readiness.
+         *
+         * Previously these were NOT NULL with default 0, which meant sessions where the user
+         * skipped the standing phase would store fabricated zero-values that polluted history
+         * charts and cross-day comparisons. Now they are NULL when standing was skipped.
+         *
+         * SQLite does not support ALTER COLUMN, so we recreate the table.
+         * Existing rows keep their current numeric values (non-null); only new skip-standing
+         * sessions will write NULL.
+         */
+        val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE `morning_readiness_new` (
+                        `id`                       INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `timestamp`                INTEGER NOT NULL,
+                        `supineRmssdMs`            REAL    NOT NULL,
+                        `supineLnRmssd`            REAL    NOT NULL,
+                        `supineSdnnMs`             REAL    NOT NULL,
+                        `supineRhr`                INTEGER NOT NULL,
+                        `standingRmssdMs`          REAL    DEFAULT NULL,
+                        `standingLnRmssd`          REAL    DEFAULT NULL,
+                        `standingSdnnMs`           REAL    DEFAULT NULL,
+                        `peakStandHr`              INTEGER DEFAULT NULL,
+                        `thirtyFifteenRatio`       REAL,
+                        `ohrrAt20sPercent`         REAL,
+                        `ohrrAt60sPercent`         REAL,
+                        `respiratoryRateBpm`       REAL,
+                        `slowBreathingFlagged`     INTEGER NOT NULL,
+                        `hooperSleep`              REAL,
+                        `hooperFatigue`            REAL,
+                        `hooperSoreness`           REAL,
+                        `hooperStress`             REAL,
+                        `hooperTotal`              REAL,
+                        `artifactPercentSupine`    REAL    NOT NULL,
+                        `artifactPercentStanding`  REAL    NOT NULL,
+                        `readinessScore`           INTEGER NOT NULL,
+                        `readinessColor`           TEXT    NOT NULL,
+                        `hrvBaseScore`             INTEGER NOT NULL,
+                        `orthoMultiplier`          REAL    NOT NULL,
+                        `cvPenaltyApplied`         INTEGER NOT NULL,
+                        `rhrLimiterApplied`        INTEGER NOT NULL,
+                        `hrDeviceId`               TEXT    DEFAULT NULL,
+                        `standTimestampMs`         INTEGER DEFAULT NULL
+                    )
+                """.trimIndent())
+
+                db.execSQL("""
+                    INSERT INTO `morning_readiness_new`
+                    SELECT
+                        id, timestamp,
+                        supineRmssdMs, supineLnRmssd, supineSdnnMs, supineRhr,
+                        standingRmssdMs, standingLnRmssd, standingSdnnMs,
+                        peakStandHr,
+                        thirtyFifteenRatio, ohrrAt20sPercent, ohrrAt60sPercent,
+                        respiratoryRateBpm, slowBreathingFlagged,
+                        hooperSleep, hooperFatigue, hooperSoreness, hooperStress, hooperTotal,
+                        artifactPercentSupine, artifactPercentStanding,
+                        readinessScore, readinessColor,
+                        hrvBaseScore, orthoMultiplier,
+                        cvPenaltyApplied, rhrLimiterApplied,
+                        hrDeviceId, standTimestampMs
+                    FROM `morning_readiness`
+                """.trimIndent())
+
+                db.execSQL("DROP TABLE `morning_readiness`")
+                db.execSQL("ALTER TABLE `morning_readiness_new` RENAME TO `morning_readiness`")
             }
         }
     }

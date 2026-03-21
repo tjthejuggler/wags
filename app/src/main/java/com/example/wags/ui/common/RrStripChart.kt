@@ -378,7 +378,11 @@ private fun DrawScope.drawStripChart(
     fun xAt(t: Double) = ((t - windowStart) / windowMs * w).toFloat()
     fun yAt(v: Double) = h - ((v - paddedMin) / yRange * h).toFloat()
 
-    val visible = beats.filter { it.timeMs >= windowStart - 2000 && it.timeMs <= cursorTimeMs + 2000 }
+    // Keep all beats that fall within the visible window (left edge with 2 s look-behind for
+    // smooth entry). There is intentionally NO upper-bound filter on cursorTimeMs: the cursor
+    // is a wall-clock value that can lag behind cumulative RR time, which would cause beats
+    // to be clipped before they reach the left edge of the screen.
+    val visible = beats.filter { it.timeMs >= windowStart - 2000 }
     if (visible.size < 2) return
     val pts = visible.map { Offset(xAt(it.timeMs), yAt(it.valueMs)) }
 

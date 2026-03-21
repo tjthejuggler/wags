@@ -371,16 +371,24 @@ private fun MorningReadinessDetailContent(
                 HELP_RHR_TITLE, HELP_RHR_TEXT)
         }
 
-        // ── Standing HRV ──────────────────────────────────────────────────────
-        DetailSection(title = "Standing HRV") {
-            DetailRowWithHelp("RMSSD", "${String.format("%.1f", reading.standingRmssdMs)} ms",
-                HELP_RMSSD_TITLE, HELP_RMSSD_TEXT)
-            DetailRowWithHelp("HRV Score (ln×20)", (reading.standingLnRmssd * 20).toInt().toString(),
-                HELP_HRV_SCORE_TITLE, HELP_HRV_SCORE_TEXT)
-            DetailRowWithHelp("SDNN", "${String.format("%.1f", reading.standingSdnnMs)} ms",
-                HELP_SDNN_TITLE, HELP_SDNN_TEXT)
-            DetailRowWithHelp("Peak Stand HR", "${reading.peakStandHr} bpm",
-                HELP_PEAK_STAND_HR_TITLE, HELP_PEAK_STAND_HR_TEXT)
+        // ── Standing HRV — only shown when the user completed the standing phase ──
+        if (reading.standingRmssdMs != null) {
+            DetailSection(title = "Standing HRV") {
+                DetailRowWithHelp("RMSSD", "${String.format("%.1f", reading.standingRmssdMs)} ms",
+                    HELP_RMSSD_TITLE, HELP_RMSSD_TEXT)
+                reading.standingLnRmssd?.let {
+                    DetailRowWithHelp("HRV Score (ln×20)", (it * 20).toInt().toString(),
+                        HELP_HRV_SCORE_TITLE, HELP_HRV_SCORE_TEXT)
+                }
+                reading.standingSdnnMs?.let {
+                    DetailRowWithHelp("SDNN", "${String.format("%.1f", it)} ms",
+                        HELP_SDNN_TITLE, HELP_SDNN_TEXT)
+                }
+                reading.peakStandHr?.let {
+                    DetailRowWithHelp("Peak Stand HR", "$it bpm",
+                        HELP_PEAK_STAND_HR_TITLE, HELP_PEAK_STAND_HR_TEXT)
+                }
+            }
         }
 
         // ── Orthostatic Response ──────────────────────────────────────────────
@@ -637,7 +645,7 @@ private fun OrthostasisStatsCard(
                 }
                 OrthoStatBox(
                     label = "Peak stand HR",
-                    value = "${reading.peakStandHr} bpm",
+                    value = reading.peakStandHr?.let { "$it bpm" } ?: "—",
                     color = ReadinessOrange
                 )
                 hrRise?.let {

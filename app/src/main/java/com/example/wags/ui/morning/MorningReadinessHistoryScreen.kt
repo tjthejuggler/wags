@@ -741,12 +741,20 @@ private fun ReadingDetailCard(
             DetailRow("SDNN", "${String.format("%.1f", reading.supineSdnnMs)} ms")
             DetailRow("Resting HR", "${reading.supineRhr} bpm")
 
-            HorizontalDivider(color = SurfaceDark)
-            Text("Standing HRV", style = MaterialTheme.typography.labelLarge, color = EcgCyan)
-            DetailRow("RMSSD", "${String.format("%.1f", reading.standingRmssdMs)} ms")
-            DetailRow("HRV Score (ln×20)", (reading.standingLnRmssd * 20).toInt().toString())
-            DetailRow("SDNN", "${String.format("%.1f", reading.standingSdnnMs)} ms")
-            DetailRow("Peak Stand HR", "${reading.peakStandHr} bpm")
+            if (reading.standingRmssdMs != null) {
+                HorizontalDivider(color = SurfaceDark)
+                Text("Standing HRV", style = MaterialTheme.typography.labelLarge, color = EcgCyan)
+                DetailRow("RMSSD", "${String.format("%.1f", reading.standingRmssdMs)} ms")
+                reading.standingLnRmssd?.let {
+                    DetailRow("HRV Score (ln×20)", (it * 20).toInt().toString())
+                }
+                reading.standingSdnnMs?.let {
+                    DetailRow("SDNN", "${String.format("%.1f", it)} ms")
+                }
+                reading.peakStandHr?.let {
+                    DetailRow("Peak Stand HR", "$it bpm")
+                }
+            }
 
             HorizontalDivider(color = SurfaceDark)
             Text("Orthostatic Response", style = MaterialTheme.typography.labelLarge, color = EcgCyan)
