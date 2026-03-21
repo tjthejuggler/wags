@@ -5,7 +5,7 @@
         <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/ResonancePlaceholderView.mc" id="1" lineNum="5" parent="globals/ResonancePlaceholderView" pc="268435460" symbol="&lt;init&gt;"/>
         <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/FreeHoldView.mc" id="2" lineNum="316" parent="globals/FreeHoldDelegate" pc="268435479" symbol="&lt;init&gt;"/>
         <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="3" lineNum="5" parent="globals/SettingsMenuDelegate" pc="268435498" symbol="&lt;init&gt;"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="4" lineNum="297" parent="globals/QueueListener" pc="268435517" symbol="&lt;init&gt;"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="4" lineNum="302" parent="globals/QueueListener" pc="268435517" symbol="&lt;init&gt;"/>
         <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="5" lineNum="113" parent="globals/SyncLogDelegate" pc="268435536" symbol="&lt;init&gt;"/>
         <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="6" lineNum="7" parent="globals/Rez" pc="268435555" symbol="&lt;init&gt;"/>
         <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="7" lineNum="143" parent="globals/TimeOfDayInfoDelegate" pc="268435579" symbol="&lt;init&gt;"/>
@@ -81,14 +81,14 @@
         <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="28" lineNum="26" parent="globals/SettingsMenuDelegate" pc="268437456" symbol="onSelect"/>
         <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="28" lineNum="27" parent="globals/SettingsMenuDelegate" pc="268437504" symbol="onSelect"/>
         <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="28" lineNum="28" parent="globals/SettingsMenuDelegate" pc="268437515" symbol="onSelect"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="29" lineNum="305" parent="globals/QueueListener" pc="268437584" symbol="onError"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="29" lineNum="306" parent="globals/QueueListener" pc="268437586" symbol="onError"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="29" lineNum="307" parent="globals/QueueListener" pc="268437607" symbol="onError"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="30" lineNum="301" parent="globals/QueueListener" pc="268437624" symbol="onComplete"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="30" lineNum="302" parent="globals/QueueListener" pc="268437626" symbol="onComplete"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="30" lineNum="303" parent="globals/QueueListener" pc="268437647" symbol="onComplete"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="31" lineNum="298" parent="globals/QueueListener" pc="268437664" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="31" lineNum="299" parent="globals/QueueListener" pc="268437666" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="29" lineNum="310" parent="globals/QueueListener" pc="268437584" symbol="onError"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="29" lineNum="311" parent="globals/QueueListener" pc="268437586" symbol="onError"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="29" lineNum="312" parent="globals/QueueListener" pc="268437607" symbol="onError"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="30" lineNum="306" parent="globals/QueueListener" pc="268437624" symbol="onComplete"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="30" lineNum="307" parent="globals/QueueListener" pc="268437626" symbol="onComplete"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="30" lineNum="308" parent="globals/QueueListener" pc="268437647" symbol="onComplete"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="31" lineNum="303" parent="globals/QueueListener" pc="268437664" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="31" lineNum="304" parent="globals/QueueListener" pc="268437666" symbol="initialize"/>
         <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="32" lineNum="140" parent="globals/SyncLogDelegate" pc="268437685" symbol="onBack"/>
         <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="32" lineNum="141" parent="globals/SyncLogDelegate" pc="268437687" symbol="onBack"/>
         <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="32" lineNum="142" parent="globals/SyncLogDelegate" pc="268437708" symbol="onBack"/>
@@ -106,21 +106,21 @@
         <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="36" lineNum="135" parent="globals/SyncLogDelegate" pc="268437806" symbol="onSelect"/>
         <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="36" lineNum="136" parent="globals/SyncLogDelegate" pc="268437824" symbol="onSelect"/>
         <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="36" lineNum="137" parent="globals/SyncLogDelegate" pc="268437840" symbol="onSelect"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="37" lineNum="275" parent="globals/MQTimer" pc="268437843" symbol="start"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="37" lineNum="276" parent="globals/MQTimer" pc="268437845" symbol="start"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="37" lineNum="277" parent="globals/MQTimer" pc="268437857" symbol="start"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="37" lineNum="279" parent="globals/MQTimer" pc="268437890" symbol="start"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="37" lineNum="280" parent="globals/MQTimer" pc="268437906" symbol="start"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="38" lineNum="270" parent="globals/MQTimer" pc="268437957" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="38" lineNum="271" parent="globals/MQTimer" pc="268437959" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="38" lineNum="272" parent="globals/MQTimer" pc="268437993" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="39" lineNum="283" parent="globals/MQTimer" pc="268438004" symbol="onTimer"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="39" lineNum="284" parent="globals/MQTimer" pc="268438008" symbol="onTimer"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="39" lineNum="286" parent="globals/MQTimer" pc="268438049" symbol="onTimer"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="39" lineNum="287" parent="globals/MQTimer" pc="268438069" symbol="onTimer"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="39" lineNum="288" parent="globals/MQTimer" pc="268438090" symbol="onTimer"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="39" lineNum="289" parent="globals/MQTimer" pc="268438111" symbol="onTimer"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="39" lineNum="291" parent="globals/MQTimer" pc="268438155" symbol="onTimer"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="37" lineNum="280" parent="globals/MQTimer" pc="268437843" symbol="start"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="37" lineNum="281" parent="globals/MQTimer" pc="268437845" symbol="start"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="37" lineNum="282" parent="globals/MQTimer" pc="268437857" symbol="start"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="37" lineNum="284" parent="globals/MQTimer" pc="268437890" symbol="start"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="37" lineNum="285" parent="globals/MQTimer" pc="268437906" symbol="start"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="38" lineNum="275" parent="globals/MQTimer" pc="268437957" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="38" lineNum="276" parent="globals/MQTimer" pc="268437959" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="38" lineNum="277" parent="globals/MQTimer" pc="268437993" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="39" lineNum="288" parent="globals/MQTimer" pc="268438004" symbol="onTimer"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="39" lineNum="289" parent="globals/MQTimer" pc="268438008" symbol="onTimer"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="39" lineNum="291" parent="globals/MQTimer" pc="268438049" symbol="onTimer"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="39" lineNum="292" parent="globals/MQTimer" pc="268438069" symbol="onTimer"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="39" lineNum="293" parent="globals/MQTimer" pc="268438090" symbol="onTimer"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="39" lineNum="294" parent="globals/MQTimer" pc="268438111" symbol="onTimer"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="39" lineNum="296" parent="globals/MQTimer" pc="268438155" symbol="onTimer"/>
         <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="40" lineNum="148" parent="globals/TimeOfDayInfoDelegate" pc="268438172" symbol="onBack"/>
         <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="40" lineNum="149" parent="globals/TimeOfDayInfoDelegate" pc="268438174" symbol="onBack"/>
         <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="40" lineNum="150" parent="globals/TimeOfDayInfoDelegate" pc="268438195" symbol="onBack"/>
@@ -625,228 +625,230 @@
         <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="102" lineNum="243" parent="globals/MessageQueue" pc="268448435" symbol="onFail"/>
         <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="102" lineNum="244" parent="globals/MessageQueue" pc="268448465" symbol="onFail"/>
         <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="102" lineNum="246" parent="globals/MessageQueue" pc="268448495" symbol="onFail"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="102" lineNum="248" parent="globals/MessageQueue" pc="268448512" symbol="onFail"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="102" lineNum="249" parent="globals/MessageQueue" pc="268448528" symbol="onFail"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="102" lineNum="250" parent="globals/MessageQueue" pc="268448558" symbol="onFail"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="102" lineNum="252" parent="globals/MessageQueue" pc="268448587" symbol="onFail"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="102" lineNum="253" parent="globals/MessageQueue" pc="268448623" symbol="onFail"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="102" lineNum="254" parent="globals/MessageQueue" pc="268448659" symbol="onFail"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="102" lineNum="255" parent="globals/MessageQueue" pc="268448672" symbol="onFail"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="102" lineNum="256" parent="globals/MessageQueue" pc="268448698" symbol="onFail"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="102" lineNum="258" parent="globals/MessageQueue" pc="268448732" symbol="onFail"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="208" parent="globals/MessageQueue" pc="268448762" symbol="_doSend"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="209" parent="globals/MessageQueue" pc="268448774" symbol="_doSend"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="210" parent="globals/MessageQueue" pc="268448800" symbol="_doSend"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="211" parent="globals/MessageQueue" pc="268448810" symbol="_doSend"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="212" parent="globals/MessageQueue" pc="268448831" symbol="_doSend"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="213" parent="globals/MessageQueue" pc="268448852" symbol="_doSend"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="216" parent="globals/MessageQueue" pc="268448856" symbol="_doSend"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="217" parent="globals/MessageQueue" pc="268448866" symbol="_doSend"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="218" parent="globals/MessageQueue" pc="268448882" symbol="_doSend"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="219" parent="globals/MessageQueue" pc="268448889" symbol="_doSend"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="220" parent="globals/MessageQueue" pc="268448907" symbol="_doSend"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="221" parent="globals/MessageQueue" pc="268448925" symbol="_doSend"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="221" parent="globals/MessageQueue" pc="268448932" symbol="_doSend"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="223" parent="globals/MessageQueue" pc="268448942" symbol="_doSend"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="224" parent="globals/MessageQueue" pc="268448990" symbol="_doSend"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="227" parent="globals/MessageQueue" pc="268449038" symbol="_doSend"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="104" lineNum="230" parent="globals/MessageQueue" pc="268449084" symbol="onOK"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="104" lineNum="231" parent="globals/MessageQueue" pc="268449094" symbol="onOK"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="104" lineNum="232" parent="globals/MessageQueue" pc="268449115" symbol="onOK"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="104" lineNum="233" parent="globals/MessageQueue" pc="268449136" symbol="onOK"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="104" lineNum="234" parent="globals/MessageQueue" pc="268449149" symbol="onOK"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="104" lineNum="235" parent="globals/MessageQueue" pc="268449175" symbol="onOK"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="104" lineNum="238" parent="globals/MessageQueue" pc="268449209" symbol="onOK"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="105" lineNum="106" parent="globals/MainMenuItemDelegate" pc="268449239" symbol="onBack"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="105" lineNum="107" parent="globals/MainMenuItemDelegate" pc="268449241" symbol="onBack"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="106" lineNum="76" parent="globals/MainMenuItemDelegate" pc="268449263" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="106" lineNum="77" parent="globals/MainMenuItemDelegate" pc="268449265" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="107" lineNum="80" parent="globals/MainMenuItemDelegate" pc="268449284" symbol="onSelect"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="107" lineNum="81" parent="globals/MainMenuItemDelegate" pc="268449288" symbol="onSelect"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="107" lineNum="82" parent="globals/MainMenuItemDelegate" pc="268449301" symbol="onSelect"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="107" lineNum="83" parent="globals/MainMenuItemDelegate" pc="268449312" symbol="onSelect"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="107" lineNum="84" parent="globals/MainMenuItemDelegate" pc="268449359" symbol="onSelect"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="107" lineNum="85" parent="globals/MainMenuItemDelegate" pc="268449413" symbol="onSelect"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="107" lineNum="93" parent="globals/MainMenuItemDelegate" pc="268449566" symbol="onSelect"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="107" lineNum="94" parent="globals/MainMenuItemDelegate" pc="268449614" symbol="onSelect"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="107" lineNum="95" parent="globals/MainMenuItemDelegate" pc="268449625" symbol="onSelect"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="107" lineNum="100" parent="globals/MainMenuItemDelegate" pc="268449693" symbol="onSelect"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="107" lineNum="101" parent="globals/MainMenuItemDelegate" pc="268449704" symbol="onSelect"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="107" lineNum="102" parent="globals/MainMenuItemDelegate" pc="268449728" symbol="onSelect"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="108" lineNum="84" parent="globals/HoldStorage" pc="268449779" symbol="getUnsyncedHolds"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="108" lineNum="85" parent="globals/HoldStorage" pc="268449791" symbol="getUnsyncedHolds"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="108" lineNum="86" parent="globals/HoldStorage" pc="268449804" symbol="getUnsyncedHolds"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="108" lineNum="87" parent="globals/HoldStorage" pc="268449812" symbol="getUnsyncedHolds"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="108" lineNum="88" parent="globals/HoldStorage" pc="268449836" symbol="getUnsyncedHolds"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="108" lineNum="89" parent="globals/HoldStorage" pc="268449861" symbol="getUnsyncedHolds"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="108" lineNum="92" parent="globals/HoldStorage" pc="268449894" symbol="getUnsyncedHolds"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="108" lineNum="93" parent="globals/HoldStorage" pc="268449945" symbol="getUnsyncedHolds"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="108" lineNum="94" parent="globals/HoldStorage" pc="268449996" symbol="getUnsyncedHolds"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="109" lineNum="138" parent="globals/HoldStorage" pc="268449999" symbol="clearSynced"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="109" lineNum="139" parent="globals/HoldStorage" pc="268450011" symbol="clearSynced"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="109" lineNum="140" parent="globals/HoldStorage" pc="268450024" symbol="clearSynced"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="109" lineNum="141" parent="globals/HoldStorage" pc="268450032" symbol="clearSynced"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="109" lineNum="142" parent="globals/HoldStorage" pc="268450056" symbol="clearSynced"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="109" lineNum="143" parent="globals/HoldStorage" pc="268450081" symbol="clearSynced"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="109" lineNum="146" parent="globals/HoldStorage" pc="268450114" symbol="clearSynced"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="109" lineNum="147" parent="globals/HoldStorage" pc="268450137" symbol="clearSynced"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="110" lineNum="75" parent="globals/HoldStorage" pc="268450171" symbol="getHolds"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="110" lineNum="76" parent="globals/HoldStorage" pc="268450183" symbol="getHolds"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="110" lineNum="77" parent="globals/HoldStorage" pc="268450205" symbol="getHolds"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="110" lineNum="78" parent="globals/HoldStorage" pc="268450211" symbol="getHolds"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="110" lineNum="80" parent="globals/HoldStorage" pc="268450221" symbol="getHolds"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="111" lineNum="98" parent="globals/HoldStorage" pc="268450224" symbol="getUnsyncedCount"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="111" lineNum="99" parent="globals/HoldStorage" pc="268450236" symbol="getUnsyncedCount"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="111" lineNum="100" parent="globals/HoldStorage" pc="268450249" symbol="getUnsyncedCount"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="111" lineNum="101" parent="globals/HoldStorage" pc="268450256" symbol="getUnsyncedCount"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="111" lineNum="102" parent="globals/HoldStorage" pc="268450280" symbol="getUnsyncedCount"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="111" lineNum="103" parent="globals/HoldStorage" pc="268450305" symbol="getUnsyncedCount"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="111" lineNum="106" parent="globals/HoldStorage" pc="268450331" symbol="getUnsyncedCount"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="112" lineNum="110" parent="globals/HoldStorage" pc="268450334" symbol="markSynced"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="112" lineNum="111" parent="globals/HoldStorage" pc="268450346" symbol="markSynced"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="112" lineNum="112" parent="globals/HoldStorage" pc="268450359" symbol="markSynced"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="112" lineNum="113" parent="globals/HoldStorage" pc="268450383" symbol="markSynced"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="112" lineNum="114" parent="globals/HoldStorage" pc="268450408" symbol="markSynced"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="112" lineNum="115" parent="globals/HoldStorage" pc="268450430" symbol="markSynced"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="112" lineNum="116" parent="globals/HoldStorage" pc="268450453" symbol="markSynced"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="112" lineNum="117" parent="globals/HoldStorage" pc="268450483" symbol="markSynced"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="112" lineNum="118" parent="globals/HoldStorage" pc="268450513" symbol="markSynced"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="112" lineNum="121" parent="globals/HoldStorage" pc="268450532" symbol="markSynced"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="112" lineNum="122" parent="globals/HoldStorage" pc="268450562" symbol="markSynced"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="112" lineNum="123" parent="globals/HoldStorage" pc="268450592" symbol="markSynced"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="113" lineNum="127" parent="globals/HoldStorage" pc="268450595" symbol="removeAt"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="113" lineNum="128" parent="globals/HoldStorage" pc="268450607" symbol="removeAt"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="113" lineNum="129" parent="globals/HoldStorage" pc="268450615" symbol="removeAt"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="113" lineNum="130" parent="globals/HoldStorage" pc="268450639" symbol="removeAt"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="113" lineNum="131" parent="globals/HoldStorage" pc="268450647" symbol="removeAt"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="113" lineNum="134" parent="globals/HoldStorage" pc="268450680" symbol="removeAt"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="38" parent="globals/HoldStorage" pc="268450683" symbol="saveHold"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="39" parent="globals/HoldStorage" pc="268450695" symbol="saveHold"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="40" parent="globals/HoldStorage" pc="268450708" symbol="saveHold"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="41" parent="globals/HoldStorage" pc="268450730" symbol="saveHold"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="42" parent="globals/HoldStorage" pc="268450736" symbol="saveHold"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="45" parent="globals/HoldStorage" pc="268450746" symbol="saveHold"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="46" parent="globals/HoldStorage" pc="268450765" symbol="saveHold"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="48" parent="globals/HoldStorage" pc="268450784" symbol="saveHold"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="51" parent="globals/HoldStorage" pc="268450798" symbol="saveHold"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="52" parent="globals/HoldStorage" pc="268450818" symbol="saveHold"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="53" parent="globals/HoldStorage" pc="268450822" symbol="saveHold"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="54" parent="globals/HoldStorage" pc="268450846" symbol="saveHold"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="55" parent="globals/HoldStorage" pc="268450871" symbol="saveHold"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="56" parent="globals/HoldStorage" pc="268450888" symbol="saveHold"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="57" parent="globals/HoldStorage" pc="268450892" symbol="saveHold"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="60" parent="globals/HoldStorage" pc="268450911" symbol="saveHold"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="62" parent="globals/HoldStorage" pc="268450917" symbol="saveHold"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="66" parent="globals/HoldStorage" pc="268450943" symbol="saveHold"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="67" parent="globals/HoldStorage" pc="268450966" symbol="saveHold"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="69" parent="globals/HoldStorage" pc="268450995" symbol="saveHold"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="70" parent="globals/HoldStorage" pc="268451037" symbol="saveHold"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="71" parent="globals/HoldStorage" pc="268451079" symbol="saveHold"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="115" lineNum="119" parent="globals/TimeOfDayInfoView" pc="268451082" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="115" lineNum="120" parent="globals/TimeOfDayInfoView" pc="268451084" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="123" parent="globals/TimeOfDayInfoView" pc="268451103" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="124" parent="globals/TimeOfDayInfoView" pc="268451107" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="125" parent="globals/TimeOfDayInfoView" pc="268451129" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="127" parent="globals/TimeOfDayInfoView" pc="268451141" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="128" parent="globals/TimeOfDayInfoView" pc="268451160" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="129" parent="globals/TimeOfDayInfoView" pc="268451179" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="131" parent="globals/TimeOfDayInfoView" pc="268451196" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="132" parent="globals/TimeOfDayInfoView" pc="268451218" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="134" parent="globals/TimeOfDayInfoView" pc="268451255" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="135" parent="globals/TimeOfDayInfoView" pc="268451277" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="137" parent="globals/TimeOfDayInfoView" pc="268451326" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="138" parent="globals/TimeOfDayInfoView" pc="268451348" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="139" parent="globals/TimeOfDayInfoView" pc="268451385" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="117" lineNum="17" parent="globals/SyncLogView" pc="268451423" symbol="onShow"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="117" lineNum="19" parent="globals/SyncLogView" pc="268451427" symbol="onShow"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="117" lineNum="21" parent="globals/SyncLogView" pc="268451450" symbol="onShow"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="117" lineNum="22" parent="globals/SyncLogView" pc="268451458" symbol="onShow"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="117" lineNum="23" parent="globals/SyncLogView" pc="268451494" symbol="onShow"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="117" lineNum="25" parent="globals/SyncLogView" pc="268451530" symbol="onShow"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="117" lineNum="26" parent="globals/SyncLogView" pc="268451540" symbol="onShow"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="118" lineNum="96" parent="globals/SyncLogView" pc="268451554" symbol="scrollDown"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="118" lineNum="97" parent="globals/SyncLogView" pc="268451556" symbol="scrollDown"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="118" lineNum="98" parent="globals/SyncLogView" pc="268451594" symbol="scrollDown"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="118" lineNum="99" parent="globals/SyncLogView" pc="268451616" symbol="scrollDown"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="119" lineNum="13" parent="globals/SyncLogView" pc="268451636" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="119" lineNum="14" parent="globals/SyncLogView" pc="268451638" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="29" parent="globals/SyncLogView" pc="268451657" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="30" parent="globals/SyncLogView" pc="268451661" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="31" parent="globals/SyncLogView" pc="268451683" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="33" parent="globals/SyncLogView" pc="268451695" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="34" parent="globals/SyncLogView" pc="268451708" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="35" parent="globals/SyncLogView" pc="268451721" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="38" parent="globals/SyncLogView" pc="268451731" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="39" parent="globals/SyncLogView" pc="268451753" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="41" parent="globals/SyncLogView" pc="268451811" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="42" parent="globals/SyncLogView" pc="268451837" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="43" parent="globals/SyncLogView" pc="268451859" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="44" parent="globals/SyncLogView" pc="268451902" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="45" parent="globals/SyncLogView" pc="268451924" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="46" parent="globals/SyncLogView" pc="268451967" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="50" parent="globals/SyncLogView" pc="268451971" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="51" parent="globals/SyncLogView" pc="268451978" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="52" parent="globals/SyncLogView" pc="268451985" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="53" parent="globals/SyncLogView" pc="268452001" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="53" parent="globals/SyncLogView" pc="268452012" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="54" parent="globals/SyncLogView" pc="268452022" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="56" parent="globals/SyncLogView" pc="268452032" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="57" parent="globals/SyncLogView" pc="268452047" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="58" parent="globals/SyncLogView" pc="268452060" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="59" parent="globals/SyncLogView" pc="268452083" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="62" parent="globals/SyncLogView" pc="268452089" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="63" parent="globals/SyncLogView" pc="268452102" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="66" parent="globals/SyncLogView" pc="268452112" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="67" parent="globals/SyncLogView" pc="268452119" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="68" parent="globals/SyncLogView" pc="268452182" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="69" parent="globals/SyncLogView" pc="268452192" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="70" parent="globals/SyncLogView" pc="268452234" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="71" parent="globals/SyncLogView" pc="268452244" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="72" parent="globals/SyncLogView" pc="268452307" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="75" parent="globals/SyncLogView" pc="268452317" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="78" parent="globals/SyncLogView" pc="268452336" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="79" parent="globals/SyncLogView" pc="268452346" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="80" parent="globals/SyncLogView" pc="268452363" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="83" parent="globals/SyncLogView" pc="268452386" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="87" parent="globals/SyncLogView" pc="268452430" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="88" parent="globals/SyncLogView" pc="268452453" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="89" parent="globals/SyncLogView" pc="268452484" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="90" parent="globals/SyncLogView" pc="268452503" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="91" parent="globals/SyncLogView" pc="268452525" symbol="onUpdate"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="121" lineNum="103" parent="globals/SyncLogView" pc="268452572" symbol="scrollUp"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="121" lineNum="104" parent="globals/SyncLogView" pc="268452574" symbol="scrollUp"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="121" lineNum="105" parent="globals/SyncLogView" pc="268452591" symbol="scrollUp"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="121" lineNum="106" parent="globals/SyncLogView" pc="268452613" symbol="scrollUp"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="121" lineNum="106" parent="globals/SyncLogView" pc="268452630" symbol="scrollUp"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="121" lineNum="107" parent="globals/SyncLogView" pc="268452646" symbol="scrollUp"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="122" lineNum="47" parent="globals/Rez/Menus/SettingsMenu" pc="268452666" symbol="&lt;init&gt;"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="123" lineNum="29" parent="globals/Rez/Menus/PrepTypeMenu" pc="268452685" symbol="&lt;init&gt;"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="124" lineNum="13" parent="globals/Rez/Menus/ApneaMenu" pc="268452704" symbol="&lt;init&gt;"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="125" lineNum="38" parent="globals/Rez/Menus/LungVolumeMenu" pc="268452723" symbol="&lt;init&gt;"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="126" lineNum="21" parent="globals/Rez/Menus/MainMenu" pc="268452742" symbol="&lt;init&gt;"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="127" lineNum="48" parent="globals/Rez/Menus/SettingsMenu" pc="268452761" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="127" lineNum="49" parent="globals/Rez/Menus/SettingsMenu" pc="268452763" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="127" lineNum="50" parent="globals/Rez/Menus/SettingsMenu" pc="268452800" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="127" lineNum="51" parent="globals/Rez/Menus/SettingsMenu" pc="268452850" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="127" lineNum="52" parent="globals/Rez/Menus/SettingsMenu" pc="268452900" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="128" lineNum="30" parent="globals/Rez/Menus/PrepTypeMenu" pc="268452951" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="128" lineNum="31" parent="globals/Rez/Menus/PrepTypeMenu" pc="268452953" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="128" lineNum="32" parent="globals/Rez/Menus/PrepTypeMenu" pc="268452990" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="128" lineNum="33" parent="globals/Rez/Menus/PrepTypeMenu" pc="268453040" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="128" lineNum="34" parent="globals/Rez/Menus/PrepTypeMenu" pc="268453090" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="129" lineNum="14" parent="globals/Rez/Menus/ApneaMenu" pc="268453141" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="129" lineNum="15" parent="globals/Rez/Menus/ApneaMenu" pc="268453143" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="129" lineNum="16" parent="globals/Rez/Menus/ApneaMenu" pc="268453180" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="129" lineNum="17" parent="globals/Rez/Menus/ApneaMenu" pc="268453230" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="130" lineNum="39" parent="globals/Rez/Menus/LungVolumeMenu" pc="268453281" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="130" lineNum="40" parent="globals/Rez/Menus/LungVolumeMenu" pc="268453283" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="130" lineNum="41" parent="globals/Rez/Menus/LungVolumeMenu" pc="268453320" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="130" lineNum="42" parent="globals/Rez/Menus/LungVolumeMenu" pc="268453370" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="130" lineNum="43" parent="globals/Rez/Menus/LungVolumeMenu" pc="268453420" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="131" lineNum="22" parent="globals/Rez/Menus/MainMenu" pc="268453471" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="131" lineNum="23" parent="globals/Rez/Menus/MainMenu" pc="268453473" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="131" lineNum="24" parent="globals/Rez/Menus/MainMenu" pc="268453510" symbol="initialize"/>
-        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="131" lineNum="25" parent="globals/Rez/Menus/MainMenu" pc="268453560" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="102" lineNum="249" parent="globals/MessageQueue" pc="268448512" symbol="onFail"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="102" lineNum="250" parent="globals/MessageQueue" pc="268448528" symbol="onFail"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="102" lineNum="251" parent="globals/MessageQueue" pc="268448558" symbol="onFail"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="102" lineNum="253" parent="globals/MessageQueue" pc="268448587" symbol="onFail"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="102" lineNum="254" parent="globals/MessageQueue" pc="268448623" symbol="onFail"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="102" lineNum="255" parent="globals/MessageQueue" pc="268448659" symbol="onFail"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="102" lineNum="256" parent="globals/MessageQueue" pc="268448672" symbol="onFail"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="102" lineNum="257" parent="globals/MessageQueue" pc="268448698" symbol="onFail"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="102" lineNum="259" parent="globals/MessageQueue" pc="268448732" symbol="onFail"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="102" lineNum="261" parent="globals/MessageQueue" pc="268448742" symbol="onFail"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="102" lineNum="262" parent="globals/MessageQueue" pc="268448768" symbol="onFail"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="208" parent="globals/MessageQueue" pc="268448801" symbol="_doSend"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="209" parent="globals/MessageQueue" pc="268448813" symbol="_doSend"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="210" parent="globals/MessageQueue" pc="268448839" symbol="_doSend"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="211" parent="globals/MessageQueue" pc="268448849" symbol="_doSend"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="212" parent="globals/MessageQueue" pc="268448870" symbol="_doSend"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="213" parent="globals/MessageQueue" pc="268448891" symbol="_doSend"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="216" parent="globals/MessageQueue" pc="268448895" symbol="_doSend"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="217" parent="globals/MessageQueue" pc="268448905" symbol="_doSend"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="218" parent="globals/MessageQueue" pc="268448921" symbol="_doSend"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="219" parent="globals/MessageQueue" pc="268448928" symbol="_doSend"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="220" parent="globals/MessageQueue" pc="268448946" symbol="_doSend"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="221" parent="globals/MessageQueue" pc="268448964" symbol="_doSend"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="221" parent="globals/MessageQueue" pc="268448971" symbol="_doSend"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="223" parent="globals/MessageQueue" pc="268448981" symbol="_doSend"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="224" parent="globals/MessageQueue" pc="268449029" symbol="_doSend"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="103" lineNum="227" parent="globals/MessageQueue" pc="268449077" symbol="_doSend"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="104" lineNum="230" parent="globals/MessageQueue" pc="268449123" symbol="onOK"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="104" lineNum="231" parent="globals/MessageQueue" pc="268449133" symbol="onOK"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="104" lineNum="232" parent="globals/MessageQueue" pc="268449154" symbol="onOK"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="104" lineNum="233" parent="globals/MessageQueue" pc="268449175" symbol="onOK"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="104" lineNum="234" parent="globals/MessageQueue" pc="268449188" symbol="onOK"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="104" lineNum="235" parent="globals/MessageQueue" pc="268449214" symbol="onOK"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/WagsApp.mc" id="104" lineNum="238" parent="globals/MessageQueue" pc="268449248" symbol="onOK"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="105" lineNum="106" parent="globals/MainMenuItemDelegate" pc="268449278" symbol="onBack"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="105" lineNum="107" parent="globals/MainMenuItemDelegate" pc="268449280" symbol="onBack"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="106" lineNum="76" parent="globals/MainMenuItemDelegate" pc="268449302" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="106" lineNum="77" parent="globals/MainMenuItemDelegate" pc="268449304" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="107" lineNum="80" parent="globals/MainMenuItemDelegate" pc="268449323" symbol="onSelect"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="107" lineNum="81" parent="globals/MainMenuItemDelegate" pc="268449327" symbol="onSelect"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="107" lineNum="82" parent="globals/MainMenuItemDelegate" pc="268449340" symbol="onSelect"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="107" lineNum="83" parent="globals/MainMenuItemDelegate" pc="268449351" symbol="onSelect"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="107" lineNum="84" parent="globals/MainMenuItemDelegate" pc="268449398" symbol="onSelect"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="107" lineNum="85" parent="globals/MainMenuItemDelegate" pc="268449452" symbol="onSelect"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="107" lineNum="93" parent="globals/MainMenuItemDelegate" pc="268449605" symbol="onSelect"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="107" lineNum="94" parent="globals/MainMenuItemDelegate" pc="268449653" symbol="onSelect"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="107" lineNum="95" parent="globals/MainMenuItemDelegate" pc="268449664" symbol="onSelect"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="107" lineNum="100" parent="globals/MainMenuItemDelegate" pc="268449732" symbol="onSelect"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="107" lineNum="101" parent="globals/MainMenuItemDelegate" pc="268449743" symbol="onSelect"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/MainMenuView.mc" id="107" lineNum="102" parent="globals/MainMenuItemDelegate" pc="268449767" symbol="onSelect"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="108" lineNum="84" parent="globals/HoldStorage" pc="268449818" symbol="getUnsyncedHolds"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="108" lineNum="85" parent="globals/HoldStorage" pc="268449830" symbol="getUnsyncedHolds"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="108" lineNum="86" parent="globals/HoldStorage" pc="268449843" symbol="getUnsyncedHolds"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="108" lineNum="87" parent="globals/HoldStorage" pc="268449851" symbol="getUnsyncedHolds"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="108" lineNum="88" parent="globals/HoldStorage" pc="268449875" symbol="getUnsyncedHolds"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="108" lineNum="89" parent="globals/HoldStorage" pc="268449900" symbol="getUnsyncedHolds"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="108" lineNum="92" parent="globals/HoldStorage" pc="268449933" symbol="getUnsyncedHolds"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="108" lineNum="93" parent="globals/HoldStorage" pc="268449984" symbol="getUnsyncedHolds"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="108" lineNum="94" parent="globals/HoldStorage" pc="268450035" symbol="getUnsyncedHolds"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="109" lineNum="138" parent="globals/HoldStorage" pc="268450038" symbol="clearSynced"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="109" lineNum="139" parent="globals/HoldStorage" pc="268450050" symbol="clearSynced"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="109" lineNum="140" parent="globals/HoldStorage" pc="268450063" symbol="clearSynced"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="109" lineNum="141" parent="globals/HoldStorage" pc="268450071" symbol="clearSynced"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="109" lineNum="142" parent="globals/HoldStorage" pc="268450095" symbol="clearSynced"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="109" lineNum="143" parent="globals/HoldStorage" pc="268450120" symbol="clearSynced"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="109" lineNum="146" parent="globals/HoldStorage" pc="268450153" symbol="clearSynced"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="109" lineNum="147" parent="globals/HoldStorage" pc="268450176" symbol="clearSynced"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="110" lineNum="75" parent="globals/HoldStorage" pc="268450210" symbol="getHolds"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="110" lineNum="76" parent="globals/HoldStorage" pc="268450222" symbol="getHolds"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="110" lineNum="77" parent="globals/HoldStorage" pc="268450244" symbol="getHolds"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="110" lineNum="78" parent="globals/HoldStorage" pc="268450250" symbol="getHolds"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="110" lineNum="80" parent="globals/HoldStorage" pc="268450260" symbol="getHolds"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="111" lineNum="98" parent="globals/HoldStorage" pc="268450263" symbol="getUnsyncedCount"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="111" lineNum="99" parent="globals/HoldStorage" pc="268450275" symbol="getUnsyncedCount"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="111" lineNum="100" parent="globals/HoldStorage" pc="268450288" symbol="getUnsyncedCount"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="111" lineNum="101" parent="globals/HoldStorage" pc="268450295" symbol="getUnsyncedCount"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="111" lineNum="102" parent="globals/HoldStorage" pc="268450319" symbol="getUnsyncedCount"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="111" lineNum="103" parent="globals/HoldStorage" pc="268450344" symbol="getUnsyncedCount"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="111" lineNum="106" parent="globals/HoldStorage" pc="268450370" symbol="getUnsyncedCount"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="112" lineNum="110" parent="globals/HoldStorage" pc="268450373" symbol="markSynced"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="112" lineNum="111" parent="globals/HoldStorage" pc="268450385" symbol="markSynced"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="112" lineNum="112" parent="globals/HoldStorage" pc="268450398" symbol="markSynced"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="112" lineNum="113" parent="globals/HoldStorage" pc="268450422" symbol="markSynced"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="112" lineNum="114" parent="globals/HoldStorage" pc="268450447" symbol="markSynced"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="112" lineNum="115" parent="globals/HoldStorage" pc="268450469" symbol="markSynced"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="112" lineNum="116" parent="globals/HoldStorage" pc="268450492" symbol="markSynced"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="112" lineNum="117" parent="globals/HoldStorage" pc="268450522" symbol="markSynced"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="112" lineNum="118" parent="globals/HoldStorage" pc="268450552" symbol="markSynced"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="112" lineNum="121" parent="globals/HoldStorage" pc="268450571" symbol="markSynced"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="112" lineNum="122" parent="globals/HoldStorage" pc="268450601" symbol="markSynced"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="112" lineNum="123" parent="globals/HoldStorage" pc="268450631" symbol="markSynced"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="113" lineNum="127" parent="globals/HoldStorage" pc="268450634" symbol="removeAt"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="113" lineNum="128" parent="globals/HoldStorage" pc="268450646" symbol="removeAt"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="113" lineNum="129" parent="globals/HoldStorage" pc="268450654" symbol="removeAt"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="113" lineNum="130" parent="globals/HoldStorage" pc="268450678" symbol="removeAt"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="113" lineNum="131" parent="globals/HoldStorage" pc="268450686" symbol="removeAt"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="113" lineNum="134" parent="globals/HoldStorage" pc="268450719" symbol="removeAt"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="38" parent="globals/HoldStorage" pc="268450722" symbol="saveHold"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="39" parent="globals/HoldStorage" pc="268450734" symbol="saveHold"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="40" parent="globals/HoldStorage" pc="268450747" symbol="saveHold"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="41" parent="globals/HoldStorage" pc="268450769" symbol="saveHold"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="42" parent="globals/HoldStorage" pc="268450775" symbol="saveHold"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="45" parent="globals/HoldStorage" pc="268450785" symbol="saveHold"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="46" parent="globals/HoldStorage" pc="268450804" symbol="saveHold"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="48" parent="globals/HoldStorage" pc="268450823" symbol="saveHold"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="51" parent="globals/HoldStorage" pc="268450837" symbol="saveHold"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="52" parent="globals/HoldStorage" pc="268450857" symbol="saveHold"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="53" parent="globals/HoldStorage" pc="268450861" symbol="saveHold"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="54" parent="globals/HoldStorage" pc="268450885" symbol="saveHold"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="55" parent="globals/HoldStorage" pc="268450910" symbol="saveHold"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="56" parent="globals/HoldStorage" pc="268450927" symbol="saveHold"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="57" parent="globals/HoldStorage" pc="268450931" symbol="saveHold"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="60" parent="globals/HoldStorage" pc="268450950" symbol="saveHold"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="62" parent="globals/HoldStorage" pc="268450956" symbol="saveHold"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="66" parent="globals/HoldStorage" pc="268450982" symbol="saveHold"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="67" parent="globals/HoldStorage" pc="268451005" symbol="saveHold"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="69" parent="globals/HoldStorage" pc="268451034" symbol="saveHold"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="70" parent="globals/HoldStorage" pc="268451076" symbol="saveHold"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/HoldStorage.mc" id="114" lineNum="71" parent="globals/HoldStorage" pc="268451118" symbol="saveHold"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="115" lineNum="119" parent="globals/TimeOfDayInfoView" pc="268451121" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="115" lineNum="120" parent="globals/TimeOfDayInfoView" pc="268451123" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="123" parent="globals/TimeOfDayInfoView" pc="268451142" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="124" parent="globals/TimeOfDayInfoView" pc="268451146" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="125" parent="globals/TimeOfDayInfoView" pc="268451168" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="127" parent="globals/TimeOfDayInfoView" pc="268451180" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="128" parent="globals/TimeOfDayInfoView" pc="268451199" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="129" parent="globals/TimeOfDayInfoView" pc="268451218" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="131" parent="globals/TimeOfDayInfoView" pc="268451235" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="132" parent="globals/TimeOfDayInfoView" pc="268451257" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="134" parent="globals/TimeOfDayInfoView" pc="268451294" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="135" parent="globals/TimeOfDayInfoView" pc="268451316" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="137" parent="globals/TimeOfDayInfoView" pc="268451365" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="138" parent="globals/TimeOfDayInfoView" pc="268451387" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SettingsMenuDelegate.mc" id="116" lineNum="139" parent="globals/TimeOfDayInfoView" pc="268451424" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="117" lineNum="17" parent="globals/SyncLogView" pc="268451462" symbol="onShow"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="117" lineNum="19" parent="globals/SyncLogView" pc="268451466" symbol="onShow"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="117" lineNum="21" parent="globals/SyncLogView" pc="268451489" symbol="onShow"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="117" lineNum="22" parent="globals/SyncLogView" pc="268451497" symbol="onShow"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="117" lineNum="23" parent="globals/SyncLogView" pc="268451533" symbol="onShow"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="117" lineNum="25" parent="globals/SyncLogView" pc="268451569" symbol="onShow"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="117" lineNum="26" parent="globals/SyncLogView" pc="268451579" symbol="onShow"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="118" lineNum="96" parent="globals/SyncLogView" pc="268451593" symbol="scrollDown"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="118" lineNum="97" parent="globals/SyncLogView" pc="268451595" symbol="scrollDown"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="118" lineNum="98" parent="globals/SyncLogView" pc="268451633" symbol="scrollDown"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="118" lineNum="99" parent="globals/SyncLogView" pc="268451655" symbol="scrollDown"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="119" lineNum="13" parent="globals/SyncLogView" pc="268451675" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="119" lineNum="14" parent="globals/SyncLogView" pc="268451677" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="29" parent="globals/SyncLogView" pc="268451696" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="30" parent="globals/SyncLogView" pc="268451700" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="31" parent="globals/SyncLogView" pc="268451722" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="33" parent="globals/SyncLogView" pc="268451734" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="34" parent="globals/SyncLogView" pc="268451747" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="35" parent="globals/SyncLogView" pc="268451760" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="38" parent="globals/SyncLogView" pc="268451770" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="39" parent="globals/SyncLogView" pc="268451792" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="41" parent="globals/SyncLogView" pc="268451850" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="42" parent="globals/SyncLogView" pc="268451876" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="43" parent="globals/SyncLogView" pc="268451898" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="44" parent="globals/SyncLogView" pc="268451941" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="45" parent="globals/SyncLogView" pc="268451963" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="46" parent="globals/SyncLogView" pc="268452006" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="50" parent="globals/SyncLogView" pc="268452010" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="51" parent="globals/SyncLogView" pc="268452017" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="52" parent="globals/SyncLogView" pc="268452024" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="53" parent="globals/SyncLogView" pc="268452040" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="53" parent="globals/SyncLogView" pc="268452051" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="54" parent="globals/SyncLogView" pc="268452061" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="56" parent="globals/SyncLogView" pc="268452071" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="57" parent="globals/SyncLogView" pc="268452086" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="58" parent="globals/SyncLogView" pc="268452099" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="59" parent="globals/SyncLogView" pc="268452122" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="62" parent="globals/SyncLogView" pc="268452128" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="63" parent="globals/SyncLogView" pc="268452141" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="66" parent="globals/SyncLogView" pc="268452151" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="67" parent="globals/SyncLogView" pc="268452158" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="68" parent="globals/SyncLogView" pc="268452221" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="69" parent="globals/SyncLogView" pc="268452231" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="70" parent="globals/SyncLogView" pc="268452273" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="71" parent="globals/SyncLogView" pc="268452283" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="72" parent="globals/SyncLogView" pc="268452346" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="75" parent="globals/SyncLogView" pc="268452356" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="78" parent="globals/SyncLogView" pc="268452375" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="79" parent="globals/SyncLogView" pc="268452385" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="80" parent="globals/SyncLogView" pc="268452402" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="83" parent="globals/SyncLogView" pc="268452425" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="87" parent="globals/SyncLogView" pc="268452469" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="88" parent="globals/SyncLogView" pc="268452492" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="89" parent="globals/SyncLogView" pc="268452523" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="90" parent="globals/SyncLogView" pc="268452542" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="120" lineNum="91" parent="globals/SyncLogView" pc="268452564" symbol="onUpdate"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="121" lineNum="103" parent="globals/SyncLogView" pc="268452611" symbol="scrollUp"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="121" lineNum="104" parent="globals/SyncLogView" pc="268452613" symbol="scrollUp"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="121" lineNum="105" parent="globals/SyncLogView" pc="268452630" symbol="scrollUp"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="121" lineNum="106" parent="globals/SyncLogView" pc="268452652" symbol="scrollUp"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="121" lineNum="106" parent="globals/SyncLogView" pc="268452669" symbol="scrollUp"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/source/SyncLogView.mc" id="121" lineNum="107" parent="globals/SyncLogView" pc="268452685" symbol="scrollUp"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="122" lineNum="47" parent="globals/Rez/Menus/SettingsMenu" pc="268452705" symbol="&lt;init&gt;"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="123" lineNum="29" parent="globals/Rez/Menus/PrepTypeMenu" pc="268452724" symbol="&lt;init&gt;"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="124" lineNum="13" parent="globals/Rez/Menus/ApneaMenu" pc="268452743" symbol="&lt;init&gt;"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="125" lineNum="38" parent="globals/Rez/Menus/LungVolumeMenu" pc="268452762" symbol="&lt;init&gt;"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="126" lineNum="21" parent="globals/Rez/Menus/MainMenu" pc="268452781" symbol="&lt;init&gt;"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="127" lineNum="48" parent="globals/Rez/Menus/SettingsMenu" pc="268452800" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="127" lineNum="49" parent="globals/Rez/Menus/SettingsMenu" pc="268452802" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="127" lineNum="50" parent="globals/Rez/Menus/SettingsMenu" pc="268452839" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="127" lineNum="51" parent="globals/Rez/Menus/SettingsMenu" pc="268452889" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="127" lineNum="52" parent="globals/Rez/Menus/SettingsMenu" pc="268452939" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="128" lineNum="30" parent="globals/Rez/Menus/PrepTypeMenu" pc="268452990" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="128" lineNum="31" parent="globals/Rez/Menus/PrepTypeMenu" pc="268452992" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="128" lineNum="32" parent="globals/Rez/Menus/PrepTypeMenu" pc="268453029" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="128" lineNum="33" parent="globals/Rez/Menus/PrepTypeMenu" pc="268453079" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="128" lineNum="34" parent="globals/Rez/Menus/PrepTypeMenu" pc="268453129" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="129" lineNum="14" parent="globals/Rez/Menus/ApneaMenu" pc="268453180" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="129" lineNum="15" parent="globals/Rez/Menus/ApneaMenu" pc="268453182" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="129" lineNum="16" parent="globals/Rez/Menus/ApneaMenu" pc="268453219" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="129" lineNum="17" parent="globals/Rez/Menus/ApneaMenu" pc="268453269" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="130" lineNum="39" parent="globals/Rez/Menus/LungVolumeMenu" pc="268453320" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="130" lineNum="40" parent="globals/Rez/Menus/LungVolumeMenu" pc="268453322" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="130" lineNum="41" parent="globals/Rez/Menus/LungVolumeMenu" pc="268453359" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="130" lineNum="42" parent="globals/Rez/Menus/LungVolumeMenu" pc="268453409" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="130" lineNum="43" parent="globals/Rez/Menus/LungVolumeMenu" pc="268453459" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="131" lineNum="22" parent="globals/Rez/Menus/MainMenu" pc="268453510" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="131" lineNum="23" parent="globals/Rez/Menus/MainMenu" pc="268453512" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="131" lineNum="24" parent="globals/Rez/Menus/MainMenu" pc="268453549" symbol="initialize"/>
+        <entry filename="/home/twain/AndroidStudioProjects/wags/garmin/bin/gen/006-B3291-00/source/Rez.mcgen" id="131" lineNum="25" parent="globals/Rez/Menus/MainMenu" pc="268453599" symbol="initialize"/>
     </pcToLineNum>
     <symbolTable>
         <entry id="8388639" module="true" symbol="Graphics"/>
@@ -1181,56 +1183,56 @@
         <entry endPc="268448154" name="fcSec" stackId="13" startPc="268448052"/>
         <entry arg="true" endPc="268448400" name="payload" stackId="1" startPc="268448289"/>
         <entry endPc="268448583" name="delay" stackId="1" startPc="268448512"/>
-        <entry endPc="268449082" name="payload" stackId="1" startPc="268448774"/>
-        <entry endPc="268449082" name="pType" stackId="2" startPc="268448774"/>
-        <entry endPc="268448938" name="t" stackId="3" startPc="268448907"/>
-        <entry arg="true" endPc="268449778" name="item" stackId="1" startPc="268449284"/>
-        <entry endPc="268449777" name="id" stackId="2" startPc="268449288"/>
-        <entry endPc="268449610" name="menu" stackId="3" startPc="268449312"/>
-        <entry endPc="268449774" name="view" stackId="4" startPc="268449704"/>
-        <entry endPc="268449998" name="holds" stackId="1" startPc="268449791"/>
-        <entry endPc="268449998" name="unsynced" stackId="2" startPc="268449791"/>
-        <entry endPc="268449893" name="i" stackId="3" startPc="268449836"/>
-        <entry endPc="268450169" name="holds" stackId="1" startPc="268450011"/>
-        <entry endPc="268450169" name="remaining" stackId="2" startPc="268450011"/>
-        <entry endPc="268450113" name="i" stackId="3" startPc="268450056"/>
-        <entry endPc="268450223" name="holds" stackId="1" startPc="268450183"/>
-        <entry endPc="268450333" name="holds" stackId="1" startPc="268450236"/>
-        <entry endPc="268450333" name="count" stackId="2" startPc="268450236"/>
-        <entry endPc="268450330" name="i" stackId="3" startPc="268450280"/>
-        <entry arg="true" endPc="268450594" name="holdId" stackId="1" startPc="268450334"/>
-        <entry endPc="268450594" name="holds" stackId="2" startPc="268450346"/>
-        <entry endPc="268450531" name="i" stackId="3" startPc="268450383"/>
-        <entry arg="true" endPc="268450682" name="arr" stackId="1" startPc="268450595"/>
-        <entry arg="true" endPc="268450682" name="idx" stackId="2" startPc="268450595"/>
-        <entry endPc="268450682" name="result" stackId="3" startPc="268450607"/>
-        <entry endPc="268450679" name="i" stackId="4" startPc="268450639"/>
-        <entry arg="true" endPc="268451081" name="holdData" stackId="1" startPc="268450683"/>
-        <entry endPc="268451081" name="holds" stackId="2" startPc="268450695"/>
-        <entry endPc="268451081" name="nextId" stackId="3" startPc="268450695"/>
-        <entry endPc="268450939" name="removedSynced" stackId="4" startPc="268450818"/>
-        <entry endPc="268450910" name="i" stackId="5" startPc="268450846"/>
-        <entry arg="true" endPc="268451422" name="dc" stackId="1" startPc="268451103"/>
-        <entry endPc="268451421" name="cx" stackId="2" startPc="268451107"/>
-        <entry endPc="268451421" name="cy" stackId="3" startPc="268451107"/>
-        <entry endPc="268451421" name="tod" stackId="4" startPc="268451107"/>
-        <entry endPc="268451552" name="reversed" stackId="1" startPc="268451427"/>
-        <entry endPc="268451529" name="i" stackId="2" startPc="268451494"/>
-        <entry arg="true" endPc="268452571" name="dc" stackId="1" startPc="268451657"/>
-        <entry endPc="268452570" name="w" stackId="2" startPc="268451661"/>
-        <entry endPc="268452570" name="h" stackId="3" startPc="268451661"/>
-        <entry endPc="268452570" name="cx" stackId="4" startPc="268451661"/>
-        <entry endPc="268452570" name="yStart" stackId="5" startPc="268451661"/>
-        <entry endPc="268452570" name="lineHeight" stackId="6" startPc="268451661"/>
-        <entry endPc="268452570" name="maxLines" stackId="7" startPc="268451661"/>
-        <entry endPc="268452429" name="i" stackId="8" startPc="268452047"/>
-        <entry endPc="268452416" name="idx" stackId="9" startPc="268452047"/>
-        <entry endPc="268452416" name="entry" stackId="10" startPc="268452047"/>
-        <entry endPc="268452416" name="y" stackId="11" startPc="268452047"/>
-        <entry endPc="268452416" name="color" stackId="12" startPc="268452047"/>
-        <entry endPc="268452416" name="maxChars" stackId="13" startPc="268452047"/>
-        <entry endPc="268452567" name="totalPages" stackId="14" startPc="268452453"/>
-        <entry endPc="268452567" name="currentPage" stackId="15" startPc="268452453"/>
+        <entry endPc="268449121" name="payload" stackId="1" startPc="268448813"/>
+        <entry endPc="268449121" name="pType" stackId="2" startPc="268448813"/>
+        <entry endPc="268448977" name="t" stackId="3" startPc="268448946"/>
+        <entry arg="true" endPc="268449817" name="item" stackId="1" startPc="268449323"/>
+        <entry endPc="268449816" name="id" stackId="2" startPc="268449327"/>
+        <entry endPc="268449649" name="menu" stackId="3" startPc="268449351"/>
+        <entry endPc="268449813" name="view" stackId="4" startPc="268449743"/>
+        <entry endPc="268450037" name="holds" stackId="1" startPc="268449830"/>
+        <entry endPc="268450037" name="unsynced" stackId="2" startPc="268449830"/>
+        <entry endPc="268449932" name="i" stackId="3" startPc="268449875"/>
+        <entry endPc="268450208" name="holds" stackId="1" startPc="268450050"/>
+        <entry endPc="268450208" name="remaining" stackId="2" startPc="268450050"/>
+        <entry endPc="268450152" name="i" stackId="3" startPc="268450095"/>
+        <entry endPc="268450262" name="holds" stackId="1" startPc="268450222"/>
+        <entry endPc="268450372" name="holds" stackId="1" startPc="268450275"/>
+        <entry endPc="268450372" name="count" stackId="2" startPc="268450275"/>
+        <entry endPc="268450369" name="i" stackId="3" startPc="268450319"/>
+        <entry arg="true" endPc="268450633" name="holdId" stackId="1" startPc="268450373"/>
+        <entry endPc="268450633" name="holds" stackId="2" startPc="268450385"/>
+        <entry endPc="268450570" name="i" stackId="3" startPc="268450422"/>
+        <entry arg="true" endPc="268450721" name="arr" stackId="1" startPc="268450634"/>
+        <entry arg="true" endPc="268450721" name="idx" stackId="2" startPc="268450634"/>
+        <entry endPc="268450721" name="result" stackId="3" startPc="268450646"/>
+        <entry endPc="268450718" name="i" stackId="4" startPc="268450678"/>
+        <entry arg="true" endPc="268451120" name="holdData" stackId="1" startPc="268450722"/>
+        <entry endPc="268451120" name="holds" stackId="2" startPc="268450734"/>
+        <entry endPc="268451120" name="nextId" stackId="3" startPc="268450734"/>
+        <entry endPc="268450978" name="removedSynced" stackId="4" startPc="268450857"/>
+        <entry endPc="268450949" name="i" stackId="5" startPc="268450885"/>
+        <entry arg="true" endPc="268451461" name="dc" stackId="1" startPc="268451142"/>
+        <entry endPc="268451460" name="cx" stackId="2" startPc="268451146"/>
+        <entry endPc="268451460" name="cy" stackId="3" startPc="268451146"/>
+        <entry endPc="268451460" name="tod" stackId="4" startPc="268451146"/>
+        <entry endPc="268451591" name="reversed" stackId="1" startPc="268451466"/>
+        <entry endPc="268451568" name="i" stackId="2" startPc="268451533"/>
+        <entry arg="true" endPc="268452610" name="dc" stackId="1" startPc="268451696"/>
+        <entry endPc="268452609" name="w" stackId="2" startPc="268451700"/>
+        <entry endPc="268452609" name="h" stackId="3" startPc="268451700"/>
+        <entry endPc="268452609" name="cx" stackId="4" startPc="268451700"/>
+        <entry endPc="268452609" name="yStart" stackId="5" startPc="268451700"/>
+        <entry endPc="268452609" name="lineHeight" stackId="6" startPc="268451700"/>
+        <entry endPc="268452609" name="maxLines" stackId="7" startPc="268451700"/>
+        <entry endPc="268452468" name="i" stackId="8" startPc="268452086"/>
+        <entry endPc="268452455" name="idx" stackId="9" startPc="268452086"/>
+        <entry endPc="268452455" name="entry" stackId="10" startPc="268452086"/>
+        <entry endPc="268452455" name="y" stackId="11" startPc="268452086"/>
+        <entry endPc="268452455" name="color" stackId="12" startPc="268452086"/>
+        <entry endPc="268452455" name="maxChars" stackId="13" startPc="268452086"/>
+        <entry endPc="268452606" name="totalPages" stackId="14" startPc="268452492"/>
+        <entry endPc="268452606" name="currentPage" stackId="15" startPc="268452492"/>
     </localVars>
     <deviceInfo deviceVersion="8fc30743a4191ec19bcafa28e3ffcc2b5a958a17" partNumber="006-B3291-00"/>
     <annotations>
@@ -1650,101 +1652,101 @@
             <param id="payload"/>
             <documentation/>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268448761" name="onFail" parent="MessageQueue" startPc="268448401">
+        <functionEntry accessMode="public" endPc="268448800" name="onFail" parent="MessageQueue" startPc="268448401">
             <documentation/>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268449083" name="_doSend" parent="MessageQueue" startPc="268448762">
+        <functionEntry accessMode="public" endPc="268449122" name="_doSend" parent="MessageQueue" startPc="268448801">
             <documentation/>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268449238" name="onOK" parent="MessageQueue" startPc="268449084">
+        <functionEntry accessMode="public" endPc="268449277" name="onOK" parent="MessageQueue" startPc="268449123">
             <documentation/>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268449262" name="onBack" parent="MainMenuItemDelegate" startPc="268449239">
+        <functionEntry accessMode="public" endPc="268449301" name="onBack" parent="MainMenuItemDelegate" startPc="268449278">
             <documentation/>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268449283" name="initialize" parent="MainMenuItemDelegate" startPc="268449263">
+        <functionEntry accessMode="public" endPc="268449322" name="initialize" parent="MainMenuItemDelegate" startPc="268449302">
             <documentation/>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268449778" name="onSelect" parent="MainMenuItemDelegate" startPc="268449284">
+        <functionEntry accessMode="public" endPc="268449817" name="onSelect" parent="MainMenuItemDelegate" startPc="268449323">
             <param id="item"/>
             <documentation/>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268449998" name="getUnsyncedHolds" parent="HoldStorage" startPc="268449779">
+        <functionEntry accessMode="public" endPc="268450037" name="getUnsyncedHolds" parent="HoldStorage" startPc="268449818">
             <documentation><![CDATA[<div class="description"> Get all unsynced holds.<br/></div>]]></documentation>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268450170" name="clearSynced" parent="HoldStorage" startPc="268449999">
+        <functionEntry accessMode="public" endPc="268450209" name="clearSynced" parent="HoldStorage" startPc="268450038">
             <documentation><![CDATA[<div class="description"> Clear all synced holds to free storage space.<br/></div>]]></documentation>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268450223" name="getHolds" parent="HoldStorage" startPc="268450171">
+        <functionEntry accessMode="public" endPc="268450262" name="getHolds" parent="HoldStorage" startPc="268450210">
             <documentation><![CDATA[<div class="description"> Get all stored holds.<br/></div>]]></documentation>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268450333" name="getUnsyncedCount" parent="HoldStorage" startPc="268450224">
+        <functionEntry accessMode="public" endPc="268450372" name="getUnsyncedCount" parent="HoldStorage" startPc="268450263">
             <documentation><![CDATA[<div class="description"> Get count of unsynced holds.<br/></div>]]></documentation>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268450594" name="markSynced" parent="HoldStorage" startPc="268450334">
+        <functionEntry accessMode="public" endPc="268450633" name="markSynced" parent="HoldStorage" startPc="268450373">
             <param id="holdId"/>
             <documentation><![CDATA[<div class="description"> Mark a hold as synced by ID.<br/></div>]]></documentation>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268450682" name="removeAt" parent="HoldStorage" startPc="268450595">
+        <functionEntry accessMode="public" endPc="268450721" name="removeAt" parent="HoldStorage" startPc="268450634">
             <param id="arr"/>
             <param id="idx"/>
             <documentation><![CDATA[<div class="description"> Remove element at index from array (returns new array).<br/></div>]]></documentation>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268451081" name="saveHold" parent="HoldStorage" startPc="268450683">
+        <functionEntry accessMode="public" endPc="268451120" name="saveHold" parent="HoldStorage" startPc="268450722">
             <param id="holdData"/>
             <documentation><![CDATA[<div class="description"> Save a completed hold to persistent storage.<br/> Returns the hold ID.<br/></div>]]></documentation>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268451102" name="initialize" parent="TimeOfDayInfoView" startPc="268451082">
+        <functionEntry accessMode="public" endPc="268451141" name="initialize" parent="TimeOfDayInfoView" startPc="268451121">
             <documentation/>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268451422" name="onUpdate" parent="TimeOfDayInfoView" startPc="268451103">
+        <functionEntry accessMode="public" endPc="268451461" name="onUpdate" parent="TimeOfDayInfoView" startPc="268451142">
             <param id="dc"/>
             <documentation/>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268451553" name="onShow" parent="SyncLogView" startPc="268451423">
+        <functionEntry accessMode="public" endPc="268451592" name="onShow" parent="SyncLogView" startPc="268451462">
             <documentation/>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268451635" name="scrollDown" parent="SyncLogView" startPc="268451554">
+        <functionEntry accessMode="public" endPc="268451674" name="scrollDown" parent="SyncLogView" startPc="268451593">
             <documentation/>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268451656" name="initialize" parent="SyncLogView" startPc="268451636">
+        <functionEntry accessMode="public" endPc="268451695" name="initialize" parent="SyncLogView" startPc="268451675">
             <documentation/>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268452571" name="onUpdate" parent="SyncLogView" startPc="268451657">
+        <functionEntry accessMode="public" endPc="268452610" name="onUpdate" parent="SyncLogView" startPc="268451696">
             <param id="dc"/>
             <documentation/>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268452665" name="scrollUp" parent="SyncLogView" startPc="268452572">
+        <functionEntry accessMode="public" endPc="268452704" name="scrollUp" parent="SyncLogView" startPc="268452611">
             <documentation/>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268452684" name="&lt;init&gt;" parent="SettingsMenu" startPc="268452666">
+        <functionEntry accessMode="public" endPc="268452723" name="&lt;init&gt;" parent="SettingsMenu" startPc="268452705">
             <documentation/>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268452703" name="&lt;init&gt;" parent="PrepTypeMenu" startPc="268452685">
+        <functionEntry accessMode="public" endPc="268452742" name="&lt;init&gt;" parent="PrepTypeMenu" startPc="268452724">
             <documentation/>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268452722" name="&lt;init&gt;" parent="ApneaMenu" startPc="268452704">
+        <functionEntry accessMode="public" endPc="268452761" name="&lt;init&gt;" parent="ApneaMenu" startPc="268452743">
             <documentation/>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268452741" name="&lt;init&gt;" parent="LungVolumeMenu" startPc="268452723">
+        <functionEntry accessMode="public" endPc="268452780" name="&lt;init&gt;" parent="LungVolumeMenu" startPc="268452762">
             <documentation/>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268452760" name="&lt;init&gt;" parent="MainMenu" startPc="268452742">
+        <functionEntry accessMode="public" endPc="268452799" name="&lt;init&gt;" parent="MainMenu" startPc="268452781">
             <documentation/>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268452950" name="initialize" parent="SettingsMenu" startPc="268452761">
+        <functionEntry accessMode="public" endPc="268452989" name="initialize" parent="SettingsMenu" startPc="268452800">
             <documentation/>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268453140" name="initialize" parent="PrepTypeMenu" startPc="268452951">
+        <functionEntry accessMode="public" endPc="268453179" name="initialize" parent="PrepTypeMenu" startPc="268452990">
             <documentation/>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268453280" name="initialize" parent="ApneaMenu" startPc="268453141">
+        <functionEntry accessMode="public" endPc="268453319" name="initialize" parent="ApneaMenu" startPc="268453180">
             <documentation/>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268453470" name="initialize" parent="LungVolumeMenu" startPc="268453281">
+        <functionEntry accessMode="public" endPc="268453509" name="initialize" parent="LungVolumeMenu" startPc="268453320">
             <documentation/>
         </functionEntry>
-        <functionEntry accessMode="public" endPc="268453610" name="initialize" parent="MainMenu" startPc="268453471">
+        <functionEntry accessMode="public" endPc="268453649" name="initialize" parent="MainMenu" startPc="268453510">
             <documentation/>
         </functionEntry>
     </functions>

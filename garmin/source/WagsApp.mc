@@ -244,8 +244,9 @@ module MessageQueue {
         System.println("[WAGS] MQ FAIL #" + _retryCount);
 
         if (_retryCount <= 3) {
-            // Retry same message with exponential backoff
-            var delay = 500 * _retryCount;
+            // Retry with longer backoff (5s * attempt) to avoid flooding BLE queue.
+            // Short retries (500ms) can overwhelm the firmware buffer and cause crashes.
+            var delay = 5000 * _retryCount;
             SyncLog.add("MQ retry in " + delay + "ms");
             MQTimer.start(delay, true);
         } else {
@@ -255,7 +256,11 @@ module MessageQueue {
             if (_queue.size() > 0) {
                 _queue = _queue.slice(1, null);
             }
-            MQTimer.start(200, false);
+            _sending = false;
+            // Wait before trying next item in queue
+            if (_queue.size() > 0) {
+                MQTimer.start(2000, false);
+            }
         }
     }
 }

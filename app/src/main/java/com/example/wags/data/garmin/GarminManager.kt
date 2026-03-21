@@ -284,7 +284,96 @@ class GarminManager @Inject constructor(
         // Save for auto-reconnect
         savePairedDevice(device)
 
-        // Create IQApp reference
+        // Show device found immediately so UI updates
+        _connectionState.value = GarminConnectionState.DeviceFound(
+            deviceName = name,
+            deviceStatus = "Checking WAGS app..."
+        )
+
+        val ciq = connectIQ ?: return
+
+        // Track whether the getApplicationInfo callback has fired
+        val callbackFired = java.util.concurrent.atomic.AtomicBoolean(false)
+
+        // Try to verify app installation state via getApplicationInfo().
+        // This helps GCM register the listener properly when the companion app
+        // package is registered in the Garmin Developer Dashboard.
+        try {
+            ciq.getApplicationInfo(WAGS_CIQ_APP_ID, device, object : ConnectIQ.IQApplicationInfoListener {
+                override fun onApplicationInfoReceived(app: IQApp?) {
+                    if (!callbackFired.compareAndSet(false, true)) return // timeout already handled
+
+                    if (app == null) {
+                        Log.e(TAG, "getApplicationInfo returned null app")
+                        addSyncLog("App info: null — using fallback")
+                        // Fall back to direct registration
+                        connectDirectly(device, name)
+                        return
+                    }
+
+                    val appStatus = app.getStatus()
+                    Log.w(TAG, "App status: $appStatus (version=${app.version()})")
+                    addSyncLog("App status: $appStatus")
+
+                    if (appStatus == IQApp.IQAppStatus.INSTALLED) {
+                        wagsApp = app
+
+                        _connectionState.value = GarminConnectionState.Connected(
+                            deviceName = name,
+                            deviceId = device.deviceIdentifier
+                        )
+
+                        // Register for incoming messages from the watch
+                        registerForMessages(device, app)
+
+                        // Trigger a sync after a short delay to let everything settle
+                        scope.launch {
+                            delay(SYNC_DELAY_MS)
+                            requestSync()
+                        }
+                    } else {
+                        Log.w(TAG, "WAGS app status=$appStatus, falling back to direct connect")
+                        addSyncLog("App status: $appStatus — using fallback")
+                        connectDirectly(device, name)
+                    }
+                }
+
+                override fun onApplicationNotInstalled(applicationId: String?) {
+                    if (!callbackFired.compareAndSet(false, true)) return
+
+                    Log.w(TAG, "WAGS CIQ app not installed per GCM (id=$applicationId) — using fallback")
+                    addSyncLog("App not installed per GCM — using fallback")
+                    // Still try direct connection — the app may be sideloaded or
+                    // the companion package isn't registered in the dashboard yet
+                    connectDirectly(device, name)
+                }
+            })
+        } catch (e: Exception) {
+            Log.e(TAG, "Error querying app info, falling back to direct registration", e)
+            addSyncLog("App info query failed: ${e.message}")
+            callbackFired.set(true)
+            connectDirectly(device, name)
+        }
+
+        // Timeout: if getApplicationInfo callback hasn't fired in 5 seconds, fall back
+        scope.launch {
+            delay(5_000)
+            if (callbackFired.compareAndSet(false, true)) {
+                Log.w(TAG, "getApplicationInfo timed out — falling back to direct connect")
+                addSyncLog("App info timeout — using fallback")
+                connectDirectly(device, name)
+            }
+        }
+    }
+
+    /**
+     * Direct connection fallback: creates an IQApp from the UUID and proceeds
+     * without waiting for getApplicationInfo(). This is the original behavior
+     * and works for sendMessage() (phone→watch). For transmit() (watch→phone)
+     * to work, the companion app package must be registered in the Garmin
+     * Developer Dashboard.
+     */
+    private fun connectDirectly(device: IQDevice, name: String) {
         val app = IQApp(WAGS_CIQ_APP_ID)
         wagsApp = app
 
@@ -293,10 +382,8 @@ class GarminManager @Inject constructor(
             deviceId = device.deviceIdentifier
         )
 
-        // Register for incoming messages from the watch
         registerForMessages(device, app)
 
-        // Trigger a sync after a short delay to let everything settle
         scope.launch {
             delay(SYNC_DELAY_MS)
             requestSync()
