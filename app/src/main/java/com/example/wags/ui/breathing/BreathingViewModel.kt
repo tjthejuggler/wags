@@ -50,6 +50,7 @@ enum class BreathingSessionPhase {
 data class BreathingUiState(
     val breathingRateBpm: Float = 5.5f,
     val ieRatio: Float = 1.0f,
+    val isHrDeviceConnected: Boolean = false,
     val pacerRadius: Float = 0f,
     val isInhaling: Boolean = true,
     val breathPhaseLabel: String = "INHALE",
@@ -125,9 +126,10 @@ class BreathingViewModel @Inject constructor(
     val uiState: StateFlow<BreathingUiState> = combine(
         _uiState,
         hrDataSource.liveHr,
-        hrDataSource.liveSpO2
-    ) { state, hr, spo2 ->
-        state.copy(liveHr = hr, liveSpO2 = spo2)
+        hrDataSource.liveSpO2,
+        hrDataSource.isAnyHrDeviceConnected
+    ) { state, hr, spo2, hrConnected ->
+        state.copy(liveHr = hr, liveSpO2 = spo2, isHrDeviceConnected = hrConnected)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),

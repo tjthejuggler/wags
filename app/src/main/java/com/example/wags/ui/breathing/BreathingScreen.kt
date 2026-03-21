@@ -9,6 +9,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,6 +34,7 @@ import androidx.navigation.NavController
 import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.common.RrIntervalChart
 import com.example.wags.ui.theme.*
+import kotlin.math.roundToInt
 
 // ── Monochrome palette (shared with ReadinessScreen) ──────────────────────────
 private val Bone       = Color(0xFFE8E8E8)
@@ -120,17 +123,26 @@ fun BreathingScreen(
                 onIeRatioChange = { viewModel.setIeRatio(it) }
             )
 
+            // ── HR device gate ────────────────────────────────────────────────
+            if (!state.isHrDeviceConnected) {
+                HrRequiredBanner(
+                    message = "Connect a Polar H10, Verity Sense, or pulse oximeter to start a session or assessment."
+                )
+            }
+
             // Start session → navigate to the dedicated session screen
             Button(
                 onClick = onNavigateToSession,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                enabled = state.isHrDeviceConnected
             ) { Text("Start Session") }
 
             HorizontalDivider(color = SurfaceVariant)
 
             Button(
                 onClick = onNavigateToRfAssessment,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                enabled = state.isHrDeviceConnected
             ) {
                 Text("RF Assessment")
             }
@@ -634,27 +646,83 @@ private fun BreathingControls(
     onRateChange: (Float) -> Unit,
     onIeRatioChange: (Float) -> Unit
 ) {
+    // Rate: 4.00–7.00 BPM in 0.01 steps → 300 intervals = 299 steps
+    // Ratio: 0.5–3.0 in 0.1 steps → 25 intervals = 24 steps
     Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Text("Breathing Rate: ${String.format("%.1f", rateBpm)} BPM",
-                style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "Breathing Rate: ${String.format("%.2f", rateBpm)} BPM",
+                style = MaterialTheme.typography.bodyLarge
+            )
             Slider(
                 value = rateBpm,
-                onValueChange = onRateChange,
+                onValueChange = { raw ->
+                    // Snap to 0.01 precision
+                    val snapped = (raw * 100).roundToInt() / 100f
+                    onRateChange(snapped.coerceIn(4f, 7f))
+                },
                 valueRange = 4f..7f,
-                steps = 11
+                steps = 299   // (7.00 - 4.00) / 0.01 - 1 = 299
             )
-            Text("I:E Ratio: 1:${String.format("%.1f", ieRatio)}",
-                style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "I:E Ratio: 1:${String.format("%.1f", ieRatio)}",
+                style = MaterialTheme.typography.bodyLarge
+            )
             Slider(
                 value = ieRatio,
-                onValueChange = onIeRatioChange,
+                onValueChange = { raw ->
+                    // Snap to 0.1 precision
+                    val snapped = (raw * 10).roundToInt() / 10f
+                    onIeRatioChange(snapped.coerceIn(0.5f, 3f))
+                },
                 valueRange = 0.5f..3f,
-                steps = 9
+                steps = 24    // (3.0 - 0.5) / 0.1 - 1 = 24
             )
+        }
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  HR REQUIRED BANNER
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@Composable
+private fun HrRequiredBanner(message: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f)
+        ),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(20.dp)
+            )
+            Column {
+                Text(
+                    text = "HR Device Required",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
