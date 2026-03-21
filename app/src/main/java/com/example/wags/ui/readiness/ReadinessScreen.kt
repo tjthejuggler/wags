@@ -16,10 +16,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -32,6 +29,7 @@ import com.example.wags.domain.model.HrvMetrics
 import com.example.wags.domain.model.ReadinessInterpretation
 import com.example.wags.domain.model.ReadinessScore
 import com.example.wags.ui.common.LiveSensorActions
+import com.example.wags.ui.common.RrIntervalChart
 import com.example.wags.ui.theme.*
 import kotlin.math.cos
 import kotlin.math.sin
@@ -43,9 +41,6 @@ private val Ash        = Color(0xFF707070)
 private val Graphite   = Color(0xFF383838)
 private val Charcoal   = Color(0xFF1C1C1C)
 private val Ink        = Color(0xFF0A0A0A)
-private val ChartLine  = Color(0xFFD0D0D0)
-private val ChartDot   = Color(0xFFFFFFFF)
-private val ChartGlow  = Color(0xFF909090)
 private val ArcFill    = Color(0xFFCCCCCC)
 private val ArcTrack   = Color(0xFF2A2A2A)
 
@@ -485,7 +480,7 @@ private fun MinimalistArcCountdown(remainingSeconds: Int, totalSeconds: Int) {
                 val dotX = centerX + radius * cos(angleRad).toFloat()
                 val dotY = centerY + radius * sin(angleRad).toFloat()
                 drawCircle(
-                    color = ChartDot,
+                    color = Color.White,
                     radius = 4.dp.toPx(),
                     center = Offset(dotX, dotY)
                 )
@@ -603,301 +598,6 @@ private fun ThinDivider() {
             .height(28.dp)
             .background(Charcoal)
     )
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  ✦  TIME-BASED STRIP CHART FOR RR INTERVALS
-//  Behaves like a classic strip-chart recorder / ECG monitor.
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-private const val CHART_WINDOW_MS = 30_000.0
-
-private data class TimedBeat(val timeMs: Double, val valueMs: Double)
-
-/**
- * Accumulates RR-interval beats from a **sliding-window** source list and
- * tracks a smoothly-advancing "now" cursor.
- *
- * The ViewModel provides a sliding window of the last ~45 RR intervals
- * from a circular buffer. The list size caps at ~45 and old values drop off
- * the front as new ones are appended. We detect new beats by comparing the
- * last value in our internal buffer with the tail of the source list.
- */
-@Stable
-private class StripChartState {
-    /** All beats with cumulative time positions. */
-    val beats = mutableStateListOf<TimedBeat>()
-
-    /** The cumulative time of the last beat (ms from first beat). */
-    var cumulativeTimeMs by mutableDoubleStateOf(0.0)
-        private set
-
-    /** Wall-clock nanos when the first beat was added — used for cursor. */
-    var firstBeatNanos: Long = 0L
-        private set
-
-    /** Whether we have received any beats yet. */
-    var started by mutableStateOf(false)
-        private set
-
-    /** Fingerprint of the last source list we processed: (size, lastValue). */
-    private var lastSourceSize = 0
-    private var lastSourceTail = 0.0
-
-    /**
-     * Ingest beats from the source sliding-window list.
-     *
-     * The source is a sliding window (last ~45 RR intervals). We figure out
-     * how many new beats were appended by comparing the source tail with our
-     * previous snapshot. New beats are those at the end of the source list
-     * that weren't there before.
-     */
-    fun ingest(source: List<Double>, nowNanos: Long) {
-        if (source.isEmpty()) return
-        if (!started) {
-            started = true
-            firstBeatNanos = nowNanos
-        }
-
-        // Determine how many new beats appeared at the end of the source.
-        val newBeatsCount: Int
-        if (beats.isEmpty()) {
-            // First time: ingest everything
-            newBeatsCount = source.size
-        } else {
-            // The source is a sliding window: old beats drop off the front,
-            // new ones appear at the back. We find where our last-known tail
-            // value appears in the new source list and take everything after it.
-            val lastKnownValue = lastSourceTail
-            var overlapIndex = -1
-            for (i in source.size - 1 downTo 0) {
-                if (source[i] == lastKnownValue) {
-                    overlapIndex = i
-                    break
-                }
-            }
-            newBeatsCount = if (overlapIndex >= 0) {
-                source.size - overlapIndex - 1
-            } else {
-                // Can't find overlap — source changed completely, ingest all
-                source.size
-            }
-        }
-
-        if (newBeatsCount <= 0) {
-            lastSourceSize = source.size
-            lastSourceTail = source.last()
-            return
-        }
-
-        // Append the new beats
-        val startIdx = source.size - newBeatsCount
-        for (i in startIdx until source.size) {
-            val rrMs = source[i]
-            if (beats.isNotEmpty()) {
-                cumulativeTimeMs += rrMs
-            }
-            beats.add(TimedBeat(timeMs = cumulativeTimeMs, valueMs = rrMs))
-        }
-
-        lastSourceSize = source.size
-        lastSourceTail = source.last()
-
-        // Trim beats that are too old (more than 2× window behind the latest)
-        val cutoff = cumulativeTimeMs - CHART_WINDOW_MS * 2
-        while (beats.size > 2 && beats.first().timeMs < cutoff) {
-            beats.removeAt(0)
-        }
-    }
-}
-
-@Composable
-private fun RrIntervalChart(rrIntervals: List<Double>, modifier: Modifier = Modifier) {
-    val state = remember { StripChartState() }
-    var cursorTimeMs by remember { mutableDoubleStateOf(0.0) }
-
-    // Ingest new data whenever the source list changes (content or size).
-    // We use a content-based key so we detect changes even when the list
-    // size stays the same (sliding window at capacity).
-    val sourceFingerprint = remember(rrIntervals) {
-        if (rrIntervals.isEmpty()) 0L
-        else rrIntervals.size.toLong() * 1_000_000L + rrIntervals.last().toLong()
-    }
-    LaunchedEffect(sourceFingerprint) {
-        state.ingest(rrIntervals, System.nanoTime())
-    }
-
-    // Continuous frame loop: advances the cursor at real-time speed
-    LaunchedEffect(Unit) {
-        while (true) {
-            withFrameNanos { nanos ->
-                if (state.started) {
-                    cursorTimeMs = (nanos - state.firstBeatNanos) / 1_000_000.0
-                }
-            }
-        }
-    }
-
-    val infiniteTransition = rememberInfiniteTransition(label = "chart_shimmer")
-    val shimmerPhase by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(3000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "shimmer"
-    )
-
-    val beats = state.beats
-    val targetMinRr = if (beats.isEmpty()) 600.0 else beats.minOf { it.valueMs }
-    val targetMaxRr = if (beats.isEmpty()) 1000.0 else beats.maxOf { it.valueMs }
-    val targetRange = (targetMaxRr - targetMinRr).coerceAtLeast(50.0)
-    val targetPaddedMin = targetMinRr - targetRange * 0.15
-    val targetPaddedMax = targetMaxRr + targetRange * 0.15
-
-    val animatedPaddedMin by animateFloatAsState(
-        targetValue = targetPaddedMin.toFloat(),
-        animationSpec = tween(durationMillis = 600, easing = LinearOutSlowInEasing),
-        label = "y_min"
-    )
-    val animatedPaddedMax by animateFloatAsState(
-        targetValue = targetPaddedMax.toFloat(),
-        animationSpec = tween(durationMillis = 600, easing = LinearOutSlowInEasing),
-        label = "y_max"
-    )
-
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Ink, Charcoal.copy(alpha = 0.3f), Ink)
-                )
-            )
-    ) {
-        if (beats.size >= 2) {
-            val beatSnapshot = beats.toList()
-            val cursor = cursorTimeMs
-            Canvas(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 12.dp)) {
-                drawStripChart(
-                    beats = beatSnapshot,
-                    cursorTimeMs = cursor,
-                    shimmerPhase = shimmerPhase,
-                    paddedMin = animatedPaddedMin.toDouble(),
-                    paddedMax = animatedPaddedMax.toDouble()
-                )
-            }
-        } else {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    "awaiting heartbeats…",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Ash.copy(alpha = 0.5f),
-                    letterSpacing = 2.sp
-                )
-            }
-        }
-    }
-}
-
-private fun DrawScope.drawStripChart(
-    beats: List<TimedBeat>,
-    cursorTimeMs: Double,
-    shimmerPhase: Float,
-    paddedMin: Double,
-    paddedMax: Double
-) {
-    if (beats.size < 2) return
-
-    val w = size.width
-    val h = size.height
-    val yRange = (paddedMax - paddedMin).coerceAtLeast(1.0)
-
-    // The right edge is always "now". The left edge is 30 s before "now".
-    // This means early on (cursor < 30s), windowStart is negative and
-    // beats at time 0 appear partway across the chart (not at the left edge).
-    val windowEnd = cursorTimeMs
-    val windowStart = cursorTimeMs - CHART_WINDOW_MS
-
-    fun xAt(timeMs: Double): Float =
-        ((timeMs - windowStart) / CHART_WINDOW_MS * w).toFloat()
-    fun yAt(valueMs: Double): Float =
-        h - ((valueMs - paddedMin) / yRange * h).toFloat()
-
-    val visibleBeats = beats.filter { it.timeMs >= windowStart - 2000 && it.timeMs <= windowEnd + 2000 }
-    if (visibleBeats.size < 2) return
-
-    val points = visibleBeats.map { Offset(xAt(it.timeMs), yAt(it.valueMs)) }
-
-    val glowPath = Path()
-    buildCatmullRomPath(glowPath, points)
-    drawPath(
-        path = glowPath,
-        color = ChartGlow.copy(alpha = 0.15f),
-        style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-    )
-
-    val mainPath = Path()
-    buildCatmullRomPath(mainPath, points)
-    drawPath(
-        path = mainPath,
-        color = ChartLine,
-        style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-    )
-
-    points.forEachIndexed { i, pt ->
-        if (pt.x < -10f || pt.x > w + 10f) return@forEachIndexed
-        val normalizedX = (pt.x / w).coerceIn(0f, 1f)
-        val fadeAlpha = if (normalizedX < 0.15f) normalizedX / 0.15f else 1f
-        val shimmerDist = kotlin.math.abs(normalizedX - shimmerPhase)
-        val shimmerBoost = (1f - (shimmerDist * 4f).coerceIn(0f, 1f)) * 0.4f
-        val dotAlpha = (0.3f + shimmerBoost) * fadeAlpha
-        val dotRadius = (1.8f + shimmerBoost * 2f).dp.toPx()
-        drawCircle(color = ChartDot.copy(alpha = dotAlpha), radius = dotRadius, center = pt)
-    }
-
-    drawRect(
-        brush = Brush.horizontalGradient(
-            colors = listOf(Ink, Ink.copy(alpha = 0f)),
-            startX = 0f,
-            endX = w * 0.12f
-        ),
-        size = size
-    )
-}
-
-private fun buildCatmullRomPath(path: Path, points: List<Offset>) {
-    if (points.size < 2) return
-    path.moveTo(points[0].x, points[0].y)
-    if (points.size == 2) { path.lineTo(points[1].x, points[1].y); return }
-
-    val extended = buildList {
-        add(Offset(
-            points[0].x - (points[1].x - points[0].x),
-            points[0].y - (points[1].y - points[0].y)
-        ))
-        addAll(points)
-        add(Offset(
-            points.last().x + (points.last().x - points[points.size - 2].x),
-            points.last().y + (points.last().y - points[points.size - 2].y)
-        ))
-    }
-
-    val tension = 0.5f
-    val segments = 12
-
-    for (i in 1 until extended.size - 2) {
-        val p0 = extended[i - 1]; val p1 = extended[i]
-        val p2 = extended[i + 1]; val p3 = extended[i + 2]
-        for (s in 1..segments) {
-            val t = s.toFloat() / segments
-            val t2 = t * t; val t3 = t2 * t
-            val x = tension * ((2 * p1.x) + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3)
-            val y = tension * ((2 * p1.y) + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3)
-            path.lineTo(x, y)
-        }
-    }
 }
 
 private fun interpretationColor(interpretation: ReadinessInterpretation) = when (interpretation) {

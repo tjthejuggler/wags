@@ -67,7 +67,13 @@ class AssessmentRunViewModel @Inject constructor(
         /** Live HR from sensor. */
         val liveHr: Int? = null,
         /** Count of RR intervals collected so far. */
-        val rrCount: Int = 0
+        val rrCount: Int = 0,
+        /** Recent RR intervals (ms) for the scrolling chart — last ~45 values. */
+        val liveRrIntervals: List<Double> = emptyList(),
+        /** Live RMSSD (ms) computed from recent RR intervals. */
+        val liveRmssd: Float? = null,
+        /** Live SDNN (ms) computed from recent RR intervals. */
+        val liveSdnn: Float? = null
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -344,10 +350,11 @@ class AssessmentRunViewModel @Inject constructor(
     // -------------------------------------------------------------------------
 
     private fun startRrPolling() {
+        val rrBufferSizeAtStart = bleManager.rrBuffer.size()
         rrPollingJob = viewModelScope.launch {
             var lastSeenCount = bleManager.rrBuffer.size()
             while (isActive) {
-                delay(200L)
+                delay(500L) // 2 Hz — matches BreathingViewModel cadence
                 val currentCount = bleManager.rrBuffer.size()
                 val newCount = currentCount - lastSeenCount
                 if (newCount > 0) {
@@ -357,13 +364,37 @@ class AssessmentRunViewModel @Inject constructor(
                         allSessionRrIntervals.add(rrMs)
                     }
                     lastSeenCount = currentCount
-                    _uiState.value = _uiState.value.copy(
-                        rrCount = allSessionRrIntervals.size,
-                        liveHr = hrDataSource.liveHr.value
-                    )
                 }
+
+                // Compute live metrics from all session RR data
+                val totalNew = currentCount - rrBufferSizeAtStart
+                val snapshot = if (totalNew > 0) bleManager.rrBuffer.readLast(totalNew) else emptyList()
+                val chartRr = if (totalNew > 0) bleManager.rrBuffer.readLast(45.coerceAtMost(totalNew)) else emptyList()
+                val liveRmssd = computeLiveRmssd(snapshot)
+                val liveSdnn = computeLiveSdnn(snapshot)
+
+                _uiState.value = _uiState.value.copy(
+                    rrCount = allSessionRrIntervals.size,
+                    liveHr = hrDataSource.liveHr.value,
+                    liveRrIntervals = chartRr,
+                    liveRmssd = liveRmssd,
+                    liveSdnn = liveSdnn
+                )
             }
         }
+    }
+
+    private fun computeLiveRmssd(rr: List<Double>): Float? {
+        if (rr.size < 2) return null
+        val diffs = (1 until rr.size).map { rr[it] - rr[it - 1] }
+        return Math.sqrt(diffs.sumOf { it * it } / diffs.size).toFloat()
+    }
+
+    private fun computeLiveSdnn(rr: List<Double>): Float? {
+        if (rr.size < 2) return null
+        val mean = rr.average()
+        val variance = rr.sumOf { (it - mean) * (it - mean) } / rr.size
+        return Math.sqrt(variance).toFloat()
     }
 
     // -------------------------------------------------------------------------

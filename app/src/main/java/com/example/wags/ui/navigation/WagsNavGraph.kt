@@ -23,6 +23,7 @@ import com.example.wags.ui.breathing.AssessmentPickerScreen
 import com.example.wags.ui.breathing.AssessmentResultScreen
 import com.example.wags.ui.breathing.AssessmentRunScreen
 import com.example.wags.ui.breathing.BreathingScreen
+import com.example.wags.ui.breathing.ResonanceSessionScreen
 import com.example.wags.ui.breathing.RfAssessmentHistoryScreen
 import com.example.wags.ui.dashboard.DashboardScreen
 import com.example.wags.ui.meditation.MeditationHistoryScreen
@@ -58,6 +59,7 @@ object WagsRoutes {
     const val RF_ASSESSMENT_RUN = "rf_assessment_run/{protocol}"
     const val RF_ASSESSMENT_RESULT = "rf_assessment_result/{sessionTimestamp}"
     const val RF_ASSESSMENT_HISTORY = "rf_assessment_history"
+    const val RESONANCE_SESSION = "resonance_session"
     const val APNEA_HISTORY = "apnea_history/{lungVolume}/{prepType}/{timeOfDay}"
     const val APNEA_RECORD_DETAIL = "apnea_record_detail/{recordId}"
     const val APNEA_ALL_RECORDS = "apnea_all_records/{lungVolume}/{prepType}/{timeOfDay}/{eventTypes}"
@@ -128,7 +130,13 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             BreathingScreen(
                 navController = navController,
                 onNavigateToRfAssessment = { navController.navigate(WagsRoutes.RF_ASSESSMENT_PICKER) },
-                onNavigateToHistory = { navController.navigate(WagsRoutes.RF_ASSESSMENT_HISTORY) }
+                onNavigateToHistory = { navController.navigate(WagsRoutes.RF_ASSESSMENT_HISTORY) },
+                onNavigateToSession = { navController.navigate(WagsRoutes.RESONANCE_SESSION) }
+            )
+        }
+        composable(WagsRoutes.RESONANCE_SESSION) {
+            ResonanceSessionScreen(
+                onNavigateBack = { navController.popBackStack() }
             )
         }
         composable(WagsRoutes.RF_ASSESSMENT_HISTORY) {

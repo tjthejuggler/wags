@@ -4,8 +4,10 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Warning
@@ -22,7 +24,17 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wags.domain.usecase.breathing.RfProtocol
+import com.example.wags.ui.common.RrIntervalChart
+import com.example.wags.ui.common.RmssdChart
+import com.example.wags.ui.common.StripChartColors
 import com.example.wags.ui.theme.*
+
+private val AsmRmssdColors = StripChartColors(
+    lineColor = Color(0xFFFFB300),
+    dotColor  = Color(0xFFFFB300),
+    glowColor = Color(0xFF7A5500)
+)
+private const val ASM_CHART_WINDOW_MS = 20_000.0
 
 // ---------------------------------------------------------------------------
 // Protocol display names
@@ -112,8 +124,9 @@ fun AssessmentRunScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Pacer visual — unified circle for all protocols
@@ -125,14 +138,14 @@ fun AssessmentRunScreen(
                 BreathingPacerCircle(
                     progress = uiState.refWave,
                     isInhaling = uiState.isInhaling,
-                    size = 220.dp,
+                    size = 200.dp,
                     overlayLabel = overlayLabel
                 )
             } else {
                 BreathingPacerCircle(
                     progress = uiState.refWave,
                     isInhaling = uiState.isInhaling,
-                    size = 220.dp
+                    size = 200.dp
                 )
             }
 
@@ -170,7 +183,26 @@ fun AssessmentRunScreen(
                 QualityWarningCard(message = warning)
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            // ── RR interval scrolling chart ───────────────────────────────
+            AsmChartLabel("RR INTERVAL")
+            RrIntervalChart(
+                rrIntervals = uiState.liveRrIntervals,
+                windowMs = ASM_CHART_WINDOW_MS,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp)
+            )
+
+            // ── RMSSD scrolling chart ─────────────────────────────────────
+            AsmChartLabel("RMSSD")
+            RmssdChart(
+                rrIntervals = uiState.liveRrIntervals,
+                windowMs = ASM_CHART_WINDOW_MS,
+                colors = AsmRmssdColors,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp)
+            )
 
             // Cancel button
             OutlinedButton(
@@ -356,4 +388,21 @@ private fun QualityWarningCard(message: String) {
             )
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Chart section label
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun AsmChartLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = TextSecondary,
+        letterSpacing = 2.sp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 4.dp, top = 2.dp)
+    )
 }
