@@ -24,6 +24,7 @@ import com.example.wags.data.ipc.HabitIntegrationRepository
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.domain.model.OximeterReading
+import com.example.wags.domain.model.PersonalBestResult
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
@@ -81,8 +82,8 @@ data class FreeHoldActiveUiState(
     val freeHoldFirstContractionMs: Long? = null,
     val liveHr: Int? = null,
     val liveSpO2: Int? = null,
-    /** Non-null when the just-completed hold set a new PB for this settings combination. */
-    val newPersonalBestMs: Long? = null,
+    /** Non-null when the just-completed hold set a new PB — contains the broadest beaten category. */
+    val newPersonalBest: PersonalBestResult? = null,
     /** True while the async personal-best check is still running after a hold ends. */
     val pbCheckPending: Boolean = false
 )
@@ -126,10 +127,18 @@ class FreeHoldActiveViewModel @Inject constructor(
     private var freeHoldStartTime = 0L
     private val oximeterSamples = mutableListOf<Pair<Long, OximeterReading>>()
     private var oximeterCollectionJob: Job? = null
+    /**
+     * Captured at hold-start: true when the oximeter is the primary device
+     * (no Polar connected). When false, any oximeter readings that arrive
+     * from a background-connected oximeter are discarded at save time so
+     * the record's SpO₂ fields stay null / N/A.
+     */
+    private var oximeterIsPrimary = false
 
     fun startFreeHold(deviceId: String) {
         bleManager.startRrStream(deviceId)
         freeHoldStartTime = System.currentTimeMillis()
+        oximeterIsPrimary = hrDataSource.isOximeterPrimaryDevice()
         _uiState.update {
             it.copy(
                 freeHoldActive = true,
@@ -138,9 +147,11 @@ class FreeHoldActiveViewModel @Inject constructor(
         }
         oximeterSamples.clear()
         oximeterCollectionJob?.cancel()
-        oximeterCollectionJob = viewModelScope.launch {
-            oximeterBleManager.readings.collect { reading ->
-                oximeterSamples.add(System.currentTimeMillis() to reading)
+        if (oximeterIsPrimary) {
+            oximeterCollectionJob = viewModelScope.launch {
+                oximeterBleManager.readings.collect { reading ->
+                    oximeterSamples.add(System.currentTimeMillis() to reading)
+                }
             }
         }
     }
@@ -174,14 +185,16 @@ class FreeHoldActiveViewModel @Inject constructor(
         audioHapticEngine.vibrateHoldEnd()
         habitRepo.sendHabitIncrement(Slot.FREE_HOLD)
         viewModelScope.launch {
-            // Query the prior best BEFORE saving so we can detect a new record correctly.
-            // A null prior best means this is the first-ever hold for this settings combo —
-            // that always counts as a new personal best.
-            val priorBest = apneaRepository.getBestFreeHoldOnce(lungVolume, prepType, timeOfDay)
-            val isNewPb = priorBest == null || duration > priorBest
+            // Check broader PB categories BEFORE saving so queries compare against prior records only.
+            val pbResult = apneaRepository.checkBroaderPersonalBest(
+                durationMs = duration,
+                lungVolume = lungVolume,
+                prepType   = prepType,
+                timeOfDay  = timeOfDay
+            )
             saveFreeHoldRecord(duration, firstContractionMs)
-            if (isNewPb) {
-                _uiState.update { it.copy(newPersonalBestMs = duration, pbCheckPending = false) }
+            if (pbResult != null) {
+                _uiState.update { it.copy(newPersonalBest = pbResult, pbCheckPending = false) }
                 habitRepo.sendHabitIncrement(Slot.APNEA_NEW_RECORD)
             } else {
                 _uiState.update { it.copy(pbCheckPending = false) }
@@ -190,11 +203,14 @@ class FreeHoldActiveViewModel @Inject constructor(
     }
 
     fun dismissNewPersonalBest() {
-        _uiState.update { it.copy(newPersonalBestMs = null) }
+        _uiState.update { it.copy(newPersonalBest = null) }
     }
 
     private fun saveFreeHoldRecord(durationMs: Long, firstContractionMs: Long? = null) {
-        val oxSnapshot = oximeterSamples.toList()
+        // Only use oximeter data when the oximeter was the primary device at hold-start.
+        // When a Polar device is the primary HR source, any background-connected oximeter
+        // readings are incidental resting values (typically 99 %) and must be discarded.
+        val oxSnapshot = if (oximeterIsPrimary) oximeterSamples.toList() else emptyList()
         oximeterSamples.clear()
 
         viewModelScope.launch {
@@ -325,17 +341,19 @@ fun FreeHoldActiveScreen(
     //   • the user tapped Stop (stopRequested), AND
     //   • the async PB check has finished (pbCheckPending is false), AND
     //   • no PB dialog is showing (newPersonalBestMs is null — either no PB or dismissed).
-    LaunchedEffect(stopRequested, state.freeHoldActive, state.newPersonalBestMs, state.pbCheckPending) {
-        if (stopRequested && !state.freeHoldActive && !state.pbCheckPending && state.newPersonalBestMs == null) {
+    LaunchedEffect(stopRequested, state.freeHoldActive, state.newPersonalBest, state.pbCheckPending) {
+        if (stopRequested && !state.freeHoldActive && !state.pbCheckPending && state.newPersonalBest == null) {
             navController.popBackStack()
         }
     }
 
     // Show the PB celebration dialog; dismiss clears the state which triggers the
     // LaunchedEffect above to pop back.
-    state.newPersonalBestMs?.let { newPbMs ->
+    state.newPersonalBest?.let { pbResult ->
         NewPersonalBestDialog(
-            newPbMs = newPbMs,
+            newPbMs = pbResult.durationMs,
+            categoryDescription = pbResult.description,
+            category = pbResult.category,
             onDismiss = { viewModel.dismissNewPersonalBest() }
         )
     }

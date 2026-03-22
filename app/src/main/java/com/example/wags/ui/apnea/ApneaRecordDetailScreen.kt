@@ -29,8 +29,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
+import com.example.wags.domain.model.PersonalBestCategory
 import com.example.wags.domain.model.PrepType
+import com.example.wags.domain.model.RecordPbBadge
 import com.example.wags.domain.model.TimeOfDay
+import com.example.wags.domain.model.trophyEmojis
 import com.example.wags.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -117,6 +120,7 @@ fun ApneaRecordDetailScreen(
                 RecordDetailContent(
                     record = state.record!!,
                     telemetry = state.telemetry,
+                    pbBadges = state.pbBadges,
                     modifier = Modifier.padding(padding)
                 )
             }
@@ -301,6 +305,7 @@ private fun EditRecordSheet(
 private fun RecordDetailContent(
     record: ApneaRecordEntity,
     telemetry: List<FreeHoldTelemetryEntity>,
+    pbBadges: List<RecordPbBadge>,
     modifier: Modifier = Modifier
 ) {
     val dateStr = remember(record.timestamp) {
@@ -375,6 +380,41 @@ private fun RecordDetailContent(
                         valueColor = Color(0xFFFF9800),
                         valueBold = true
                     )
+                }
+
+                // ── Personal Best badges ────────────────────────────────────
+                if (pbBadges.isNotEmpty()) {
+                    HorizontalDivider(
+                        color = Color.White.copy(alpha = 0.12f),
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                    Text(
+                        "Personal Best",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = EcgCyan
+                    )
+                    pbBadges.forEach { badge ->
+                        val trophies = badge.category.trophyEmojis()
+                        val status = if (badge.isCurrent) "Current" else "Former"
+                        val statusColor = if (badge.isCurrent) EcgCyan else TextSecondary
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "$trophies ${badge.description}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (badge.isCurrent) Color.White else TextSecondary
+                            )
+                            Text(
+                                status,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = statusColor
+                            )
+                        }
+                    }
                 }
             }
         }

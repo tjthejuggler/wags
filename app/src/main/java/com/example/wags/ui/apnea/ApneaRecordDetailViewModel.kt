@@ -7,6 +7,7 @@ import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
 import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.domain.model.PrepType
+import com.example.wags.domain.model.RecordPbBadge
 import com.example.wags.domain.model.TimeOfDay
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -22,6 +23,7 @@ import javax.inject.Inject
 data class ApneaRecordDetailUiState(
     val record: ApneaRecordEntity? = null,
     val telemetry: List<FreeHoldTelemetryEntity> = emptyList(),
+    val pbBadges: List<RecordPbBadge> = emptyList(),
     val isLoading: Boolean = true,
     val notFound: Boolean = false,
     /** True while the edit bottom-sheet is open. */
@@ -54,8 +56,14 @@ class ApneaRecordDetailViewModel @Inject constructor(
                 _uiState.update { it.copy(isLoading = false, notFound = true) }
             } else {
                 val telemetry = apneaRepository.getTelemetryForRecord(recordId)
+                val badges = apneaRepository.getRecordPbBadges(recordId)
                 _uiState.update {
-                    it.copy(record = record, telemetry = telemetry, isLoading = false)
+                    it.copy(
+                        record = record,
+                        telemetry = telemetry,
+                        pbBadges = badges,
+                        isLoading = false
+                    )
                 }
             }
         }
@@ -101,7 +109,7 @@ class ApneaRecordDetailViewModel @Inject constructor(
         _uiState.update { it.copy(editTimeOfDay = tod) }
     }
 
-    /** Persists the edited settings to the DB and refreshes the displayed record. */
+    /** Persists the edited settings to the DB and refreshes the displayed record + PB badges. */
     fun saveEdits() {
         val record = _uiState.value.record ?: return
         val state  = _uiState.value
@@ -112,7 +120,8 @@ class ApneaRecordDetailViewModel @Inject constructor(
                 timeOfDay  = state.editTimeOfDay.name
             )
             apneaRepository.updateRecord(updated)
-            _uiState.update { it.copy(record = updated, showEditSheet = false) }
+            val badges = apneaRepository.getRecordPbBadges(recordId)
+            _uiState.update { it.copy(record = updated, pbBadges = badges, showEditSheet = false) }
         }
     }
 }

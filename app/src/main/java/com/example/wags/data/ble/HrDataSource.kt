@@ -57,6 +57,30 @@ class HrDataSource @Inject constructor(
         .stateIn(scope, SharingStarted.Eagerly, null)
 
     /**
+     * True when the oximeter is the primary (or only) HR/SpO₂ device.
+     *
+     * SpO₂ data is only meaningful when the oximeter is the device the user
+     * intends to use for the hold.  When a Polar device is connected it takes
+     * priority for HR, and any SpO₂ readings from a background-connected
+     * oximeter are incidental — they should **not** be saved alongside the
+     * hold record because they represent resting values (typically 99 %) that
+     * would pollute the chart and stats.
+     *
+     * Returns `true` only when:
+     *   • No Polar device is connected, AND
+     *   • The oximeter IS connected.
+     */
+    fun isOximeterPrimaryDevice(): Boolean {
+        val h10 = polarBleManager.h10State.value
+        val verity = polarBleManager.verityState.value
+        val oxy = oximeterBleManager.connectionState.value
+        val polarConnected = h10 is BleConnectionState.Connected ||
+            verity is BleConnectionState.Connected
+        val oxyConnected = oxy is OximeterConnectionState.Connected
+        return !polarConnected && oxyConnected
+    }
+
+    /**
      * Returns a human-readable label for the currently connected HR/SpO₂ device,
      * suitable for storing alongside recorded data so the source is always known.
      *

@@ -17,6 +17,8 @@ import com.example.wags.domain.model.ApneaStats
 import com.example.wags.domain.model.ApneaTable
 import com.example.wags.domain.model.ApneaTableType
 import com.example.wags.domain.model.OximeterReading
+import com.example.wags.domain.model.PersonalBestCategory
+import com.example.wags.domain.model.PersonalBestResult
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.model.TableDifficulty
@@ -83,6 +85,11 @@ data class ApneaUiState(
     val bestTimeForSettingsMs: Long = 0L,
     /** recordId of the best free-hold record for the current settings combination (null if none). */
     val bestTimeForSettingsRecordId: Long? = null,
+    /**
+     * The broadest PB category that the current best record holds.
+     * Determines how many trophy emojis to show (1–4). Null when no best record exists.
+     */
+    val bestTimeTrophyCategory: PersonalBestCategory? = null,
     val selectedLength: TableLength = TableLength.MEDIUM,
     val selectedDifficulty: TableDifficulty = TableDifficulty.MEDIUM,
     // Contraction tracking
@@ -103,8 +110,8 @@ data class ApneaUiState(
      */
     val openSection: ApneaSection? = ApneaSection.BEST_TIME,
     // ── New personal best dialog ──────────────────────────────────────────────
-    /** Non-null when a new personal best was just set — holds the new PB in ms for the congrats dialog. */
-    val newPersonalBestMs: Long? = null,
+    /** Non-null when a new personal best was just set — contains the broadest beaten category. */
+    val newPersonalBest: PersonalBestResult? = null,
     // ── Inline advanced-modality session state ────────────────────────────────
     /** Which modality (if any) has an active inline session running. */
     val activeModalitySession: TrainingModality? = null,
@@ -176,6 +183,13 @@ class ApneaViewModel @Inject constructor(
     private val oximeterSamples = mutableListOf<Pair<Long, OximeterReading>>()
     private var oximeterCollectionJob: Job? = null
     private var advancedSessionStartMs: Long = 0L
+    /**
+     * Captured at hold-start: true when the oximeter is the primary device
+     * (no Polar connected). When false, any oximeter readings that arrive
+     * from a background-connected oximeter are discarded at save time so
+     * the record's SpO₂ fields stay null / N/A.
+     */
+    private var oximeterIsPrimary = false
 
     // Separate flows for the three settings that drive the best-time / filtered-records queries
     private val _lungVolume  = MutableStateFlow("FULL")
@@ -238,11 +252,17 @@ class ApneaViewModel @Inject constructor(
                 }
         }
         // Whenever any setting changes, re-subscribe to best-time record-id query
+        // and recompute the trophy level for the best record.
         viewModelScope.launch {
             combine(_lungVolume, _prepType, _timeOfDay) { lv, pt, tod -> Triple(lv, pt, tod) }
                 .collectLatest { (lv, pt, tod) ->
                     apneaRepository.getBestFreeHoldRecordId(lv, pt.name, tod.name).collect { id ->
                         _uiState.update { it.copy(bestTimeForSettingsRecordId = id) }
+                        // Compute trophy level for the best record
+                        val trophyCategory = if (id != null) {
+                            apneaRepository.getBestRecordTrophyLevel(lv, pt.name, tod.name)
+                        } else null
+                        _uiState.update { it.copy(bestTimeTrophyCategory = trophyCategory) }
                     }
                 }
         }
@@ -372,19 +392,14 @@ class ApneaViewModel @Inject constructor(
 
     fun setPersonalBest(pbMs: Long) {
         val current = _uiState.value.personalBestMs
-        val isNewPb = pbMs > current
         _uiState.update {
-            it.copy(
-                personalBestMs = pbMs,
-                newPersonalBestMs = if (isNewPb) pbMs else null
-            )
+            it.copy(personalBestMs = pbMs)
         }
         prefs.edit().putLong("pb_ms", pbMs).apply()
-        if (isNewPb) habitRepo.sendHabitIncrement(Slot.APNEA_NEW_RECORD)
     }
 
     fun dismissNewPersonalBest() {
-        _uiState.update { it.copy(newPersonalBestMs = null) }
+        _uiState.update { it.copy(newPersonalBest = null) }
     }
 
     fun setLength(length: TableLength) {
@@ -444,6 +459,7 @@ class ApneaViewModel @Inject constructor(
     fun startFreeHold(deviceId: String) {
         bleManager.startRrStream(deviceId)
         freeHoldStartTime = System.currentTimeMillis()
+        oximeterIsPrimary = hrDataSource.isOximeterPrimaryDevice()
         _uiState.update {
             it.copy(
                 freeHoldActive = true,
@@ -452,12 +468,16 @@ class ApneaViewModel @Inject constructor(
             )
         }
 
-        // Start collecting oximeter readings for this hold
+        // Start collecting oximeter readings for this hold — only when the
+        // oximeter is the primary device. When a Polar device is connected,
+        // background oximeter readings are incidental resting values.
         oximeterSamples.clear()
         oximeterCollectionJob?.cancel()
-        oximeterCollectionJob = viewModelScope.launch {
-            oximeterBleManager.readings.collect { reading ->
-                oximeterSamples.add(System.currentTimeMillis() to reading)
+        if (oximeterIsPrimary) {
+            oximeterCollectionJob = viewModelScope.launch {
+                oximeterBleManager.readings.collect { reading ->
+                    oximeterSamples.add(System.currentTimeMillis() to reading)
+                }
             }
         }
     }
@@ -492,29 +512,39 @@ class ApneaViewModel @Inject constructor(
         // Stop collecting oximeter readings before saving so the snapshot is stable
         oximeterCollectionJob?.cancel()
         oximeterCollectionJob = null
-        val currentBest = _uiState.value.bestTimeForSettingsMs
-        // A currentBest of 0 means no prior record for this settings combo — always a new PB.
-        val isNewBest = currentBest == 0L || duration > currentBest
         val firstContractionMs = _uiState.value.freeHoldFirstContractionMs
+        val state = _uiState.value
         _uiState.update {
             it.copy(
                 freeHoldActive = false,
                 freeHoldDurationMs = duration,
-                freeHoldFirstContractionMs = null,
-                newPersonalBestMs = if (isNewBest) duration else it.newPersonalBestMs
+                freeHoldFirstContractionMs = null
             )
         }
         audioHapticEngine.vibrateHoldEnd()
-        saveFreeHoldRecord(duration, firstContractionMs)
         // Signal the Habit app that a free breath hold was successfully completed
         habitRepo.sendHabitIncrement(Slot.FREE_HOLD)
-        // Signal a new personal best if this hold beat the previous record for this settings combo
-        if (isNewBest) habitRepo.sendHabitIncrement(Slot.APNEA_NEW_RECORD)
+        viewModelScope.launch {
+            // Check broader PB categories BEFORE saving so queries compare against prior records only.
+            val pbResult = apneaRepository.checkBroaderPersonalBest(
+                durationMs = duration,
+                lungVolume = state.selectedLungVolume,
+                prepType   = state.prepType.name,
+                timeOfDay  = state.timeOfDay.name
+            )
+            saveFreeHoldRecord(duration, firstContractionMs)
+            if (pbResult != null) {
+                _uiState.update { it.copy(newPersonalBest = pbResult) }
+                habitRepo.sendHabitIncrement(Slot.APNEA_NEW_RECORD)
+            }
+        }
     }
 
     private fun saveFreeHoldRecord(durationMs: Long, firstContractionMs: Long? = null) {
-        // Take a stable snapshot of the oximeter samples collected during this hold
-        val oxSnapshot = oximeterSamples.toList()
+        // Only use oximeter data when the oximeter was the primary device at hold-start.
+        // When a Polar device is the primary HR source, any background-connected oximeter
+        // readings are incidental resting values (typically 99 %) and must be discarded.
+        val oxSnapshot = if (oximeterIsPrimary) oximeterSamples.toList() else emptyList()
         oximeterSamples.clear()
         // Capture device label at the moment the hold ends (before any disconnect)
         val deviceLabel = hrDataSource.activeHrDeviceLabel()

@@ -4,6 +4,13 @@ import androidx.room.*
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import kotlinx.coroutines.flow.Flow
 
+/** Lightweight projection returned by [ApneaRecordDao.getBestFreeHoldRecord]. */
+data class BestRecordTuple(
+    val recordId: Long,
+    val durationMs: Long,
+    val timestamp: Long
+)
+
 @Dao
 interface ApneaRecordDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -58,6 +65,17 @@ interface ApneaRecordDao {
           AND tableType IS NULL
     """)
     suspend fun getBestFreeHoldOnce(lungVolume: String, prepType: String, timeOfDay: String): Long?
+
+    /** One-shot recordId of the best free-hold for a given settings combination. */
+    @Query("""
+        SELECT recordId FROM apnea_records
+        WHERE lungVolume = :lungVolume
+          AND prepType   = :prepType
+          AND timeOfDay  = :timeOfDay
+          AND tableType IS NULL
+        ORDER BY durationMs DESC LIMIT 1
+    """)
+    suspend fun getBestFreeHoldRecordIdOnce(lungVolume: String, prepType: String, timeOfDay: String): Long?
 
     /** Single record by primary key. */
     @Query("SELECT * FROM apnea_records WHERE recordId = :recordId LIMIT 1")
@@ -256,6 +274,284 @@ interface ApneaRecordDao {
         limit: Int,
         offset: Int
     ): List<ApneaRecordEntity>
+
+    // ── Broader personal-best queries (one-shot, for PB celebration) ──────────
+
+    /** Best free-hold across ALL settings (global PB). */
+    @Query("""
+        SELECT MAX(durationMs) FROM apnea_records
+        WHERE tableType IS NULL
+    """)
+    suspend fun getBestFreeHoldGlobal(): Long?
+
+    /** Best free-hold for a given timeOfDay (any lungVolume, any prepType). */
+    @Query("""
+        SELECT MAX(durationMs) FROM apnea_records
+        WHERE tableType IS NULL
+          AND timeOfDay = :timeOfDay
+    """)
+    suspend fun getBestFreeHoldByTimeOfDay(timeOfDay: String): Long?
+
+    /** Best free-hold for a given lungVolume (any prepType, any timeOfDay). */
+    @Query("""
+        SELECT MAX(durationMs) FROM apnea_records
+        WHERE tableType IS NULL
+          AND lungVolume = :lungVolume
+    """)
+    suspend fun getBestFreeHoldByLungVolume(lungVolume: String): Long?
+
+    /** Best free-hold for a given prepType (any lungVolume, any timeOfDay). */
+    @Query("""
+        SELECT MAX(durationMs) FROM apnea_records
+        WHERE tableType IS NULL
+          AND prepType = :prepType
+    """)
+    suspend fun getBestFreeHoldByPrepType(prepType: String): Long?
+
+    /** Best free-hold for a given timeOfDay + lungVolume (any prepType). */
+    @Query("""
+        SELECT MAX(durationMs) FROM apnea_records
+        WHERE tableType IS NULL
+          AND timeOfDay  = :timeOfDay
+          AND lungVolume = :lungVolume
+    """)
+    suspend fun getBestFreeHoldByTimeOfDayAndLungVolume(timeOfDay: String, lungVolume: String): Long?
+
+    /** Best free-hold for a given timeOfDay + prepType (any lungVolume). */
+    @Query("""
+        SELECT MAX(durationMs) FROM apnea_records
+        WHERE tableType IS NULL
+          AND timeOfDay = :timeOfDay
+          AND prepType  = :prepType
+    """)
+    suspend fun getBestFreeHoldByTimeOfDayAndPrepType(timeOfDay: String, prepType: String): Long?
+
+    /** Best free-hold for a given lungVolume + prepType (any timeOfDay). */
+    @Query("""
+        SELECT MAX(durationMs) FROM apnea_records
+        WHERE tableType IS NULL
+          AND lungVolume = :lungVolume
+          AND prepType   = :prepType
+    """)
+    suspend fun getBestFreeHoldByLungVolumeAndPrepType(lungVolume: String, prepType: String): Long?
+
+    // ── Check if a record is currently the best for a category ────────────────
+
+    /** Is this record's duration the best across ALL free holds? */
+    @Query("""
+        SELECT CASE WHEN r.durationMs >= COALESCE(
+            (SELECT MAX(o.durationMs) FROM apnea_records o
+             WHERE o.tableType IS NULL AND o.recordId != :recordId), 0)
+        THEN 1 ELSE 0 END
+        FROM apnea_records r WHERE r.recordId = :recordId
+    """)
+    suspend fun isGlobalBest(recordId: Long): Boolean
+
+    /** Is this record's duration the best for its timeOfDay? */
+    @Query("""
+        SELECT CASE WHEN r.durationMs >= COALESCE(
+            (SELECT MAX(o.durationMs) FROM apnea_records o
+             WHERE o.tableType IS NULL AND o.recordId != :recordId
+               AND o.timeOfDay = r.timeOfDay), 0)
+        THEN 1 ELSE 0 END
+        FROM apnea_records r WHERE r.recordId = :recordId
+    """)
+    suspend fun isBestForTimeOfDay(recordId: Long): Boolean
+
+    /** Is this record's duration the best for its lungVolume? */
+    @Query("""
+        SELECT CASE WHEN r.durationMs >= COALESCE(
+            (SELECT MAX(o.durationMs) FROM apnea_records o
+             WHERE o.tableType IS NULL AND o.recordId != :recordId
+               AND o.lungVolume = r.lungVolume), 0)
+        THEN 1 ELSE 0 END
+        FROM apnea_records r WHERE r.recordId = :recordId
+    """)
+    suspend fun isBestForLungVolume(recordId: Long): Boolean
+
+    /** Is this record's duration the best for its prepType? */
+    @Query("""
+        SELECT CASE WHEN r.durationMs >= COALESCE(
+            (SELECT MAX(o.durationMs) FROM apnea_records o
+             WHERE o.tableType IS NULL AND o.recordId != :recordId
+               AND o.prepType = r.prepType), 0)
+        THEN 1 ELSE 0 END
+        FROM apnea_records r WHERE r.recordId = :recordId
+    """)
+    suspend fun isBestForPrepType(recordId: Long): Boolean
+
+    /** Is this record's duration the best for its timeOfDay + lungVolume? */
+    @Query("""
+        SELECT CASE WHEN r.durationMs >= COALESCE(
+            (SELECT MAX(o.durationMs) FROM apnea_records o
+             WHERE o.tableType IS NULL AND o.recordId != :recordId
+               AND o.timeOfDay = r.timeOfDay AND o.lungVolume = r.lungVolume), 0)
+        THEN 1 ELSE 0 END
+        FROM apnea_records r WHERE r.recordId = :recordId
+    """)
+    suspend fun isBestForTimeOfDayAndLungVolume(recordId: Long): Boolean
+
+    /** Is this record's duration the best for its timeOfDay + prepType? */
+    @Query("""
+        SELECT CASE WHEN r.durationMs >= COALESCE(
+            (SELECT MAX(o.durationMs) FROM apnea_records o
+             WHERE o.tableType IS NULL AND o.recordId != :recordId
+               AND o.timeOfDay = r.timeOfDay AND o.prepType = r.prepType), 0)
+        THEN 1 ELSE 0 END
+        FROM apnea_records r WHERE r.recordId = :recordId
+    """)
+    suspend fun isBestForTimeOfDayAndPrepType(recordId: Long): Boolean
+
+    /** Is this record's duration the best for its lungVolume + prepType? */
+    @Query("""
+        SELECT CASE WHEN r.durationMs >= COALESCE(
+            (SELECT MAX(o.durationMs) FROM apnea_records o
+             WHERE o.tableType IS NULL AND o.recordId != :recordId
+               AND o.lungVolume = r.lungVolume AND o.prepType = r.prepType), 0)
+        THEN 1 ELSE 0 END
+        FROM apnea_records r WHERE r.recordId = :recordId
+    """)
+    suspend fun isBestForLungVolumeAndPrepType(recordId: Long): Boolean
+
+    /** Is this record's duration the best for its exact 3-setting combo? */
+    @Query("""
+        SELECT CASE WHEN r.durationMs >= COALESCE(
+            (SELECT MAX(o.durationMs) FROM apnea_records o
+             WHERE o.tableType IS NULL AND o.recordId != :recordId
+               AND o.lungVolume = r.lungVolume AND o.prepType = r.prepType
+               AND o.timeOfDay = r.timeOfDay), 0)
+        THEN 1 ELSE 0 END
+        FROM apnea_records r WHERE r.recordId = :recordId
+    """)
+    suspend fun isBestForExactSettings(recordId: Long): Boolean
+
+    // ── Was a record EVER the best at the time it was recorded? ───────────────
+
+    /** Was this record the best across ALL free holds at the time it was recorded? */
+    @Query("""
+        SELECT CASE WHEN NOT EXISTS (
+            SELECT 1 FROM apnea_records o
+            WHERE o.tableType IS NULL
+              AND o.timestamp < r.timestamp
+              AND o.durationMs >= r.durationMs
+        ) THEN 1 ELSE 0 END
+        FROM apnea_records r WHERE r.recordId = :recordId
+    """)
+    suspend fun wasGlobalBestAtTime(recordId: Long): Boolean
+
+    /** Was this record the best for its timeOfDay at the time it was recorded? */
+    @Query("""
+        SELECT CASE WHEN NOT EXISTS (
+            SELECT 1 FROM apnea_records o
+            WHERE o.tableType IS NULL
+              AND o.timeOfDay = r.timeOfDay
+              AND o.timestamp < r.timestamp
+              AND o.durationMs >= r.durationMs
+        ) THEN 1 ELSE 0 END
+        FROM apnea_records r WHERE r.recordId = :recordId
+    """)
+    suspend fun wasBestForTimeOfDayAtTime(recordId: Long): Boolean
+
+    /** Was this record the best for its lungVolume at the time it was recorded? */
+    @Query("""
+        SELECT CASE WHEN NOT EXISTS (
+            SELECT 1 FROM apnea_records o
+            WHERE o.tableType IS NULL
+              AND o.lungVolume = r.lungVolume
+              AND o.timestamp < r.timestamp
+              AND o.durationMs >= r.durationMs
+        ) THEN 1 ELSE 0 END
+        FROM apnea_records r WHERE r.recordId = :recordId
+    """)
+    suspend fun wasBestForLungVolumeAtTime(recordId: Long): Boolean
+
+    /** Was this record the best for its prepType at the time it was recorded? */
+    @Query("""
+        SELECT CASE WHEN NOT EXISTS (
+            SELECT 1 FROM apnea_records o
+            WHERE o.tableType IS NULL
+              AND o.prepType = r.prepType
+              AND o.timestamp < r.timestamp
+              AND o.durationMs >= r.durationMs
+        ) THEN 1 ELSE 0 END
+        FROM apnea_records r WHERE r.recordId = :recordId
+    """)
+    suspend fun wasBestForPrepTypeAtTime(recordId: Long): Boolean
+
+    /** Was this record the best for its timeOfDay + lungVolume at the time it was recorded? */
+    @Query("""
+        SELECT CASE WHEN NOT EXISTS (
+            SELECT 1 FROM apnea_records o
+            WHERE o.tableType IS NULL
+              AND o.timeOfDay = r.timeOfDay AND o.lungVolume = r.lungVolume
+              AND o.timestamp < r.timestamp
+              AND o.durationMs >= r.durationMs
+        ) THEN 1 ELSE 0 END
+        FROM apnea_records r WHERE r.recordId = :recordId
+    """)
+    suspend fun wasBestForTimeOfDayAndLungVolumeAtTime(recordId: Long): Boolean
+
+    /** Was this record the best for its timeOfDay + prepType at the time it was recorded? */
+    @Query("""
+        SELECT CASE WHEN NOT EXISTS (
+            SELECT 1 FROM apnea_records o
+            WHERE o.tableType IS NULL
+              AND o.timeOfDay = r.timeOfDay AND o.prepType = r.prepType
+              AND o.timestamp < r.timestamp
+              AND o.durationMs >= r.durationMs
+        ) THEN 1 ELSE 0 END
+        FROM apnea_records r WHERE r.recordId = :recordId
+    """)
+    suspend fun wasBestForTimeOfDayAndPrepTypeAtTime(recordId: Long): Boolean
+
+    /** Was this record the best for its lungVolume + prepType at the time it was recorded? */
+    @Query("""
+        SELECT CASE WHEN NOT EXISTS (
+            SELECT 1 FROM apnea_records o
+            WHERE o.tableType IS NULL
+              AND o.lungVolume = r.lungVolume AND o.prepType = r.prepType
+              AND o.timestamp < r.timestamp
+              AND o.durationMs >= r.durationMs
+        ) THEN 1 ELSE 0 END
+        FROM apnea_records r WHERE r.recordId = :recordId
+    """)
+    suspend fun wasBestForLungVolumeAndPrepTypeAtTime(recordId: Long): Boolean
+
+    /** Was this record the best for its exact 3-setting combo at the time it was recorded? */
+    @Query("""
+        SELECT CASE WHEN NOT EXISTS (
+            SELECT 1 FROM apnea_records o
+            WHERE o.tableType IS NULL
+              AND o.lungVolume = r.lungVolume AND o.prepType = r.prepType
+              AND o.timeOfDay = r.timeOfDay
+              AND o.timestamp < r.timestamp
+              AND o.durationMs >= r.durationMs
+        ) THEN 1 ELSE 0 END
+        FROM apnea_records r WHERE r.recordId = :recordId
+    """)
+    suspend fun wasBestForExactSettingsAtTime(recordId: Long): Boolean
+
+    // ── Flexible best-record query for Personal Bests screen ─────────────────
+
+    /**
+     * Returns the best (longest) free-hold record matching optional filters.
+     * Pass empty string "" for any filter to match all values for that dimension.
+     * Returns recordId, durationMs, and timestamp of the best record, or null if none.
+     */
+    @Query("""
+        SELECT recordId, durationMs, timestamp FROM apnea_records
+        WHERE tableType IS NULL
+          AND (:lungVolume = '' OR lungVolume = :lungVolume)
+          AND (:prepType   = '' OR prepType   = :prepType)
+          AND (:timeOfDay  = '' OR timeOfDay  = :timeOfDay)
+        ORDER BY durationMs DESC
+        LIMIT 1
+    """)
+    suspend fun getBestFreeHoldRecord(
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String
+    ): BestRecordTuple?
 
     // ── Stats queries (all settings combined) ────────────────────────────────
 

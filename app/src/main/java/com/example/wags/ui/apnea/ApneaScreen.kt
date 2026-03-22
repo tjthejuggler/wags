@@ -35,6 +35,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.domain.model.ApneaStats
+import com.example.wags.domain.model.PersonalBestCategory
+import com.example.wags.domain.model.trophyEmojis
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.model.TableDifficulty
@@ -60,9 +62,11 @@ fun ApneaScreen(
     val deviceId = "PLACEHOLDER_H10_ID"
 
     // New personal best congratulations dialog
-    state.newPersonalBestMs?.let { newPbMs ->
+    state.newPersonalBest?.let { pbResult ->
         NewPersonalBestDialog(
-            newPbMs = newPbMs,
+            newPbMs = pbResult.durationMs,
+            categoryDescription = pbResult.description,
+            category = pbResult.category,
             onDismiss = { viewModel.dismissNewPersonalBest() }
         )
     }
@@ -140,6 +144,7 @@ fun ApneaScreen(
                         freeHoldDurationMs = state.freeHoldDurationMs,
                         bestTimeMs = state.bestTimeForSettingsMs,
                         bestTimeRecordId = state.bestTimeForSettingsRecordId,
+                        bestTimeTrophyCategory = state.bestTimeTrophyCategory,
                         showTimer = state.showTimer,
                         onShowTimerChange = { viewModel.setShowTimer(it) },
                         onStartHold = {
@@ -154,6 +159,9 @@ fun ApneaScreen(
                         },
                         onBestTimeClick = { recordId ->
                             navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
+                        },
+                        onTrophyClick = {
+                            navController.navigate(WagsRoutes.PERSONAL_BESTS)
                         }
                     )
                 }
@@ -340,8 +348,38 @@ fun ApneaScreen(
 @Composable
 internal fun NewPersonalBestDialog(
     newPbMs: Long,
+    categoryDescription: String = "",
+    category: PersonalBestCategory = PersonalBestCategory.EXACT,
     onDismiss: () -> Unit
 ) {
+    val emoji = when (category) {
+        PersonalBestCategory.GLOBAL       -> "🌍"
+        PersonalBestCategory.ONE_SETTING  -> "⭐"
+        PersonalBestCategory.TWO_SETTINGS -> "🏆"
+        PersonalBestCategory.EXACT        -> "🏆"
+    }
+
+    val headline = when (category) {
+        PersonalBestCategory.GLOBAL       -> "New All-Time Personal Best!"
+        PersonalBestCategory.ONE_SETTING  -> "New Personal Best!"
+        PersonalBestCategory.TWO_SETTINGS -> "New Personal Best!"
+        PersonalBestCategory.EXACT        -> "New Personal Best!"
+    }
+
+    val subtitle = when (category) {
+        PersonalBestCategory.GLOBAL       -> "Best across all settings!"
+        PersonalBestCategory.ONE_SETTING  -> "Best for $categoryDescription (any other settings)"
+        PersonalBestCategory.TWO_SETTINGS -> "Best for $categoryDescription"
+        PersonalBestCategory.EXACT        -> "Best for $categoryDescription"
+    }
+
+    val confettiCount = when (category) {
+        PersonalBestCategory.GLOBAL       -> 80
+        PersonalBestCategory.ONE_SETTING  -> 60
+        PersonalBestCategory.TWO_SETTINGS -> 50
+        PersonalBestCategory.EXACT        -> 45
+    }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -361,7 +399,7 @@ internal fun NewPersonalBestDialog(
             // Confetti rains over the entire screen
             ConfettiOverlay(
                 modifier = Modifier.fillMaxSize(),
-                particleCount = 45,
+                particleCount = confettiCount,
                 durationMs = 3_500
             )
 
@@ -388,12 +426,12 @@ internal fun NewPersonalBestDialog(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            "🏆",
+                            emoji,
                             style = MaterialTheme.typography.displayMedium,
                             textAlign = TextAlign.Center
                         )
                         Text(
-                            "New Personal Best!",
+                            headline,
                             style = MaterialTheme.typography.headlineSmall,
                             color = EcgCyan,
                             fontWeight = FontWeight.Bold,
@@ -407,9 +445,15 @@ internal fun NewPersonalBestDialog(
                             textAlign = TextAlign.Center
                         )
                         Text(
-                            "Congratulations! You've beaten your previous record. Keep it up!",
+                            subtitle,
                             style = MaterialTheme.typography.bodyMedium,
                             color = TextSecondary,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            "Congratulations! You've beaten your previous record. Keep it up!",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary.copy(alpha = 0.7f),
                             textAlign = TextAlign.Center
                         )
                         Spacer(modifier = Modifier.height(4.dp))
@@ -570,10 +614,12 @@ private fun FreeHoldContent(
     freeHoldDurationMs: Long,
     bestTimeMs: Long,
     bestTimeRecordId: Long?,
+    bestTimeTrophyCategory: PersonalBestCategory?,
     showTimer: Boolean,
     onShowTimerChange: (Boolean) -> Unit,
     onStartHold: () -> Unit,
-    onBestTimeClick: (Long) -> Unit = {}
+    onBestTimeClick: (Long) -> Unit = {},
+    onTrophyClick: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -592,16 +638,30 @@ private fun FreeHoldContent(
 
         // Personal best for current settings
         if (bestTimeMs > 0L) {
-            Text(
-                "🏆 ${formatMs(bestTimeMs)}",
-                style = MaterialTheme.typography.headlineSmall,
-                color = EcgCyan,
-                fontWeight = FontWeight.Bold,
-                modifier = if (bestTimeRecordId != null)
-                    Modifier.clickable { onBestTimeClick(bestTimeRecordId) }
-                else
-                    Modifier
-            )
+            val trophies = bestTimeTrophyCategory?.trophyEmojis() ?: "🏆"
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                // Trophies → navigate to Personal Bests screen
+                Text(
+                    trophies,
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.clickable { onTrophyClick() }
+                )
+                Text(" ", style = MaterialTheme.typography.headlineSmall)
+                // Duration → navigate to record detail
+                Text(
+                    formatMs(bestTimeMs),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = EcgCyan,
+                    fontWeight = FontWeight.Bold,
+                    modifier = if (bestTimeRecordId != null)
+                        Modifier.clickable { onBestTimeClick(bestTimeRecordId) }
+                    else
+                        Modifier
+                )
+            }
         }
 
         // Last hold result (shown after returning from the active-hold screen)

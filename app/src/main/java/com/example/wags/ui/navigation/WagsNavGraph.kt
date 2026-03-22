@@ -17,6 +17,7 @@ import com.example.wags.ui.apnea.ApneaRecordDetailScreen
 import com.example.wags.ui.apnea.ApneaScreen
 import com.example.wags.ui.apnea.ApneaTableScreen
 import com.example.wags.ui.apnea.FreeHoldActiveScreen
+import com.example.wags.ui.apnea.PersonalBestsScreen
 import com.example.wags.ui.apnea.SessionAnalyticsHistoryScreen
 import com.example.wags.ui.apnea.SessionAnalyticsScreen
 import com.example.wags.ui.breathing.AssessmentPickerScreen
@@ -64,6 +65,7 @@ object WagsRoutes {
     const val APNEA_RECORD_DETAIL = "apnea_record_detail/{recordId}"
     const val APNEA_ALL_RECORDS = "apnea_all_records/{lungVolume}/{prepType}/{timeOfDay}/{eventTypes}"
     const val FREE_HOLD_ACTIVE = "free_hold_active/{lungVolume}/{prepType}/{timeOfDay}/{showTimer}"
+    const val PERSONAL_BESTS = "personal_bests"
     // ── Meditation / NSDR ──────────────────────────────────────────────────────
     // ── Garmin Watch ─────────────────────────────────────────────────────────
     const val GARMIN = "garmin"
@@ -251,6 +253,9 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             arguments = listOf(navArgument("recordId") { type = NavType.LongType })
         ) {
             ApneaRecordDetailScreen(navController = navController)
+        }
+        composable(WagsRoutes.PERSONAL_BESTS) {
+            PersonalBestsScreen(navController = navController)
         }
         composable(WagsRoutes.RF_ASSESSMENT_PICKER) {
             AssessmentPickerScreen(

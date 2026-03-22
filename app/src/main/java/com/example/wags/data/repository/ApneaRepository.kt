@@ -5,6 +5,12 @@ import com.example.wags.data.db.dao.FreeHoldTelemetryDao
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
 import com.example.wags.domain.model.ApneaStats
+import com.example.wags.domain.model.PersonalBestCategory
+import com.example.wags.domain.model.PersonalBestEntry
+import com.example.wags.domain.model.PersonalBestResult
+import com.example.wags.domain.model.PrepType
+import com.example.wags.domain.model.RecordPbBadge
+import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.di.IoDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
@@ -52,6 +58,347 @@ class ApneaRepository @Inject constructor(
     /** recordId of the best free-hold for the current settings combination. */
     fun getBestFreeHoldRecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?> =
         dao.getBestFreeHoldRecordId(lungVolume, prepType, timeOfDay)
+
+    // ── Broader personal-best queries (one-shot, for PB celebration) ──────────
+
+    /** Best free-hold across ALL settings (global PB). */
+    suspend fun getBestFreeHoldGlobal(): Long? =
+        withContext(ioDispatcher) { dao.getBestFreeHoldGlobal() }
+
+    /** Best free-hold for a given timeOfDay (any lungVolume, any prepType). */
+    suspend fun getBestFreeHoldByTimeOfDay(timeOfDay: String): Long? =
+        withContext(ioDispatcher) { dao.getBestFreeHoldByTimeOfDay(timeOfDay) }
+
+    /** Best free-hold for a given lungVolume (any prepType, any timeOfDay). */
+    suspend fun getBestFreeHoldByLungVolume(lungVolume: String): Long? =
+        withContext(ioDispatcher) { dao.getBestFreeHoldByLungVolume(lungVolume) }
+
+    /** Best free-hold for a given prepType (any lungVolume, any timeOfDay). */
+    suspend fun getBestFreeHoldByPrepType(prepType: String): Long? =
+        withContext(ioDispatcher) { dao.getBestFreeHoldByPrepType(prepType) }
+
+    /** Best free-hold for a given timeOfDay + lungVolume (any prepType). */
+    suspend fun getBestFreeHoldByTimeOfDayAndLungVolume(timeOfDay: String, lungVolume: String): Long? =
+        withContext(ioDispatcher) { dao.getBestFreeHoldByTimeOfDayAndLungVolume(timeOfDay, lungVolume) }
+
+    /** Best free-hold for a given timeOfDay + prepType (any lungVolume). */
+    suspend fun getBestFreeHoldByTimeOfDayAndPrepType(timeOfDay: String, prepType: String): Long? =
+        withContext(ioDispatcher) { dao.getBestFreeHoldByTimeOfDayAndPrepType(timeOfDay, prepType) }
+
+    /** Best free-hold for a given lungVolume + prepType (any timeOfDay). */
+    suspend fun getBestFreeHoldByLungVolumeAndPrepType(lungVolume: String, prepType: String): Long? =
+        withContext(ioDispatcher) { dao.getBestFreeHoldByLungVolumeAndPrepType(lungVolume, prepType) }
+
+    /**
+     * Determines the **broadest** personal-best category that a new hold of
+     * [durationMs] beats, given the hold's settings.
+     *
+     * Must be called **before** the new record is saved to the database so
+     * the queries compare against prior records only.
+     *
+     * Returns null when the hold is not even a PB for the exact settings combo.
+     *
+     * Display-name helpers use the raw enum names; callers should format them
+     * (e.g. lowercase + capitalise) for the UI.
+     */
+    suspend fun checkBroaderPersonalBest(
+        durationMs: Long,
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String
+    ): PersonalBestResult? = withContext(ioDispatcher) {
+        // ── Exact settings (3 constraints) ─────────────────────────────────
+        val exactBest = dao.getBestFreeHoldOnce(lungVolume, prepType, timeOfDay)
+        val isExactPb = exactBest == null || durationMs > exactBest
+        if (!isExactPb) return@withContext null   // not even a PB for exact settings
+
+        // Helper to format a setting name for display
+        fun fmt(s: String): String = s.lowercase().replace('_', ' ')
+            .replaceFirstChar { it.uppercase() }
+
+        // ── Global (0 constraints) ─────────────────────────────────────────
+        val globalBest = dao.getBestFreeHoldGlobal()
+        if (globalBest == null || durationMs > globalBest) {
+            return@withContext PersonalBestResult(
+                durationMs  = durationMs,
+                category    = PersonalBestCategory.GLOBAL,
+                description = "all settings"
+            )
+        }
+
+        // ── Single-setting categories (1 constraint, 2 relaxed) ────────────
+        val todBest = dao.getBestFreeHoldByTimeOfDay(timeOfDay)
+        if (todBest == null || durationMs > todBest) {
+            return@withContext PersonalBestResult(
+                durationMs  = durationMs,
+                category    = PersonalBestCategory.ONE_SETTING,
+                description = fmt(timeOfDay)
+            )
+        }
+
+        val lvBest = dao.getBestFreeHoldByLungVolume(lungVolume)
+        if (lvBest == null || durationMs > lvBest) {
+            return@withContext PersonalBestResult(
+                durationMs  = durationMs,
+                category    = PersonalBestCategory.ONE_SETTING,
+                description = fmt(lungVolume)
+            )
+        }
+
+        val ptBest = dao.getBestFreeHoldByPrepType(prepType)
+        if (ptBest == null || durationMs > ptBest) {
+            return@withContext PersonalBestResult(
+                durationMs  = durationMs,
+                category    = PersonalBestCategory.ONE_SETTING,
+                description = fmt(prepType)
+            )
+        }
+
+        // ── Two-setting categories (2 constraints, 1 relaxed) ──────────────
+        val todLvBest = dao.getBestFreeHoldByTimeOfDayAndLungVolume(timeOfDay, lungVolume)
+        if (todLvBest == null || durationMs > todLvBest) {
+            return@withContext PersonalBestResult(
+                durationMs  = durationMs,
+                category    = PersonalBestCategory.TWO_SETTINGS,
+                description = "${fmt(timeOfDay)} · ${fmt(lungVolume)}"
+            )
+        }
+
+        val todPtBest = dao.getBestFreeHoldByTimeOfDayAndPrepType(timeOfDay, prepType)
+        if (todPtBest == null || durationMs > todPtBest) {
+            return@withContext PersonalBestResult(
+                durationMs  = durationMs,
+                category    = PersonalBestCategory.TWO_SETTINGS,
+                description = "${fmt(timeOfDay)} · ${fmt(prepType)}"
+            )
+        }
+
+        val lvPtBest = dao.getBestFreeHoldByLungVolumeAndPrepType(lungVolume, prepType)
+        if (lvPtBest == null || durationMs > lvPtBest) {
+            return@withContext PersonalBestResult(
+                durationMs  = durationMs,
+                category    = PersonalBestCategory.TWO_SETTINGS,
+                description = "${fmt(lungVolume)} · ${fmt(prepType)}"
+            )
+        }
+
+        // ── Exact only ─────────────────────────────────────────────────────
+        PersonalBestResult(
+            durationMs  = durationMs,
+            category    = PersonalBestCategory.EXACT,
+            description = "${fmt(timeOfDay)} · ${fmt(lungVolume)} · ${fmt(prepType)}"
+        )
+    }
+
+    /**
+     * Computes the broadest [PersonalBestCategory] that the current best record
+     * for the given settings combination holds **right now**.
+     *
+     * Returns null if there is no free-hold record for these settings.
+     */
+    suspend fun getBestRecordTrophyLevel(
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String
+    ): PersonalBestCategory? = withContext(ioDispatcher) {
+        val recordId = dao.getBestFreeHoldRecordIdOnce(lungVolume, prepType, timeOfDay)
+            ?: return@withContext null
+        computeBroadestCurrentCategory(recordId, lungVolume, prepType, timeOfDay)
+    }
+
+    /**
+     * Computes all PB badges for a specific record — both current and former.
+     *
+     * Returns a list of [RecordPbBadge] from broadest to narrowest.
+     * Only includes categories where the record was at least a PB at the time
+     * it was recorded.
+     */
+    suspend fun getRecordPbBadges(recordId: Long): List<RecordPbBadge> = withContext(ioDispatcher) {
+        val record = dao.getById(recordId) ?: return@withContext emptyList()
+        if (record.tableType != null) return@withContext emptyList() // only free holds
+
+        fun fmt(s: String): String = s.lowercase().replace('_', ' ')
+            .replaceFirstChar { it.uppercase() }
+
+        val lv = record.lungVolume
+        val pt = record.prepType
+        val tod = record.timeOfDay
+
+        val badges = mutableListOf<RecordPbBadge>()
+
+        // Check from broadest to narrowest — only add if it was a PB at the time
+        // Global
+        if (dao.wasGlobalBestAtTime(recordId)) {
+            badges.add(RecordPbBadge(
+                category = PersonalBestCategory.GLOBAL,
+                description = "All settings",
+                isCurrent = dao.isGlobalBest(recordId)
+            ))
+        }
+
+        // Single-setting categories
+        if (dao.wasBestForTimeOfDayAtTime(recordId)) {
+            badges.add(RecordPbBadge(
+                category = PersonalBestCategory.ONE_SETTING,
+                description = fmt(tod),
+                isCurrent = dao.isBestForTimeOfDay(recordId)
+            ))
+        }
+        if (dao.wasBestForLungVolumeAtTime(recordId)) {
+            badges.add(RecordPbBadge(
+                category = PersonalBestCategory.ONE_SETTING,
+                description = fmt(lv),
+                isCurrent = dao.isBestForLungVolume(recordId)
+            ))
+        }
+        if (dao.wasBestForPrepTypeAtTime(recordId)) {
+            badges.add(RecordPbBadge(
+                category = PersonalBestCategory.ONE_SETTING,
+                description = fmt(pt),
+                isCurrent = dao.isBestForPrepType(recordId)
+            ))
+        }
+
+        // Two-setting categories
+        if (dao.wasBestForTimeOfDayAndLungVolumeAtTime(recordId)) {
+            badges.add(RecordPbBadge(
+                category = PersonalBestCategory.TWO_SETTINGS,
+                description = "${fmt(tod)} · ${fmt(lv)}",
+                isCurrent = dao.isBestForTimeOfDayAndLungVolume(recordId)
+            ))
+        }
+        if (dao.wasBestForTimeOfDayAndPrepTypeAtTime(recordId)) {
+            badges.add(RecordPbBadge(
+                category = PersonalBestCategory.TWO_SETTINGS,
+                description = "${fmt(tod)} · ${fmt(pt)}",
+                isCurrent = dao.isBestForTimeOfDayAndPrepType(recordId)
+            ))
+        }
+        if (dao.wasBestForLungVolumeAndPrepTypeAtTime(recordId)) {
+            badges.add(RecordPbBadge(
+                category = PersonalBestCategory.TWO_SETTINGS,
+                description = "${fmt(lv)} · ${fmt(pt)}",
+                isCurrent = dao.isBestForLungVolumeAndPrepType(recordId)
+            ))
+        }
+
+        // Exact 3-setting combo
+        if (dao.wasBestForExactSettingsAtTime(recordId)) {
+            badges.add(RecordPbBadge(
+                category = PersonalBestCategory.EXACT,
+                description = "${fmt(tod)} · ${fmt(lv)} · ${fmt(pt)}",
+                isCurrent = dao.isBestForExactSettings(recordId)
+            ))
+        }
+
+        badges
+    }
+
+    /**
+     * Helper: determines the broadest category for which a given record is
+     * currently the best.
+     */
+    private suspend fun computeBroadestCurrentCategory(
+        recordId: Long,
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String
+    ): PersonalBestCategory {
+        if (dao.isGlobalBest(recordId)) return PersonalBestCategory.GLOBAL
+
+        if (dao.isBestForTimeOfDay(recordId)) return PersonalBestCategory.ONE_SETTING
+        if (dao.isBestForLungVolume(recordId)) return PersonalBestCategory.ONE_SETTING
+        if (dao.isBestForPrepType(recordId)) return PersonalBestCategory.ONE_SETTING
+
+        if (dao.isBestForTimeOfDayAndLungVolume(recordId)) return PersonalBestCategory.TWO_SETTINGS
+        if (dao.isBestForTimeOfDayAndPrepType(recordId)) return PersonalBestCategory.TWO_SETTINGS
+        if (dao.isBestForLungVolumeAndPrepType(recordId)) return PersonalBestCategory.TWO_SETTINGS
+
+        return PersonalBestCategory.EXACT
+    }
+
+    // ── All Personal Bests (for the Personal Bests screen) ───────────────────
+
+    /**
+     * Builds the complete list of personal-best entries across every combination
+     * of settings, ordered from broadest (4🏆 global) to narrowest (1🏆 exact).
+     *
+     * Layout:
+     *  • 4🏆  Global (1 entry)
+     *  • 3🏆  Single-setting: 3 timeOfDay + 3 lungVolume + 3 prepType = 9 entries
+     *  • 2🏆  Two-setting pairs: 3×3 tod×lv + 3×3 tod×pt + 3×3 lv×pt = 27 entries
+     *  • 1🏆  Exact 3-setting combos: 3×3×3 = 27 entries
+     *  Total: 64 entries
+     */
+    suspend fun getAllPersonalBests(): List<PersonalBestEntry> = withContext(ioDispatcher) {
+        val entries = mutableListOf<PersonalBestEntry>()
+
+        val lungVolumes = listOf("FULL", "HALF", "EMPTY")
+        val prepTypes   = PrepType.entries.map { it.name }
+        val timesOfDay  = TimeOfDay.entries.map { it.name }
+
+        fun String.displayLv() = lowercase().replaceFirstChar { it.uppercase() }
+        fun String.displayPt() = PrepType.valueOf(this).displayName()
+        fun String.displayTod() = TimeOfDay.valueOf(this).displayName()
+
+        // Helper to query and build an entry
+        suspend fun entry(trophies: Int, label: String, lv: String, pt: String, tod: String): PersonalBestEntry {
+            val best = dao.getBestFreeHoldRecord(lv, pt, tod)
+            return PersonalBestEntry(
+                trophyCount = trophies,
+                label       = label,
+                recordId    = best?.recordId,
+                durationMs  = best?.durationMs,
+                timestamp   = best?.timestamp
+            )
+        }
+
+        // ── 4🏆 Global ──────────────────────────────────────────────────────
+        entries += entry(4, "All settings", "", "", "")
+
+        // ── 3🏆 Single setting ──────────────────────────────────────────────
+        for (tod in timesOfDay) {
+            entries += entry(3, tod.displayTod(), "", "", tod)
+        }
+        for (lv in lungVolumes) {
+            entries += entry(3, lv.displayLv(), lv, "", "")
+        }
+        for (pt in prepTypes) {
+            entries += entry(3, pt.displayPt(), "", pt, "")
+        }
+
+        // ── 2🏆 Two-setting pairs ──────────────────────────────────────────
+        for (tod in timesOfDay) {
+            for (lv in lungVolumes) {
+                entries += entry(2, "${tod.displayTod()} · ${lv.displayLv()}", lv, "", tod)
+            }
+        }
+        for (tod in timesOfDay) {
+            for (pt in prepTypes) {
+                entries += entry(2, "${tod.displayTod()} · ${pt.displayPt()}", "", pt, tod)
+            }
+        }
+        for (lv in lungVolumes) {
+            for (pt in prepTypes) {
+                entries += entry(2, "${lv.displayLv()} · ${pt.displayPt()}", lv, pt, "")
+            }
+        }
+
+        // ── 1🏆 Exact 3-setting combos ─────────────────────────────────────
+        for (tod in timesOfDay) {
+            for (lv in lungVolumes) {
+                for (pt in prepTypes) {
+                    entries += entry(
+                        1,
+                        "${tod.displayTod()} · ${lv.displayLv()} · ${pt.displayPt()}",
+                        lv, pt, tod
+                    )
+                }
+            }
+        }
+
+        entries
+    }
 
     // ── Paginated all-records (for the All Records screen) ───────────────────
 
