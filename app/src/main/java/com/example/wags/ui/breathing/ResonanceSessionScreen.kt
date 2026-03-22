@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -26,6 +27,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wags.ui.common.RrIntervalChart
 import com.example.wags.ui.common.RmssdChart
 import com.example.wags.ui.common.StripChartColors
+import com.example.wags.ui.common.WagsFeedback
 import com.example.wags.ui.theme.*
 
 // ── Monochrome palette ────────────────────────────────────────────────────────
@@ -76,6 +78,7 @@ fun ResonanceSessionScreen(
     viewModel: BreathingViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val deviceId = "PLACEHOLDER_H10_ID"
 
     // True once the phase has moved past IDLE (i.e. PREPARING or beyond).
@@ -89,6 +92,8 @@ fun ResonanceSessionScreen(
             BreathingSessionPhase.BREATHING -> sessionEverActive = true
             BreathingSessionPhase.COMPLETE  -> {
                 sessionEverActive = true
+                // Notify the user the session is done before navigating away.
+                WagsFeedback.sessionEnd(context)
                 onNavigateBack()
             }
             BreathingSessionPhase.IDLE -> {

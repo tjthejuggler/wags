@@ -1,10 +1,5 @@
 package com.example.wags.ui.morning
 
-import android.media.MediaPlayer
-import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -28,6 +23,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import com.example.wags.ui.common.WagsFeedback
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -84,37 +80,23 @@ fun MorningReadinessScreen(
         )
     }
 
-    // Stand alert: play singing bell + vibrate when flag is set.
-    // We use a monotonically-increasing generation counter as the LaunchedEffect key
-    // so the effect always re-fires even if the Boolean somehow stays true across
-    // recompositions driven by the liveHr/liveSpO2 combine emissions.
+    // Stand alert: play stand sound + vibrate when the FSM requests the user to stand.
+    // A monotonically-increasing generation counter is used as the LaunchedEffect key
+    // so the effect always re-fires even if the Boolean stays true across recompositions
+    // driven by the liveHr/liveSpO2 combine emissions.
     val standAlertGeneration = remember { androidx.compose.runtime.mutableIntStateOf(0) }
     LaunchedEffect(uiState.triggerStandAlert) {
         if (uiState.triggerStandAlert) {
             standAlertGeneration.intValue++
-            try {
-                // Use applicationContext so MediaPlayer is not tied to the Activity lifecycle.
-                val mp = MediaPlayer.create(context.applicationContext, com.example.wags.R.raw.singing_bell)
-                if (mp != null) {
-                    mp.setOnCompletionListener { it.release() }
-                    mp.start()
-                }
-            } catch (_: Exception) { }
-            try {
-                val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    (context.getSystemService(VibratorManager::class.java))?.defaultVibrator
-                } else {
-                    @Suppress("DEPRECATION")
-                    context.getSystemService(Vibrator::class.java)
-                }
-                vibrator?.vibrate(
-                    VibrationEffect.createWaveform(
-                        longArrayOf(0, 300, 100, 300, 100, 500),
-                        -1
-                    )
-                )
-            } catch (_: Exception) { }
+            WagsFeedback.standUp(context)
             viewModel.acknowledgeStandAlert()
+        }
+    }
+
+    // Session-complete feedback: chime + vibration when the FSM reaches COMPLETE.
+    LaunchedEffect(uiState.fsmState) {
+        if (uiState.fsmState == MorningReadinessState.COMPLETE) {
+            WagsFeedback.sessionEnd(context)
         }
     }
 

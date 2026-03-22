@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -30,6 +31,7 @@ import com.example.wags.domain.model.ReadinessInterpretation
 import com.example.wags.domain.model.ReadinessScore
 import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.common.RrIntervalChart
+import com.example.wags.ui.common.WagsFeedback
 import com.example.wags.ui.theme.*
 import kotlin.math.cos
 import kotlin.math.sin
@@ -52,7 +54,15 @@ fun ReadinessScreen(
     viewModel: ReadinessViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val deviceId = "PLACEHOLDER_H10_ID"
+
+    // Session-complete feedback: chime + vibration when recording finishes.
+    LaunchedEffect(state.sessionState) {
+        if (state.sessionState == ReadinessSessionState.COMPLETE) {
+            WagsFeedback.sessionEnd(context)
+        }
+    }
 
     Scaffold(
         containerColor = BackgroundDark,
