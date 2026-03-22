@@ -14,6 +14,8 @@ import com.example.wags.domain.model.OximeterReading
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
@@ -68,6 +70,13 @@ class OximeterBleManager @Inject constructor(
     val scanResults: StateFlow<List<ScanResult>> = _scanResults.asStateFlow()
 
     private var bluetoothGatt: BluetoothGatt? = null
+    /**
+     * Guards all access to [bluetoothGatt] so that concurrent connect / disconnect
+     * calls from the AutoConnectManager loop, background-scan callback, and GATT
+     * Binder thread cannot race against each other.
+     */
+    private val gattLock = Any()
+
     /** Job for the UI-initiated scan (startScan / stopScan). */
     private var scanJob: Job? = null
     /** Job for the auto-connect scan-then-connect sequence. Never cancelled by stopScan(). */
@@ -227,7 +236,7 @@ class OximeterBleManager @Inject constructor(
         // Stop UI scan only — do NOT cancel autoConnectJob
         scanJob?.cancel()
         scanJob = null
-        bluetoothAdapter?.bluetoothLeScanner?.stopScan(scanCallback)
+        try { bluetoothAdapter?.bluetoothLeScanner?.stopScan(scanCallback) } catch (_: Exception) {}
         if (_connectionState.value is OximeterConnectionState.Scanning) {
             _connectionState.value = OximeterConnectionState.Disconnected
         }
@@ -236,9 +245,31 @@ class OximeterBleManager @Inject constructor(
             _connectionState.value = OximeterConnectionState.Error("Invalid address: $deviceAddress")
             return
         }
-        Log.d(TAG, "Connecting to $deviceAddress")
-        _connectionState.value = OximeterConnectionState.Connecting(deviceAddress)
-        bluetoothGatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
+
+        synchronized(gattLock) {
+            // If already connected/connecting to this address, skip the redundant attempt
+            val currentState = _connectionState.value
+            if (currentState is OximeterConnectionState.Connected &&
+                currentState.deviceAddress.equals(deviceAddress, ignoreCase = true)
+            ) {
+                Log.d(TAG, "Already connected to $deviceAddress — skipping")
+                return
+            }
+
+            // Close any previous GATT instance before opening a new one.
+            // Without this, a second concurrent connect() overwrites bluetoothGatt
+            // and the old GATT's disconnect callback closes the *new* GATT → crash.
+            bluetoothGatt?.let { oldGatt ->
+                Log.d(TAG, "Closing stale GATT before new connect")
+                try { oldGatt.disconnect() } catch (_: Exception) {}
+                try { oldGatt.close() } catch (_: Exception) {}
+                bluetoothGatt = null
+            }
+
+            Log.d(TAG, "Connecting to $deviceAddress")
+            _connectionState.value = OximeterConnectionState.Connecting(deviceAddress)
+            bluetoothGatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
+        }
     }
 
     /**
@@ -301,15 +332,19 @@ class OximeterBleManager @Inject constructor(
     }
 
     fun disconnect() {
-        bluetoothGatt?.disconnect()
+        synchronized(gattLock) {
+            bluetoothGatt?.disconnect()
+        }
     }
 
     fun release() {
         scanJob?.cancel()
         autoConnectJob?.cancel()
         backgroundScanJob?.cancel()
-        bluetoothGatt?.close()
-        bluetoothGatt = null
+        synchronized(gattLock) {
+            try { bluetoothGatt?.close() } catch (_: Exception) {}
+            bluetoothGatt = null
+        }
         scope.cancel()
     }
 
@@ -317,7 +352,7 @@ class OximeterBleManager @Inject constructor(
 
     private val gattCallback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
-            Log.d(TAG, "onConnectionStateChange status=$status newState=$newState")
+            Log.d(TAG, "onConnectionStateChange status=$status newState=$newState device=${gatt.device.address}")
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
                     Log.d(TAG, "Connected — discovering services")
@@ -326,21 +361,37 @@ class OximeterBleManager @Inject constructor(
                 }
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     Log.d(TAG, "Disconnected (status=$status)")
-                    // Use Error state for failed connection attempts (status != 0)
-                    // so AutoConnectManager can distinguish failure from idle disconnect.
-                    if (status != BluetoothGatt.GATT_SUCCESS) {
-                        _connectionState.value = OximeterConnectionState.Error(
-                            "Connection failed (status=$status)"
-                        )
-                    } else {
-                        _connectionState.value = OximeterConnectionState.Disconnected
+                    synchronized(gattLock) {
+                        // Only clean up if this callback belongs to the *current* GATT.
+                        // A stale GATT from a previous connect attempt must not null-out
+                        // the field that now points to a newer, valid GATT instance.
+                        val isCurrentGatt = (gatt === bluetoothGatt)
+                        if (isCurrentGatt) {
+                            // Use Error state for failed connection attempts (status != 0)
+                            // so AutoConnectManager can distinguish failure from idle disconnect.
+                            if (status != BluetoothGatt.GATT_SUCCESS) {
+                                _connectionState.value = OximeterConnectionState.Error(
+                                    "Connection failed (status=$status)"
+                                )
+                            } else {
+                                _connectionState.value = OximeterConnectionState.Disconnected
+                            }
+                            _liveHr.value = null
+                            _liveSpO2.value = null
+                            bluetoothGatt = null
+                        } else {
+                            Log.d(TAG, "Ignoring disconnect from stale GATT instance")
+                        }
                     }
-                    _liveHr.value = null
-                    _liveSpO2.value = null
-                    bluetoothGatt?.close()
-                    bluetoothGatt = null
+                    // Always close the gatt instance that fired the callback
+                    try { gatt.close() } catch (_: Exception) {}
                     // Notify AutoConnectManager so it can re-arm immediately
-                    onDisconnected?.invoke()
+                    // (only if this was the current GATT — checked above)
+                    synchronized(gattLock) {
+                        if (bluetoothGatt == null) {
+                            onDisconnected?.invoke()
+                        }
+                    }
                 }
             }
         }

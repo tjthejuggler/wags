@@ -10,6 +10,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.coroutineContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 private const val TAG = "AutoConnect"
 
@@ -61,6 +63,15 @@ class AutoConnectManager @Inject constructor(
      */
     @Volatile private var reconnectNow = false
 
+    /**
+     * Prevents concurrent oximeter connect attempts.  The background-scan
+     * [onKnownDeviceFound] callback can fire while [connectOximeterNow] is
+     * already running from the main loop — without this guard both paths
+     * call [OximeterBleManager.connect] nearly simultaneously, causing a
+     * GATT race condition that crashes the app.
+     */
+    private val oximeterConnectMutex = Mutex()
+
     private var loopJob: Job? = null
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -75,10 +86,21 @@ class AutoConnectManager @Inject constructor(
         oximeterBleManager.onDisconnected = { onDeviceDisconnected() }
 
         // Wire background scan callback — when the oximeter is detected nearby,
-        // immediately trigger a connect.
+        // immediately trigger a connect.  The mutex prevents this from racing
+        // with an already-running connectOximeterNow() from the main loop.
         oximeterBleManager.onKnownDeviceFound = { address ->
             Log.d(TAG, "Background scan found oximeter $address — triggering connect")
-            scope.launch { connectOximeterNow(address) }
+            scope.launch {
+                if (oximeterConnectMutex.tryLock()) {
+                    try {
+                        connectOximeterNow(address)
+                    } finally {
+                        oximeterConnectMutex.unlock()
+                    }
+                } else {
+                    Log.d(TAG, "Oximeter connect already in progress — skipping background trigger")
+                }
+            }
         }
 
         loopJob?.cancel()
@@ -182,13 +204,15 @@ class AutoConnectManager @Inject constructor(
             var oximeterConnected = oximeterBleManager.connectionState.value is OximeterConnectionState.Connected
 
             if (!oximeterConnected && !sessionActive.get() && oximeterHistory.isNotEmpty()) {
-                for (address in oximeterHistory) {
-                    if (sessionActive.get()) break
-                    Log.d(TAG, "Trying oximeter: $address")
-                    oximeterConnected = connectOximeterNow(address)
-                    if (oximeterConnected) {
-                        Log.d(TAG, "Oximeter connected: $address")
-                        break
+                oximeterConnectMutex.withLock {
+                    for (address in oximeterHistory) {
+                        if (sessionActive.get()) break
+                        Log.d(TAG, "Trying oximeter: $address")
+                        oximeterConnected = connectOximeterNow(address)
+                        if (oximeterConnected) {
+                            Log.d(TAG, "Oximeter connected: $address")
+                            break
+                        }
                     }
                 }
             }
