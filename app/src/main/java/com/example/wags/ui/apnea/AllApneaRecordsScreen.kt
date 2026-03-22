@@ -133,7 +133,7 @@ fun AllApneaRecordsScreen(
                                     FilterChip(
                                         selected = state.filterLungVolume == vol,
                                         onClick = { viewModel.setLungVolumeFilter(vol) },
-                                        label = { Text(vol.lowercase().replaceFirstChar { it.uppercase() }) }
+                                        label = { Text(if (vol == "PARTIAL") "Half" else vol.lowercase().replaceFirstChar { it.uppercase() }) }
                                     )
                                 }
                             }
@@ -585,7 +585,7 @@ private fun AllRecordsRow(
                         color = TextSecondary
                     )
                     Text(
-                        "${record.lungVolume.lowercase().replaceFirstChar { it.uppercase() }}  ·  ${record.prepType}",
+                        "${if (record.lungVolume == "PARTIAL") "Half" else record.lungVolume.lowercase().replaceFirstChar { it.uppercase() }}  ·  ${record.prepType}",
                         style = MaterialTheme.typography.labelSmall,
                         color = TextSecondary.copy(alpha = 0.7f)
                     )

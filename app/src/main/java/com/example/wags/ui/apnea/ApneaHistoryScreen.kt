@@ -79,7 +79,7 @@ fun ApneaHistoryScreen(
                         FilterChip(
                             selected = true,
                             onClick = {},
-                            label = { Text(state.lungVolume) }
+                            label = { Text(if (state.lungVolume == "PARTIAL") "Half" else state.lungVolume.lowercase().replaceFirstChar { it.uppercase() }) }
                         )
                         FilterChip(
                             selected = true,
@@ -204,7 +204,7 @@ private fun FreeHoldHistoryRow(record: ApneaRecordEntity, onClick: () -> Unit) {
             ) {
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        record.lungVolume,
+                        if (record.lungVolume == "PARTIAL") "Half" else record.lungVolume.lowercase().replaceFirstChar { it.uppercase() },
                         style = MaterialTheme.typography.labelMedium,
                         color = TextSecondary
                     )

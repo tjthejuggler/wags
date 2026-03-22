@@ -576,7 +576,7 @@ private fun ApneaSettingsContent(
                 FilterChip(
                     selected = selectedLungVolume == volume,
                     onClick = { onLungVolumeChange(volume) },
-                    label = { Text(volume.lowercase().replaceFirstChar { it.uppercase() }) }
+                    label = { Text(volume.displayLungVolume()) }
                 )
             }
         }
@@ -1083,7 +1083,7 @@ private fun StatsContent(
                 )
                 if (!showAll) {
                     Text(
-                        "${lungVolume.lowercase().replaceFirstChar { it.uppercase() }}  ·  ${prepType.displayName()}  ·  ${timeOfDay.displayName()}",
+                        "${lungVolume.displayLungVolume()}  ·  ${prepType.displayName()}  ·  ${timeOfDay.displayName()}",
                         style = MaterialTheme.typography.labelSmall,
                         color = TextSecondary
                     )
@@ -1289,6 +1289,12 @@ private fun StatsRow(label: String, value: String) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared helpers
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** Maps the stored lung-volume key to a display label. "PARTIAL" → "Half"; others are title-cased. */
+internal fun String.displayLungVolume(): String = when (this.uppercase()) {
+    "PARTIAL" -> "Half"
+    else      -> lowercase().replaceFirstChar { it.uppercase() }
+}
 
 internal fun formatMs(ms: Long): String {
     val totalSeconds = ms / 1000L

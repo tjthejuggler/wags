@@ -337,7 +337,7 @@ class ApneaRepository @Inject constructor(
         val prepTypes   = PrepType.entries.map { it.name }
         val timesOfDay  = TimeOfDay.entries.map { it.name }
 
-        fun String.displayLv() = lowercase().replaceFirstChar { it.uppercase() }
+        fun String.displayLv() = if (this == "PARTIAL") "Half" else lowercase().replaceFirstChar { it.uppercase() }
         fun String.displayPt() = PrepType.valueOf(this).displayName()
         fun String.displayTod() = TimeOfDay.valueOf(this).displayName()
 

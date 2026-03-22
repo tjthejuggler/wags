@@ -206,14 +206,15 @@ private fun EditRecordSheet(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Lung Volume", style = MaterialTheme.typography.labelLarge, color = TextSecondary)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("FULL", "HALF", "EMPTY").forEach { vol ->
+                    listOf("FULL", "PARTIAL", "EMPTY").forEach { vol ->
                         val isSelected = lungVolume == vol
+                        val displayLabel = if (vol == "PARTIAL") "Half" else vol.lowercase().replaceFirstChar { it.uppercase() }
                         FilterChip(
                             selected = isSelected,
                             onClick  = { onLungVolumeChange(vol) },
                             label    = {
                                 Text(
-                                    vol.lowercase().replaceFirstChar { it.uppercase() },
+                                    displayLabel,
                                     color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurface
                                 )
                             },
@@ -358,7 +359,8 @@ private fun RecordDetailContent(
                 )
                 DetailRow(
                     label = "Lung Volume",
-                    value = record.lungVolume.lowercase().replaceFirstChar { it.uppercase() }
+                    value = if (record.lungVolume == "PARTIAL") "Half"
+                            else record.lungVolume.lowercase().replaceFirstChar { it.uppercase() }
                 )
                 DetailRow(
                     label = "Prep Type",
