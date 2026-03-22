@@ -466,7 +466,7 @@ class AssessmentRunViewModel @Inject constructor(
         RfPhase.IDLE      -> "IDLE"
         RfPhase.BASELINE  -> "BASELINE"
         RfPhase.TEST_BLOCK -> "TESTING %.1f BPM".format(rateBpm)
-        RfPhase.WASHOUT   -> "WASHOUT"
+        RfPhase.WASHOUT   -> "BREATHE NATURALLY"
         RfPhase.COMPLETE  -> "COMPLETE"
     }
 

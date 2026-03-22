@@ -99,7 +99,18 @@ class RfAssessmentOrchestrator @Inject constructor(
 ) {
 
     companion object {
-        private val TEST_RATES_BPM = listOf(4.5f, 5.0f, 5.5f, 6.0f, 6.5f)
+        /**
+         * Core 5 rates used by STANDARD and CONTINUOUS protocols.
+         * These are shuffled at session start so the order is randomized.
+         */
+        private val STANDARD_RATES_BPM = listOf(4.5f, 5.0f, 5.5f, 6.0f, 6.5f)
+
+        /**
+         * Expanded pool for EXPRESS protocol. Each session randomly picks 5
+         * from this larger set so that repeated assessments cover different
+         * rates, reducing order bias and improving long-term calibration.
+         */
+        private val EXPRESS_POOL_BPM = listOf(4.0f, 4.5f, 5.0f, 5.5f, 6.0f, 6.5f, 7.0f)
 
         /** 13-combination grid for DEEP protocol: (rateBpm to ieRatio). */
         val DEEP_GRID = listOf(
@@ -395,19 +406,32 @@ class RfAssessmentOrchestrator @Inject constructor(
     /**
      * Returns (grid, testDurationMs, washoutDurationMs).
      * Grid is a list of (rateBpm, ieRatio) pairs.
+     *
+     * All stepped protocols shuffle their rate order so that repeated
+     * assessments don't always test the same rate first. EXPRESS draws
+     * 5 rates from a larger pool for better long-term coverage.
      */
     private fun protocolParams(
         protocol: RfProtocol,
         optimalBpm: Float
     ): Triple<List<Pair<Float, Float>>, Long, Long> = when (protocol) {
-        RfProtocol.EXPRESS    -> Triple(TEST_RATES_BPM.map { it to 1.0f }, 60_000L,  30_000L)
-        RfProtocol.STANDARD   -> Triple(TEST_RATES_BPM.map { it to 1.0f }, 120_000L, 60_000L)
-        RfProtocol.DEEP       -> Triple(DEEP_GRID,                          180_000L, 60_000L)
+        RfProtocol.EXPRESS    -> Triple(
+            EXPRESS_POOL_BPM.shuffled().take(5).map { it to 1.0f },
+            60_000L, 30_000L
+        )
+        RfProtocol.STANDARD   -> Triple(
+            STANDARD_RATES_BPM.shuffled().map { it to 1.0f },
+            120_000L, 60_000L
+        )
+        RfProtocol.DEEP       -> Triple(DEEP_GRID.shuffled(), 180_000L, 60_000L)
         RfProtocol.TARGETED   -> Triple(
-            listOf(optimalBpm to 1.0f, optimalBpm + 0.2f to 1.0f, optimalBpm - 0.2f to 1.0f),
+            listOf(optimalBpm to 1.0f, optimalBpm + 0.2f to 1.0f, optimalBpm - 0.2f to 1.0f).shuffled(),
             180_000L, 60_000L
         )
-        RfProtocol.CONTINUOUS -> Triple(TEST_RATES_BPM.map { it to 1.0f }, 120_000L, 0L)
+        RfProtocol.CONTINUOUS -> Triple(
+            STANDARD_RATES_BPM.shuffled().map { it to 1.0f },
+            120_000L, 0L
+        )
         RfProtocol.SLIDING_WINDOW -> Triple(emptyList(), 0L, 0L) // handled separately
     }
 

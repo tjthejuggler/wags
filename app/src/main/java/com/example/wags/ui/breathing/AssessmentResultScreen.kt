@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -171,7 +172,7 @@ fun AssessmentResultScreen(
                         optimalBpm = session.optimalBpm,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(200.dp)
+                            .height(220.dp)
                     )
                 }
             }
@@ -189,7 +190,7 @@ fun AssessmentResultScreen(
                         points = waveformPoints,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(160.dp)
+                            .height(180.dp)
                     )
                 }
             }
@@ -207,7 +208,7 @@ fun AssessmentResultScreen(
                         points = spectrumPoints,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(160.dp)
+                            .height(180.dp)
                     )
                 }
             }
@@ -367,7 +368,7 @@ private fun ResonanceCurveChart(
                 Brush.verticalGradient(listOf(Ink, Charcoal.copy(alpha = 0.3f), Ink))
             )
     ) {
-        Canvas(modifier = Modifier.fillMaxSize().padding(12.dp)) {
+        Canvas(modifier = Modifier.fillMaxSize().padding(start = 36.dp, end = 12.dp, top = 12.dp, bottom = 24.dp)) {
             if (points.size < 2) return@Canvas
             val w = size.width
             val h = size.height
@@ -380,15 +381,42 @@ private fun ResonanceCurveChart(
             fun xAt(bpm: Float) = ((bpm - minBpm) / bpmRange * w)
             fun yAt(score: Float) = h - (score / maxScore * h)
 
-            // Draw grid lines
-            for (i in 0..4) {
-                val y = h * i / 4f
+            val labelPaint = android.graphics.Paint().apply {
+                color = 0xFF707070.toInt()
+                textSize = 9.sp.toPx()
+                isAntiAlias = true
+            }
+
+            // Draw grid lines + Y-axis labels
+            val yTicks = 4
+            for (i in 0..yTicks) {
+                val y = h * i / yTicks.toFloat()
                 drawLine(Graphite.copy(alpha = 0.3f), Offset(0f, y), Offset(w, y), strokeWidth = 1f)
+                val value = maxScore * (yTicks - i) / yTicks
+                val label = if (maxScore > 100) "%.0f".format(value) else "%.1f".format(value)
+                drawContext.canvas.nativeCanvas.drawText(
+                    label, -34.dp.toPx(), y + 4.dp.toPx(), labelPaint
+                )
+            }
+
+            // X-axis labels
+            val sorted = points.sortedBy { it.bpm }
+            val xLabelPaint = android.graphics.Paint().apply {
+                color = 0xFF707070.toInt()
+                textSize = 9.sp.toPx()
+                isAntiAlias = true
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+            sorted.forEach { pt ->
+                val x = xAt(pt.bpm)
+                drawContext.canvas.nativeCanvas.drawText(
+                    "%.1f".format(pt.bpm), x, h + 14.dp.toPx(), xLabelPaint
+                )
             }
 
             // Draw curve
             val path = Path()
-            points.sortedBy { it.bpm }.forEachIndexed { idx, pt ->
+            sorted.forEachIndexed { idx, pt ->
                 val x = xAt(pt.bpm)
                 val y = yAt(pt.score)
                 if (idx == 0) path.moveTo(x, y) else path.lineTo(x, y)
@@ -396,7 +424,7 @@ private fun ResonanceCurveChart(
             drawPath(path, ChartCyan, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
 
             // Draw dots
-            points.sortedBy { it.bpm }.forEach { pt ->
+            sorted.forEach { pt ->
                 val x = xAt(pt.bpm)
                 val y = yAt(pt.score)
                 val isOptimal = kotlin.math.abs(pt.bpm - optimalBpm) < 0.05f
@@ -409,12 +437,12 @@ private fun ResonanceCurveChart(
             }
         }
 
-        // X-axis label
+        // X-axis title
         Text(
-            text = "Breathing Rate (BPM) →",
+            text = "Breathing Rate (BPM)",
             style = MaterialTheme.typography.labelSmall,
             color = Ash,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 2.dp)
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 1.dp)
         )
     }
 }
@@ -449,7 +477,7 @@ private fun HrWaveformChart(
             .clip(RoundedCornerShape(12.dp))
             .background(Brush.verticalGradient(listOf(Ink, Charcoal.copy(alpha = 0.3f), Ink)))
     ) {
-        Canvas(modifier = Modifier.fillMaxSize().padding(12.dp)) {
+        Canvas(modifier = Modifier.fillMaxSize().padding(start = 36.dp, end = 12.dp, top = 12.dp, bottom = 24.dp)) {
             if (points.size < 2) return@Canvas
             val w = size.width
             val h = size.height
@@ -464,10 +492,38 @@ private fun HrWaveformChart(
             val paddedMax = maxHr + hrRange * 0.1f
             val paddedRange = paddedMax - paddedMin
 
-            // Grid
-            for (i in 0..4) {
-                val y = h * i / 4f
+            val labelPaint = android.graphics.Paint().apply {
+                color = 0xFF707070.toInt()
+                textSize = 9.sp.toPx()
+                isAntiAlias = true
+            }
+            val xLabelPaint = android.graphics.Paint().apply {
+                color = 0xFF707070.toInt()
+                textSize = 9.sp.toPx()
+                isAntiAlias = true
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+
+            // Grid + Y-axis labels
+            val yTicks = 4
+            for (i in 0..yTicks) {
+                val y = h * i / yTicks.toFloat()
                 drawLine(Graphite.copy(alpha = 0.3f), Offset(0f, y), Offset(w, y), strokeWidth = 1f)
+                val value = paddedMax - (paddedMax - paddedMin) * i / yTicks
+                drawContext.canvas.nativeCanvas.drawText(
+                    "%.0f".format(value), -34.dp.toPx(), y + 4.dp.toPx(), labelPaint
+                )
+            }
+
+            // X-axis labels (time in seconds, 3-4 ticks)
+            val totalSec = tRange / 1000f
+            val xTicks = if (totalSec > 30) 4 else 3
+            for (i in 0..xTicks) {
+                val timeSec = totalSec * i / xTicks
+                val x = w * i / xTicks.toFloat()
+                drawContext.canvas.nativeCanvas.drawText(
+                    "%.0fs".format(timeSec), x, h + 14.dp.toPx(), xLabelPaint
+                )
             }
 
             // Waveform
@@ -480,12 +536,12 @@ private fun HrWaveformChart(
             drawPath(path, ChartGreen, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
         }
 
-        // Labels
+        // Axis title
         Text(
-            text = "Instantaneous HR (BPM) — sine-wave pattern = resonance",
+            text = "HR (BPM) — sine-wave = resonance",
             style = MaterialTheme.typography.labelSmall,
             color = Ash,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 2.dp)
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 1.dp)
         )
     }
 }
@@ -520,7 +576,7 @@ private fun PowerSpectrumChart(
             .clip(RoundedCornerShape(12.dp))
             .background(Brush.verticalGradient(listOf(Ink, Charcoal.copy(alpha = 0.3f), Ink)))
     ) {
-        Canvas(modifier = Modifier.fillMaxSize().padding(12.dp)) {
+        Canvas(modifier = Modifier.fillMaxSize().padding(start = 40.dp, end = 12.dp, top = 12.dp, bottom = 24.dp)) {
             if (points.size < 2) return@Canvas
             val w = size.width
             val h = size.height
@@ -532,6 +588,18 @@ private fun PowerSpectrumChart(
             val maxFreq = 0.5f
             val maxPower = filtered.maxOf { it.powerMs2 }.coerceAtLeast(1f)
 
+            val labelPaint = android.graphics.Paint().apply {
+                color = 0xFF707070.toInt()
+                textSize = 9.sp.toPx()
+                isAntiAlias = true
+            }
+            val xLabelPaint = android.graphics.Paint().apply {
+                color = 0xFF707070.toInt()
+                textSize = 9.sp.toPx()
+                isAntiAlias = true
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+
             // LF band highlight (0.04–0.15 Hz)
             val lfStartX = 0.04f / maxFreq * w
             val lfEndX = 0.15f / maxFreq * w
@@ -541,10 +609,25 @@ private fun PowerSpectrumChart(
                 size = androidx.compose.ui.geometry.Size(lfEndX - lfStartX, h)
             )
 
-            // Grid
-            for (i in 0..4) {
-                val y = h * i / 4f
+            // Grid + Y-axis labels
+            val yTicks = 4
+            for (i in 0..yTicks) {
+                val y = h * i / yTicks.toFloat()
                 drawLine(Graphite.copy(alpha = 0.3f), Offset(0f, y), Offset(w, y), strokeWidth = 1f)
+                val value = maxPower * (yTicks - i) / yTicks
+                val label = if (maxPower > 1000) "%.0f".format(value) else "%.1f".format(value)
+                drawContext.canvas.nativeCanvas.drawText(
+                    label, -38.dp.toPx(), y + 4.dp.toPx(), labelPaint
+                )
+            }
+
+            // X-axis labels (frequency in Hz, 3 ticks)
+            val freqTicks = listOf(0f, 0.1f, 0.2f, 0.3f, 0.4f, 0.5f)
+            freqTicks.forEach { freq ->
+                val x = freq / maxFreq * w
+                drawContext.canvas.nativeCanvas.drawText(
+                    "%.1f".format(freq), x, h + 14.dp.toPx(), xLabelPaint
+                )
             }
 
             // Spectrum fill
@@ -569,13 +652,13 @@ private fun PowerSpectrumChart(
             drawPath(linePath, ChartMagenta, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
         }
 
-        // Labels
+        // Axis titles
         Row(
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 2.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 1.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("LF Band (0.04–0.15 Hz)", style = MaterialTheme.typography.labelSmall, color = ChartCyan.copy(alpha = 0.7f))
-            Text("Frequency →", style = MaterialTheme.typography.labelSmall, color = Ash)
+            Text("LF Band", style = MaterialTheme.typography.labelSmall, color = ChartCyan.copy(alpha = 0.7f))
+            Text("Frequency (Hz)", style = MaterialTheme.typography.labelSmall, color = Ash)
         }
     }
 }

@@ -93,6 +93,9 @@ class RrStripChartState(private val windowMs: Double = DEFAULT_CHART_WINDOW_MS) 
         private set
     var started by mutableStateOf(false)
         private set
+    /** Wall-clock offset (ms) captured at the moment the first beat arrives. */
+    var firstBeatWallMs: Long = 0L
+        private set
     private var lastSourceTail = 0.0
 
     fun ingest(source: List<Double>, nowNanos: Long) {
@@ -100,6 +103,7 @@ class RrStripChartState(private val windowMs: Double = DEFAULT_CHART_WINDOW_MS) 
         if (!started) {
             started = true
             firstBeatNanos = nowNanos
+            firstBeatWallMs = System.currentTimeMillis()
         }
         val newBeatsCount: Int = if (beats.isEmpty()) {
             source.size
@@ -141,6 +145,8 @@ class RmssdStripChartState(private val windowMs: Double = DEFAULT_CHART_WINDOW_M
         private set
     var started by mutableStateOf(false)
         private set
+    var firstBeatWallMs: Long = 0L
+        private set
     private var lastSourceTail = 0.0
     private var prevRrMs = Double.NaN
 
@@ -149,6 +155,7 @@ class RmssdStripChartState(private val windowMs: Double = DEFAULT_CHART_WINDOW_M
         if (!started) {
             started = true
             firstBeatNanos = nowNanos
+            firstBeatWallMs = System.currentTimeMillis()
         }
         val newBeatsCount: Int = if (beats.isEmpty() && prevRrMs.isNaN()) {
             source.size
@@ -208,10 +215,26 @@ fun RrIntervalChart(
     }
     LaunchedEffect(fingerprint) { state.ingest(rrIntervals, System.nanoTime()) }
 
+    // Cursor is anchored to the data's cumulative time so the latest data
+    // point is always at the right edge of the chart. A small wall-clock
+    // delta is added between data arrivals for smooth scrolling, but it
+    // never exceeds 600 ms ahead of the last data point (one beat gap).
     LaunchedEffect(Unit) {
+        var lastDataTime = 0.0
+        var lastDataWallMs = 0L
         while (true) {
-            withFrameNanos { nanos ->
-                if (state.started) cursorTimeMs = (nanos - state.firstBeatNanos) / 1_000_000.0
+            withFrameNanos { _ ->
+                if (state.started) {
+                    val dataTime = state.cumulativeTimeMs
+                    if (dataTime != lastDataTime) {
+                        lastDataTime = dataTime
+                        lastDataWallMs = System.currentTimeMillis()
+                    }
+                    val sinceLastData = (System.currentTimeMillis() - lastDataWallMs).toDouble()
+                    // Advance cursor smoothly past the last data point, but cap
+                    // the look-ahead so the line stays near the right edge.
+                    cursorTimeMs = dataTime + sinceLastData.coerceAtMost(600.0)
+                }
             }
         }
     }
@@ -257,9 +280,19 @@ fun RmssdChart(
     LaunchedEffect(fingerprint) { state.ingest(rrIntervals, System.nanoTime()) }
 
     LaunchedEffect(Unit) {
+        var lastDataTime = 0.0
+        var lastDataWallMs = 0L
         while (true) {
-            withFrameNanos { nanos ->
-                if (state.started) cursorTimeMs = (nanos - state.firstBeatNanos) / 1_000_000.0
+            withFrameNanos { _ ->
+                if (state.started) {
+                    val dataTime = state.cumulativeTimeMs
+                    if (dataTime != lastDataTime) {
+                        lastDataTime = dataTime
+                        lastDataWallMs = System.currentTimeMillis()
+                    }
+                    val sinceLastData = (System.currentTimeMillis() - lastDataWallMs).toDouble()
+                    cursorTimeMs = dataTime + sinceLastData.coerceAtMost(600.0)
+                }
             }
         }
     }

@@ -132,7 +132,7 @@ fun AssessmentRunScreen(
             // Pacer visual — unified circle for all protocols
             if (protocol.isStepped()) {
                 val overlayLabel = when {
-                    uiState.phase == "BASELINE" || uiState.phase == "WASHOUT" -> uiState.phase
+                    uiState.phase == "BASELINE" || uiState.phase == "BREATHE NATURALLY" -> uiState.phase
                     else -> null
                 }
                 BreathingPacerCircle(
