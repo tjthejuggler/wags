@@ -62,7 +62,7 @@ module SettingsManager {
         } else if (value.equals("EMPTY")) {
             return "Empty";
         } else if (value.equals("PARTIAL")) {
-            return "Partial";
+            return "Half";
         }
         return value;
     }

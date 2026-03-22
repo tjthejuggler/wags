@@ -26,7 +26,6 @@ fun ApneaTableScreen(
     viewModel: ApneaViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val deviceId = "PLACEHOLDER_H10_ID"
     val parsedType = runCatching { ApneaTableType.valueOf(tableType) }.getOrDefault(ApneaTableType.O2)
 
     // Load table when screen enters with a valid personal best
@@ -82,7 +81,7 @@ fun ApneaTableScreen(
                             apneaState = state.apneaState,
                             onStart = {
                                 viewModel.loadTable(parsedType)
-                                viewModel.startTableSession(deviceId)
+                                viewModel.startTableSession()
                             },
                             onStop = { viewModel.stopTableSession() }
                         )

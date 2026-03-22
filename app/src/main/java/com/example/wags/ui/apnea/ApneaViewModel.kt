@@ -430,8 +430,11 @@ class ApneaViewModel @Inject constructor(
         }
     }
 
-    fun startTableSession(deviceId: String) {
-        bleManager.startRrStream(deviceId)
+    fun startTableSession() {
+        val polarDeviceId = hrDataSource.connectedPolarDeviceId()
+        if (polarDeviceId != null) {
+            bleManager.startRrStream(polarDeviceId)
+        }
         stateMachine.setCallbacks(
             onWarning = { secs -> onWarning(secs) },
             onStateChange = { /* state collected via flow in init */ }
@@ -456,8 +459,14 @@ class ApneaViewModel @Inject constructor(
         _navigateToFreeHoldActive.tryEmit(Unit)
     }
 
-    fun startFreeHold(deviceId: String) {
-        bleManager.startRrStream(deviceId)
+    fun startFreeHold() {
+        // Use the actual connected Polar device ID for the RR stream — the old
+        // placeholder caused startRrStream to silently fail, which could leave
+        // the rrBuffer empty if the auto-started HR stream hadn't populated it yet.
+        val polarDeviceId = hrDataSource.connectedPolarDeviceId()
+        if (polarDeviceId != null) {
+            bleManager.startRrStream(polarDeviceId)
+        }
         freeHoldStartTime = System.currentTimeMillis()
         oximeterIsPrimary = hrDataSource.isOximeterPrimaryDevice()
         _uiState.update {

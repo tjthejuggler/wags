@@ -15,7 +15,7 @@ class SettingsMenuDelegate extends WatchUi.Menu2InputDelegate {
             var current = SettingsManager.getLungVolume();
             menu.addItem(new WatchUi.MenuItem("Full",    current.equals("FULL")    ? ">" : "", :lvFull,    null));
             menu.addItem(new WatchUi.MenuItem("Empty",   current.equals("EMPTY")   ? ">" : "", :lvEmpty,   null));
-            menu.addItem(new WatchUi.MenuItem("Partial", current.equals("PARTIAL") ? ">" : "", :lvPartial, null));
+            menu.addItem(new WatchUi.MenuItem("Half", current.equals("PARTIAL") ? ">" : "", :lvPartial, null));
             WatchUi.pushView(menu, new LungVolumeDelegate(), WatchUi.SLIDE_LEFT);
         } else if (id == :menuPrepType) {
             var menu = new WatchUi.Menu2({:title => "Prep Type"});

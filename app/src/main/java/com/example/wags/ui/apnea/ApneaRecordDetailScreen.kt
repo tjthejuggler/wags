@@ -156,12 +156,15 @@ fun ApneaRecordDetailScreen(
     // ── Edit bottom sheet ──────────────────────────────────────────────────────
     if (state.showEditSheet) {
         EditRecordSheet(
-            lungVolume  = state.editLungVolume,
-            prepType    = state.editPrepType,
-            timeOfDay   = state.editTimeOfDay,
-            onLungVolumeChange = { viewModel.setEditLungVolume(it) },
-            onPrepTypeChange   = { viewModel.setEditPrepType(it) },
-            onTimeOfDayChange  = { viewModel.setEditTimeOfDay(it) },
+            lungVolume         = state.editLungVolume,
+            prepType           = state.editPrepType,
+            timeOfDay          = state.editTimeOfDay,
+            hrDeviceId         = state.editHrDeviceId,
+            deviceLabelOptions = state.deviceLabelOptions,
+            onLungVolumeChange   = { viewModel.setEditLungVolume(it) },
+            onPrepTypeChange     = { viewModel.setEditPrepType(it) },
+            onTimeOfDayChange    = { viewModel.setEditTimeOfDay(it) },
+            onHrDeviceIdChange   = { viewModel.setEditHrDeviceId(it) },
             onSave    = { viewModel.saveEdits() },
             onDismiss = { viewModel.closeEditSheet() }
         )
@@ -178,9 +181,12 @@ private fun EditRecordSheet(
     lungVolume: String,
     prepType: PrepType,
     timeOfDay: TimeOfDay,
+    hrDeviceId: String?,
+    deviceLabelOptions: List<String>,
     onLungVolumeChange: (String) -> Unit,
     onPrepTypeChange: (PrepType) -> Unit,
     onTimeOfDayChange: (TimeOfDay) -> Unit,
+    onHrDeviceIdChange: (String?) -> Unit,
     onSave: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -274,6 +280,55 @@ private fun EditRecordSheet(
                                 labelColor             = MaterialTheme.colorScheme.onSurface
                             )
                         )
+                    }
+                }
+            }
+
+            // ── HR/SpO₂ Device ────────────────────────────────────────────────
+            if (deviceLabelOptions.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("HR/SpO₂ Device", style = MaterialTheme.typography.labelLarge, color = TextSecondary)
+                    var expanded by remember { mutableStateOf(false) }
+                    ExposedDropdownMenuBox(
+                        expanded = expanded,
+                        onExpandedChange = { expanded = it }
+                    ) {
+                        OutlinedTextField(
+                            value = hrDeviceId ?: "None recorded",
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                focusedBorderColor = EcgCyan,
+                                unfocusedBorderColor = TextSecondary
+                            )
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("None recorded") },
+                                onClick = {
+                                    onHrDeviceIdChange(null)
+                                    expanded = false
+                                }
+                            )
+                            deviceLabelOptions.forEach { label ->
+                                DropdownMenuItem(
+                                    text = { Text(label) },
+                                    onClick = {
+                                        onHrDeviceIdChange(label)
+                                        expanded = false
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
             }

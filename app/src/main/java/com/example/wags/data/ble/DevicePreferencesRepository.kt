@@ -80,6 +80,23 @@ class DevicePreferencesRepository @Inject constructor(
     val verityHistory: List<String>     get() = getHistory(KEY_VERITY_HISTORY)
     val oximeterHistory: List<String>   get() = getHistory(KEY_OXIMETER_HISTORY)
 
+    // ── Device label history (human-readable names for the edit dropdown) ─────
+
+    /**
+     * All device labels ever used, most-recently-connected first.
+     * Labels are the device's own advertised name (no artificial type prefix),
+     * e.g. "Polar H10 A1B2C3D4", "PC-60F", "Garmin Watch".
+     */
+    val deviceLabelHistory: List<String> get() = getHistory(KEY_DEVICE_LABEL_HISTORY)
+
+    /**
+     * Record a device label so it appears in the edit dropdown for past records.
+     * Call this whenever a device is used for a hold or session.
+     */
+    fun recordDeviceLabel(label: String) {
+        addToHistory(KEY_DEVICE_LABEL_HISTORY, label)
+    }
+
     // ── Meditation audio directory ─────────────────────────────────────────────
 
     /** URI string of the user-chosen meditation audio folder (SAF persistent URI), or "". */
@@ -111,12 +128,21 @@ class DevicePreferencesRepository @Inject constructor(
         const val KEY_VERITY_HISTORY     = "verity_device_history"
         const val KEY_OXIMETER_HISTORY   = "oximeter_address_history"
 
+        // Human-readable device label history (for the edit dropdown on past records)
+        const val KEY_DEVICE_LABEL_HISTORY = "device_label_history"
+
         // Legacy single-value keys — kept so we can migrate on first run
         private const val KEY_H10_ID_LEGACY       = "h10_device_id"
         private const val KEY_VERITY_ID_LEGACY    = "verity_device_id"
         private const val KEY_OXIMETER_ADDR_LEGACY = "oximeter_address"
 
         const val KEY_MEDITATION_DIR_URI = "meditation_audio_dir_uri"
+
+        /**
+         * Tracks which one-time migrations have already run.
+         * Bump the value in [migrateLabelPrefixes] when adding a new migration.
+         */
+        private const val KEY_LABEL_MIGRATION_VERSION = "device_label_migration_version"
 
         /** Maximum number of devices remembered per type. */
         const val MAX_HISTORY = 10
@@ -128,6 +154,7 @@ class DevicePreferencesRepository @Inject constructor(
 
     init {
         migrateLegacyKeys()
+        migrateLabelPrefixes()
     }
 
     /**
@@ -149,6 +176,22 @@ class DevicePreferencesRepository @Inject constructor(
         }
         if (legacyOximeter.isNotBlank() && getHistory(KEY_OXIMETER_HISTORY).isEmpty()) {
             addToHistory(KEY_OXIMETER_HISTORY, legacyOximeter)
+        }
+    }
+
+    /**
+     * One-time migration: clear the device label history that was stored with
+     * artificial type prefixes ("Polar H10 · …", "Oximeter · …").
+     * Labels will be re-populated with the device's own advertised name the
+     * next time each device connects.
+     */
+    private fun migrateLabelPrefixes() {
+        val currentVersion = prefs.getInt(KEY_LABEL_MIGRATION_VERSION, 0)
+        if (currentVersion < 1) {
+            prefs.edit()
+                .remove(KEY_DEVICE_LABEL_HISTORY)
+                .putInt(KEY_LABEL_MIGRATION_VERSION, 1)
+                .apply()
         }
     }
 }

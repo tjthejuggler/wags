@@ -59,7 +59,6 @@ fun ApneaScreen(
     viewModel: ApneaViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val deviceId = "PLACEHOLDER_H10_ID"
 
     // New personal best congratulations dialog
     state.newPersonalBest?.let { pbResult ->

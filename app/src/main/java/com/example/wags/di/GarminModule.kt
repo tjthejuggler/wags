@@ -1,6 +1,7 @@
 package com.example.wags.di
 
 import android.content.Context
+import com.example.wags.data.ble.DevicePreferencesRepository
 import com.example.wags.data.garmin.GarminApneaRepository
 import com.example.wags.data.garmin.GarminManager
 import com.example.wags.data.repository.ApneaRepository
@@ -43,9 +44,10 @@ object GarminModule {
     fun provideGarminApneaRepository(
         garminManager: GarminManager,
         apneaRepository: ApneaRepository,
+        devicePrefs: DevicePreferencesRepository,
         @IoDispatcher ioDispatcher: CoroutineDispatcher,
         scope: CoroutineScope
     ): GarminApneaRepository = GarminApneaRepository(
-        garminManager, apneaRepository, ioDispatcher, scope
+        garminManager, apneaRepository, devicePrefs, ioDispatcher, scope
     )
 }

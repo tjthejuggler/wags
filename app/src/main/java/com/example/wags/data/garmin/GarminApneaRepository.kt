@@ -1,6 +1,7 @@
 package com.example.wags.data.garmin
 
 import android.util.Log
+import com.example.wags.data.ble.DevicePreferencesRepository
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
 import com.example.wags.data.repository.ApneaRepository
@@ -25,6 +26,7 @@ import javax.inject.Singleton
 class GarminApneaRepository @Inject constructor(
     private val garminManager: GarminManager,
     private val apneaRepository: ApneaRepository,
+    private val devicePrefs: DevicePreferencesRepository,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     private val scope: CoroutineScope
 ) {
@@ -125,6 +127,9 @@ class GarminApneaRepository @Inject constructor(
                     Log.d(TAG, "Saved ${telemetryEntities.size} telemetry samples for record $recordId")
                 }
             }
+
+            // Record the Garmin Watch label so it appears in the device edit dropdown
+            devicePrefs.recordDeviceLabel("Garmin Watch")
 
             Log.i(TAG, "Garmin Free Hold saved: recordId=$recordId, duration=${payload.durationMs}ms")
         } catch (e: Exception) {

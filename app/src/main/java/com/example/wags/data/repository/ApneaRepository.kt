@@ -333,7 +333,7 @@ class ApneaRepository @Inject constructor(
     suspend fun getAllPersonalBests(): List<PersonalBestEntry> = withContext(ioDispatcher) {
         val entries = mutableListOf<PersonalBestEntry>()
 
-        val lungVolumes = listOf("FULL", "HALF", "EMPTY")
+        val lungVolumes = listOf("FULL", "PARTIAL", "EMPTY")
         val prepTypes   = PrepType.entries.map { it.name }
         val timesOfDay  = TimeOfDay.entries.map { it.name }
 

@@ -170,10 +170,22 @@ class SettingsViewModel @Inject constructor(
 
     // ── Unified scan ─────────────────────────────────────────────────────────
 
-    /** Starts both Polar and Oximeter scans simultaneously. */
+    /**
+     * Starts both Polar and Oximeter scans.
+     *
+     * Android's BLE stack can only run one scan at a time reliably.  Running
+     * two scans simultaneously often causes one (or both) to silently fail.
+     * We start the Polar scan first (it uses the Polar SDK's internal scanner)
+     * and delay the raw BLE oximeter scan by a short interval so the two
+     * don't collide on the radio.
+     */
     fun startScan() {
         bleManager.startScan()
-        oximeterBleManager.startScan()
+        viewModelScope.launch {
+            // Small delay so the Polar SDK's scan gets established first
+            kotlinx.coroutines.delay(800)
+            oximeterBleManager.startScan()
+        }
     }
 
     /** Stops both scans. */

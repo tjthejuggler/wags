@@ -134,11 +134,24 @@ class FreeHoldActiveViewModel @Inject constructor(
      * the record's SpO₂ fields stay null / N/A.
      */
     private var oximeterIsPrimary = false
+    /**
+     * Captured at hold-start so the label is guaranteed to reflect the device
+     * that was actually connected when the hold began — even if it disconnects
+     * before the hold ends.
+     */
+    private var holdStartDeviceLabel: String? = null
 
-    fun startFreeHold(deviceId: String) {
-        bleManager.startRrStream(deviceId)
+    fun startFreeHold() {
+        // Use the actual connected Polar device ID for the RR stream — the old
+        // placeholder caused startRrStream to silently fail, which could leave
+        // the rrBuffer empty if the auto-started HR stream hadn't populated it yet.
+        val polarDeviceId = hrDataSource.connectedPolarDeviceId()
+        if (polarDeviceId != null) {
+            bleManager.startRrStream(polarDeviceId)
+        }
         freeHoldStartTime = System.currentTimeMillis()
         oximeterIsPrimary = hrDataSource.isOximeterPrimaryDevice()
+        holdStartDeviceLabel = hrDataSource.activeHrDeviceLabel()
         _uiState.update {
             it.copy(
                 freeHoldActive = true,
@@ -175,6 +188,12 @@ class FreeHoldActiveViewModel @Inject constructor(
         oximeterCollectionJob?.cancel()
         oximeterCollectionJob = null
         val firstContractionMs = _uiState.value.freeHoldFirstContractionMs
+        // Capture device label at hold-end as well — use whichever is non-null,
+        // preferring the hold-start label (guaranteed to reflect the device that
+        // was connected when the hold began).  The hold-end label acts as a
+        // fallback for the edge case where the device connected *after* the hold
+        // started (e.g. late auto-connect).
+        val deviceLabel = holdStartDeviceLabel ?: hrDataSource.activeHrDeviceLabel()
         _uiState.update {
             it.copy(
                 freeHoldActive = false,
@@ -192,7 +211,7 @@ class FreeHoldActiveViewModel @Inject constructor(
                 prepType   = prepType,
                 timeOfDay  = timeOfDay
             )
-            saveFreeHoldRecord(duration, firstContractionMs)
+            saveFreeHoldRecord(duration, firstContractionMs, deviceLabel)
             if (pbResult != null) {
                 _uiState.update { it.copy(newPersonalBest = pbResult, pbCheckPending = false) }
                 habitRepo.sendHabitIncrement(Slot.APNEA_NEW_RECORD)
@@ -206,7 +225,7 @@ class FreeHoldActiveViewModel @Inject constructor(
         _uiState.update { it.copy(newPersonalBest = null) }
     }
 
-    private fun saveFreeHoldRecord(durationMs: Long, firstContractionMs: Long? = null) {
+    private fun saveFreeHoldRecord(durationMs: Long, firstContractionMs: Long? = null, deviceLabel: String? = null) {
         // Only use oximeter data when the oximeter was the primary device at hold-start.
         // When a Polar device is the primary HR source, any background-connected oximeter
         // readings are incidental resting values (typically 99 %) and must be discarded.
@@ -252,7 +271,8 @@ class FreeHoldActiveViewModel @Inject constructor(
                     maxHrBpm           = maxHr,
                     lowestSpO2         = lowestSpO2,
                     tableType          = null,
-                    firstContractionMs = firstContractionMs
+                    firstContractionMs = firstContractionMs,
+                    hrDeviceId         = deviceLabel
                 )
             )
 
@@ -332,7 +352,6 @@ fun FreeHoldActiveScreen(
     viewModel: FreeHoldActiveViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val deviceId = "PLACEHOLDER_H10_ID"
 
     // True once the user taps Stop — we wait for the async PB check before navigating.
     var stopRequested by remember { mutableStateOf(false) }
@@ -385,7 +404,7 @@ fun FreeHoldActiveScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            onStart = { viewModel.startFreeHold(deviceId) },
+            onStart = { viewModel.startFreeHold() },
             onFirstContraction = { viewModel.recordFreeHoldFirstContraction() },
             onStop = {
                 stopRequested = true

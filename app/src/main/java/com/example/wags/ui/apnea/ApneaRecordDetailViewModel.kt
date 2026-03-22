@@ -3,6 +3,7 @@ package com.example.wags.ui.apnea
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.wags.data.ble.DevicePreferencesRepository
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
 import com.example.wags.data.repository.ApneaRepository
@@ -28,16 +29,21 @@ data class ApneaRecordDetailUiState(
     val notFound: Boolean = false,
     /** True while the edit bottom-sheet is open. */
     val showEditSheet: Boolean = false,
-    /** Editable copies of the three settings fields — initialised from the record when sheet opens. */
+    /** Editable copies of the settings fields — initialised from the record when sheet opens. */
     val editLungVolume: String = "FULL",
     val editPrepType: PrepType = PrepType.NO_PREP,
-    val editTimeOfDay: TimeOfDay = TimeOfDay.DAY
+    val editTimeOfDay: TimeOfDay = TimeOfDay.DAY,
+    /** Editable device label — null means "None recorded". */
+    val editHrDeviceId: String? = null,
+    /** All device labels ever used, for the edit dropdown. */
+    val deviceLabelOptions: List<String> = emptyList()
 )
 
 @HiltViewModel
 class ApneaRecordDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val apneaRepository: ApneaRepository
+    private val apneaRepository: ApneaRepository,
+    private val devicePrefs: DevicePreferencesRepository
 ) : ViewModel() {
 
     private val recordId: Long = savedStateHandle.get<Long>("recordId") ?: -1L
@@ -83,12 +89,20 @@ class ApneaRecordDetailViewModel @Inject constructor(
         val record = _uiState.value.record ?: return
         val prepType = runCatching { PrepType.valueOf(record.prepType) }.getOrDefault(PrepType.NO_PREP)
         val timeOfDay = runCatching { TimeOfDay.valueOf(record.timeOfDay) }.getOrDefault(TimeOfDay.DAY)
+        // Build the device label options: all labels from history, plus the
+        // record's current label if it's not already in the list.
+        val historyLabels = devicePrefs.deviceLabelHistory.toMutableList()
+        record.hrDeviceId?.let { current ->
+            if (current !in historyLabels) historyLabels.add(current)
+        }
         _uiState.update {
             it.copy(
-                showEditSheet  = true,
-                editLungVolume = record.lungVolume,
-                editPrepType   = prepType,
-                editTimeOfDay  = timeOfDay
+                showEditSheet      = true,
+                editLungVolume     = record.lungVolume,
+                editPrepType       = prepType,
+                editTimeOfDay      = timeOfDay,
+                editHrDeviceId     = record.hrDeviceId,
+                deviceLabelOptions = historyLabels
             )
         }
     }
@@ -109,6 +123,10 @@ class ApneaRecordDetailViewModel @Inject constructor(
         _uiState.update { it.copy(editTimeOfDay = tod) }
     }
 
+    fun setEditHrDeviceId(deviceId: String?) {
+        _uiState.update { it.copy(editHrDeviceId = deviceId) }
+    }
+
     /** Persists the edited settings to the DB and refreshes the displayed record + PB badges. */
     fun saveEdits() {
         val record = _uiState.value.record ?: return
@@ -117,7 +135,8 @@ class ApneaRecordDetailViewModel @Inject constructor(
             val updated = record.copy(
                 lungVolume = state.editLungVolume,
                 prepType   = state.editPrepType.name,
-                timeOfDay  = state.editTimeOfDay.name
+                timeOfDay  = state.editTimeOfDay.name,
+                hrDeviceId = state.editHrDeviceId
             )
             apneaRepository.updateRecord(updated)
             val badges = apneaRepository.getRecordPbBadges(recordId)
