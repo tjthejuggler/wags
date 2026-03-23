@@ -23,14 +23,16 @@ class BleService : LifecycleService() {
         const val ACTION_STOP = "com.example.wags.BLE_STOP"
     }
 
-    @Inject lateinit var bleManager: PolarBleManager
+    @Inject lateinit var deviceManager: UnifiedDeviceManager
 
     private var wakeLock: PowerManager.WakeLock? = null
     private val binder = LocalBinder()
 
     inner class LocalBinder : Binder() {
         fun getService(): BleService = this@BleService
-        fun getBleManager(): PolarBleManager = bleManager
+        fun getDeviceManager(): UnifiedDeviceManager = deviceManager
+        /** @deprecated Use [getDeviceManager] instead. */
+        fun getBleManager(): PolarBleManager = deviceManager.polarBleManager
     }
 
     override fun onCreate() {
@@ -55,7 +57,7 @@ class BleService : LifecycleService() {
     }
 
     override fun onDestroy() {
-        bleManager.cleanup()
+        deviceManager.cleanup()
         releaseWakeLock()
         super.onDestroy()
     }

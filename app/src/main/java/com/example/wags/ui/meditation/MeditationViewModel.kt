@@ -7,15 +7,13 @@ import android.provider.DocumentsContract
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.HrDataSource
-import com.example.wags.data.ble.OximeterBleManager
-import com.example.wags.data.ble.PolarBleManager
+import com.example.wags.data.ble.UnifiedDeviceManager
 import com.example.wags.data.db.entity.MeditationAudioEntity
 import com.example.wags.data.db.entity.MeditationSessionEntity
 import com.example.wags.data.repository.MeditationRepository
 import com.example.wags.data.repository.YouTubeMetadataFetcher
 import com.example.wags.di.IoDispatcher
 import com.example.wags.di.MathDispatcher
-import com.example.wags.domain.model.OximeterConnectionState
 import com.example.wags.domain.usecase.hrv.ArtifactCorrectionUseCase
 import com.example.wags.domain.usecase.session.HrSonificationEngine
 import com.example.wags.domain.usecase.session.NsdrAnalyticsCalculator
@@ -92,8 +90,7 @@ data class MeditationUiState(
 class MeditationViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val repository: MeditationRepository,
-    private val bleManager: PolarBleManager,
-    private val oximeterBleManager: OximeterBleManager,
+    private val deviceManager: UnifiedDeviceManager,
     private val hrDataSource: HrDataSource,
     private val analyticsCalculator: NsdrAnalyticsCalculator,
     private val artifactCorrection: ArtifactCorrectionUseCase,
@@ -126,9 +123,7 @@ class MeditationViewModel @Inject constructor(
         // Observe HR device connection
         viewModelScope.launch {
             hrDataSource.isAnyHrDeviceConnected.collect { anyConnected ->
-                val polarId = hrDataSource.connectedPolarDeviceId()
-                val oxyAddr = (oximeterBleManager.connectionState.value as? OximeterConnectionState.Connected)?.deviceAddress
-                val activeId = polarId ?: oxyAddr
+                val activeId = hrDataSource.connectedDeviceId()
                 _uiState.update {
                     it.copy(hasHrMonitor = anyConnected, connectedDeviceId = activeId)
                 }
@@ -258,7 +253,7 @@ class MeditationViewModel @Inject constructor(
 
         val activeMonitorId = _uiState.value.connectedDeviceId?.takeIf { it.isNotBlank() }
         if (activeMonitorId != null) {
-            bleManager.startRrStream(activeMonitorId)
+            deviceManager.startRrStream(activeMonitorId)
         }
 
         hrTimeSeries.clear()
@@ -296,7 +291,7 @@ class MeditationViewModel @Inject constructor(
                 val elapsed = (System.currentTimeMillis() - sessionStartMs) / 1_000L
 
                 if (activeMonitorId != null) {
-                    val rrSnapshot = bleManager.rrBuffer.readLast(64)
+                    val rrSnapshot = deviceManager.rrBuffer.readLast(64)
                     val polarHr = if (rrSnapshot.isNotEmpty())
                         (60_000.0 / rrSnapshot.last()).toFloat() else null
                     val currentHr = polarHr ?: hrDataSource.liveHr.value?.toFloat()
@@ -414,7 +409,7 @@ class MeditationViewModel @Inject constructor(
             try {
                 if (monitorId != null && hrTimeSeries.isNotEmpty()) {
                     val analytics = withContext(mathDispatcher) {
-                        val rrSnapshot = bleManager.rrBuffer.readLast(1024)
+                        val rrSnapshot = deviceManager.rrBuffer.readLast(1024)
                         val corrected  = artifactCorrection.execute(rrSnapshot)
                         analyticsCalculator.calculate(
                             hrTimeSeries = hrTimeSeries.toList(),

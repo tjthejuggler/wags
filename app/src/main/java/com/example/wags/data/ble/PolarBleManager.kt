@@ -2,6 +2,8 @@ package com.example.wags.data.ble
 
 import android.util.Log
 import com.example.wags.domain.model.BleConnectionState
+import com.example.wags.domain.model.DeviceType
+import com.example.wags.domain.model.ScannedDevice
 import com.polar.androidcommunications.api.ble.model.DisInfo
 import com.polar.sdk.api.PolarBleApi
 import com.polar.sdk.api.PolarBleApiCallback
@@ -16,14 +18,13 @@ import javax.inject.Singleton
 private const val TAG = "PolarBleManager"
 
 /**
- * Manages Polar BLE device connections.
+ * Manages Polar BLE device connections via the Polar SDK.
  *
- * ## Name-based device identification
+ * ## Single-device model
  *
- * Devices are identified by their advertised name **after** connection:
- *   - Name contains "H10" → routed to [h10State] (chest strap: HR, RR, ECG, ACC)
- *   - Name contains "Sense" → routed to [verityState] (optical: HR, PPI)
- *   - Anything else → routed to [h10State] as fallback
+ * Only one Polar device is connected at a time. The device type (H10 vs
+ * Verity Sense) is determined from the advertised name after connection and
+ * exposed via [BleConnectionState.Connected.deviceType].
  *
  * The caller never needs to specify which type a device is — just call
  * [connectDevice] with the device ID and the manager figures it out.
@@ -47,13 +48,16 @@ class PolarBleManager @Inject constructor(
     val rrBuffer = CircularBuffer<Double>(RR_BUFFER_SIZE)
     val ecgBuffer = CircularBuffer<Int>(ECG_BUFFER_SIZE)
     val ppiBuffer = CircularBuffer<Int>(PPI_BUFFER_SIZE)
-    val accBuffer = CircularBuffer<Triple<Int, Int, Int>>(ACC_BUFFER_SIZE)  // (x, y, z)
+    val accBuffer = CircularBuffer<Triple<Int, Int, Int>>(ACC_BUFFER_SIZE)
 
-    private val _h10State = MutableStateFlow<BleConnectionState>(BleConnectionState.Disconnected)
-    val h10State: StateFlow<BleConnectionState> = _h10State.asStateFlow()
+    /** Single connection state for the one connected Polar device. */
+    private val _connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Disconnected)
+    val connectionState: StateFlow<BleConnectionState> = _connectionState.asStateFlow()
 
-    private val _verityState = MutableStateFlow<BleConnectionState>(BleConnectionState.Disconnected)
-    val verityState: StateFlow<BleConnectionState> = _verityState.asStateFlow()
+    // Legacy accessors — delegate to the single connectionState
+    val h10State: StateFlow<BleConnectionState> get() = connectionState
+    val verityState: StateFlow<BleConnectionState>
+        get() = connectionState // same flow — consumers will check deviceType
 
     /** Live heart rate in bpm from whichever device is streaming HR. Null when no device connected. */
     private val _liveHr = MutableStateFlow<Int?>(null)
@@ -65,17 +69,22 @@ class PolarBleManager @Inject constructor(
     private val _scanResults = MutableStateFlow<List<PolarDeviceInfo>>(emptyList())
     val scanResults: StateFlow<List<PolarDeviceInfo>> = _scanResults.asStateFlow()
 
+    /** Unified scan results for the UnifiedDeviceManager. */
+    val unifiedScanResults: StateFlow<List<ScannedDevice>> = _scanResults.map { polarDevices ->
+        polarDevices.map { device ->
+            ScannedDevice(
+                identifier = device.deviceId,
+                name = device.name.ifBlank { "Polar ${device.deviceId}" },
+                rssi = device.rssi,
+                isPolar = true
+            )
+        }
+    }.stateIn(scope, SharingStarted.Eagerly, emptyList())
+
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
     private var scanJob: Job? = null
-
-    /**
-     * Slot registry: maps a Polar deviceId → which slot ("h10" or "verity")
-     * it was assigned to. Populated automatically based on device name when
-     * the device connects, or set to a temporary value during the Connecting phase.
-     */
-    private val deviceSlotRegistry = mutableMapOf<String, String>()   // deviceId → "h10"|"verity"
 
     fun startScan() {
         scanJob?.cancel()
@@ -108,43 +117,25 @@ class PolarBleManager @Inject constructor(
         polarApi.setApiCallback(object : PolarBleApiCallback() {
             override fun deviceConnected(polarDeviceInfo: PolarDeviceInfo) {
                 val deviceName = polarDeviceInfo.name ?: "Unknown"
-                // Auto-detect device type from name and update the slot registry
-                val slot = detectSlotFromName(deviceName)
-                deviceSlotRegistry[polarDeviceInfo.deviceId] = slot
-                Log.d(TAG, "Device connected: ${polarDeviceInfo.deviceId} name='$deviceName' → slot=$slot")
+                val deviceType = DeviceType.fromName(deviceName)
+                Log.d(TAG, "Device connected: ${polarDeviceInfo.deviceId} name='$deviceName' → type=$deviceType")
 
-                val state = BleConnectionState.Connected(
+                _connectionState.value = BleConnectionState.Connected(
                     polarDeviceInfo.deviceId,
-                    deviceName
+                    deviceName,
+                    deviceType
                 )
-                updateState(polarDeviceInfo.deviceId, state)
                 startHrStream(polarDeviceInfo.deviceId)
             }
 
             override fun deviceConnecting(polarDeviceInfo: PolarDeviceInfo) {
-                // During connecting, we may not have the name yet.
-                // If the device is already in the registry (from a previous connection),
-                // keep that slot. Otherwise, use a temporary slot that will be corrected
-                // in deviceConnected when we learn the actual name.
-                if (polarDeviceInfo.deviceId !in deviceSlotRegistry) {
-                    // Temporary: guess from name if available, otherwise default to "h10"
-                    val name = polarDeviceInfo.name ?: ""
-                    deviceSlotRegistry[polarDeviceInfo.deviceId] = detectSlotFromName(name)
-                }
-                updateState(
-                    polarDeviceInfo.deviceId,
-                    BleConnectionState.Connecting(polarDeviceInfo.deviceId)
-                )
+                _connectionState.value = BleConnectionState.Connecting(polarDeviceInfo.deviceId)
             }
 
             override fun deviceDisconnected(polarDeviceInfo: PolarDeviceInfo) {
-                updateState(polarDeviceInfo.deviceId, BleConnectionState.Disconnected)
+                _connectionState.value = BleConnectionState.Disconnected
                 stopAllStreams(polarDeviceInfo.deviceId)
-                // Clear HR if no device remains connected
-                val anyConnected = _h10State.value is BleConnectionState.Connected ||
-                    _verityState.value is BleConnectionState.Connected
-                if (!anyConnected) _liveHr.value = null
-                // Notify AutoConnectManager so it can re-arm immediately
+                _liveHr.value = null
                 onDisconnected?.invoke()
             }
 
@@ -159,73 +150,19 @@ class PolarBleManager @Inject constructor(
     }
 
     /**
-     * Determines the slot ("h10" or "verity") from the device's advertised name.
-     *
-     * - Contains "H10" → "h10" (chest strap with ECG + ACC)
-     * - Contains "Sense" → "verity" (optical HR with PPI)
-     * - Anything else → "h10" (safe default — H10 features are a superset)
-     */
-    private fun detectSlotFromName(name: String): String {
-        val upper = name.uppercase()
-        return when {
-            upper.contains("H10") -> "h10"
-            upper.contains("SENSE") -> "verity"
-            else -> "h10"  // default: treat unknown Polar devices as H10
-        }
-    }
-
-    /**
-     * Routes a state update to the correct StateFlow using [deviceSlotRegistry].
-     *
-     * Falls back to the old heuristic (check current state value) only if the
-     * device was never registered — e.g. a spontaneous SDK callback for a device
-     * we didn't initiate a connect for.
-     */
-    private fun updateState(deviceId: String, state: BleConnectionState) {
-        val slot = deviceSlotRegistry[deviceId]
-        when {
-            slot == "h10"   -> _h10State.value = state
-            slot == "verity" -> _verityState.value = state
-            else -> {
-                // Fallback: infer from current state (legacy path, should rarely hit)
-                val h10Matches = _h10State.value.let {
-                    (it is BleConnectionState.Connecting && it.deviceId == deviceId) ||
-                    (it is BleConnectionState.Connected  && it.deviceId == deviceId)
-                }
-                if (h10Matches) _h10State.value = state else _verityState.value = state
-            }
-        }
-    }
-
-    /**
      * Connect to a Polar device. The device type (H10 vs Verity Sense) is
      * determined automatically from the device name once connected.
-     *
-     * During the Connecting phase, if the device was previously connected
-     * its known slot is reused; otherwise it defaults to "h10" until the
-     * actual name is received.
      */
     fun connectDevice(deviceId: String) {
-        // If we already know this device's slot from a previous connection, reuse it.
-        // Otherwise, set a temporary slot that will be corrected in deviceConnected.
-        if (deviceId !in deviceSlotRegistry) {
-            deviceSlotRegistry[deviceId] = "h10"  // temporary default
-        }
-        val slot = deviceSlotRegistry[deviceId]!!
-        if (slot == "h10") _h10State.value = BleConnectionState.Connecting(deviceId)
-        else _verityState.value = BleConnectionState.Connecting(deviceId)
+        _connectionState.value = BleConnectionState.Connecting(deviceId)
         try {
             polarApi.connectToDevice(deviceId)
         } catch (e: PolarInvalidArgument) {
-            val error = BleConnectionState.Error(e.message ?: "Connection failed")
-            if (slot == "h10") _h10State.value = error else _verityState.value = error
+            _connectionState.value = BleConnectionState.Error(e.message ?: "Connection failed")
         }
     }
 
-    /**
-     * @deprecated Use [connectDevice] without isH10 parameter.
-     * Kept temporarily for backward compatibility during migration.
-     */
+    /** @deprecated Use [connectDevice] without isH10 parameter. */
     fun connectDevice(deviceId: String, @Suppress("UNUSED_PARAMETER") isH10: Boolean) {
         connectDevice(deviceId)
     }
@@ -236,26 +173,42 @@ class PolarBleManager @Inject constructor(
         } catch (e: PolarInvalidArgument) { /* ignore */ }
     }
 
+    /** Disconnect whichever Polar device is currently connected. */
+    fun disconnect() {
+        val state = _connectionState.value
+        when (state) {
+            is BleConnectionState.Connected -> disconnectDevice(state.deviceId)
+            is BleConnectionState.Connecting -> disconnectDevice(state.deviceId)
+            else -> { /* nothing to disconnect */ }
+        }
+    }
+
     /**
-     * Returns true if the device currently in the H10 slot is actually an H10
-     * (i.e. its name contains "H10"). Used by features that require H10-specific
-     * capabilities like ECG and ACC streaming.
+     * Returns true if the connected device is a Polar H10 (by name).
+     * Used by features that require H10-specific capabilities like ECG and ACC.
      */
     fun isH10Connected(): Boolean {
-        val state = _h10State.value
-        if (state !is BleConnectionState.Connected) return false
-        return state.deviceName.uppercase().contains("H10")
+        val state = _connectionState.value
+        return state is BleConnectionState.Connected && state.deviceType == DeviceType.POLAR_H10
     }
 
     /**
      * Returns the device ID of the connected H10 (by name), or null.
      */
     fun connectedH10DeviceId(): String? {
-        val state = _h10State.value
-        if (state is BleConnectionState.Connected && state.deviceName.uppercase().contains("H10")) {
+        val state = _connectionState.value
+        if (state is BleConnectionState.Connected && state.deviceType == DeviceType.POLAR_H10) {
             return state.deviceId
         }
         return null
+    }
+
+    /**
+     * Returns the device ID of whichever Polar device is connected, or null.
+     */
+    fun connectedDeviceId(): String? {
+        val state = _connectionState.value
+        return if (state is BleConnectionState.Connected) state.deviceId else null
     }
 
     /**
@@ -264,41 +217,37 @@ class PolarBleManager @Inject constructor(
      */
     private fun startHrStream(deviceId: String) {
         val key = "$deviceId-hr"
+        Log.d(TAG, "startHrStream($deviceId) — cancelling existing job? ${streamJobs[key] != null}")
         streamJobs[key]?.cancel()
         streamJobs[key] = scope.launch {
+            Log.d(TAG, "startHrStream($deviceId) — coroutine launched, calling polarApi.startHrStreaming")
             try {
                 polarApi.startHrStreaming(deviceId).toKotlinFlow().collect { hrData ->
                     hrData.samples.forEach { sample ->
+                        Log.d(TAG, "HR sample: hr=${sample.hr}, rrsMs=${sample.rrsMs}, rrBuffer.totalWrites=${rrBuffer.totalWrites()}")
                         _liveHr.value = sample.hr
                         sample.rrsMs.forEach { rrRaw ->
                             rrBuffer.write(rrRaw * RR_CONVERSION_FACTOR)
                         }
                     }
                 }
+                Log.d(TAG, "startHrStream($deviceId) — flow completed normally")
             } catch (e: Exception) {
-                // stream ended or device disconnected
+                Log.e(TAG, "startHrStream($deviceId) — exception: ${e.javaClass.simpleName}: ${e.message}", e)
             }
         }
     }
 
-    /** Start H10 RR stream. Converts raw 1/1024s units to milliseconds. */
+    /**
+     * Ensure the HR+RR stream is running for the given device.
+     *
+     * Delegates to [startHrStream] which writes to both [liveHr] and [rrBuffer].
+     * The Polar SDK only supports one active HR stream per device, so we must
+     * NOT open a second `startHrStreaming` subscription — that would silently
+     * kill the first one and stop [liveHr] updates.
+     */
     fun startRrStream(deviceId: String) {
-        val key = "$deviceId-rr"
-        streamJobs[key]?.cancel()
-        streamJobs[key] = scope.launch {
-            try {
-                polarApi.startHrStreaming(deviceId).toKotlinFlow().collect { hrData ->
-                    hrData.samples.forEach { sample ->
-                        sample.rrsMs.forEach { rrRaw ->
-                            val rrMs = rrRaw * RR_CONVERSION_FACTOR
-                            rrBuffer.write(rrMs)
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                // stream ended or device not connected
-            }
-        }
+        startHrStream(deviceId)
     }
 
     /** Start H10 ECG stream. Writes batches to ECG circular buffer. */

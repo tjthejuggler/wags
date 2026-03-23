@@ -4,7 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.HrDataSource
-import com.example.wags.data.ble.PolarBleManager
+import com.example.wags.data.ble.UnifiedDeviceManager
 import com.example.wags.data.db.entity.MorningReadinessEntity
 import com.example.wags.data.db.entity.MorningReadinessTelemetryEntity
 import com.example.wags.data.ipc.HabitIntegrationRepository
@@ -65,7 +65,7 @@ class MorningReadinessViewModel @Inject constructor(
     private val fsm: MorningReadinessFsm,
     private val orchestrator: MorningReadinessOrchestrator,
     private val repository: MorningReadinessRepository,
-    private val bleManager: PolarBleManager,
+    private val deviceManager: UnifiedDeviceManager,
     private val hrDataSource: HrDataSource,
     private val habitRepo: HabitIntegrationRepository,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
@@ -121,7 +121,7 @@ class MorningReadinessViewModel @Inject constructor(
         fsm.onStandPromptReady = {
             _uiState.update { it.copy(triggerStandAlert = true) }
             // Arm the stand detector with the last ~1 second of supine ACC data
-            val supineSamples = bleManager.accBuffer.readLast(200)
+            val supineSamples = deviceManager.accBuffer.readLast(200)
             standDetector.arm(supineSamples)
             // The FSM timestamp is the fallback if ACC detection times out
             standDetector.setFallbackTimestamp(System.currentTimeMillis())
@@ -139,7 +139,7 @@ class MorningReadinessViewModel @Inject constructor(
         // Morning readiness requires an H10 (chest strap with ACC for stand detection).
         // The device type is determined by name — if the connected Polar device's name
         // contains "H10", it's an H10 regardless of which slot it was assigned to.
-        val h10Id = bleManager.connectedH10DeviceId()
+        val h10Id = deviceManager.polarBleManager.connectedH10DeviceId()
         if (h10Id == null) {
             _uiState.update { it.copy(noHrmDialogVisible = true) }
             return
@@ -149,7 +149,7 @@ class MorningReadinessViewModel @Inject constructor(
         lastRrBufferSize = 0
         standDetector.reset()
         // Start ACC stream so the stand detector has data
-        bleManager.startAccStream(h10Id)
+        deviceManager.startAccStream(h10Id)
         fsm.start(viewModelScope)
         startRrPolling()
     }
@@ -163,8 +163,8 @@ class MorningReadinessViewModel @Inject constructor(
         rrPollingJob = viewModelScope.launch {
             while (isActive) {
                 delay(500L) // Poll at 2 Hz for smoother chart updates
-                val snapshot = bleManager.rrBuffer.readLast(60)
-                val currentSize = bleManager.rrBuffer.readLast(512).size
+                val snapshot = deviceManager.rrBuffer.readLast(60)
+                val currentSize = deviceManager.rrBuffer.readLast(512).size
 
                 // Feed new intervals to FSM with reconstructed timestamps.
                 // The BLE buffer only stores raw RR interval durations (ms), not
@@ -176,7 +176,7 @@ class MorningReadinessViewModel @Inject constructor(
                 // timestamps to find HR at 20 s and 60 s post-peak.
                 if (currentSize > lastRrBufferSize) {
                     val newCount = currentSize - lastRrBufferSize
-                    val allRecent = bleManager.rrBuffer.readLast(newCount.coerceAtMost(512))
+                    val allRecent = deviceManager.rrBuffer.readLast(newCount.coerceAtMost(512))
                     val now = System.currentTimeMillis()
                     // Total duration of all intervals in this batch
                     val totalDurationMs = allRecent.sumOf { it }.toLong()
@@ -198,7 +198,7 @@ class MorningReadinessViewModel @Inject constructor(
                 // Grab ~30 s worth of RR intervals for the scrolling chart.
                 // At a typical resting HR of ~60 bpm that's ~30 beats; at 80 bpm ~40 beats.
                 // We read the last 45 to cover a range of heart rates.
-                val chartRr = bleManager.rrBuffer.readLast(45)
+                val chartRr = deviceManager.rrBuffer.readLast(45)
 
                 // Update live RMSSD, SDNN, chart data, and counts
                 val liveRmssd = computeRmssd(snapshot)
@@ -226,7 +226,7 @@ class MorningReadinessViewModel @Inject constructor(
         accPollingJob = viewModelScope.launch {
             while (isActive && !standDetector.isDetected) {
                 delay(100L)
-                val samples = bleManager.accBuffer.readLast(20)  // last ~100ms at 200 Hz
+                val samples = deviceManager.accBuffer.readLast(20)  // last ~100ms at 200 Hz
                 val detectedTs = standDetector.checkSamples(samples)
                 if (detectedTs != null) {
                     // Inform the FSM of the precise stand timestamp

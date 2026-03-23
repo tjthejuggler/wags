@@ -4,7 +4,7 @@
 
 ## Overview
 
-Wags is a professional-grade Android freediving training app built with Kotlin and Jetpack Compose. It combines HRV-based readiness assessment, structured apnea table training, BLE-connected biometric monitoring (Polar H10/Verity Sense for HRV, Wellue/Viatom pulse oximeters for SpO₂), and real-time safety monitoring into a single cohesive training ecosystem.
+Wags is a professional-grade Android freediving training app built with Kotlin and Jetpack Compose. It combines HRV-based readiness assessment, structured apnea table training, unified BLE-connected biometric monitoring (any BLE device — Polar H10/Verity Sense, Wellue/Viatom oximeters, generic HR sensors — auto-detected by name), and real-time safety monitoring into a single cohesive training ecosystem.
 
 The app is designed for competitive freedivers and serious recreational practitioners who want data-driven training, not just a stopwatch.
 
@@ -24,8 +24,7 @@ The app is designed for competitive freedivers and serious recreational practiti
 - **Free Hold Mode** — Stopwatch-style free breath-hold with Polar HR monitoring
 - **Contraction Tracking** — Double-tap or volume-button logging during holds; cruising/struggle phase analytics
 - **Session Analytics** — Per-session contraction delta bar chart and historical hypoxic resistance scatter plot
-- **Polar BLE Integration** — Real-time RR interval streaming from Polar H10 / Verity Sense
-- **Oximeter BLE Integration** — SpO₂ monitoring from Wellue OxySmart / Viatom PC-60F
+- **Unified BLE Integration** — Single scan/connect flow for any BLE device; device type auto-detected from advertised name (Polar H10, Verity Sense, Wellue OxySmart, Viatom PC-60F, generic HR sensors); capabilities (HR, RR, ECG, ACC, PPI, SpO₂) determined per device type
 - **SpO₂ Safety Monitor** — Configurable critical threshold (70–95%) with TTS + haptic abort alert
 - **Personal Best Tracking** — Persistent PB storage; all tables auto-scale to current PB
 - **TTS + Haptic Engine** — Phase announcements, countdown cues, and differentiated vibration patterns
@@ -45,11 +44,12 @@ com.example.wags/
 │
 ├── data/
 │   ├── ble/
-│   │   ├── PolarBleManager.kt       # Polar BLE — name-based auto-detection (H10/Verity Sense)
-│   │   ├── OximeterBleManager.kt    # Wellue/Viatom SpO₂ BLE scanning & GATT
-│   │   ├── AutoConnectManager.kt    # Persistent auto-reconnect loop for all BLE devices
-│   │   ├── DevicePreferencesRepository.kt  # Unified Polar + oximeter device history
-│   │   ├── HrDataSource.kt          # Merged HR/SpO₂ source across all devices
+│   │   ├── UnifiedDeviceManager.kt  # Facade merging Polar + Generic backends into single API
+│   │   ├── PolarBleManager.kt       # Polar BLE backend — HR, RR, ECG, ACC, PPI streams
+│   │   ├── GenericBleManager.kt     # Non-Polar BLE backend — raw GATT (oximeters, generic HR)
+│   │   ├── AutoConnectManager.kt    # Persistent auto-reconnect loop cycling saved device history
+│   │   ├── DevicePreferencesRepository.kt  # Unified device history (identifier::name::isPolar)
+│   │   ├── HrDataSource.kt          # Merged HR/SpO₂ source via UnifiedDeviceManager
 │   │   ├── BleService.kt            # Foreground service for BLE connections
 │   │   ├── BlePermissionManager.kt  # Runtime BLE permission helper
 │   │   ├── AccRespirationEngine.kt  # Accelerometer-based respiration detection
@@ -120,8 +120,8 @@ com.example.wags/
     ├── readiness/      ReadinessScreen, ReadinessViewModel
     ├── realtime/       EcgChartView, TachogramView (Canvas-based)
     ├── session/        SessionScreen, SessionViewModel
-    ├── settings/       SettingsScreen (Polar), OximeterSettingsScreen,
-    │                   SettingsViewModel, OximeterViewModel
+    ├── settings/       SettingsScreen (unified device management),
+    │                   SettingsViewModel
     └── theme/          Color.kt, Theme.kt, Type.kt
 ```
 
@@ -371,20 +371,13 @@ cd wags
 ./gradlew test
 ```
 
-### Polar Device Setup
+### BLE Device Setup
 
-1. Open **Device Settings** from the dashboard top-right gear icon
+1. Open **Settings** from the dashboard top-right gear icon
 2. Grant Bluetooth permissions when prompted
-3. Tap **Scan** and select your Polar H10 or Verity Sense
-4. The device ID is saved automatically for future sessions
-
-### Oximeter Setup
-
-1. Open **Oximeter (SpO₂)** from the dashboard
-2. Grant Bluetooth permissions when prompted
-3. Tap **Scan** and select your Wellue OxySmart or Viatom PC-60F
-4. Set your critical SpO₂ threshold (default: 80%)
-5. The app will alert you if SpO₂ drops below threshold during training
+3. Tap **Scan** — all nearby BLE devices appear in a single list (Polar, oximeters, generic HR sensors)
+4. Tap any device to connect — the app auto-detects its type from the advertised name and routes to the correct backend
+5. Connected devices are saved to history and auto-reconnect on app restart
 
 ### First Training Session
 
@@ -481,26 +474,68 @@ Ported the full RF Assessment ecosystem from the desktop hrvm app to Android.
 
 ---
 
-### BLE Device Connection Simplification — 2026-03-23
+### Unified BLE Device Architecture — 2026-03-23
 
-**Problem:** The previous BLE connection system required users to manually assign Polar devices as either "H10" or "Verity Sense" when connecting from the Settings screen. This led to devices being connected to the wrong slot (e.g. an H10 connected as a Verity Sense), which caused features like Morning Readiness to reject the device because it checked `h10State` specifically.
+**Problem:** The previous BLE connection system had two predetermined device categories (Polar and Oximeter) managed by separate subsystems (`PolarBleManager` and `OximeterBleManager`). This caused devices to be misclassified (e.g. a Polar H10 ending up in the oximeter slot), required separate scan/connect flows for each type, and made the Settings screen confusing with dual device sections.
 
-**Solution:** Replaced the manual device-type assignment with **automatic name-based identification**. Devices are now identified by their advertised name after connection:
+**Solution:** Replaced the dual-backend system with a **unified device architecture**:
 
-- Name contains **"H10"** → routed to H10 slot (chest strap: HR, RR, ECG, ACC)
-- Name contains **"Sense"** → routed to Verity Sense slot (optical: HR, PPI)
-- Name contains **"OxySmart"** → handled by OximeterBleManager (HR + SpO₂)
-- Unknown Polar devices → default to H10 slot (safe fallback)
+- **Single scan** finds ALL nearby BLE devices (Polar SDK + raw GATT simultaneously)
+- **Connect to any device** — routing to the correct backend (Polar SDK or raw GATT) is automatic based on the device's advertised name
+- **Device type auto-detection** from name after connection:
+  - Name contains **"H10"** → `POLAR_H10` (HR, RR, ECG, ACC)
+  - Name contains **"Sense"** → `POLAR_VERITY` (HR, PPI)
+  - Name contains **"OxySmart"** or **"PC-60F"** → `OXIMETER` (HR, SpO₂)
+  - Unknown → `GENERIC_BLE` (HR only)
+- **Capability-based feature checks** — sessions check `hasCapability(RR)` or `isH10Connected()` instead of checking specific device slots
+- **Single device history** — all saved devices stored in one list (`identifier::name::isPolar`), auto-reconnect cycles through the list until one connects
+- **Single Settings screen** — one scan button, one device list, one connected device card showing type and capabilities
 
-#### Files Modified
+#### New Files
+
+| File | Purpose |
+|---|---|
+| [`UnifiedDeviceManager.kt`](app/src/main/java/com/example/wags/data/ble/UnifiedDeviceManager.kt) | Facade merging PolarBleManager + GenericBleManager into single API: connectionState, scanResults, liveHr, liveSpO2, connect/disconnect, capability queries, stream delegation |
+| [`GenericBleManager.kt`](app/src/main/java/com/example/wags/data/ble/GenericBleManager.kt) | Renamed from OximeterBleManager; uses unified `BleConnectionState` instead of `OximeterConnectionState`; handles all non-Polar BLE devices via raw Android GATT |
+| [`DeviceType.kt`](app/src/main/java/com/example/wags/domain/model/DeviceType.kt) | Enum: POLAR_H10, POLAR_VERITY, OXIMETER, GENERIC_BLE — each with a `capabilities: Set<DeviceCapability>` |
+| [`DeviceCapability.kt`](app/src/main/java/com/example/wags/domain/model/DeviceCapability.kt) | Enum: HR, RR, ECG, ACC, PPI, SPO2 |
+| [`ScannedDevice.kt`](app/src/main/java/com/example/wags/domain/model/ScannedDevice.kt) | Unified scan result model for both backends |
+
+#### Modified Files
 
 | File | Change |
 |---|---|
-| [`PolarBleManager.kt`](app/src/main/java/com/example/wags/data/ble/PolarBleManager.kt) | Removed `isH10` parameter from `connectDevice()`; added `detectSlotFromName()` for automatic routing; added `isH10Connected()` and `connectedH10DeviceId()` helpers |
-| [`DevicePreferencesRepository.kt`](app/src/main/java/com/example/wags/data/ble/DevicePreferencesRepository.kt) | Merged separate H10/Verity history lists into unified `polarHistory`; added migration from old keys; backward-compatible accessors |
-| [`AutoConnectManager.kt`](app/src/main/java/com/example/wags/data/ble/AutoConnectManager.kt) | Replaced dual H10+Verity reconnect loops with single Polar reconnect loop |
-| [`SettingsViewModel.kt`](app/src/main/java/com/example/wags/ui/settings/SettingsViewModel.kt) | Replaced `connectH10()`/`connectVerity()`/`disconnectH10()`/`disconnectVerity()` with `connectPolar()`/`disconnectPolar()` |
-| [`SettingsScreen.kt`](app/src/main/java/com/example/wags/ui/settings/SettingsScreen.kt) | Replaced dual "H10"/"Verity" buttons with single "Connect" button; unified Polar status row |
-| [`MorningReadinessViewModel.kt`](app/src/main/java/com/example/wags/ui/morning/MorningReadinessViewModel.kt) | Changed H10 check from slot-based (`h10State`) to name-based (`connectedH10DeviceId()`) |
-| [`SessionViewModel.kt`](app/src/main/java/com/example/wags/ui/session/SessionViewModel.kt) | Simplified device ID resolution to use `hrDataSource.connectedPolarDeviceId()` |
-| [`MeditationViewModel.kt`](app/src/main/java/com/example/wags/ui/meditation/MeditationViewModel.kt) | Simplified device ID resolution to use `hrDataSource.connectedPolarDeviceId()` |
+| [`BleConnectionState.kt`](app/src/main/java/com/example/wags/domain/model/BleConnectionState.kt) | Added `Scanning` state; added `deviceType: DeviceType` to `Connected` |
+| [`PolarBleManager.kt`](app/src/main/java/com/example/wags/data/ble/PolarBleManager.kt) | Single `connectionState` replacing h10State/verityState dual slots; `unifiedScanResults` flow |
+| [`DevicePreferencesRepository.kt`](app/src/main/java/com/example/wags/data/ble/DevicePreferencesRepository.kt) | Unified device history (`SavedDevice` entries); migration from legacy polar/oximeter split |
+| [`HrDataSource.kt`](app/src/main/java/com/example/wags/data/ble/HrDataSource.kt) | Now delegates to `UnifiedDeviceManager` instead of both managers |
+| [`AutoConnectManager.kt`](app/src/main/java/com/example/wags/data/ble/AutoConnectManager.kt) | Single loop iterating unified `deviceHistory`; routes to Polar or Generic based on `isPolar` flag |
+| [`BleService.kt`](app/src/main/java/com/example/wags/data/ble/BleService.kt) | Injects `UnifiedDeviceManager` instead of `PolarBleManager` |
+| [`BleModule.kt`](app/src/main/java/com/example/wags/di/BleModule.kt) | Only provides PolarBleApi; all managers are `@Singleton @Inject` |
+| [`SettingsViewModel.kt`](app/src/main/java/com/example/wags/ui/settings/SettingsViewModel.kt) | Single `deviceState`, single `scanResults: List<ScannedDevice>`, unified `connectDevice()`/`disconnectDevice()` |
+| [`SettingsScreen.kt`](app/src/main/java/com/example/wags/ui/settings/SettingsScreen.kt) | Single connected device card with type + capabilities; single scan results list |
+| All session ViewModels | Replaced `PolarBleManager` + `OximeterBleManager` injection with `UnifiedDeviceManager`; use `deviceManager.rrBuffer`, `deviceManager.startRrStream()`, etc. |
+
+#### Deleted Files
+
+| File | Reason |
+|---|---|
+| `OximeterBleManager.kt` | Replaced by `GenericBleManager.kt` |
+| `OximeterConnectionState.kt` | Replaced by unified `BleConnectionState` with `deviceType` field |
+
+### Bug Fixes — 2026-03-23
+
+#### Sawtooth HR chart in apnea oximeter holds
+
+When only an oximeter was connected during a free-hold, `saveFreeHoldRecord()` unconditionally read `rrBuffer.readLast(512)` which returned stale Polar RR data from a previous session. This interleaved with fresh oximeter HR values, producing an alternating high/low sawtooth pattern. Fixed by gating the RR snapshot on `oximeterIsPrimary`:
+
+- `ApneaViewModel.saveFreeHoldRecord()`
+- `FreeHoldActiveViewModel.saveFreeHoldRecord()`
+
+#### Polar H10 HR stream killed by duplicate `startHrStreaming` subscription
+
+`PolarBleManager.startRrStream()` opened a **second** `polarApi.startHrStreaming()` Flowable (key `"$deviceId-rr"`) while the auto-started HR stream (key `"$deviceId-hr"`) was already active. The Polar SDK only supports one active HR stream per device, so the second subscription silently killed the first — which was the only one writing to `liveHr`. Result: HR disappeared from the top bar and HRV readiness got zero RR intervals ("need at least 2 NNs").
+
+Fix: `startRrStream()` now delegates to `startHrStream()`, which writes to both `liveHr` and `rrBuffer` using a single SDK subscription.
+
+- `PolarBleManager.kt` — `startRrStream()` → delegates to `startHrStream()`

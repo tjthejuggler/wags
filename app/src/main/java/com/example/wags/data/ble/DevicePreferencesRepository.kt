@@ -13,16 +13,17 @@ import javax.inject.Singleton
  * Persists BLE device identifiers so the auto-connect loop can reconnect to
  * previously-used devices without any manual intervention.
  *
- * Two device categories are tracked:
- *   - Polar devices (H10, Verity Sense — identified by name after connection)
- *   - Oximeter / SpO₂ sensor (BLE MAC address)
+ * ## Unified device history
  *
- * For each category we keep an **ordered history list** (most-recently-connected
- * first, capped at [MAX_HISTORY]) so the auto-connect loop can cycle through
- * every device the user has ever paired, not just the last one.
+ * All devices (Polar, oximeter, generic BLE) are stored in a **single ordered
+ * history list** (most-recently-connected first, capped at [MAX_HISTORY]).
  *
- * Device type (H10 vs Verity Sense) is determined automatically from the
- * device name after connection — not stored as a preference.
+ * Each entry is stored as `identifier::name::isPolar` (double-colon separated):
+ *   - `identifier` — Polar device ID (e.g. "A1B2C3D4") or BLE MAC address
+ *   - `name` — advertised device name (for display and type detection)
+ *   - `isPolar` — "1" if the device uses the Polar SDK, "0" otherwise
+ *
+ * The auto-connect loop cycles through this list until one device connects.
  */
 @Singleton
 class DevicePreferencesRepository @Inject constructor(
@@ -31,86 +32,82 @@ class DevicePreferencesRepository @Inject constructor(
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    // ── History lists ──────────────────────────────────────────────────────────
+    // ── Unified device history ──────────────────────────────────────────────────
 
     /**
-     * Returns the full history for [key], most-recently-connected first.
-     * Stored as a pipe-separated string: "ID1|ID2|ID3".
+     * All known devices, most-recently-connected first.
+     * Each entry contains the identifier, name, and whether it's a Polar device.
      */
-    fun getHistory(key: String): List<String> {
-        val raw = prefs.getString(key, "") ?: ""
-        return if (raw.isBlank()) emptyList()
-        else raw.split(SEPARATOR).filter { it.isNotBlank() }
-    }
+    val deviceHistory: List<SavedDevice>
+        get() = getDeviceHistory(KEY_DEVICE_HISTORY)
 
     /**
-     * Prepends [id] to the history for [key], deduplicates, and caps at
-     * [MAX_HISTORY] entries. The most-recently-connected device is always first.
+     * Add a device to the unified history. Deduplicates by identifier and
+     * caps at [MAX_HISTORY] entries.
      */
-    fun addToHistory(key: String, id: String) {
-        if (id.isBlank()) return
-        val updated = (listOf(id) + getHistory(key))
-            .distinct()
+    fun addDevice(identifier: String, name: String, isPolar: Boolean) {
+        if (identifier.isBlank()) return
+        val entry = SavedDevice(identifier, name, isPolar)
+        val current = getDeviceHistory(KEY_DEVICE_HISTORY)
+        val updated = (listOf(entry) + current.filter { it.identifier != identifier })
             .take(MAX_HISTORY)
-        prefs.edit().putString(key, updated.joinToString(SEPARATOR)).apply()
+        saveDeviceHistory(KEY_DEVICE_HISTORY, updated)
         refresh()
     }
 
-    // ── Polar device history (unified — H10 + Verity Sense) ───────────────────
+    /**
+     * Remove a device from the unified history by identifier.
+     */
+    fun removeDevice(identifier: String) {
+        val current = getDeviceHistory(KEY_DEVICE_HISTORY)
+        val updated = current.filter { it.identifier != identifier }
+        saveDeviceHistory(KEY_DEVICE_HISTORY, updated)
+        refresh()
+    }
+
+    // ── Legacy history accessors (for backward compatibility during migration) ──
 
     /** All known Polar device IDs, most-recently-connected first. */
-    val polarHistory: List<String> get() = getHistory(KEY_POLAR_HISTORY)
+    val polarHistory: List<String>
+        get() = deviceHistory.filter { it.isPolar }.map { it.identifier }
+
+    /** All known non-Polar device addresses, most-recently-connected first. */
+    val oximeterHistory: List<String>
+        get() = deviceHistory.filter { !it.isPolar }.map { it.identifier }
 
     /** The most-recently-connected Polar device ID, or "" if none. */
     var savedPolarId: String
-        get() = getHistory(KEY_POLAR_HISTORY).firstOrNull() ?: ""
-        set(value) = addToHistory(KEY_POLAR_HISTORY, value)
+        get() = polarHistory.firstOrNull() ?: ""
+        set(value) = addDevice(value, "", true)
+
+    /** The most-recently-connected oximeter MAC address, or "" if none. */
+    var savedOximeterAddress: String
+        get() = oximeterHistory.firstOrNull() ?: ""
+        set(value) = addDevice(value, "", false)
 
     // ── Legacy accessors (kept for backward compatibility) ─────────────────────
 
-    /** @deprecated Use [savedPolarId] instead. Returns the first Polar device. */
     var savedH10Id: String
         get() = savedPolarId
         set(value) { savedPolarId = value }
 
-    /** @deprecated Use [savedPolarId] instead. Returns the first Polar device. */
     var savedVerityId: String
         get() {
-            // Return the second Polar device if available, otherwise ""
-            val history = polarHistory
-            return if (history.size > 1) history[1] else ""
+            val polars = polarHistory
+            return if (polars.size > 1) polars[1] else ""
         }
         set(value) { savedPolarId = value }
 
-    // ── Oximeter history ──────────────────────────────────────────────────────
-
-    /** The most-recently-connected oximeter MAC address, or "" if none. */
-    var savedOximeterAddress: String
-        get() = getHistory(KEY_OXIMETER_HISTORY).firstOrNull() ?: ""
-        set(value) = addToHistory(KEY_OXIMETER_HISTORY, value)
-
-    val oximeterHistory: List<String> get() = getHistory(KEY_OXIMETER_HISTORY)
-
     // ── Device label history (human-readable names for the edit dropdown) ─────
 
-    /**
-     * All device labels ever used, most-recently-connected first.
-     * Labels are the device's own advertised name (no artificial type prefix),
-     * e.g. "Polar H10 A1B2C3D4", "PC-60F", "Garmin Watch".
-     */
     val deviceLabelHistory: List<String> get() = getHistory(KEY_DEVICE_LABEL_HISTORY)
 
-    /**
-     * Record a device label so it appears in the edit dropdown for past records.
-     * Call this whenever a device is used for a hold or session.
-     */
     fun recordDeviceLabel(label: String) {
         addToHistory(KEY_DEVICE_LABEL_HISTORY, label)
     }
 
     // ── Meditation audio directory ─────────────────────────────────────────────
 
-    /** URI string of the user-chosen meditation audio folder (SAF persistent URI), or "". */
     var meditationAudioDirUri: String
         get() = prefs.getString(KEY_MEDITATION_DIR_URI, "") ?: ""
         set(value) = prefs.edit().putString(KEY_MEDITATION_DIR_URI, value).apply()
@@ -130,36 +127,78 @@ class DevicePreferencesRepository @Inject constructor(
         meditationAudioDirUri = meditationAudioDirUri
     )
 
-    companion object {
-        const val PREFS_NAME             = "wags_device_prefs"
+    // ── Internal helpers ───────────────────────────────────────────────────────
 
-        // Unified Polar device history (replaces separate H10 + Verity lists)
-        const val KEY_POLAR_HISTORY      = "polar_device_history"
+    private fun getDeviceHistory(key: String): List<SavedDevice> {
+        val raw = prefs.getString(key, "") ?: ""
+        if (raw.isBlank()) return emptyList()
+        return raw.split(LIST_SEPARATOR).mapNotNull { entry ->
+            val parts = entry.split(FIELD_SEPARATOR)
+            if (parts.size >= 3) {
+                SavedDevice(
+                    identifier = parts[0],
+                    name = parts[1],
+                    isPolar = parts[2] == "1"
+                )
+            } else null
+        }
+    }
+
+    private fun saveDeviceHistory(key: String, devices: List<SavedDevice>) {
+        val raw = devices.joinToString(LIST_SEPARATOR) { device ->
+            "${device.identifier}${FIELD_SEPARATOR}${device.name}${FIELD_SEPARATOR}${if (device.isPolar) "1" else "0"}"
+        }
+        prefs.edit().putString(key, raw).apply()
+    }
+
+    fun getHistory(key: String): List<String> {
+        val raw = prefs.getString(key, "") ?: ""
+        return if (raw.isBlank()) emptyList()
+        else raw.split(PIPE_SEPARATOR).filter { it.isNotBlank() }
+    }
+
+    fun addToHistory(key: String, id: String) {
+        if (id.isBlank()) return
+        val updated = (listOf(id) + getHistory(key))
+            .distinct()
+            .take(MAX_HISTORY)
+        prefs.edit().putString(key, updated.joinToString(PIPE_SEPARATOR)).apply()
+        refresh()
+    }
+
+    companion object {
+        const val PREFS_NAME = "wags_device_prefs"
+
+        // Unified device history
+        const val KEY_DEVICE_HISTORY = "unified_device_history"
 
         // Legacy keys (kept for migration)
-        private const val KEY_H10_HISTORY        = "h10_device_history"
-        private const val KEY_VERITY_HISTORY     = "verity_device_history"
-        const val KEY_OXIMETER_HISTORY   = "oximeter_address_history"
+        private const val KEY_POLAR_HISTORY = "polar_device_history"
+        private const val KEY_H10_HISTORY = "h10_device_history"
+        private const val KEY_VERITY_HISTORY = "verity_device_history"
+        const val KEY_OXIMETER_HISTORY = "oximeter_address_history"
 
-        // Human-readable device label history (for the edit dropdown on past records)
+        // Human-readable device label history
         const val KEY_DEVICE_LABEL_HISTORY = "device_label_history"
 
-        // Legacy single-value keys — kept so we can migrate on first run
-        private const val KEY_H10_ID_LEGACY       = "h10_device_id"
-        private const val KEY_VERITY_ID_LEGACY    = "verity_device_id"
+        // Legacy single-value keys
+        private const val KEY_H10_ID_LEGACY = "h10_device_id"
+        private const val KEY_VERITY_ID_LEGACY = "verity_device_id"
         private const val KEY_OXIMETER_ADDR_LEGACY = "oximeter_address"
 
         const val KEY_MEDITATION_DIR_URI = "meditation_audio_dir_uri"
 
-        /**
-         * Tracks which one-time migrations have already run.
-         */
         private const val KEY_LABEL_MIGRATION_VERSION = "device_label_migration_version"
+        private const val KEY_UNIFIED_MIGRATION_DONE = "unified_device_migration_done"
 
-        /** Maximum number of devices remembered per type. */
         const val MAX_HISTORY = 10
 
-        private const val SEPARATOR = "|"
+        /** Separator between entries in the unified device history. */
+        private const val LIST_SEPARATOR = "|"
+        /** Separator between fields within a single entry. */
+        private const val FIELD_SEPARATOR = "::"
+        /** Separator for legacy pipe-separated lists. */
+        private const val PIPE_SEPARATOR = "|"
     }
 
     // ── One-time migrations ───────────────────────────────────────────────────
@@ -167,20 +206,18 @@ class DevicePreferencesRepository @Inject constructor(
     init {
         migrateLegacyKeys()
         migrateLabelPrefixes()
-        migrateH10VerityToUnifiedPolar()
+        migrateToUnifiedHistory()
     }
 
     /**
      * If the app was previously installed with the old single-value keys, migrate
-     * those values into the new history lists so existing users don't lose their
-     * saved devices on upgrade.
+     * those values into the legacy history lists first.
      */
     private fun migrateLegacyKeys() {
         val legacyH10 = prefs.getString(KEY_H10_ID_LEGACY, "") ?: ""
         val legacyVerity = prefs.getString(KEY_VERITY_ID_LEGACY, "") ?: ""
         val legacyOximeter = prefs.getString(KEY_OXIMETER_ADDR_LEGACY, "") ?: ""
 
-        // Migrate legacy single-value keys to history lists
         if (legacyH10.isNotBlank() && getHistory(KEY_H10_HISTORY).isEmpty()) {
             addToHistory(KEY_H10_HISTORY, legacyH10)
         }
@@ -194,7 +231,7 @@ class DevicePreferencesRepository @Inject constructor(
 
     /**
      * One-time migration: clear the device label history that was stored with
-     * artificial type prefixes ("Polar H10 · …", "Oximeter · …").
+     * artificial type prefixes.
      */
     private fun migrateLabelPrefixes() {
         val currentVersion = prefs.getInt(KEY_LABEL_MIGRATION_VERSION, 0)
@@ -207,31 +244,58 @@ class DevicePreferencesRepository @Inject constructor(
     }
 
     /**
-     * One-time migration: merge the old separate H10 and Verity history lists
-     * into the new unified Polar history list.
+     * One-time migration: merge all legacy history lists (Polar, H10, Verity,
+     * Oximeter) into the new unified device history.
      */
-    private fun migrateH10VerityToUnifiedPolar() {
-        if (getHistory(KEY_POLAR_HISTORY).isNotEmpty()) return  // already migrated
+    private fun migrateToUnifiedHistory() {
+        if (prefs.getBoolean(KEY_UNIFIED_MIGRATION_DONE, false)) return
 
-        val h10Devices = getHistory(KEY_H10_HISTORY)
-        val verityDevices = getHistory(KEY_VERITY_HISTORY)
-        val merged = (h10Devices + verityDevices).distinct().take(MAX_HISTORY)
-
-        if (merged.isNotEmpty()) {
-            prefs.edit()
-                .putString(KEY_POLAR_HISTORY, merged.joinToString(SEPARATOR))
-                .apply()
-            refresh()
+        val existing = getDeviceHistory(KEY_DEVICE_HISTORY)
+        if (existing.isNotEmpty()) {
+            prefs.edit().putBoolean(KEY_UNIFIED_MIGRATION_DONE, true).apply()
+            return
         }
+
+        // Gather all legacy Polar devices
+        val polarDevices = (
+            getHistory(KEY_POLAR_HISTORY) +
+            getHistory(KEY_H10_HISTORY) +
+            getHistory(KEY_VERITY_HISTORY)
+        ).distinct().map { id -> SavedDevice(id, "", true) }
+
+        // Gather all legacy oximeter devices
+        val oximeterDevices = getHistory(KEY_OXIMETER_HISTORY)
+            .distinct()
+            .map { addr -> SavedDevice(addr, "", false) }
+
+        val merged = (polarDevices + oximeterDevices).take(MAX_HISTORY)
+        if (merged.isNotEmpty()) {
+            saveDeviceHistory(KEY_DEVICE_HISTORY, merged)
+        }
+
+        prefs.edit().putBoolean(KEY_UNIFIED_MIGRATION_DONE, true).apply()
+        refresh()
     }
 }
+
+/**
+ * A device entry in the unified history.
+ *
+ * @param identifier Polar device ID or BLE MAC address.
+ * @param name       Advertised device name (may be blank for legacy entries).
+ * @param isPolar    True if this device uses the Polar SDK for connection.
+ */
+data class SavedDevice(
+    val identifier: String,
+    val name: String = "",
+    val isPolar: Boolean = false
+)
 
 data class DevicePrefsSnapshot(
     val savedPolarId: String,
     val savedOximeterAddress: String,
     val meditationAudioDirUri: String = ""
 ) {
-    // Backward compatibility aliases
     val savedH10Id: String get() = savedPolarId
     val savedVerityId: String get() = ""
 }

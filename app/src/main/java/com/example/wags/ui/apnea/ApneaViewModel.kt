@@ -4,8 +4,7 @@ import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.HrDataSource
-import com.example.wags.data.ble.OximeterBleManager
-import com.example.wags.data.ble.PolarBleManager
+import com.example.wags.data.ble.UnifiedDeviceManager
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.ApneaSessionEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
@@ -140,8 +139,7 @@ data class ApneaUiState(
 
 @HiltViewModel
 class ApneaViewModel @Inject constructor(
-    private val bleManager: PolarBleManager,
-    private val oximeterBleManager: OximeterBleManager,
+    private val deviceManager: UnifiedDeviceManager,
     private val hrDataSource: HrDataSource,
     private val apneaRepository: ApneaRepository,
     private val sessionRepository: ApneaSessionRepository,
@@ -205,12 +203,12 @@ class ApneaViewModel @Inject constructor(
 
         // Mirror live oximeter readings into UI state so the screen can show them
         viewModelScope.launch {
-            oximeterBleManager.liveHr.collect { hr ->
+            deviceManager.genericBleManager.liveHr.collect { hr ->
                 _uiState.update { it.copy(liveOxHr = hr) }
             }
         }
         viewModelScope.launch {
-            oximeterBleManager.liveSpO2.collect { spo2 ->
+            deviceManager.genericBleManager.liveSpO2.collect { spo2 ->
                 _uiState.update { it.copy(liveOxSpO2 = spo2) }
             }
         }
@@ -433,7 +431,7 @@ class ApneaViewModel @Inject constructor(
     fun startTableSession() {
         val polarDeviceId = hrDataSource.connectedPolarDeviceId()
         if (polarDeviceId != null) {
-            bleManager.startRrStream(polarDeviceId)
+            deviceManager.startRrStream(polarDeviceId)
         }
         stateMachine.setCallbacks(
             onWarning = { secs -> onWarning(secs) },
@@ -465,7 +463,7 @@ class ApneaViewModel @Inject constructor(
         // the rrBuffer empty if the auto-started HR stream hadn't populated it yet.
         val polarDeviceId = hrDataSource.connectedPolarDeviceId()
         if (polarDeviceId != null) {
-            bleManager.startRrStream(polarDeviceId)
+            deviceManager.startRrStream(polarDeviceId)
         }
         freeHoldStartTime = System.currentTimeMillis()
         oximeterIsPrimary = hrDataSource.isOximeterPrimaryDevice()
@@ -484,7 +482,7 @@ class ApneaViewModel @Inject constructor(
         oximeterCollectionJob?.cancel()
         if (oximeterIsPrimary) {
             oximeterCollectionJob = viewModelScope.launch {
-                oximeterBleManager.readings.collect { reading ->
+                deviceManager.oximeterReadings.collect { reading ->
                     oximeterSamples.add(System.currentTimeMillis() to reading)
                 }
             }
@@ -559,8 +557,8 @@ class ApneaViewModel @Inject constructor(
         val deviceLabel = hrDataSource.activeHrDeviceLabel()
 
         viewModelScope.launch {
-            // ── Polar RR-derived HR samples ───────────────────────────────────
-            val rrSnapshot = bleManager.rrBuffer.readLast(512)
+            // ── Polar RR-derived HR samples (only when Polar is the primary device) ──
+            val rrSnapshot = if (!oximeterIsPrimary) deviceManager.rrBuffer.readLast(512) else emptyList()
             val rrHrValues = rrSnapshot.map { 60_000.0 / it }
             val minHrFromRr = rrHrValues.minOrNull()?.toFloat() ?: 0f
             val maxHrFromRr = rrHrValues.maxOrNull()?.toFloat() ?: 0f

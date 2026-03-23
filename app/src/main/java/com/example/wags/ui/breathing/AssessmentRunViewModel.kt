@@ -4,7 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.HrDataSource
-import com.example.wags.data.ble.PolarBleManager
+import com.example.wags.data.ble.UnifiedDeviceManager
 import com.example.wags.data.db.entity.RfAssessmentEntity
 import com.example.wags.data.ipc.HabitIntegrationRepository
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
@@ -33,7 +33,7 @@ import javax.inject.Inject
 class AssessmentRunViewModel @Inject constructor(
     private val orchestrator: RfAssessmentOrchestrator,
     private val repository: RfAssessmentRepository,
-    private val bleManager: PolarBleManager,
+    private val deviceManager: UnifiedDeviceManager,
     private val pacerEngine: ContinuousPacerEngine,
     private val hrDataSource: HrDataSource,
     private val habitRepo: HabitIntegrationRepository,
@@ -350,16 +350,16 @@ class AssessmentRunViewModel @Inject constructor(
     // -------------------------------------------------------------------------
 
     private fun startRrPolling() {
-        val rrWritesAtStart = bleManager.rrBuffer.totalWrites()
+        val rrWritesAtStart = deviceManager.rrBuffer.totalWrites()
         rrPollingJob = viewModelScope.launch {
-            var lastSeenWrites = bleManager.rrBuffer.totalWrites()
+            var lastSeenWrites = deviceManager.rrBuffer.totalWrites()
             while (isActive) {
                 delay(500L) // 2 Hz — matches BreathingViewModel cadence
-                val currentWrites = bleManager.rrBuffer.totalWrites()
+                val currentWrites = deviceManager.rrBuffer.totalWrites()
                 val newCount = (currentWrites - lastSeenWrites).toInt()
-                    .coerceAtMost(bleManager.rrBuffer.capacity) // can't read more than buffer holds
+                    .coerceAtMost(deviceManager.rrBuffer.capacity) // can't read more than buffer holds
                 if (newCount > 0) {
-                    val newBeats = bleManager.rrBuffer.readLast(newCount)
+                    val newBeats = deviceManager.rrBuffer.readLast(newCount)
                     newBeats.forEach { rrMs ->
                         orchestrator.feedRr(rrMs.toFloat())
                         allSessionRrIntervals.add(rrMs)
@@ -369,9 +369,9 @@ class AssessmentRunViewModel @Inject constructor(
 
                 // Compute live metrics from all session RR data
                 val totalNew = (currentWrites - rrWritesAtStart).toInt()
-                    .coerceAtMost(bleManager.rrBuffer.capacity)
-                val snapshot = if (totalNew > 0) bleManager.rrBuffer.readLast(totalNew) else emptyList()
-                val chartRr = if (totalNew > 0) bleManager.rrBuffer.readLast(45.coerceAtMost(totalNew)) else emptyList()
+                    .coerceAtMost(deviceManager.rrBuffer.capacity)
+                val snapshot = if (totalNew > 0) deviceManager.rrBuffer.readLast(totalNew) else emptyList()
+                val chartRr = if (totalNew > 0) deviceManager.rrBuffer.readLast(45.coerceAtMost(totalNew)) else emptyList()
                 val liveRmssd = computeLiveRmssd(snapshot)
                 val liveSdnn = computeLiveSdnn(snapshot)
 

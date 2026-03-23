@@ -1,7 +1,6 @@
 package com.example.wags.ui.settings
 
 import android.Manifest
-import android.bluetooth.le.ScanResult
 import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -27,10 +26,9 @@ import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.data.garmin.GarminConnectionState
 import com.example.wags.domain.model.BleConnectionState
 import com.example.wags.domain.model.HabitEntry
-import com.example.wags.domain.model.OximeterConnectionState
+import com.example.wags.domain.model.ScannedDevice
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
-import com.polar.sdk.api.model.PolarDeviceInfo
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,16 +42,12 @@ fun SettingsScreen(
     var showImportConfirmDialog by remember { mutableStateOf(false) }
     var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
 
-    // SAF file picker for export (create a new ZIP file)
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/zip")
     ) { uri: Uri? ->
-        if (uri != null) {
-            viewModel.exportData(uri)
-        }
+        if (uri != null) viewModel.exportData(uri)
     }
 
-    // SAF file picker for import (open an existing ZIP file)
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -63,7 +57,6 @@ fun SettingsScreen(
         }
     }
 
-    // SAF directory picker for meditation audio folder
     val meditationDirLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
@@ -107,12 +100,10 @@ fun SettingsScreen(
         else permissionLauncher.launch(blePermissions)
     }
 
-    // Load habits once when the screen first appears
     LaunchedEffect(Unit) {
         viewModel.loadHabits()
     }
 
-    // Stop all scans when leaving the screen
     DisposableEffect(Unit) {
         onDispose { viewModel.stopScan() }
     }
@@ -157,14 +148,11 @@ fun SettingsScreen(
                 }
             }
 
-            // ── Connected devices status ───────────────────────────────────
+            // ── Connected device status ─────────────────────────────────────
             item {
-                ConnectedDevicesCard(
-                    h10State = state.h10State,
-                    verityState = state.verityState,
-                    oximeterState = state.oximeterState,
-                    onDisconnectPolar = { viewModel.disconnectPolar() },
-                    onDisconnectOximeter = { viewModel.disconnectOximeter() }
+                ConnectedDeviceCard(
+                    deviceState = state.deviceState,
+                    onDisconnect = { viewModel.disconnectDevice() }
                 )
             }
 
@@ -258,8 +246,7 @@ fun SettingsScreen(
             }
 
             // ── Empty state ────────────────────────────────────────────────
-            val totalResults = state.polarScanResults.size + state.oximeterScanResults.size
-            if (totalResults == 0 && !state.isScanning) {
+            if (state.scanResults.isEmpty() && !state.isScanning) {
                 item {
                     Text(
                         "No devices found. Make sure your sensors are powered on, then tap Scan.",
@@ -269,45 +256,12 @@ fun SettingsScreen(
                 }
             }
 
-            // ── Polar scan results ─────────────────────────────────────────
-            if (state.polarScanResults.isNotEmpty()) {
-                item {
-                    Text(
-                        "Polar Devices",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = TextSecondary
-                    )
-                }
-            }
-
-            items(state.polarScanResults, key = { "polar-${it.deviceId}" }) { device ->
-                PolarDeviceResultCard(
+            // ── Unified scan results ────────────────────────────────────────
+            items(state.scanResults, key = { it.identifier }) { device ->
+                DeviceResultCard(
                     device = device,
-                    h10State = state.h10State,
-                    verityState = state.verityState,
-                    onConnect = {
-                        viewModel.stopScan()
-                        viewModel.connectPolar(device)
-                    }
-                )
-            }
-
-            // ── Oximeter scan results ──────────────────────────────────────
-            if (state.oximeterScanResults.isNotEmpty()) {
-                item {
-                    Text(
-                        "Oximeter / SpO₂ Devices",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = TextSecondary
-                    )
-                }
-            }
-
-            items(state.oximeterScanResults, key = { "oxy-${it.device.address}" }) { result ->
-                OximeterDeviceResultCard(
-                    result = result,
-                    oximeterState = state.oximeterState,
-                    onConnect = { viewModel.connectOximeter(result.device.address) }
+                    deviceState = state.deviceState,
+                    onConnect = { viewModel.connectDevice(device) }
                 )
             }
 
@@ -412,15 +366,12 @@ fun SettingsScreen(
     }
 }
 
-// ── Connected devices summary card ────────────────────────────────────────────
+// ── Connected device summary card ─────────────────────────────────────────────
 
 @Composable
-private fun ConnectedDevicesCard(
-    h10State: BleConnectionState,
-    verityState: BleConnectionState,
-    oximeterState: OximeterConnectionState,
-    onDisconnectPolar: () -> Unit,
-    onDisconnectOximeter: () -> Unit
+private fun ConnectedDeviceCard(
+    deviceState: BleConnectionState,
+    onDisconnect: () -> Unit
 ) {
     Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
         Column(
@@ -429,41 +380,48 @@ private fun ConnectedDevicesCard(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Connected Devices", style = MaterialTheme.typography.titleMedium)
+            Text("Connected Device", style = MaterialTheme.typography.titleMedium)
 
-            // Polar device row — show whichever is connected (or both if somehow both are)
-            PolarDeviceStatusRow(
-                h10State = h10State,
-                verityState = verityState,
-                onDisconnect = onDisconnectPolar
-            )
-
-            // Oximeter row
-            HorizontalDivider(color = SurfaceVariant, modifier = Modifier.padding(vertical = 2.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text("Oximeter (SpO₂)", style = MaterialTheme.typography.bodyLarge)
-                    val (statusText, statusColor) = when (oximeterState) {
-                        is OximeterConnectionState.Connected ->
-                            "Connected: ${oximeterState.deviceName}" to ReadinessGreen
-                        is OximeterConnectionState.Connecting ->
+                    val (statusText, statusColor) = when (deviceState) {
+                        is BleConnectionState.Connected -> {
+                            val typeName = when (deviceState.deviceType) {
+                                com.example.wags.domain.model.DeviceType.POLAR_H10 -> "Polar H10"
+                                com.example.wags.domain.model.DeviceType.POLAR_VERITY -> "Polar Verity Sense"
+                                com.example.wags.domain.model.DeviceType.OXIMETER -> "Pulse Oximeter"
+                                com.example.wags.domain.model.DeviceType.GENERIC_BLE -> "BLE Sensor"
+                            }
+                            "$typeName: ${deviceState.deviceName}" to ReadinessGreen
+                        }
+                        is BleConnectionState.Connecting ->
                             "Connecting…" to ReadinessOrange
-                        is OximeterConnectionState.Scanning ->
+                        is BleConnectionState.Scanning ->
                             "Scanning…" to EcgCyan
-                        is OximeterConnectionState.Error ->
-                            "Error: ${oximeterState.message}" to ReadinessRed
-                        is OximeterConnectionState.Disconnected ->
+                        is BleConnectionState.Error ->
+                            "Error: ${deviceState.message}" to ReadinessRed
+                        is BleConnectionState.Disconnected ->
                             "Not connected" to TextSecondary
                     }
-                    Text(statusText, style = MaterialTheme.typography.bodySmall, color = statusColor)
+                    Text(statusText, style = MaterialTheme.typography.bodyMedium, color = statusColor)
+
+                    // Show capabilities when connected
+                    if (deviceState is BleConnectionState.Connected) {
+                        val caps = deviceState.deviceType.capabilities.joinToString(", ") { it.name }
+                        Text(
+                            "Capabilities: $caps",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                    }
                 }
-                if (oximeterState is OximeterConnectionState.Connected) {
+                if (deviceState is BleConnectionState.Connected) {
                     OutlinedButton(
-                        onClick = onDisconnectOximeter,
+                        onClick = onDisconnect,
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
                     ) { Text("Disconnect") }
                 }
@@ -472,129 +430,18 @@ private fun ConnectedDevicesCard(
     }
 }
 
-/**
- * Shows the status of connected Polar devices. The device type is determined
- * from the device name — no manual assignment needed.
- */
-@Composable
-private fun PolarDeviceStatusRow(
-    h10State: BleConnectionState,
-    verityState: BleConnectionState,
-    onDisconnect: () -> Unit
-) {
-    // Determine the combined Polar status
-    val h10Connected = h10State is BleConnectionState.Connected
-    val verityConnected = verityState is BleConnectionState.Connected
-    val anyConnecting = h10State is BleConnectionState.Connecting || verityState is BleConnectionState.Connecting
-    val anyError = h10State is BleConnectionState.Error || verityState is BleConnectionState.Error
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column {
-            Text("Polar HR Sensor", style = MaterialTheme.typography.bodyLarge)
-            when {
-                h10Connected -> {
-                    val name = (h10State as BleConnectionState.Connected).deviceName
-                    Text("Connected: $name", style = MaterialTheme.typography.bodySmall, color = ReadinessGreen)
-                }
-                verityConnected -> {
-                    val name = (verityState as BleConnectionState.Connected).deviceName
-                    Text("Connected: $name", style = MaterialTheme.typography.bodySmall, color = ReadinessGreen)
-                }
-                anyConnecting -> {
-                    Text("Connecting…", style = MaterialTheme.typography.bodySmall, color = ReadinessOrange)
-                }
-                anyError -> {
-                    val msg = when {
-                        h10State is BleConnectionState.Error -> h10State.message
-                        verityState is BleConnectionState.Error -> verityState.message
-                        else -> "Unknown error"
-                    }
-                    Text("Error: $msg", style = MaterialTheme.typography.bodySmall, color = ReadinessRed)
-                }
-                else -> {
-                    Text("Not connected", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                }
-            }
-        }
-        if (h10Connected || verityConnected) {
-            OutlinedButton(
-                onClick = onDisconnect,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
-            ) { Text("Disconnect") }
-        }
-    }
-}
-
-// ── Polar device result card (single Connect button) ──────────────────────────
+// ── Unified device result card ────────────────────────────────────────────────
 
 @Composable
-private fun PolarDeviceResultCard(
-    device: PolarDeviceInfo,
-    h10State: BleConnectionState,
-    verityState: BleConnectionState,
+private fun DeviceResultCard(
+    device: ScannedDevice,
+    deviceState: BleConnectionState,
     onConnect: () -> Unit
 ) {
-    val h10Connected = h10State is BleConnectionState.Connected &&
-        (h10State as BleConnectionState.Connected).deviceId == device.deviceId
-    val verityConnected = verityState is BleConnectionState.Connected &&
-        (verityState as BleConnectionState.Connected).deviceId == device.deviceId
-    val alreadyConnected = h10Connected || verityConnected
-
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = if (alreadyConnected) SurfaceVariant else SurfaceDark
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = device.name.ifBlank { "Unknown Polar Device" },
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Text(
-                    text = device.deviceId,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
-                )
-                if (alreadyConnected) {
-                    Text("Connected", style = MaterialTheme.typography.bodySmall, color = ReadinessGreen)
-                }
-            }
-            if (!alreadyConnected) {
-                Button(
-                    onClick = onConnect,
-                    modifier = Modifier.height(32.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                ) { Text("Connect", style = MaterialTheme.typography.bodySmall) }
-            }
-        }
-    }
-}
-
-// ── Oximeter device result card ───────────────────────────────────────────────
-
-@Composable
-private fun OximeterDeviceResultCard(
-    result: ScanResult,
-    oximeterState: OximeterConnectionState,
-    onConnect: () -> Unit
-) {
-    val address = result.device.address
-    val name = result.device.name ?: address
-    val isConnected = oximeterState is OximeterConnectionState.Connected &&
-        oximeterState.deviceAddress == address
-    val isConnecting = oximeterState is OximeterConnectionState.Connecting &&
-        oximeterState.deviceAddress == address
+    val isConnected = deviceState is BleConnectionState.Connected &&
+        deviceState.deviceId == device.identifier
+    val isConnecting = deviceState is BleConnectionState.Connecting &&
+        deviceState.deviceId == device.identifier
 
     Card(
         colors = CardDefaults.cardColors(
@@ -609,8 +456,15 @@ private fun OximeterDeviceResultCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(name, style = MaterialTheme.typography.bodyLarge)
-                Text(address, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                Text(
+                    text = device.name.ifBlank { device.identifier },
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = device.identifier,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
                 when {
                     isConnected -> Text(
                         "Connected",
@@ -963,7 +817,6 @@ private fun DataExportImportCard(
 
             HorizontalDivider(color = SurfaceVariant)
 
-            // ── Export button ────────────────────────────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -999,7 +852,6 @@ private fun DataExportImportCard(
 
             HorizontalDivider(color = SurfaceVariant)
 
-            // ── Import button ────────────────────────────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1030,7 +882,6 @@ private fun DataExportImportCard(
                 }
             }
 
-            // ── Result / error messages ──────────────────────────────────────
             if (message != null) {
                 HorizontalDivider(color = SurfaceVariant)
                 Card(

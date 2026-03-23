@@ -25,4 +25,8 @@ object BleModule {
                 PolarBleApi.PolarBleSdkFeature.FEATURE_POLAR_ONLINE_STREAMING
             )
         )
+
+    // PolarBleManager, GenericBleManager, UnifiedDeviceManager, HrDataSource,
+    // AutoConnectManager, and DevicePreferencesRepository are all @Singleton
+    // with @Inject constructor — Hilt creates them automatically.
 }

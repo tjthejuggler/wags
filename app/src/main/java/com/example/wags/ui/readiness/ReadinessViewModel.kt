@@ -1,9 +1,10 @@
 package com.example.wags.ui.readiness
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.HrDataSource
-import com.example.wags.data.ble.PolarBleManager
+import com.example.wags.data.ble.UnifiedDeviceManager
 import com.example.wags.data.db.entity.DailyReadingEntity
 import com.example.wags.data.ipc.HabitIntegrationRepository
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
@@ -52,7 +53,7 @@ data class ReadinessUiState(
 
 @HiltViewModel
 class ReadinessViewModel @Inject constructor(
-    private val bleManager: PolarBleManager,
+    private val deviceManager: UnifiedDeviceManager,
     private val hrDataSource: HrDataSource,
     private val readinessRepository: ReadinessRepository,
     private val artifactCorrection: ArtifactCorrectionUseCase,
@@ -88,9 +89,11 @@ class ReadinessViewModel @Inject constructor(
         if (_uiState.value.sessionState == ReadinessSessionState.RECORDING) return
         collectedRr.clear()
         sessionHrDeviceLabel = hrDataSource.activeHrDeviceLabel()
-        bleManager.startRrStream(deviceId)
+        Log.d("ReadinessVM", "startSession(deviceId=$deviceId) — calling startRrStream")
+        deviceManager.startRrStream(deviceId)
         // Snapshot the current total writes so we only count intervals from this point forward
-        rrWritesAtStart = bleManager.rrBuffer.totalWrites()
+        rrWritesAtStart = deviceManager.rrBuffer.totalWrites()
+        Log.d("ReadinessVM", "rrWritesAtStart=$rrWritesAtStart, rrBuffer.capacity=${deviceManager.rrBuffer.capacity}")
         _uiState.update {
             it.copy(
                 sessionState = ReadinessSessionState.RECORDING,
@@ -108,16 +111,17 @@ class ReadinessViewModel @Inject constructor(
                 delay(500L) // Poll at 2 Hz for smoother chart updates
                 remaining = (remaining - 1L).coerceAtLeast(0L)
                 // Only take intervals added since the session started
-                val totalWrites = bleManager.rrBuffer.totalWrites()
+                val totalWrites = deviceManager.rrBuffer.totalWrites()
                 val newCount = (totalWrites - rrWritesAtStart).toInt()
-                    .coerceAtMost(bleManager.rrBuffer.capacity)
-                val snapshot = if (newCount > 0) bleManager.rrBuffer.readLast(newCount) else emptyList()
+                    .coerceAtMost(deviceManager.rrBuffer.capacity)
+                val snapshot = if (newCount > 0) deviceManager.rrBuffer.readLast(newCount) else emptyList()
+                Log.d("ReadinessVM", "poll: remaining=$remaining totalWrites=$totalWrites rrWritesAtStart=$rrWritesAtStart newCount=$newCount snapshot.size=${snapshot.size} liveHr=${deviceManager.liveHr.value}")
                 collectedRr.clear()
                 collectedRr.addAll(snapshot)
                 val liveRmssd = computeLiveRmssd(snapshot)
                 val liveSdnn = computeLiveSdnn(snapshot)
                 // Last ~45 RR intervals for the chart (~30 s at typical resting HR)
-                val chartRr = if (newCount > 0) bleManager.rrBuffer.readLast(45.coerceAtMost(newCount)) else emptyList()
+                val chartRr = if (newCount > 0) deviceManager.rrBuffer.readLast(45.coerceAtMost(newCount)) else emptyList()
                 _uiState.update {
                     it.copy(
                         remainingSeconds = remaining,

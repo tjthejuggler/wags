@@ -3,13 +3,11 @@ package com.example.wags.ui.session
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.HrDataSource
-import com.example.wags.data.ble.OximeterBleManager
-import com.example.wags.data.ble.PolarBleManager
+import com.example.wags.data.ble.UnifiedDeviceManager
 import com.example.wags.data.db.entity.SessionLogEntity
 import com.example.wags.data.repository.SessionRepository
 import com.example.wags.di.IoDispatcher
 import com.example.wags.di.MathDispatcher
-import com.example.wags.domain.model.OximeterConnectionState
 import com.example.wags.domain.model.SessionType
 import com.example.wags.domain.usecase.hrv.ArtifactCorrectionUseCase
 import com.example.wags.domain.usecase.session.HrSonificationEngine
@@ -55,8 +53,7 @@ data class SessionUiState(
 
 @HiltViewModel
 class SessionViewModel @Inject constructor(
-    private val bleManager: PolarBleManager,
-    private val oximeterBleManager: OximeterBleManager,
+    private val deviceManager: UnifiedDeviceManager,
     private val hrDataSource: HrDataSource,
     private val sessionRepository: SessionRepository,
     private val analyticsCalculator: NsdrAnalyticsCalculator,
@@ -89,10 +86,7 @@ class SessionViewModel @Inject constructor(
         // Observe all HR-capable connection states to keep hasHrMonitor + connectedDeviceId in sync
         viewModelScope.launch {
             hrDataSource.isAnyHrDeviceConnected.collect { anyConnected ->
-                // Polar takes priority for RR-based analytics; oximeter is HR-only
-                val polarId = hrDataSource.connectedPolarDeviceId()
-                val oxyAddr = (oximeterBleManager.connectionState.value as? OximeterConnectionState.Connected)?.deviceAddress
-                val activeId = polarId ?: oxyAddr
+                val activeId = hrDataSource.connectedDeviceId()
                 _uiState.update {
                     it.copy(
                         hasHrMonitor = anyConnected,
@@ -122,7 +116,7 @@ class SessionViewModel @Inject constructor(
 
         val activeMonitorId = deviceId?.takeIf { it.isNotBlank() }
         if (activeMonitorId != null) {
-            bleManager.startRrStream(activeMonitorId)
+            deviceManager.startRrStream(activeMonitorId)
         }
 
         hrTimeSeries.clear()
@@ -153,8 +147,8 @@ class SessionViewModel @Inject constructor(
                 val elapsed = (System.currentTimeMillis() - sessionStartMs) / 1_000L
 
                 if (activeMonitorId != null) {
-                    // Try Polar RR buffer first (gives RMSSD); fall back to oximeter HR
-                    val rrSnapshot = bleManager.rrBuffer.readLast(64)
+                    // Try Polar RR buffer first (gives RMSSD); fall back to generic HR
+                    val rrSnapshot = deviceManager.rrBuffer.readLast(64)
                     val polarHr = if (rrSnapshot.isNotEmpty())
                         (60_000.0 / rrSnapshot.last()).toFloat() else null
                     val currentHr = polarHr ?: hrDataSource.liveHr.value?.toFloat()
@@ -205,7 +199,7 @@ class SessionViewModel @Inject constructor(
                 if (monitorId != null && hrTimeSeries.isNotEmpty()) {
                     // Full HR analytics path
                     val analytics = withContext(mathDispatcher) {
-                        val rrSnapshot = bleManager.rrBuffer.readLast(1024)
+                        val rrSnapshot = deviceManager.rrBuffer.readLast(1024)
                         val corrected = artifactCorrection.execute(rrSnapshot)
                         analyticsCalculator.calculate(
                             hrTimeSeries = hrTimeSeries.toList(),
@@ -277,9 +271,7 @@ class SessionViewModel @Inject constructor(
         sonificationEngine.stop()
         hrTimeSeries.clear()
         // Preserve connection state across reset
-        val polarId = hrDataSource.connectedPolarDeviceId()
-        val oxyAddr = (oximeterBleManager.connectionState.value as? OximeterConnectionState.Connected)?.deviceAddress
-        val activeId = polarId ?: oxyAddr
+        val activeId = hrDataSource.connectedDeviceId()
         _uiState.value = SessionUiState(
             hasHrMonitor = activeId != null,
             connectedDeviceId = activeId

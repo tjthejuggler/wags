@@ -16,8 +16,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavController
 import com.example.wags.data.ble.HrDataSource
-import com.example.wags.data.ble.OximeterBleManager
-import com.example.wags.data.ble.PolarBleManager
+import com.example.wags.data.ble.UnifiedDeviceManager
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
 import com.example.wags.data.ipc.HabitIntegrationRepository
@@ -91,8 +90,7 @@ data class FreeHoldActiveUiState(
 @HiltViewModel
 class FreeHoldActiveViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val bleManager: PolarBleManager,
-    private val oximeterBleManager: OximeterBleManager,
+    private val deviceManager: UnifiedDeviceManager,
     private val hrDataSource: HrDataSource,
     private val apneaRepository: ApneaRepository,
     private val audioHapticEngine: ApneaAudioHapticEngine,
@@ -147,7 +145,7 @@ class FreeHoldActiveViewModel @Inject constructor(
         // the rrBuffer empty if the auto-started HR stream hadn't populated it yet.
         val polarDeviceId = hrDataSource.connectedPolarDeviceId()
         if (polarDeviceId != null) {
-            bleManager.startRrStream(polarDeviceId)
+            deviceManager.startRrStream(polarDeviceId)
         }
         freeHoldStartTime = System.currentTimeMillis()
         oximeterIsPrimary = hrDataSource.isOximeterPrimaryDevice()
@@ -162,7 +160,7 @@ class FreeHoldActiveViewModel @Inject constructor(
         oximeterCollectionJob?.cancel()
         if (oximeterIsPrimary) {
             oximeterCollectionJob = viewModelScope.launch {
-                oximeterBleManager.readings.collect { reading ->
+                deviceManager.oximeterReadings.collect { reading ->
                     oximeterSamples.add(System.currentTimeMillis() to reading)
                 }
             }
@@ -233,7 +231,11 @@ class FreeHoldActiveViewModel @Inject constructor(
         oximeterSamples.clear()
 
         viewModelScope.launch {
-            val rrSnapshot = bleManager.rrBuffer.readLast(512)
+            // Only read Polar RR buffer when Polar is the primary device.
+            // When the oximeter is primary, the rrBuffer may contain stale data
+            // from a previous Polar session which would interleave with fresh
+            // oximeter readings and produce a sawtooth pattern in the chart.
+            val rrSnapshot = if (!oximeterIsPrimary) deviceManager.rrBuffer.readLast(512) else emptyList()
 
             // ── RR-derived HR — discard physiologically impossible beats ──────
             val rrHrValues = rrSnapshot
