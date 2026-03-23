@@ -45,9 +45,12 @@ com.example.wags/
 │
 ├── data/
 │   ├── ble/
-│   │   ├── PolarBleManager.kt       # Polar H10/Verity Sense RR streaming
+│   │   ├── PolarBleManager.kt       # Polar BLE — name-based auto-detection (H10/Verity Sense)
 │   │   ├── OximeterBleManager.kt    # Wellue/Viatom SpO₂ BLE scanning & GATT
-│   │   ├── BleService.kt            # Foreground service (connectedDevice type)
+│   │   ├── AutoConnectManager.kt    # Persistent auto-reconnect loop for all BLE devices
+│   │   ├── DevicePreferencesRepository.kt  # Unified Polar + oximeter device history
+│   │   ├── HrDataSource.kt          # Merged HR/SpO₂ source across all devices
+│   │   ├── BleService.kt            # Foreground service for BLE connections
 │   │   ├── BlePermissionManager.kt  # Runtime BLE permission helper
 │   │   ├── AccRespirationEngine.kt  # Accelerometer-based respiration detection
 │   │   ├── CircularBuffer.kt        # Lock-free ring buffer for RR samples
@@ -464,3 +467,29 @@ Ported the full RF Assessment ecosystem from the desktop hrvm app to Android.
 | `DEEP` | ~42 min | 13 combos × 3 min, deep calibration |
 | `TARGETED` | ~10 min | Optimal ±0.2 BPM × 3 min (requires history) |
 | `SLIDING_WINDOW` | ~16 min | Chirp 6.75 → 4.5 BPM, continuous scan |
+
+---
+
+### BLE Device Connection Simplification — 2026-03-23
+
+**Problem:** The previous BLE connection system required users to manually assign Polar devices as either "H10" or "Verity Sense" when connecting from the Settings screen. This led to devices being connected to the wrong slot (e.g. an H10 connected as a Verity Sense), which caused features like Morning Readiness to reject the device because it checked `h10State` specifically.
+
+**Solution:** Replaced the manual device-type assignment with **automatic name-based identification**. Devices are now identified by their advertised name after connection:
+
+- Name contains **"H10"** → routed to H10 slot (chest strap: HR, RR, ECG, ACC)
+- Name contains **"Sense"** → routed to Verity Sense slot (optical: HR, PPI)
+- Name contains **"OxySmart"** → handled by OximeterBleManager (HR + SpO₂)
+- Unknown Polar devices → default to H10 slot (safe fallback)
+
+#### Files Modified
+
+| File | Change |
+|---|---|
+| [`PolarBleManager.kt`](app/src/main/java/com/example/wags/data/ble/PolarBleManager.kt) | Removed `isH10` parameter from `connectDevice()`; added `detectSlotFromName()` for automatic routing; added `isH10Connected()` and `connectedH10DeviceId()` helpers |
+| [`DevicePreferencesRepository.kt`](app/src/main/java/com/example/wags/data/ble/DevicePreferencesRepository.kt) | Merged separate H10/Verity history lists into unified `polarHistory`; added migration from old keys; backward-compatible accessors |
+| [`AutoConnectManager.kt`](app/src/main/java/com/example/wags/data/ble/AutoConnectManager.kt) | Replaced dual H10+Verity reconnect loops with single Polar reconnect loop |
+| [`SettingsViewModel.kt`](app/src/main/java/com/example/wags/ui/settings/SettingsViewModel.kt) | Replaced `connectH10()`/`connectVerity()`/`disconnectH10()`/`disconnectVerity()` with `connectPolar()`/`disconnectPolar()` |
+| [`SettingsScreen.kt`](app/src/main/java/com/example/wags/ui/settings/SettingsScreen.kt) | Replaced dual "H10"/"Verity" buttons with single "Connect" button; unified Polar status row |
+| [`MorningReadinessViewModel.kt`](app/src/main/java/com/example/wags/ui/morning/MorningReadinessViewModel.kt) | Changed H10 check from slot-based (`h10State`) to name-based (`connectedH10DeviceId()`) |
+| [`SessionViewModel.kt`](app/src/main/java/com/example/wags/ui/session/SessionViewModel.kt) | Simplified device ID resolution to use `hrDataSource.connectedPolarDeviceId()` |
+| [`MeditationViewModel.kt`](app/src/main/java/com/example/wags/ui/meditation/MeditationViewModel.kt) | Simplified device ID resolution to use `hrDataSource.connectedPolarDeviceId()` |

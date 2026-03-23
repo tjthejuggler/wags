@@ -136,7 +136,11 @@ class MorningReadinessViewModel @Inject constructor(
     }
 
     fun startSession() {
-        if (bleManager.h10State.value !is BleConnectionState.Connected) {
+        // Morning readiness requires an H10 (chest strap with ACC for stand detection).
+        // The device type is determined by name — if the connected Polar device's name
+        // contains "H10", it's an H10 regardless of which slot it was assigned to.
+        val h10Id = bleManager.connectedH10DeviceId()
+        if (h10Id == null) {
             _uiState.update { it.copy(noHrmDialogVisible = true) }
             return
         }
@@ -145,8 +149,7 @@ class MorningReadinessViewModel @Inject constructor(
         lastRrBufferSize = 0
         standDetector.reset()
         // Start ACC stream so the stand detector has data
-        val h10Id = (bleManager.h10State.value as? BleConnectionState.Connected)?.deviceId
-        if (h10Id != null) bleManager.startAccStream(h10Id)
+        bleManager.startAccStream(h10Id)
         fsm.start(viewModelScope)
         startRrPolling()
     }

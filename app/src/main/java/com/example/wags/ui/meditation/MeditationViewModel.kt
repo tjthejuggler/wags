@@ -15,7 +15,6 @@ import com.example.wags.data.repository.MeditationRepository
 import com.example.wags.data.repository.YouTubeMetadataFetcher
 import com.example.wags.di.IoDispatcher
 import com.example.wags.di.MathDispatcher
-import com.example.wags.domain.model.BleConnectionState
 import com.example.wags.domain.model.OximeterConnectionState
 import com.example.wags.domain.usecase.hrv.ArtifactCorrectionUseCase
 import com.example.wags.domain.usecase.session.HrSonificationEngine
@@ -127,10 +126,9 @@ class MeditationViewModel @Inject constructor(
         // Observe HR device connection
         viewModelScope.launch {
             hrDataSource.isAnyHrDeviceConnected.collect { anyConnected ->
-                val h10Id = (bleManager.h10State.value as? BleConnectionState.Connected)?.deviceId
-                val verityId = (bleManager.verityState.value as? BleConnectionState.Connected)?.deviceId
+                val polarId = hrDataSource.connectedPolarDeviceId()
                 val oxyAddr = (oximeterBleManager.connectionState.value as? OximeterConnectionState.Connected)?.deviceAddress
-                val activeId = h10Id ?: verityId ?: oxyAddr
+                val activeId = polarId ?: oxyAddr
                 _uiState.update {
                     it.copy(hasHrMonitor = anyConnected, connectedDeviceId = activeId)
                 }

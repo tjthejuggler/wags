@@ -19,29 +19,22 @@ private const val TAG = "AutoConnect"
  * Orchestrates automatic BLE reconnection whenever the app is running but no
  * session is active.
  *
- * ## Strategy (v5 — continuous scan-and-connect with stale-Connecting guard)
+ * ## Strategy (v6 — unified Polar + name-based identification)
+ *
+ * Polar devices are stored in a single unified history list. The device type
+ * (H10 vs Verity Sense) is determined automatically from the device name
+ * after connection by [PolarBleManager].
  *
  * The loop runs continuously whenever any device is disconnected:
  *
- * 1. **Immediate first attempt** — On start (and after every disconnect) we do
- *    one quick connect attempt for each saved device.
+ * 1. **Polar reconnect** — For each saved Polar device ID, call `connectDevice()`
+ *    (no isH10 flag needed). The PolarBleManager routes the device to the
+ *    correct slot (h10State or verityState) based on its advertised name.
  *
- * 2. **Continuous Polar scan** — We call `connectToDevice()` for each saved
- *    Polar device on every loop iteration when it is not already connected.
- *    If the SDK has been stuck in *Connecting* for longer than
- *    [POLAR_CONNECTING_TIMEOUT_MS] we disconnect and re-issue the connect so
- *    the SDK restarts its internal scan.
+ * 2. **Oximeter reconnect** — Same as before: direct connect + background scan.
  *
- * 3. **Background BLE scan (oximeter)** — For non-Polar devices we run a
- *    continuous low-power BLE scan filtered to known MAC addresses.  The moment
- *    the device is detected by the radio, we connect immediately.
- *
- * 4. **Short recheck when disconnected** — While any device is still
- *    disconnected the loop rechecks every [RECHECK_DISCONNECTED_MS] (5 s) so
- *    a newly-powered device is picked up quickly.  Once everything is connected
- *    the loop parks for [RECHECK_CONNECTED_MS] (30 s) to save battery.
- *
- * 5. **Session guard** — The loop suspends while [sessionActive] is true.
+ * 3. **Short recheck when disconnected** — 5s interval. Long recheck when all
+ *    connected — 30s.
  *
  * Call [start] once after Bluetooth permissions are granted.
  * Call [setSessionActive] to pause/resume around sessions.
@@ -64,19 +57,14 @@ class AutoConnectManager @Inject constructor(
     @Volatile private var reconnectNow = false
 
     /**
-     * Prevents concurrent oximeter connect attempts.  The background-scan
-     * [onKnownDeviceFound] callback can fire while [connectOximeterNow] is
-     * already running from the main loop — without this guard both paths
-     * call [OximeterBleManager.connect] nearly simultaneously, causing a
-     * GATT race condition that crashes the app.
+     * Prevents concurrent oximeter connect attempts.
      */
     private val oximeterConnectMutex = Mutex()
 
     private var loopJob: Job? = null
 
-    /** Tracks when each Polar slot entered the Connecting state so we can detect stale connections. */
-    private var h10ConnectingSince: Long = 0L
-    private var verityConnectingSince: Long = 0L
+    /** Tracks when the Polar connect attempt started so we can detect stale connections. */
+    private var polarConnectingSince: Long = 0L
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -89,9 +77,7 @@ class AutoConnectManager @Inject constructor(
         polarBleManager.onDisconnected = { onDeviceDisconnected() }
         oximeterBleManager.onDisconnected = { onDeviceDisconnected() }
 
-        // Wire background scan callback — when the oximeter is detected nearby,
-        // immediately trigger a connect.  The mutex prevents this from racing
-        // with an already-running connectOximeterNow() from the main loop.
+        // Wire background scan callback for oximeter
         oximeterBleManager.onKnownDeviceFound = { address ->
             Log.d(TAG, "Background scan found oximeter $address — triggering connect")
             scope.launch {
@@ -148,13 +134,12 @@ class AutoConnectManager @Inject constructor(
             }
 
             // ── 2. Build candidate lists ──────────────────────────────────────
-            val h10History      = prefs.h10History
-            val verityHistory   = prefs.verityHistory
+            val polarHistory    = prefs.polarHistory
             val oximeterHistory = prefs.oximeterHistory
 
-            Log.d(TAG, "History — H10=$h10History Verity=$verityHistory Oximeter=$oximeterHistory")
+            Log.d(TAG, "History — Polar=$polarHistory Oximeter=$oximeterHistory")
 
-            val hasAnySaved = h10History.isNotEmpty() || verityHistory.isNotEmpty() || oximeterHistory.isNotEmpty()
+            val hasAnySaved = polarHistory.isNotEmpty() || oximeterHistory.isNotEmpty()
             if (!hasAnySaved) {
                 Log.d(TAG, "No saved devices — waiting ${NO_DEVICE_WAIT_MS}ms")
                 delay(NO_DEVICE_WAIT_MS)
@@ -162,89 +147,62 @@ class AutoConnectManager @Inject constructor(
             }
 
             // ── 3. Attempt Polar connections ──────────────────────────────────
-            // Re-issue connectDevice() for every saved Polar device that is not
-            // already connected.  If the SDK has been stuck in Connecting for
-            // longer than POLAR_CONNECTING_TIMEOUT_MS, disconnect and re-issue
-            // so the SDK restarts its internal BLE scan.
-
-            if (!sessionActive.get()) {
+            // Try to connect each saved Polar device. The PolarBleManager will
+            // auto-detect whether it's an H10 or Verity Sense from the name.
+            if (!sessionActive.get() && polarHistory.isNotEmpty()) {
                 val h10State = polarBleManager.h10State.value
-                val now = System.currentTimeMillis()
-
-                val staleH10Connecting = h10State is BleConnectionState.Connecting &&
-                    h10ConnectingSince > 0 &&
-                    (now - h10ConnectingSince) > POLAR_CONNECTING_TIMEOUT_MS
-
-                if (staleH10Connecting) {
-                    Log.d(TAG, "H10 stuck in Connecting for >${POLAR_CONNECTING_TIMEOUT_MS}ms — disconnecting to retry")
-                    val connectingId = (h10State as BleConnectionState.Connecting).deviceId
-                    polarBleManager.disconnectDevice(connectingId)
-                    delay(500)
-                    h10ConnectingSince = 0L
-                }
-
-                val currentH10State = polarBleManager.h10State.value
-                val needsH10Connect = h10History.isNotEmpty() &&
-                    currentH10State !is BleConnectionState.Connected &&
-                    currentH10State !is BleConnectionState.Connecting
-                if (needsH10Connect) {
-                    for (deviceId in h10History) {
-                        if (sessionActive.get()) break
-                        Log.d(TAG, "Issuing Polar connect for H10: $deviceId")
-                        polarBleManager.connectDevice(deviceId, isH10 = true)
-                        h10ConnectingSince = System.currentTimeMillis()
-                        delay(POLAR_CONNECT_SETTLE_MS)
-                        if (polarBleManager.h10State.value is BleConnectionState.Connected) {
-                            h10ConnectingSince = 0L
-                            break
-                        }
-                    }
-                } else if (currentH10State is BleConnectionState.Connected) {
-                    h10ConnectingSince = 0L
-                }
-            }
-
-            if (!sessionActive.get()) {
                 val verityState = polarBleManager.verityState.value
+                val anyPolarConnected = h10State is BleConnectionState.Connected ||
+                    verityState is BleConnectionState.Connected
+                val anyPolarConnecting = h10State is BleConnectionState.Connecting ||
+                    verityState is BleConnectionState.Connecting
+
                 val now = System.currentTimeMillis()
 
-                val staleVerityConnecting = verityState is BleConnectionState.Connecting &&
-                    verityConnectingSince > 0 &&
-                    (now - verityConnectingSince) > POLAR_CONNECTING_TIMEOUT_MS
+                // Check for stale Connecting state
+                val staleConnecting = anyPolarConnecting &&
+                    polarConnectingSince > 0 &&
+                    (now - polarConnectingSince) > POLAR_CONNECTING_TIMEOUT_MS
 
-                if (staleVerityConnecting) {
-                    Log.d(TAG, "Verity stuck in Connecting for >${POLAR_CONNECTING_TIMEOUT_MS}ms — disconnecting to retry")
-                    val connectingId = (verityState as BleConnectionState.Connecting).deviceId
-                    polarBleManager.disconnectDevice(connectingId)
+                if (staleConnecting) {
+                    Log.d(TAG, "Polar stuck in Connecting for >${POLAR_CONNECTING_TIMEOUT_MS}ms — disconnecting to retry")
+                    // Disconnect whichever is stuck
+                    if (h10State is BleConnectionState.Connecting) {
+                        polarBleManager.disconnectDevice(h10State.deviceId)
+                    }
+                    if (verityState is BleConnectionState.Connecting) {
+                        polarBleManager.disconnectDevice(verityState.deviceId)
+                    }
                     delay(500)
-                    verityConnectingSince = 0L
+                    polarConnectingSince = 0L
                 }
 
-                val currentVerityState = polarBleManager.verityState.value
-                val needsVerityConnect = verityHistory.isNotEmpty() &&
-                    currentVerityState !is BleConnectionState.Connected &&
-                    currentVerityState !is BleConnectionState.Connecting
-                if (needsVerityConnect) {
-                    for (deviceId in verityHistory) {
+                // If no Polar device is connected or connecting, try each saved device
+                val needsConnect = !anyPolarConnected &&
+                    !(anyPolarConnecting && !staleConnecting)
+
+                if (needsConnect) {
+                    for (deviceId in polarHistory) {
                         if (sessionActive.get()) break
-                        Log.d(TAG, "Issuing Polar connect for Verity: $deviceId")
-                        polarBleManager.connectDevice(deviceId, isH10 = false)
-                        verityConnectingSince = System.currentTimeMillis()
+                        Log.d(TAG, "Issuing Polar connect: $deviceId")
+                        polarBleManager.connectDevice(deviceId)
+                        polarConnectingSince = System.currentTimeMillis()
                         delay(POLAR_CONNECT_SETTLE_MS)
-                        if (polarBleManager.verityState.value is BleConnectionState.Connected) {
-                            verityConnectingSince = 0L
+                        // Check if any Polar device connected
+                        val h10Now = polarBleManager.h10State.value
+                        val verityNow = polarBleManager.verityState.value
+                        if (h10Now is BleConnectionState.Connected ||
+                            verityNow is BleConnectionState.Connected) {
+                            polarConnectingSince = 0L
                             break
                         }
                     }
-                } else if (currentVerityState is BleConnectionState.Connected) {
-                    verityConnectingSince = 0L
+                } else if (anyPolarConnected) {
+                    polarConnectingSince = 0L
                 }
             }
 
             // ── 4. Attempt oximeter connection ────────────────────────────────
-            // Try a direct connect for each known oximeter.  If none succeeds,
-            // start the background scan so we detect it the moment it turns on.
-
             var oximeterConnected = oximeterBleManager.connectionState.value is OximeterConnectionState.Connected
 
             if (!oximeterConnected && !sessionActive.get() && oximeterHistory.isNotEmpty()) {
@@ -270,21 +228,15 @@ class AutoConnectManager @Inject constructor(
             }
 
             // ── 6. Determine whether everything is connected ──────────────────
-            // Only count as "all connected" when devices are truly Connected,
-            // not just Connecting — so the loop keeps rechecking at the short
-            // interval while a device is still trying to connect.
             val allConnected = run {
-                val h10Ok = h10History.isEmpty() ||
-                    polarBleManager.h10State.value is BleConnectionState.Connected
-                val verityOk = verityHistory.isEmpty() ||
+                val polarOk = polarHistory.isEmpty() ||
+                    polarBleManager.h10State.value is BleConnectionState.Connected ||
                     polarBleManager.verityState.value is BleConnectionState.Connected
                 val oxyOk = oximeterHistory.isEmpty() || oximeterConnected
-                h10Ok && verityOk && oxyOk
+                polarOk && oxyOk
             }
 
             // ── 7. Park — short interval when disconnected, long when all OK ──
-            // When any device is still disconnected we recheck frequently so a
-            // newly-powered device is picked up within a few seconds.
             val recheckMs = if (allConnected) RECHECK_CONNECTED_MS else RECHECK_DISCONNECTED_MS
             Log.d(TAG, "allConnected=$allConnected — rechecking in ${recheckMs}ms")
             reconnectNow = false
@@ -315,7 +267,6 @@ class AutoConnectManager @Inject constructor(
         oximeterBleManager.stopBackgroundScan()
 
         return withTimeoutOrNull(OXIMETER_CONNECT_TIMEOUT_MS) {
-            // Subscribe BEFORE issuing the connect so we cannot miss the callback.
             val resultDeferred = scope.async {
                 oximeterBleManager.connectionState
                     .filter { state ->
@@ -323,18 +274,16 @@ class AutoConnectManager @Inject constructor(
                             is OximeterConnectionState.Connected ->
                                 state.deviceAddress.equals(address, ignoreCase = true)
                             is OximeterConnectionState.Error        -> true
-                            is OximeterConnectionState.Disconnected -> true  // failed connect → back to disconnected
-                            is OximeterConnectionState.Connecting   -> false // still in progress
-                            is OximeterConnectionState.Scanning     -> false // still in progress
+                            is OximeterConnectionState.Disconnected -> true
+                            is OximeterConnectionState.Connecting   -> false
+                            is OximeterConnectionState.Scanning     -> false
                         }
                     }
                     .first()
             }
 
-            // Issue the connect (scan-then-connect).
             oximeterBleManager.connectWithScan(address)
 
-            // Wait for terminal state.
             val terminal = resultDeferred.await()
             terminal is OximeterConnectionState.Connected
         } ?: false
@@ -343,41 +292,13 @@ class AutoConnectManager @Inject constructor(
     // ── Constants ─────────────────────────────────────────────────────────────
 
     companion object {
-        /**
-         * Oximeter connect timeout.  Covers the 8s scan window + GATT connect.
-         */
         private const val OXIMETER_CONNECT_TIMEOUT_MS = 20_000L
-
-        /** Brief pause after issuing a Polar connect to let the SDK settle. */
         private const val POLAR_CONNECT_SETTLE_MS = 2_000L
-
-        /**
-         * If a Polar device has been in Connecting state for longer than this,
-         * we disconnect and re-issue the connect.  The Polar SDK sometimes gets
-         * stuck in Connecting when the device was off at the time of the first
-         * connect call and doesn't recover when the device is later turned on.
-         */
         private const val POLAR_CONNECTING_TIMEOUT_MS = 30_000L
-
-        /** How often to check for early-wake signals. */
         private const val WAKE_CHECK_INTERVAL_MS = 500L
-
-        /** Poll interval while a session is active. */
         private const val SESSION_POLL_MS = 1_000L
-
-        /** How long to wait before rechecking when no devices are saved. */
         private const val NO_DEVICE_WAIT_MS = 30_000L
-
-        /**
-         * Recheck interval when at least one device is still disconnected.
-         * Short so a newly-powered device is picked up within a few seconds.
-         */
         private const val RECHECK_DISCONNECTED_MS = 5_000L
-
-        /**
-         * Recheck interval when all saved devices are connected.
-         * Longer to save battery — disconnect callbacks will wake us early anyway.
-         */
         private const val RECHECK_CONNECTED_MS = 30_000L
     }
 }

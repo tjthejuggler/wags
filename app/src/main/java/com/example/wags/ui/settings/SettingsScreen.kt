@@ -9,8 +9,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
@@ -20,7 +18,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -166,10 +163,7 @@ fun SettingsScreen(
                     h10State = state.h10State,
                     verityState = state.verityState,
                     oximeterState = state.oximeterState,
-                    savedH10Id = state.savedH10Id,
-                    savedVerityId = state.savedVerityId,
-                    onDisconnectH10 = { viewModel.disconnectH10() },
-                    onDisconnectVerity = { viewModel.disconnectVerity() },
+                    onDisconnectPolar = { viewModel.disconnectPolar() },
                     onDisconnectOximeter = { viewModel.disconnectOximeter() }
                 )
             }
@@ -291,13 +285,9 @@ fun SettingsScreen(
                     device = device,
                     h10State = state.h10State,
                     verityState = state.verityState,
-                    onConnectH10 = {
+                    onConnect = {
                         viewModel.stopScan()
-                        viewModel.connectH10(device)
-                    },
-                    onConnectVerity = {
-                        viewModel.stopScan()
-                        viewModel.connectVerity(device)
+                        viewModel.connectPolar(device)
                     }
                 )
             }
@@ -429,10 +419,7 @@ private fun ConnectedDevicesCard(
     h10State: BleConnectionState,
     verityState: BleConnectionState,
     oximeterState: OximeterConnectionState,
-    savedH10Id: String,
-    savedVerityId: String,
-    onDisconnectH10: () -> Unit,
-    onDisconnectVerity: () -> Unit,
+    onDisconnectPolar: () -> Unit,
     onDisconnectOximeter: () -> Unit
 ) {
     Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
@@ -443,17 +430,12 @@ private fun ConnectedDevicesCard(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text("Connected Devices", style = MaterialTheme.typography.titleMedium)
-            DeviceStatusRow(
-                label = "Polar H10",
-                deviceId = savedH10Id,
-                state = h10State,
-                onDisconnect = onDisconnectH10
-            )
-            DeviceStatusRow(
-                label = "Polar Verity Sense",
-                deviceId = savedVerityId,
-                state = verityState,
-                onDisconnect = onDisconnectVerity
+
+            // Polar device row — show whichever is connected (or both if somehow both are)
+            PolarDeviceStatusRow(
+                h10State = h10State,
+                verityState = verityState,
+                onDisconnect = onDisconnectPolar
             )
 
             // Oximeter row
@@ -490,36 +472,55 @@ private fun ConnectedDevicesCard(
     }
 }
 
+/**
+ * Shows the status of connected Polar devices. The device type is determined
+ * from the device name — no manual assignment needed.
+ */
 @Composable
-private fun DeviceStatusRow(
-    label: String,
-    deviceId: String,
-    state: BleConnectionState,
+private fun PolarDeviceStatusRow(
+    h10State: BleConnectionState,
+    verityState: BleConnectionState,
     onDisconnect: () -> Unit
 ) {
+    // Determine the combined Polar status
+    val h10Connected = h10State is BleConnectionState.Connected
+    val verityConnected = verityState is BleConnectionState.Connected
+    val anyConnecting = h10State is BleConnectionState.Connecting || verityState is BleConnectionState.Connecting
+    val anyError = h10State is BleConnectionState.Error || verityState is BleConnectionState.Error
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column {
-            Text(label, style = MaterialTheme.typography.bodyLarge)
-            val statusText = when (state) {
-                is BleConnectionState.Connected -> "Connected: ${state.deviceName}"
-                is BleConnectionState.Connecting -> "Connecting…"
-                is BleConnectionState.Disconnected ->
-                    if (deviceId.isNotBlank()) "Last: $deviceId" else "Not connected"
-                is BleConnectionState.Error -> "Error: ${state.message}"
+            Text("Polar HR Sensor", style = MaterialTheme.typography.bodyLarge)
+            when {
+                h10Connected -> {
+                    val name = (h10State as BleConnectionState.Connected).deviceName
+                    Text("Connected: $name", style = MaterialTheme.typography.bodySmall, color = ReadinessGreen)
+                }
+                verityConnected -> {
+                    val name = (verityState as BleConnectionState.Connected).deviceName
+                    Text("Connected: $name", style = MaterialTheme.typography.bodySmall, color = ReadinessGreen)
+                }
+                anyConnecting -> {
+                    Text("Connecting…", style = MaterialTheme.typography.bodySmall, color = ReadinessOrange)
+                }
+                anyError -> {
+                    val msg = when {
+                        h10State is BleConnectionState.Error -> h10State.message
+                        verityState is BleConnectionState.Error -> verityState.message
+                        else -> "Unknown error"
+                    }
+                    Text("Error: $msg", style = MaterialTheme.typography.bodySmall, color = ReadinessRed)
+                }
+                else -> {
+                    Text("Not connected", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                }
             }
-            val statusColor = when (state) {
-                is BleConnectionState.Connected -> ReadinessGreen
-                is BleConnectionState.Connecting -> ReadinessOrange
-                is BleConnectionState.Disconnected -> TextSecondary
-                is BleConnectionState.Error -> ReadinessRed
-            }
-            Text(statusText, style = MaterialTheme.typography.bodySmall, color = statusColor)
         }
-        if (state is BleConnectionState.Connected) {
+        if (h10Connected || verityConnected) {
             OutlinedButton(
                 onClick = onDisconnect,
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
@@ -528,15 +529,14 @@ private fun DeviceStatusRow(
     }
 }
 
-// ── Polar device result card ──────────────────────────────────────────────────
+// ── Polar device result card (single Connect button) ──────────────────────────
 
 @Composable
 private fun PolarDeviceResultCard(
     device: PolarDeviceInfo,
     h10State: BleConnectionState,
     verityState: BleConnectionState,
-    onConnectH10: () -> Unit,
-    onConnectVerity: () -> Unit
+    onConnect: () -> Unit
 ) {
     val h10Connected = h10State is BleConnectionState.Connected &&
         (h10State as BleConnectionState.Connected).deviceId == device.deviceId
@@ -571,22 +571,11 @@ private fun PolarDeviceResultCard(
                 }
             }
             if (!alreadyConnected) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    horizontalAlignment = Alignment.End
-                ) {
-                    Button(
-                        onClick = onConnectH10,
-                        modifier = Modifier.height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                    ) { Text("H10", style = MaterialTheme.typography.bodySmall) }
-                    OutlinedButton(
-                        onClick = onConnectVerity,
-                        modifier = Modifier.height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
-                    ) { Text("Verity", style = MaterialTheme.typography.bodySmall) }
-                }
+                Button(
+                    onClick = onConnect,
+                    modifier = Modifier.height(32.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                ) { Text("Connect", style = MaterialTheme.typography.bodySmall) }
             }
         }
     }

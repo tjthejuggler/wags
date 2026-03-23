@@ -1,5 +1,6 @@
 package com.example.wags.data.ble
 
+import android.util.Log
 import com.example.wags.domain.model.BleConnectionState
 import com.polar.androidcommunications.api.ble.model.DisInfo
 import com.polar.sdk.api.PolarBleApi
@@ -12,6 +13,21 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
+private const val TAG = "PolarBleManager"
+
+/**
+ * Manages Polar BLE device connections.
+ *
+ * ## Name-based device identification
+ *
+ * Devices are identified by their advertised name **after** connection:
+ *   - Name contains "H10" → routed to [h10State] (chest strap: HR, RR, ECG, ACC)
+ *   - Name contains "Sense" → routed to [verityState] (optical: HR, PPI)
+ *   - Anything else → routed to [h10State] as fallback
+ *
+ * The caller never needs to specify which type a device is — just call
+ * [connectDevice] with the device ID and the manager figures it out.
+ */
 @Singleton
 class PolarBleManager @Inject constructor(
     private val polarApi: PolarBleApi
@@ -55,14 +71,9 @@ class PolarBleManager @Inject constructor(
     private var scanJob: Job? = null
 
     /**
-     * Explicit slot registry: maps a Polar deviceId → which slot ("h10" or "verity")
-     * it was assigned to when [connectDevice] was called.
-     *
-     * This is the authoritative source for routing SDK callbacks to the correct
-     * StateFlow.  Without it, [updateState] had to infer the slot from the
-     * *current* state value — which breaks after a disconnect because the state
-     * reverts to [BleConnectionState.Disconnected] (no deviceId), causing the
-     * next Connecting callback for the H10 to be misrouted to verityState.
+     * Slot registry: maps a Polar deviceId → which slot ("h10" or "verity")
+     * it was assigned to. Populated automatically based on device name when
+     * the device connects, or set to a temporary value during the Connecting phase.
      */
     private val deviceSlotRegistry = mutableMapOf<String, String>()   // deviceId → "h10"|"verity"
 
@@ -96,15 +107,30 @@ class PolarBleManager @Inject constructor(
     init {
         polarApi.setApiCallback(object : PolarBleApiCallback() {
             override fun deviceConnected(polarDeviceInfo: PolarDeviceInfo) {
+                val deviceName = polarDeviceInfo.name ?: "Unknown"
+                // Auto-detect device type from name and update the slot registry
+                val slot = detectSlotFromName(deviceName)
+                deviceSlotRegistry[polarDeviceInfo.deviceId] = slot
+                Log.d(TAG, "Device connected: ${polarDeviceInfo.deviceId} name='$deviceName' → slot=$slot")
+
                 val state = BleConnectionState.Connected(
                     polarDeviceInfo.deviceId,
-                    polarDeviceInfo.name ?: "Unknown"
+                    deviceName
                 )
                 updateState(polarDeviceInfo.deviceId, state)
                 startHrStream(polarDeviceInfo.deviceId)
             }
 
             override fun deviceConnecting(polarDeviceInfo: PolarDeviceInfo) {
+                // During connecting, we may not have the name yet.
+                // If the device is already in the registry (from a previous connection),
+                // keep that slot. Otherwise, use a temporary slot that will be corrected
+                // in deviceConnected when we learn the actual name.
+                if (polarDeviceInfo.deviceId !in deviceSlotRegistry) {
+                    // Temporary: guess from name if available, otherwise default to "h10"
+                    val name = polarDeviceInfo.name ?: ""
+                    deviceSlotRegistry[polarDeviceInfo.deviceId] = detectSlotFromName(name)
+                }
                 updateState(
                     polarDeviceInfo.deviceId,
                     BleConnectionState.Connecting(polarDeviceInfo.deviceId)
@@ -133,6 +159,22 @@ class PolarBleManager @Inject constructor(
     }
 
     /**
+     * Determines the slot ("h10" or "verity") from the device's advertised name.
+     *
+     * - Contains "H10" → "h10" (chest strap with ECG + ACC)
+     * - Contains "Sense" → "verity" (optical HR with PPI)
+     * - Anything else → "h10" (safe default — H10 features are a superset)
+     */
+    private fun detectSlotFromName(name: String): String {
+        val upper = name.uppercase()
+        return when {
+            upper.contains("H10") -> "h10"
+            upper.contains("SENSE") -> "verity"
+            else -> "h10"  // default: treat unknown Polar devices as H10
+        }
+    }
+
+    /**
      * Routes a state update to the correct StateFlow using [deviceSlotRegistry].
      *
      * Falls back to the old heuristic (check current state value) only if the
@@ -155,23 +197,65 @@ class PolarBleManager @Inject constructor(
         }
     }
 
-    fun connectDevice(deviceId: String, isH10: Boolean) {
-        // Register the slot BEFORE setting state so the SDK callback is always routed correctly.
-        deviceSlotRegistry[deviceId] = if (isH10) "h10" else "verity"
-        if (isH10) _h10State.value = BleConnectionState.Connecting(deviceId)
+    /**
+     * Connect to a Polar device. The device type (H10 vs Verity Sense) is
+     * determined automatically from the device name once connected.
+     *
+     * During the Connecting phase, if the device was previously connected
+     * its known slot is reused; otherwise it defaults to "h10" until the
+     * actual name is received.
+     */
+    fun connectDevice(deviceId: String) {
+        // If we already know this device's slot from a previous connection, reuse it.
+        // Otherwise, set a temporary slot that will be corrected in deviceConnected.
+        if (deviceId !in deviceSlotRegistry) {
+            deviceSlotRegistry[deviceId] = "h10"  // temporary default
+        }
+        val slot = deviceSlotRegistry[deviceId]!!
+        if (slot == "h10") _h10State.value = BleConnectionState.Connecting(deviceId)
         else _verityState.value = BleConnectionState.Connecting(deviceId)
         try {
             polarApi.connectToDevice(deviceId)
         } catch (e: PolarInvalidArgument) {
             val error = BleConnectionState.Error(e.message ?: "Connection failed")
-            if (isH10) _h10State.value = error else _verityState.value = error
+            if (slot == "h10") _h10State.value = error else _verityState.value = error
         }
+    }
+
+    /**
+     * @deprecated Use [connectDevice] without isH10 parameter.
+     * Kept temporarily for backward compatibility during migration.
+     */
+    fun connectDevice(deviceId: String, @Suppress("UNUSED_PARAMETER") isH10: Boolean) {
+        connectDevice(deviceId)
     }
 
     fun disconnectDevice(deviceId: String) {
         try {
             polarApi.disconnectFromDevice(deviceId)
         } catch (e: PolarInvalidArgument) { /* ignore */ }
+    }
+
+    /**
+     * Returns true if the device currently in the H10 slot is actually an H10
+     * (i.e. its name contains "H10"). Used by features that require H10-specific
+     * capabilities like ECG and ACC streaming.
+     */
+    fun isH10Connected(): Boolean {
+        val state = _h10State.value
+        if (state !is BleConnectionState.Connected) return false
+        return state.deviceName.uppercase().contains("H10")
+    }
+
+    /**
+     * Returns the device ID of the connected H10 (by name), or null.
+     */
+    fun connectedH10DeviceId(): String? {
+        val state = _h10State.value
+        if (state is BleConnectionState.Connected && state.deviceName.uppercase().contains("H10")) {
+            return state.deviceId
+        }
+        return null
     }
 
     /**

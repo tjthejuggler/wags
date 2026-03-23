@@ -46,8 +46,7 @@ data class SettingsUiState(
     val isScanning: Boolean = false,
     val polarScanResults: List<PolarDeviceInfo> = emptyList(),
     val oximeterScanResults: List<ScanResult> = emptyList(),
-    val savedH10Id: String = "",
-    val savedVerityId: String = "",
+    val savedPolarId: String = "",
     // ── Garmin Watch ──────────────────────────────────────────────────────────
     val garminState: GarminConnectionState = GarminConnectionState.Uninitialized,
     // ── Meditation audio directory ─────────────────────────────────────────────
@@ -128,8 +127,7 @@ class SettingsViewModel @Inject constructor(
             isScanning            = polarScanning || oximeterScanning,
             polarScanResults      = polarResults,
             oximeterScanResults   = oximeterResults,
-            savedH10Id            = snap.savedH10Id,
-            savedVerityId         = snap.savedVerityId,
+            savedPolarId          = snap.savedPolarId,
             garminState           = garminState,
             meditationAudioDirUri = snap.meditationAudioDirUri
         )
@@ -156,8 +154,7 @@ class SettingsViewModel @Inject constructor(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = SettingsUiState(
-            savedH10Id              = devicePrefs.savedH10Id,
-            savedVerityId           = devicePrefs.savedVerityId,
+            savedPolarId            = devicePrefs.savedPolarId,
             meditationAudioDirUri   = devicePrefs.meditationAudioDirUri,
             freeHoldHabit           = slotSelection(Slot.FREE_HOLD),
             apneaNewRecordHabit     = slotSelection(Slot.APNEA_NEW_RECORD),
@@ -170,52 +167,43 @@ class SettingsViewModel @Inject constructor(
 
     // ── Unified scan ─────────────────────────────────────────────────────────
 
-    /**
-     * Starts both Polar and Oximeter scans.
-     *
-     * Android's BLE stack can only run one scan at a time reliably.  Running
-     * two scans simultaneously often causes one (or both) to silently fail.
-     * We start the Polar scan first (it uses the Polar SDK's internal scanner)
-     * and delay the raw BLE oximeter scan by a short interval so the two
-     * don't collide on the radio.
-     */
     fun startScan() {
         bleManager.startScan()
         viewModelScope.launch {
-            // Small delay so the Polar SDK's scan gets established first
             kotlinx.coroutines.delay(800)
             oximeterBleManager.startScan()
         }
     }
 
-    /** Stops both scans. */
     fun stopScan() {
         bleManager.stopScan()
         oximeterBleManager.stopScan()
     }
 
-    // ── Polar connections ─────────────────────────────────────────────────────
+    // ── Polar connections (simplified — no device type assignment) ─────────────
 
-    fun connectH10(device: PolarDeviceInfo) {
-        devicePrefs.savedH10Id = device.deviceId
+    /**
+     * Connect to a Polar device. The device type (H10 vs Verity Sense) is
+     * determined automatically from the device name after connection.
+     */
+    fun connectPolar(device: PolarDeviceInfo) {
+        devicePrefs.savedPolarId = device.deviceId
         devicePrefs.refresh()
-        bleManager.connectDevice(device.deviceId, isH10 = true)
+        bleManager.connectDevice(device.deviceId)
     }
 
-    fun connectVerity(device: PolarDeviceInfo) {
-        devicePrefs.savedVerityId = device.deviceId
-        devicePrefs.refresh()
-        bleManager.connectDevice(device.deviceId, isH10 = false)
-    }
-
-    fun disconnectH10() {
-        val id = devicePrefs.savedH10Id
-        if (id.isNotBlank()) bleManager.disconnectDevice(id)
-    }
-
-    fun disconnectVerity() {
-        val id = devicePrefs.savedVerityId
-        if (id.isNotBlank()) bleManager.disconnectDevice(id)
+    /**
+     * Disconnect whichever Polar device is currently connected.
+     */
+    fun disconnectPolar() {
+        val h10 = bleManager.h10State.value
+        val verity = bleManager.verityState.value
+        if (h10 is BleConnectionState.Connected) {
+            bleManager.disconnectDevice(h10.deviceId)
+        }
+        if (verity is BleConnectionState.Connected) {
+            bleManager.disconnectDevice(verity.deviceId)
+        }
     }
 
     // ── Oximeter connections ──────────────────────────────────────────────────
@@ -241,10 +229,6 @@ class SettingsViewModel @Inject constructor(
 
     // ── Habit / Tail integration ──────────────────────────────────────────────
 
-    /**
-     * Queries the Habit app's Content Provider on the IO dispatcher and updates
-     * [_habitState] with the result. Safe to call multiple times.
-     */
     fun loadHabits() {
         viewModelScope.launch {
             _habitState.update { it.copy(isLoadingHabits = true, habitAppUnavailable = false) }
@@ -259,14 +243,12 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** Persists [entry] as the selected habit for [slot] and updates UI state. */
     fun selectHabit(slot: Slot, entry: HabitEntry) {
         habitRepo.setHabit(slot, entry)
         val selection = HabitSlotSelection(entry.habitId, entry.habitName)
         _habitState.update { it.copySlot(slot, selection) }
     }
 
-    /** Clears the habit selection for [slot]. */
     fun clearHabit(slot: Slot) {
         habitRepo.clearHabit(slot)
         _habitState.update { it.copySlot(slot, HabitSlotSelection()) }
@@ -274,10 +256,8 @@ class SettingsViewModel @Inject constructor(
 
     // ── Data Export / Import ───────────────────────────────────────────────────
 
-    /** Returns a suggested filename for the export. */
     fun getExportFileName(): String = dataExportImportRepo.generateExportFileName()
 
-    /** Exports all data to the given URI (chosen by the user via SAF). */
     fun exportData(uri: Uri) {
         viewModelScope.launch {
             _exportImportState.update { it.copy(isExporting = true, exportImportMessage = null, exportImportError = null) }
@@ -292,7 +272,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** Imports all data from the given URI (chosen by the user via SAF). */
     fun importData(uri: Uri) {
         viewModelScope.launch {
             _exportImportState.update { it.copy(isImporting = true, exportImportMessage = null, exportImportError = null) }
@@ -307,7 +286,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** Clears the export/import result message. */
     fun clearExportImportMessage() {
         _exportImportState.update { it.copy(exportImportMessage = null, exportImportError = null) }
     }
@@ -347,7 +325,6 @@ private data class HabitPartialState(
     val hrvReadinessHabit: HabitSlotSelection = HabitSlotSelection(),
     val resonanceBreathingHabit: HabitSlotSelection = HabitSlotSelection()
 ) {
-    /** Returns a copy with the given [slot]'s selection replaced by [value]. */
     fun copySlot(slot: HabitIntegrationRepository.Slot, value: HabitSlotSelection) = when (slot) {
         HabitIntegrationRepository.Slot.FREE_HOLD           -> copy(freeHoldHabit = value)
         HabitIntegrationRepository.Slot.APNEA_NEW_RECORD    -> copy(apneaNewRecordHabit = value)

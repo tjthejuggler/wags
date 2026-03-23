@@ -9,7 +9,6 @@ import com.example.wags.data.db.entity.SessionLogEntity
 import com.example.wags.data.repository.SessionRepository
 import com.example.wags.di.IoDispatcher
 import com.example.wags.di.MathDispatcher
-import com.example.wags.domain.model.BleConnectionState
 import com.example.wags.domain.model.OximeterConnectionState
 import com.example.wags.domain.model.SessionType
 import com.example.wags.domain.usecase.hrv.ArtifactCorrectionUseCase
@@ -90,11 +89,10 @@ class SessionViewModel @Inject constructor(
         // Observe all HR-capable connection states to keep hasHrMonitor + connectedDeviceId in sync
         viewModelScope.launch {
             hrDataSource.isAnyHrDeviceConnected.collect { anyConnected ->
-                val h10Id = (bleManager.h10State.value as? BleConnectionState.Connected)?.deviceId
-                val verityId = (bleManager.verityState.value as? BleConnectionState.Connected)?.deviceId
-                val oxyAddr = (oximeterBleManager.connectionState.value as? OximeterConnectionState.Connected)?.deviceAddress
                 // Polar takes priority for RR-based analytics; oximeter is HR-only
-                val activeId = h10Id ?: verityId ?: oxyAddr
+                val polarId = hrDataSource.connectedPolarDeviceId()
+                val oxyAddr = (oximeterBleManager.connectionState.value as? OximeterConnectionState.Connected)?.deviceAddress
+                val activeId = polarId ?: oxyAddr
                 _uiState.update {
                     it.copy(
                         hasHrMonitor = anyConnected,
@@ -279,10 +277,9 @@ class SessionViewModel @Inject constructor(
         sonificationEngine.stop()
         hrTimeSeries.clear()
         // Preserve connection state across reset
-        val h10Id = (bleManager.h10State.value as? BleConnectionState.Connected)?.deviceId
-        val verityId = (bleManager.verityState.value as? BleConnectionState.Connected)?.deviceId
+        val polarId = hrDataSource.connectedPolarDeviceId()
         val oxyAddr = (oximeterBleManager.connectionState.value as? OximeterConnectionState.Connected)?.deviceAddress
-        val activeId = h10Id ?: verityId ?: oxyAddr
+        val activeId = polarId ?: oxyAddr
         _uiState.value = SessionUiState(
             hasHrMonitor = activeId != null,
             connectedDeviceId = activeId
