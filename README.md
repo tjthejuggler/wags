@@ -539,3 +539,11 @@ When only an oximeter was connected during a free-hold, `saveFreeHoldRecord()` u
 Fix: `startRrStream()` now delegates to `startHrStream()`, which writes to both `liveHr` and `rrBuffer` using a single SDK subscription.
 
 - `PolarBleManager.kt` — `startRrStream()` → delegates to `startHrStream()`
+
+#### RF assessment phase synchrony falsely rejecting later epochs
+
+`CoherenceScoreCalculator.calculatePhaseSynchrony()` computed cross-correlation between the IHR signal and a cosine reference wave to find the best-matching lag, but then **discarded the correlation value** and based the synchrony score solely on the **magnitude of the lag**: `synchrony = 1.0 - (bestLagSec / halfCycle)`. Since the pacer runs continuously across epochs, later epochs start at arbitrary pacer phases, producing large lags and near-zero synchrony — even when the user was perfectly following the pacer. The first 3 rounds happened to start near the reference wave's phase 0, so they passed; rounds 4–5 did not.
+
+Fix: synchrony is now the **peak cross-correlation value** (clamped to 0–1), which measures how well the IHR tracks the breathing pattern regardless of phase offset. The lag search window was also widened from half-cycle to full-cycle to cover all possible phase offsets.
+
+- `CoherenceScoreCalculator.kt` — `calculatePhaseSynchrony()` returns `bestCorr.coerceIn(0.0, 1.0)` instead of lag-based penalty

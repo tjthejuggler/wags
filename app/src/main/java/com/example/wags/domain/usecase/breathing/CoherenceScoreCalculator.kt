@@ -4,7 +4,6 @@ import com.example.wags.domain.usecase.hrv.FftProcessor
 import com.example.wags.domain.usecase.hrv.PchipResampler
 import com.example.wags.domain.usecase.hrv.PsdBandIntegrator
 import javax.inject.Inject
-import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
@@ -212,6 +211,11 @@ class CoherenceScoreCalculator @Inject constructor(
      * Phase synchrony via cross-correlation between IHR and respiratory reference.
      * Returns 0.0 (no sync) to 1.0 (perfect sync).
      *
+     * Uses the **peak cross-correlation value** (not the lag) as the synchrony
+     * measure. The lag search covers a full breath cycle so that epochs starting
+     * at any pacer phase are handled correctly — the correlation strength tells
+     * us how well the user followed the pacer regardless of phase offset.
+     *
      * @param ihrBpm instantaneous HR in BPM at 4 Hz (from PCHIP-resampled NN)
      * @param breathRefWave synthetic respiratory reference wave at same sample rate
      * @param cycleDurationSec duration of one breath cycle in seconds
@@ -228,10 +232,10 @@ class CoherenceScoreCalculator @Inject constructor(
         val ihrNorm = normalize(ihrBpm.take(n).toDoubleArray())
         val refNorm = normalize(breathRefWave.take(n).toDoubleArray())
 
-        // Cross-correlate: find lag that maximizes correlation
-        val maxLagSamples = (cycleDurationSec * PchipResampler.RESAMPLE_RATE_HZ / 2).toInt()
+        // Cross-correlate over a full cycle to handle arbitrary epoch start phase.
+        // The peak correlation value measures how well the IHR tracks the pacer.
+        val maxLagSamples = (cycleDurationSec * PchipResampler.RESAMPLE_RATE_HZ).toInt()
         var bestCorr = Double.MIN_VALUE
-        var bestLag = 0
 
         for (lag in -maxLagSamples..maxLagSamples) {
             var corr = 0.0
@@ -245,14 +249,12 @@ class CoherenceScoreCalculator @Inject constructor(
             if (count > 0) corr /= count
             if (corr > bestCorr) {
                 bestCorr = corr
-                bestLag = lag
             }
         }
 
-        val bestLagSec = abs(bestLag) / PchipResampler.RESAMPLE_RATE_HZ
-        val halfCycle = cycleDurationSec / 2.0
-        val synchrony = (1.0 - (bestLagSec / halfCycle)).coerceIn(0.0, 1.0)
-        return synchrony.toFloat()
+        // bestCorr is the normalized cross-correlation at the optimal lag.
+        // Range is roughly -1..+1; clamp to 0..1 for the synchrony score.
+        return bestCorr.coerceIn(0.0, 1.0).toFloat()
     }
 
     /**
