@@ -400,6 +400,17 @@ cd wags
 
 ## Changelog
 
+### 2026-03-23 — Critical Fix: RR Interval Polling Stops After CircularBuffer Fills
+
+#### Bug Fix
+
+- **[`CircularBuffer`](app/src/main/java/com/example/wags/data/ble/CircularBuffer.kt)** — Added monotonically increasing `totalWrites()` counter. The existing `size()` method caps at `capacity` (1024), so any polling loop using `size()` to detect new data would stop seeing new entries once the buffer was full. `totalWrites()` never caps and is safe for "new since last check" subtraction.
+- **[`AssessmentRunViewModel`](app/src/main/java/com/example/wags/ui/breathing/AssessmentRunViewModel.kt)** — Replaced `rrBuffer.size()` with `rrBuffer.totalWrites()` in the RR polling loop. This was the primary cause of beats getting stuck during RF assessments (e.g., stuck at beat 57), which cascaded into: coherence stuck at a single value, all epoch results invalid (score 0), warning symbols on all breathing rates in the report, and the resonance curve flat at 0.
+- **[`BreathingViewModel`](app/src/main/java/com/example/wags/ui/breathing/BreathingViewModel.kt)** — Same fix applied to all 3 polling loops: the session RR polling loop, the RF assessment RR forwarding loop, and the session-start snapshot.
+- **[`ReadinessViewModel`](app/src/main/java/com/example/wags/ui/readiness/ReadinessViewModel.kt)** — Same fix applied to the readiness session RR polling loop and session-start snapshot.
+
+---
+
 ### 2026-03-11 — Morning Readiness: FSM Simplification, Bug Fix & History Screen
 
 #### Bug Fix

@@ -146,8 +146,8 @@ class BreathingViewModel @Inject constructor(
     private var rrPollingJob: Job? = null
     private var timerJob: Job? = null
 
-    /** Buffer size at the moment the session started — used to ignore pre-session RR intervals */
-    private var rrBufferSizeAtStart: Int = 0
+    /** Total writes at the moment the session started — used to ignore pre-session RR intervals */
+    private var rrWritesAtStart: Long = 0L
 
     /** All RR intervals collected during this session (for post-session analytics). */
     private val allSessionRrIntervals = mutableListOf<Double>()
@@ -170,7 +170,7 @@ class BreathingViewModel @Inject constructor(
     fun startSession(deviceId: String) {
         if (_uiState.value.isSessionActive) return
         bleManager.startRrStream(deviceId)
-        rrBufferSizeAtStart = bleManager.rrBuffer.size()
+        rrWritesAtStart = bleManager.rrBuffer.totalWrites()
         pacerEngine.reset()
         allSessionRrIntervals.clear()
         sessionStartTimeMs = System.currentTimeMillis()
@@ -402,20 +402,22 @@ class BreathingViewModel @Inject constructor(
      */
     private fun startRrPollingLoop() {
         rrPollingJob = viewModelScope.launch {
-            var lastSeenCount = bleManager.rrBuffer.size()
+            var lastSeenWrites = bleManager.rrBuffer.totalWrites()
             while (isActive) {
                 delay(500L) // 2 Hz for smooth chart updates
-                val currentCount = bleManager.rrBuffer.size()
-                val newCount = currentCount - lastSeenCount
+                val currentWrites = bleManager.rrBuffer.totalWrites()
+                val newCount = (currentWrites - lastSeenWrites).toInt()
+                    .coerceAtMost(bleManager.rrBuffer.capacity)
                 if (newCount > 0) {
                     val newBeats = bleManager.rrBuffer.readLast(newCount)
                     synchronized(allSessionRrIntervals) {
                         newBeats.forEach { rrMs -> allSessionRrIntervals.add(rrMs) }
                     }
-                    lastSeenCount = currentCount
+                    lastSeenWrites = currentWrites
                 }
 
-                val totalNew = currentCount - rrBufferSizeAtStart
+                val totalNew = (currentWrites - rrWritesAtStart).toInt()
+                    .coerceAtMost(bleManager.rrBuffer.capacity)
                 val snapshot = if (totalNew > 0) bleManager.rrBuffer.readLast(totalNew) else emptyList()
                 val liveRmssd = computeLiveRmssd(snapshot)
                 val liveSdnn = computeLiveSdnn(snapshot)
@@ -464,16 +466,17 @@ class BreathingViewModel @Inject constructor(
         rfCollectorJob = viewModelScope.launch {
             // Poll rrBuffer and forward new beats to orchestrator
             launch {
-                var lastSeenCount = bleManager.rrBuffer.size()
+                var lastSeenWrites = bleManager.rrBuffer.totalWrites()
                 while (isActive) {
                     delay(200L)
-                    val currentCount = bleManager.rrBuffer.size()
-                    val newCount = currentCount - lastSeenCount
+                    val currentWrites = bleManager.rrBuffer.totalWrites()
+                    val newCount = (currentWrites - lastSeenWrites).toInt()
+                        .coerceAtMost(bleManager.rrBuffer.capacity)
                     if (newCount > 0) {
                         bleManager.rrBuffer.readLast(newCount).forEach { rrMs ->
                             rfOrchestrator.feedRr(rrMs.toFloat())
                         }
-                        lastSeenCount = currentCount
+                        lastSeenWrites = currentWrites
                     }
                 }
             }

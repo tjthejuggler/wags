@@ -10,6 +10,7 @@ class CircularBuffer<T>(val capacity: Int) {
     private var writeIdx = 0
     private var readIdx = 0
     private var count = 0
+    private var _totalWrites = 0L
 
     /** Write a single value. Overwrites oldest if full. */
     fun write(value: T) {
@@ -17,6 +18,7 @@ class CircularBuffer<T>(val capacity: Int) {
             buffer[writeIdx] = value
             writeIdx = (writeIdx + 1) % capacity
             if (count < capacity) count++ else readIdx = (readIdx + 1) % capacity
+            _totalWrites++
         }
     }
 
@@ -27,6 +29,7 @@ class CircularBuffer<T>(val capacity: Int) {
                 buffer[writeIdx] = value
                 writeIdx = (writeIdx + 1) % capacity
                 if (count < capacity) count++ else readIdx = (readIdx + 1) % capacity
+                _totalWrites++
             }
         }
     }
@@ -64,5 +67,14 @@ class CircularBuffer<T>(val capacity: Int) {
 
     fun size(): Int = lock.read { count }
     fun isFull(): Boolean = lock.read { count == capacity }
-    fun clear() = lock.write { writeIdx = 0; readIdx = 0; count = 0 }
+
+    /**
+     * Monotonically increasing count of all values ever written to this buffer.
+     * Unlike [size], this never caps at [capacity] — it keeps growing as new
+     * values are written, making it safe for polling loops that track "new since
+     * last check" via subtraction.
+     */
+    fun totalWrites(): Long = lock.read { _totalWrites }
+
+    fun clear() = lock.write { writeIdx = 0; readIdx = 0; count = 0; _totalWrites = 0L }
 }

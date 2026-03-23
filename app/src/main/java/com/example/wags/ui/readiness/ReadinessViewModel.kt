@@ -81,16 +81,16 @@ class ReadinessViewModel @Inject constructor(
     private val collectedRr = mutableListOf<Double>()
     // Captured at session-start so the device label is recorded even if it disconnects before save
     private var sessionHrDeviceLabel: String? = null
-    // Buffer size at the moment the session started — used to ignore pre-session RR intervals
-    private var rrBufferSizeAtStart: Int = 0
+    // Total writes at the moment the session started — used to ignore pre-session RR intervals
+    private var rrWritesAtStart: Long = 0L
 
     fun startSession(deviceId: String, durationSeconds: Long = 120L) {
         if (_uiState.value.sessionState == ReadinessSessionState.RECORDING) return
         collectedRr.clear()
         sessionHrDeviceLabel = hrDataSource.activeHrDeviceLabel()
         bleManager.startRrStream(deviceId)
-        // Snapshot the current buffer size so we only count intervals from this point forward
-        rrBufferSizeAtStart = bleManager.rrBuffer.size()
+        // Snapshot the current total writes so we only count intervals from this point forward
+        rrWritesAtStart = bleManager.rrBuffer.totalWrites()
         _uiState.update {
             it.copy(
                 sessionState = ReadinessSessionState.RECORDING,
@@ -108,8 +108,9 @@ class ReadinessViewModel @Inject constructor(
                 delay(500L) // Poll at 2 Hz for smoother chart updates
                 remaining = (remaining - 1L).coerceAtLeast(0L)
                 // Only take intervals added since the session started
-                val totalInBuffer = bleManager.rrBuffer.size()
-                val newCount = totalInBuffer - rrBufferSizeAtStart
+                val totalWrites = bleManager.rrBuffer.totalWrites()
+                val newCount = (totalWrites - rrWritesAtStart).toInt()
+                    .coerceAtMost(bleManager.rrBuffer.capacity)
                 val snapshot = if (newCount > 0) bleManager.rrBuffer.readLast(newCount) else emptyList()
                 collectedRr.clear()
                 collectedRr.addAll(snapshot)

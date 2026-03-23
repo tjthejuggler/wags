@@ -350,24 +350,26 @@ class AssessmentRunViewModel @Inject constructor(
     // -------------------------------------------------------------------------
 
     private fun startRrPolling() {
-        val rrBufferSizeAtStart = bleManager.rrBuffer.size()
+        val rrWritesAtStart = bleManager.rrBuffer.totalWrites()
         rrPollingJob = viewModelScope.launch {
-            var lastSeenCount = bleManager.rrBuffer.size()
+            var lastSeenWrites = bleManager.rrBuffer.totalWrites()
             while (isActive) {
                 delay(500L) // 2 Hz — matches BreathingViewModel cadence
-                val currentCount = bleManager.rrBuffer.size()
-                val newCount = currentCount - lastSeenCount
+                val currentWrites = bleManager.rrBuffer.totalWrites()
+                val newCount = (currentWrites - lastSeenWrites).toInt()
+                    .coerceAtMost(bleManager.rrBuffer.capacity) // can't read more than buffer holds
                 if (newCount > 0) {
                     val newBeats = bleManager.rrBuffer.readLast(newCount)
                     newBeats.forEach { rrMs ->
                         orchestrator.feedRr(rrMs.toFloat())
                         allSessionRrIntervals.add(rrMs)
                     }
-                    lastSeenCount = currentCount
+                    lastSeenWrites = currentWrites
                 }
 
                 // Compute live metrics from all session RR data
-                val totalNew = currentCount - rrBufferSizeAtStart
+                val totalNew = (currentWrites - rrWritesAtStart).toInt()
+                    .coerceAtMost(bleManager.rrBuffer.capacity)
                 val snapshot = if (totalNew > 0) bleManager.rrBuffer.readLast(totalNew) else emptyList()
                 val chartRr = if (totalNew > 0) bleManager.rrBuffer.readLast(45.coerceAtMost(totalNew)) else emptyList()
                 val liveRmssd = computeLiveRmssd(snapshot)
