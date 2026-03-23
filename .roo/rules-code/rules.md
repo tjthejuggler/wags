@@ -1,0 +1,1 @@
+Unless specifically intructed otherwise, do not do anything at all with the garmin wear app.
