@@ -30,6 +30,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.db.entity.ApneaRecordEntity
+import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.ui.navigation.WagsRoutes
@@ -182,6 +183,30 @@ fun AllApneaRecordsScreen(
                                         selected = state.filterTimeOfDay == tod.name,
                                         onClick = { viewModel.setTimeOfDayFilter(tod.name) },
                                         label = { Text(tod.displayName()) }
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "Posture",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = TextSecondary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                item {
+                                    FilterChip(
+                                        selected = state.filterPosture == "",
+                                        onClick = { viewModel.setPostureFilter("") },
+                                        label = { Text("All") }
+                                    )
+                                }
+                                items(Posture.entries) { pos ->
+                                    FilterChip(
+                                        selected = state.filterPosture == pos.name,
+                                        onClick = { viewModel.setPostureFilter(pos.name) },
+                                        label = { Text(pos.displayName()) }
                                     )
                                 }
                             }
@@ -585,7 +610,7 @@ private fun AllRecordsRow(
                         color = TextSecondary
                     )
                     Text(
-                        "${if (record.lungVolume == "PARTIAL") "Half" else record.lungVolume.lowercase().replaceFirstChar { it.uppercase() }}  ·  ${record.prepType}",
+                        "${if (record.lungVolume == "PARTIAL") "Half" else record.lungVolume.lowercase().replaceFirstChar { it.uppercase() }}  ·  ${record.prepType.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }}  ·  ${record.posture.lowercase().replaceFirstChar { it.uppercase() }}",
                         style = MaterialTheme.typography.labelSmall,
                         color = TextSecondary.copy(alpha = 0.7f)
                     )

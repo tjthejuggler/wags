@@ -61,10 +61,10 @@ object WagsRoutes {
     const val RF_ASSESSMENT_RESULT = "rf_assessment_result/{sessionTimestamp}"
     const val RF_ASSESSMENT_HISTORY = "rf_assessment_history"
     const val RESONANCE_SESSION = "resonance_session"
-    const val APNEA_HISTORY = "apnea_history/{lungVolume}/{prepType}/{timeOfDay}"
+    const val APNEA_HISTORY = "apnea_history/{lungVolume}/{prepType}/{timeOfDay}/{posture}"
     const val APNEA_RECORD_DETAIL = "apnea_record_detail/{recordId}"
-    const val APNEA_ALL_RECORDS = "apnea_all_records/{lungVolume}/{prepType}/{timeOfDay}/{eventTypes}"
-    const val FREE_HOLD_ACTIVE = "free_hold_active/{lungVolume}/{prepType}/{timeOfDay}/{showTimer}"
+    const val APNEA_ALL_RECORDS = "apnea_all_records/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{eventTypes}"
+    const val FREE_HOLD_ACTIVE = "free_hold_active/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{showTimer}"
     const val PERSONAL_BESTS = "personal_bests"
     // ── Meditation / NSDR ──────────────────────────────────────────────────────
     // ── Garmin Watch ─────────────────────────────────────────────────────────
@@ -80,13 +80,13 @@ object WagsRoutes {
     fun sessionAnalytics(sessionId: Long) = "session_analytics/$sessionId"
     fun rfAssessmentRun(protocol: String) = "rf_assessment_run/$protocol"
     fun rfAssessmentResult(sessionTimestamp: Long) = "rf_assessment_result/$sessionTimestamp"
-    fun apneaHistory(lungVolume: String, prepType: String, timeOfDay: String) =
-        "apnea_history/$lungVolume/$prepType/$timeOfDay"
+    fun apneaHistory(lungVolume: String, prepType: String, timeOfDay: String, posture: String) =
+        "apnea_history/$lungVolume/$prepType/$timeOfDay/$posture"
     fun apneaRecordDetail(recordId: Long) = "apnea_record_detail/$recordId"
     fun hrvReadinessDetail(readingId: Long) = "hrv_readiness_detail/$readingId"
     fun morningReadinessDetail(readingId: Long) = "morning_readiness_detail/$readingId"
-    fun freeHoldActive(lungVolume: String, prepType: String, timeOfDay: String, showTimer: Boolean) =
-        "free_hold_active/$lungVolume/$prepType/$timeOfDay/$showTimer"
+    fun freeHoldActive(lungVolume: String, prepType: String, timeOfDay: String, posture: String, showTimer: Boolean) =
+        "free_hold_active/$lungVolume/$prepType/$timeOfDay/$posture/$showTimer"
     fun meditationSessionDetail(sessionId: Long) = "meditation_session_detail/$sessionId"
 
     /**
@@ -98,8 +98,9 @@ object WagsRoutes {
         lungVolume: String = "",
         prepType: String = "",
         timeOfDay: String = "",
+        posture: String = "",
         eventTypes: String = "ALL"
-    ) = "apnea_all_records/$lungVolume/$prepType/$timeOfDay/$eventTypes"
+    ) = "apnea_all_records/$lungVolume/$prepType/$timeOfDay/$posture/$eventTypes"
 }
 
 @Composable
@@ -158,18 +159,21 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
                 navArgument("lungVolume") { type = NavType.StringType },
                 navArgument("prepType")   { type = NavType.StringType },
                 navArgument("timeOfDay")  { type = NavType.StringType },
+                navArgument("posture")    { type = NavType.StringType },
                 navArgument("showTimer")  { type = NavType.BoolType }
             )
         ) { backStackEntry ->
             val lungVolume = backStackEntry.arguments?.getString("lungVolume") ?: "FULL"
             val prepType   = backStackEntry.arguments?.getString("prepType")   ?: "NO_PREP"
             val timeOfDay  = backStackEntry.arguments?.getString("timeOfDay")  ?: "DAY"
+            val posture    = backStackEntry.arguments?.getString("posture")    ?: "LAYING"
             val showTimer  = backStackEntry.arguments?.getBoolean("showTimer") ?: true
             FreeHoldActiveScreen(
                 navController = navController,
                 lungVolume = lungVolume,
                 prepType   = prepType,
                 timeOfDay  = timeOfDay,
+                posture    = posture,
                 showTimer  = showTimer
             )
         }
@@ -233,6 +237,7 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
                 navArgument("lungVolume") { type = NavType.StringType; defaultValue = "" },
                 navArgument("prepType")   { type = NavType.StringType; defaultValue = "" },
                 navArgument("timeOfDay")  { type = NavType.StringType; defaultValue = "" },
+                navArgument("posture")    { type = NavType.StringType; defaultValue = "" },
                 navArgument("eventTypes") { type = NavType.StringType; defaultValue = "ALL" }
             )
         ) {
@@ -243,7 +248,8 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             arguments = listOf(
                 navArgument("lungVolume") { type = NavType.StringType },
                 navArgument("prepType")   { type = NavType.StringType },
-                navArgument("timeOfDay")  { type = NavType.StringType }
+                navArgument("timeOfDay")  { type = NavType.StringType },
+                navArgument("posture")    { type = NavType.StringType }
             )
         ) {
             ApneaHistoryScreen(navController = navController)

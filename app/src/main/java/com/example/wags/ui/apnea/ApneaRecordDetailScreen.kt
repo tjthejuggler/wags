@@ -30,6 +30,7 @@ import androidx.navigation.NavController
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
 import com.example.wags.domain.model.PersonalBestCategory
+import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.RecordPbBadge
 import com.example.wags.domain.model.TimeOfDay
@@ -159,11 +160,13 @@ fun ApneaRecordDetailScreen(
             lungVolume         = state.editLungVolume,
             prepType           = state.editPrepType,
             timeOfDay          = state.editTimeOfDay,
+            posture            = state.editPosture,
             hrDeviceId         = state.editHrDeviceId,
             deviceLabelOptions = state.deviceLabelOptions,
             onLungVolumeChange   = { viewModel.setEditLungVolume(it) },
             onPrepTypeChange     = { viewModel.setEditPrepType(it) },
             onTimeOfDayChange    = { viewModel.setEditTimeOfDay(it) },
+            onPostureChange      = { viewModel.setEditPosture(it) },
             onHrDeviceIdChange   = { viewModel.setEditHrDeviceId(it) },
             onSave    = { viewModel.saveEdits() },
             onDismiss = { viewModel.closeEditSheet() }
@@ -181,11 +184,13 @@ private fun EditRecordSheet(
     lungVolume: String,
     prepType: PrepType,
     timeOfDay: TimeOfDay,
+    posture: Posture,
     hrDeviceId: String?,
     deviceLabelOptions: List<String>,
     onLungVolumeChange: (String) -> Unit,
     onPrepTypeChange: (PrepType) -> Unit,
     onTimeOfDayChange: (TimeOfDay) -> Unit,
+    onPostureChange: (Posture) -> Unit,
     onHrDeviceIdChange: (String?) -> Unit,
     onSave: () -> Unit,
     onDismiss: () -> Unit
@@ -271,6 +276,31 @@ private fun EditRecordSheet(
                             label    = {
                                 Text(
                                     tod.name.lowercase().replaceFirstChar { it.uppercase() },
+                                    color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurface
+                                )
+                            },
+                            colors   = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = EcgCyan,
+                                selectedLabelColor     = Color.Black,
+                                labelColor             = MaterialTheme.colorScheme.onSurface
+                            )
+                        )
+                    }
+                }
+            }
+
+            // ── Posture ────────────────────────────────────────────────────────
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Posture", style = MaterialTheme.typography.labelLarge, color = TextSecondary)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Posture.entries.forEach { pos ->
+                        val isSelected = posture == pos
+                        FilterChip(
+                            selected = isSelected,
+                            onClick  = { onPostureChange(pos) },
+                            label    = {
+                                Text(
+                                    pos.displayName(),
                                     color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurface
                                 )
                             },
@@ -424,6 +454,9 @@ private fun RecordDetailContent(
                 )
                 DetailRow(label = "Time of Day",
                     value = record.timeOfDay.lowercase().replaceFirstChar { it.uppercase() }
+                )
+                DetailRow(label = "Posture",
+                    value = record.posture.lowercase().replaceFirstChar { it.uppercase() }
                 )
                 DetailRow(label = "Type", value = record.tableType ?: "Free Hold")
                 DetailRow(

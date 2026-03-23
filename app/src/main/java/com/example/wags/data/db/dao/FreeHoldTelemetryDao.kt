@@ -27,27 +27,21 @@ interface FreeHoldTelemetryDao {
     // Physiological bounds applied to every HR/SpO2 predicate:
     //   HR   : 20–250 bpm
     //   SpO2 : 1–100 %  (0 = no-signal artefact; real extreme dives can go very low)
-    // This ensures sensor glitches (e.g. 0 bpm / 0 % during a BLE dropout) never
-    // corrupt aggregate stats, even for records that were saved before the
-    // ingestion-layer filter was added.
 
-    /**
-     * Highest HR seen in the FIRST sample of each session (filtered by settings).
-     */
+    // ── Start HR ─────────────────────────────────────────────────────────────
+
     @Query("""
         SELECT MAX(t.heartRateBpm)
         FROM free_hold_telemetry t
         INNER JOIN apnea_records r ON r.recordId = t.recordId
         INNER JOIN (
             SELECT recordId, MIN(timestampMs) AS firstTs
-            FROM free_hold_telemetry
-            GROUP BY recordId
+            FROM free_hold_telemetry GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
-        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
-          AND t.heartRateBpm IS NOT NULL
-          AND t.heartRateBpm BETWEEN 20 AND 250
+        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay AND r.posture = :posture
+          AND t.heartRateBpm IS NOT NULL AND t.heartRateBpm BETWEEN 20 AND 250
     """)
-    fun getMaxStartHr(lungVolume: String, prepType: String, timeOfDay: String): Flow<Int?>
+    fun getMaxStartHr(lungVolume: String, prepType: String, timeOfDay: String, posture: String): Flow<Int?>
 
     @Query("""
         SELECT t.recordId
@@ -55,15 +49,13 @@ interface FreeHoldTelemetryDao {
         INNER JOIN apnea_records r ON r.recordId = t.recordId
         INNER JOIN (
             SELECT recordId, MIN(timestampMs) AS firstTs
-            FROM free_hold_telemetry
-            GROUP BY recordId
+            FROM free_hold_telemetry GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
-        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
-          AND t.heartRateBpm IS NOT NULL
-          AND t.heartRateBpm BETWEEN 20 AND 250
+        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay AND r.posture = :posture
+          AND t.heartRateBpm IS NOT NULL AND t.heartRateBpm BETWEEN 20 AND 250
         ORDER BY t.heartRateBpm DESC LIMIT 1
     """)
-    fun getMaxStartHrRecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
+    fun getMaxStartHrRecordId(lungVolume: String, prepType: String, timeOfDay: String, posture: String): Flow<Long?>
 
     @Query("""
         SELECT MIN(t.heartRateBpm)
@@ -71,14 +63,12 @@ interface FreeHoldTelemetryDao {
         INNER JOIN apnea_records r ON r.recordId = t.recordId
         INNER JOIN (
             SELECT recordId, MIN(timestampMs) AS firstTs
-            FROM free_hold_telemetry
-            GROUP BY recordId
+            FROM free_hold_telemetry GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
-        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
-          AND t.heartRateBpm IS NOT NULL
-          AND t.heartRateBpm BETWEEN 20 AND 250
+        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay AND r.posture = :posture
+          AND t.heartRateBpm IS NOT NULL AND t.heartRateBpm BETWEEN 20 AND 250
     """)
-    fun getMinStartHr(lungVolume: String, prepType: String, timeOfDay: String): Flow<Int?>
+    fun getMinStartHr(lungVolume: String, prepType: String, timeOfDay: String, posture: String): Flow<Int?>
 
     @Query("""
         SELECT t.recordId
@@ -86,15 +76,15 @@ interface FreeHoldTelemetryDao {
         INNER JOIN apnea_records r ON r.recordId = t.recordId
         INNER JOIN (
             SELECT recordId, MIN(timestampMs) AS firstTs
-            FROM free_hold_telemetry
-            GROUP BY recordId
+            FROM free_hold_telemetry GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
-        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
-          AND t.heartRateBpm IS NOT NULL
-          AND t.heartRateBpm BETWEEN 20 AND 250
+        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay AND r.posture = :posture
+          AND t.heartRateBpm IS NOT NULL AND t.heartRateBpm BETWEEN 20 AND 250
         ORDER BY t.heartRateBpm ASC LIMIT 1
     """)
-    fun getMinStartHrRecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
+    fun getMinStartHrRecordId(lungVolume: String, prepType: String, timeOfDay: String, posture: String): Flow<Long?>
+
+    // ── Start SpO2 ───────────────────────────────────────────────────────────
 
     @Query("""
         SELECT MAX(t.spO2)
@@ -102,14 +92,12 @@ interface FreeHoldTelemetryDao {
         INNER JOIN apnea_records r ON r.recordId = t.recordId
         INNER JOIN (
             SELECT recordId, MIN(timestampMs) AS firstTs
-            FROM free_hold_telemetry
-            GROUP BY recordId
+            FROM free_hold_telemetry GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
-        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
-          AND t.spO2 IS NOT NULL
-          AND t.spO2 BETWEEN 1 AND 100
+        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay AND r.posture = :posture
+          AND t.spO2 IS NOT NULL AND t.spO2 BETWEEN 1 AND 100
     """)
-    fun getMaxStartSpO2(lungVolume: String, prepType: String, timeOfDay: String): Flow<Int?>
+    fun getMaxStartSpO2(lungVolume: String, prepType: String, timeOfDay: String, posture: String): Flow<Int?>
 
     @Query("""
         SELECT t.recordId
@@ -117,15 +105,13 @@ interface FreeHoldTelemetryDao {
         INNER JOIN apnea_records r ON r.recordId = t.recordId
         INNER JOIN (
             SELECT recordId, MIN(timestampMs) AS firstTs
-            FROM free_hold_telemetry
-            GROUP BY recordId
+            FROM free_hold_telemetry GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
-        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
-          AND t.spO2 IS NOT NULL
-          AND t.spO2 BETWEEN 1 AND 100
+        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay AND r.posture = :posture
+          AND t.spO2 IS NOT NULL AND t.spO2 BETWEEN 1 AND 100
         ORDER BY t.spO2 DESC LIMIT 1
     """)
-    fun getMaxStartSpO2RecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
+    fun getMaxStartSpO2RecordId(lungVolume: String, prepType: String, timeOfDay: String, posture: String): Flow<Long?>
 
     @Query("""
         SELECT MIN(t.spO2)
@@ -133,14 +119,12 @@ interface FreeHoldTelemetryDao {
         INNER JOIN apnea_records r ON r.recordId = t.recordId
         INNER JOIN (
             SELECT recordId, MIN(timestampMs) AS firstTs
-            FROM free_hold_telemetry
-            GROUP BY recordId
+            FROM free_hold_telemetry GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
-        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
-          AND t.spO2 IS NOT NULL
-          AND t.spO2 BETWEEN 1 AND 100
+        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay AND r.posture = :posture
+          AND t.spO2 IS NOT NULL AND t.spO2 BETWEEN 1 AND 100
     """)
-    fun getMinStartSpO2(lungVolume: String, prepType: String, timeOfDay: String): Flow<Int?>
+    fun getMinStartSpO2(lungVolume: String, prepType: String, timeOfDay: String, posture: String): Flow<Int?>
 
     @Query("""
         SELECT t.recordId
@@ -148,15 +132,15 @@ interface FreeHoldTelemetryDao {
         INNER JOIN apnea_records r ON r.recordId = t.recordId
         INNER JOIN (
             SELECT recordId, MIN(timestampMs) AS firstTs
-            FROM free_hold_telemetry
-            GROUP BY recordId
+            FROM free_hold_telemetry GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
-        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
-          AND t.spO2 IS NOT NULL
-          AND t.spO2 BETWEEN 1 AND 100
+        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay AND r.posture = :posture
+          AND t.spO2 IS NOT NULL AND t.spO2 BETWEEN 1 AND 100
         ORDER BY t.spO2 ASC LIMIT 1
     """)
-    fun getMinStartSpO2RecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
+    fun getMinStartSpO2RecordId(lungVolume: String, prepType: String, timeOfDay: String, posture: String): Flow<Long?>
+
+    // ── End HR ───────────────────────────────────────────────────────────────
 
     @Query("""
         SELECT MAX(t.heartRateBpm)
@@ -164,14 +148,12 @@ interface FreeHoldTelemetryDao {
         INNER JOIN apnea_records r ON r.recordId = t.recordId
         INNER JOIN (
             SELECT recordId, MAX(timestampMs) AS lastTs
-            FROM free_hold_telemetry
-            GROUP BY recordId
+            FROM free_hold_telemetry GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
-        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
-          AND t.heartRateBpm IS NOT NULL
-          AND t.heartRateBpm BETWEEN 20 AND 250
+        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay AND r.posture = :posture
+          AND t.heartRateBpm IS NOT NULL AND t.heartRateBpm BETWEEN 20 AND 250
     """)
-    fun getMaxEndHr(lungVolume: String, prepType: String, timeOfDay: String): Flow<Int?>
+    fun getMaxEndHr(lungVolume: String, prepType: String, timeOfDay: String, posture: String): Flow<Int?>
 
     @Query("""
         SELECT t.recordId
@@ -179,15 +161,13 @@ interface FreeHoldTelemetryDao {
         INNER JOIN apnea_records r ON r.recordId = t.recordId
         INNER JOIN (
             SELECT recordId, MAX(timestampMs) AS lastTs
-            FROM free_hold_telemetry
-            GROUP BY recordId
+            FROM free_hold_telemetry GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
-        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
-          AND t.heartRateBpm IS NOT NULL
-          AND t.heartRateBpm BETWEEN 20 AND 250
+        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay AND r.posture = :posture
+          AND t.heartRateBpm IS NOT NULL AND t.heartRateBpm BETWEEN 20 AND 250
         ORDER BY t.heartRateBpm DESC LIMIT 1
     """)
-    fun getMaxEndHrRecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
+    fun getMaxEndHrRecordId(lungVolume: String, prepType: String, timeOfDay: String, posture: String): Flow<Long?>
 
     @Query("""
         SELECT MIN(t.heartRateBpm)
@@ -195,14 +175,12 @@ interface FreeHoldTelemetryDao {
         INNER JOIN apnea_records r ON r.recordId = t.recordId
         INNER JOIN (
             SELECT recordId, MAX(timestampMs) AS lastTs
-            FROM free_hold_telemetry
-            GROUP BY recordId
+            FROM free_hold_telemetry GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
-        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
-          AND t.heartRateBpm IS NOT NULL
-          AND t.heartRateBpm BETWEEN 20 AND 250
+        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay AND r.posture = :posture
+          AND t.heartRateBpm IS NOT NULL AND t.heartRateBpm BETWEEN 20 AND 250
     """)
-    fun getMinEndHr(lungVolume: String, prepType: String, timeOfDay: String): Flow<Int?>
+    fun getMinEndHr(lungVolume: String, prepType: String, timeOfDay: String, posture: String): Flow<Int?>
 
     @Query("""
         SELECT t.recordId
@@ -210,15 +188,15 @@ interface FreeHoldTelemetryDao {
         INNER JOIN apnea_records r ON r.recordId = t.recordId
         INNER JOIN (
             SELECT recordId, MAX(timestampMs) AS lastTs
-            FROM free_hold_telemetry
-            GROUP BY recordId
+            FROM free_hold_telemetry GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
-        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
-          AND t.heartRateBpm IS NOT NULL
-          AND t.heartRateBpm BETWEEN 20 AND 250
+        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay AND r.posture = :posture
+          AND t.heartRateBpm IS NOT NULL AND t.heartRateBpm BETWEEN 20 AND 250
         ORDER BY t.heartRateBpm ASC LIMIT 1
     """)
-    fun getMinEndHrRecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
+    fun getMinEndHrRecordId(lungVolume: String, prepType: String, timeOfDay: String, posture: String): Flow<Long?>
+
+    // ── End SpO2 ─────────────────────────────────────────────────────────────
 
     @Query("""
         SELECT MAX(t.spO2)
@@ -226,14 +204,12 @@ interface FreeHoldTelemetryDao {
         INNER JOIN apnea_records r ON r.recordId = t.recordId
         INNER JOIN (
             SELECT recordId, MAX(timestampMs) AS lastTs
-            FROM free_hold_telemetry
-            GROUP BY recordId
+            FROM free_hold_telemetry GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
-        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
-          AND t.spO2 IS NOT NULL
-          AND t.spO2 BETWEEN 1 AND 100
+        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay AND r.posture = :posture
+          AND t.spO2 IS NOT NULL AND t.spO2 BETWEEN 1 AND 100
     """)
-    fun getMaxEndSpO2(lungVolume: String, prepType: String, timeOfDay: String): Flow<Int?>
+    fun getMaxEndSpO2(lungVolume: String, prepType: String, timeOfDay: String, posture: String): Flow<Int?>
 
     @Query("""
         SELECT t.recordId
@@ -241,15 +217,13 @@ interface FreeHoldTelemetryDao {
         INNER JOIN apnea_records r ON r.recordId = t.recordId
         INNER JOIN (
             SELECT recordId, MAX(timestampMs) AS lastTs
-            FROM free_hold_telemetry
-            GROUP BY recordId
+            FROM free_hold_telemetry GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
-        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
-          AND t.spO2 IS NOT NULL
-          AND t.spO2 BETWEEN 1 AND 100
+        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay AND r.posture = :posture
+          AND t.spO2 IS NOT NULL AND t.spO2 BETWEEN 1 AND 100
         ORDER BY t.spO2 DESC LIMIT 1
     """)
-    fun getMaxEndSpO2RecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
+    fun getMaxEndSpO2RecordId(lungVolume: String, prepType: String, timeOfDay: String, posture: String): Flow<Long?>
 
     @Query("""
         SELECT MIN(t.spO2)
@@ -257,14 +231,12 @@ interface FreeHoldTelemetryDao {
         INNER JOIN apnea_records r ON r.recordId = t.recordId
         INNER JOIN (
             SELECT recordId, MAX(timestampMs) AS lastTs
-            FROM free_hold_telemetry
-            GROUP BY recordId
+            FROM free_hold_telemetry GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
-        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
-          AND t.spO2 IS NOT NULL
-          AND t.spO2 BETWEEN 1 AND 100
+        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay AND r.posture = :posture
+          AND t.spO2 IS NOT NULL AND t.spO2 BETWEEN 1 AND 100
     """)
-    fun getMinEndSpO2(lungVolume: String, prepType: String, timeOfDay: String): Flow<Int?>
+    fun getMinEndSpO2(lungVolume: String, prepType: String, timeOfDay: String, posture: String): Flow<Int?>
 
     @Query("""
         SELECT t.recordId
@@ -272,15 +244,13 @@ interface FreeHoldTelemetryDao {
         INNER JOIN apnea_records r ON r.recordId = t.recordId
         INNER JOIN (
             SELECT recordId, MAX(timestampMs) AS lastTs
-            FROM free_hold_telemetry
-            GROUP BY recordId
+            FROM free_hold_telemetry GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
-        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay
-          AND t.spO2 IS NOT NULL
-          AND t.spO2 BETWEEN 1 AND 100
+        WHERE r.lungVolume = :lungVolume AND r.prepType = :prepType AND r.timeOfDay = :timeOfDay AND r.posture = :posture
+          AND t.spO2 IS NOT NULL AND t.spO2 BETWEEN 1 AND 100
         ORDER BY t.spO2 ASC LIMIT 1
     """)
-    fun getMinEndSpO2RecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?>
+    fun getMinEndSpO2RecordId(lungVolume: String, prepType: String, timeOfDay: String, posture: String): Flow<Long?>
 
     // ── All-settings variants ─────────────────────────────────────────────────
 
@@ -290,8 +260,7 @@ interface FreeHoldTelemetryDao {
         INNER JOIN (
             SELECT recordId, MIN(timestampMs) AS firstTs FROM free_hold_telemetry GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
-        WHERE t.heartRateBpm IS NOT NULL
-          AND t.heartRateBpm BETWEEN 20 AND 250
+        WHERE t.heartRateBpm IS NOT NULL AND t.heartRateBpm BETWEEN 20 AND 250
     """)
     fun getMaxStartHrAll(): Flow<Int?>
 
@@ -301,8 +270,7 @@ interface FreeHoldTelemetryDao {
         INNER JOIN (
             SELECT recordId, MIN(timestampMs) AS firstTs FROM free_hold_telemetry GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
-        WHERE t.heartRateBpm IS NOT NULL
-          AND t.heartRateBpm BETWEEN 20 AND 250
+        WHERE t.heartRateBpm IS NOT NULL AND t.heartRateBpm BETWEEN 20 AND 250
         ORDER BY t.heartRateBpm DESC LIMIT 1
     """)
     fun getMaxStartHrRecordIdAll(): Flow<Long?>
@@ -313,8 +281,7 @@ interface FreeHoldTelemetryDao {
         INNER JOIN (
             SELECT recordId, MIN(timestampMs) AS firstTs FROM free_hold_telemetry GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
-        WHERE t.heartRateBpm IS NOT NULL
-          AND t.heartRateBpm BETWEEN 20 AND 250
+        WHERE t.heartRateBpm IS NOT NULL AND t.heartRateBpm BETWEEN 20 AND 250
     """)
     fun getMinStartHrAll(): Flow<Int?>
 
@@ -324,8 +291,7 @@ interface FreeHoldTelemetryDao {
         INNER JOIN (
             SELECT recordId, MIN(timestampMs) AS firstTs FROM free_hold_telemetry GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
-        WHERE t.heartRateBpm IS NOT NULL
-          AND t.heartRateBpm BETWEEN 20 AND 250
+        WHERE t.heartRateBpm IS NOT NULL AND t.heartRateBpm BETWEEN 20 AND 250
         ORDER BY t.heartRateBpm ASC LIMIT 1
     """)
     fun getMinStartHrRecordIdAll(): Flow<Long?>
@@ -336,8 +302,7 @@ interface FreeHoldTelemetryDao {
         INNER JOIN (
             SELECT recordId, MIN(timestampMs) AS firstTs FROM free_hold_telemetry GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
-        WHERE t.spO2 IS NOT NULL
-          AND t.spO2 BETWEEN 1 AND 100
+        WHERE t.spO2 IS NOT NULL AND t.spO2 BETWEEN 1 AND 100
     """)
     fun getMaxStartSpO2All(): Flow<Int?>
 
@@ -347,8 +312,7 @@ interface FreeHoldTelemetryDao {
         INNER JOIN (
             SELECT recordId, MIN(timestampMs) AS firstTs FROM free_hold_telemetry GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
-        WHERE t.spO2 IS NOT NULL
-          AND t.spO2 BETWEEN 1 AND 100
+        WHERE t.spO2 IS NOT NULL AND t.spO2 BETWEEN 1 AND 100
         ORDER BY t.spO2 DESC LIMIT 1
     """)
     fun getMaxStartSpO2RecordIdAll(): Flow<Long?>
@@ -359,8 +323,7 @@ interface FreeHoldTelemetryDao {
         INNER JOIN (
             SELECT recordId, MIN(timestampMs) AS firstTs FROM free_hold_telemetry GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
-        WHERE t.spO2 IS NOT NULL
-          AND t.spO2 BETWEEN 1 AND 100
+        WHERE t.spO2 IS NOT NULL AND t.spO2 BETWEEN 1 AND 100
     """)
     fun getMinStartSpO2All(): Flow<Int?>
 
@@ -370,8 +333,7 @@ interface FreeHoldTelemetryDao {
         INNER JOIN (
             SELECT recordId, MIN(timestampMs) AS firstTs FROM free_hold_telemetry GROUP BY recordId
         ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
-        WHERE t.spO2 IS NOT NULL
-          AND t.spO2 BETWEEN 1 AND 100
+        WHERE t.spO2 IS NOT NULL AND t.spO2 BETWEEN 1 AND 100
         ORDER BY t.spO2 ASC LIMIT 1
     """)
     fun getMinStartSpO2RecordIdAll(): Flow<Long?>
@@ -382,8 +344,7 @@ interface FreeHoldTelemetryDao {
         INNER JOIN (
             SELECT recordId, MAX(timestampMs) AS lastTs FROM free_hold_telemetry GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
-        WHERE t.heartRateBpm IS NOT NULL
-          AND t.heartRateBpm BETWEEN 20 AND 250
+        WHERE t.heartRateBpm IS NOT NULL AND t.heartRateBpm BETWEEN 20 AND 250
     """)
     fun getMaxEndHrAll(): Flow<Int?>
 
@@ -393,8 +354,7 @@ interface FreeHoldTelemetryDao {
         INNER JOIN (
             SELECT recordId, MAX(timestampMs) AS lastTs FROM free_hold_telemetry GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
-        WHERE t.heartRateBpm IS NOT NULL
-          AND t.heartRateBpm BETWEEN 20 AND 250
+        WHERE t.heartRateBpm IS NOT NULL AND t.heartRateBpm BETWEEN 20 AND 250
         ORDER BY t.heartRateBpm DESC LIMIT 1
     """)
     fun getMaxEndHrRecordIdAll(): Flow<Long?>
@@ -405,8 +365,7 @@ interface FreeHoldTelemetryDao {
         INNER JOIN (
             SELECT recordId, MAX(timestampMs) AS lastTs FROM free_hold_telemetry GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
-        WHERE t.heartRateBpm IS NOT NULL
-          AND t.heartRateBpm BETWEEN 20 AND 250
+        WHERE t.heartRateBpm IS NOT NULL AND t.heartRateBpm BETWEEN 20 AND 250
     """)
     fun getMinEndHrAll(): Flow<Int?>
 
@@ -416,8 +375,7 @@ interface FreeHoldTelemetryDao {
         INNER JOIN (
             SELECT recordId, MAX(timestampMs) AS lastTs FROM free_hold_telemetry GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
-        WHERE t.heartRateBpm IS NOT NULL
-          AND t.heartRateBpm BETWEEN 20 AND 250
+        WHERE t.heartRateBpm IS NOT NULL AND t.heartRateBpm BETWEEN 20 AND 250
         ORDER BY t.heartRateBpm ASC LIMIT 1
     """)
     fun getMinEndHrRecordIdAll(): Flow<Long?>
@@ -428,8 +386,7 @@ interface FreeHoldTelemetryDao {
         INNER JOIN (
             SELECT recordId, MAX(timestampMs) AS lastTs FROM free_hold_telemetry GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
-        WHERE t.spO2 IS NOT NULL
-          AND t.spO2 BETWEEN 1 AND 100
+        WHERE t.spO2 IS NOT NULL AND t.spO2 BETWEEN 1 AND 100
     """)
     fun getMaxEndSpO2All(): Flow<Int?>
 
@@ -439,8 +396,7 @@ interface FreeHoldTelemetryDao {
         INNER JOIN (
             SELECT recordId, MAX(timestampMs) AS lastTs FROM free_hold_telemetry GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
-        WHERE t.spO2 IS NOT NULL
-          AND t.spO2 BETWEEN 1 AND 100
+        WHERE t.spO2 IS NOT NULL AND t.spO2 BETWEEN 1 AND 100
         ORDER BY t.spO2 DESC LIMIT 1
     """)
     fun getMaxEndSpO2RecordIdAll(): Flow<Long?>
@@ -451,8 +407,7 @@ interface FreeHoldTelemetryDao {
         INNER JOIN (
             SELECT recordId, MAX(timestampMs) AS lastTs FROM free_hold_telemetry GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
-        WHERE t.spO2 IS NOT NULL
-          AND t.spO2 BETWEEN 1 AND 100
+        WHERE t.spO2 IS NOT NULL AND t.spO2 BETWEEN 1 AND 100
     """)
     fun getMinEndSpO2All(): Flow<Int?>
 
@@ -462,8 +417,7 @@ interface FreeHoldTelemetryDao {
         INNER JOIN (
             SELECT recordId, MAX(timestampMs) AS lastTs FROM free_hold_telemetry GROUP BY recordId
         ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
-        WHERE t.spO2 IS NOT NULL
-          AND t.spO2 BETWEEN 1 AND 100
+        WHERE t.spO2 IS NOT NULL AND t.spO2 BETWEEN 1 AND 100
         ORDER BY t.spO2 ASC LIMIT 1
     """)
     fun getMinEndSpO2RecordIdAll(): Flow<Long?>

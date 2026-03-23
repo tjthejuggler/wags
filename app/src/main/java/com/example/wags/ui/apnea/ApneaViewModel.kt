@@ -18,6 +18,7 @@ import com.example.wags.domain.model.ApneaTableType
 import com.example.wags.domain.model.OximeterReading
 import com.example.wags.domain.model.PersonalBestCategory
 import com.example.wags.domain.model.PersonalBestResult
+import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.model.TableDifficulty
@@ -78,6 +79,7 @@ data class ApneaUiState(
     val selectedLungVolume: String = "FULL",
     val prepType: PrepType = PrepType.NO_PREP,
     val timeOfDay: TimeOfDay = TimeOfDay.fromCurrentTime(),
+    val posture: Posture = Posture.LAYING,
     /** When true, a live elapsed-time counter is shown during the breath hold. */
     val showTimer: Boolean = true,
     /** Best free-hold for the current lungVolume + prepType combination (from DB). */
@@ -86,7 +88,7 @@ data class ApneaUiState(
     val bestTimeForSettingsRecordId: Long? = null,
     /**
      * The broadest PB category that the current best record holds.
-     * Determines how many trophy emojis to show (1–4). Null when no best record exists.
+     * Determines how many trophy emojis to show (1–5). Null when no best record exists.
      */
     val bestTimeTrophyCategory: PersonalBestCategory? = null,
     val selectedLength: TableLength = TableLength.MEDIUM,
@@ -189,10 +191,11 @@ class ApneaViewModel @Inject constructor(
      */
     private var oximeterIsPrimary = false
 
-    // Separate flows for the three settings that drive the best-time / filtered-records queries
+    // Separate flows for the four settings that drive the best-time / filtered-records queries
     private val _lungVolume  = MutableStateFlow("FULL")
     private val _prepType    = MutableStateFlow(PrepType.NO_PREP)
     private val _timeOfDay   = MutableStateFlow(TimeOfDay.fromCurrentTime())
+    private val _posture     = MutableStateFlow(Posture.LAYING)
 
     init {
         // Load persisted PB on startup
@@ -242,9 +245,10 @@ class ApneaViewModel @Inject constructor(
 
         // Whenever any setting changes, re-subscribe to best-time query
         viewModelScope.launch {
-            combine(_lungVolume, _prepType, _timeOfDay) { lv, pt, tod -> Triple(lv, pt, tod) }
-                .collectLatest { (lv, pt, tod) ->
-                    apneaRepository.getBestFreeHold(lv, pt.name, tod.name).collect { best ->
+            combine(_lungVolume, _prepType, _timeOfDay, _posture) { lv, pt, tod, pos -> arrayOf(lv, pt, tod, pos) }
+                .collectLatest { arr ->
+                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as TimeOfDay; val pos = arr[3] as Posture
+                    apneaRepository.getBestFreeHold(lv, pt.name, tod.name, pos.name).collect { best ->
                         _uiState.update { it.copy(bestTimeForSettingsMs = best ?: 0L) }
                     }
                 }
@@ -252,13 +256,14 @@ class ApneaViewModel @Inject constructor(
         // Whenever any setting changes, re-subscribe to best-time record-id query
         // and recompute the trophy level for the best record.
         viewModelScope.launch {
-            combine(_lungVolume, _prepType, _timeOfDay) { lv, pt, tod -> Triple(lv, pt, tod) }
-                .collectLatest { (lv, pt, tod) ->
-                    apneaRepository.getBestFreeHoldRecordId(lv, pt.name, tod.name).collect { id ->
+            combine(_lungVolume, _prepType, _timeOfDay, _posture) { lv, pt, tod, pos -> arrayOf(lv, pt, tod, pos) }
+                .collectLatest { arr ->
+                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as TimeOfDay; val pos = arr[3] as Posture
+                    apneaRepository.getBestFreeHoldRecordId(lv, pt.name, tod.name, pos.name).collect { id ->
                         _uiState.update { it.copy(bestTimeForSettingsRecordId = id) }
                         // Compute trophy level for the best record
                         val trophyCategory = if (id != null) {
-                            apneaRepository.getBestRecordTrophyLevel(lv, pt.name, tod.name)
+                            apneaRepository.getBestRecordTrophyLevel(lv, pt.name, tod.name, pos.name)
                         } else null
                         _uiState.update { it.copy(bestTimeTrophyCategory = trophyCategory) }
                     }
@@ -266,18 +271,20 @@ class ApneaViewModel @Inject constructor(
         }
         // Recent records: 10 most recent across ALL event types, filtered by current settings
         viewModelScope.launch {
-            combine(_lungVolume, _prepType, _timeOfDay) { lv, pt, tod -> Triple(lv, pt, tod) }
-                .collectLatest { (lv, pt, tod) ->
-                    apneaRepository.getRecentBySettings(lv, pt.name, tod.name, limit = 10).collect { records ->
+            combine(_lungVolume, _prepType, _timeOfDay, _posture) { lv, pt, tod, pos -> arrayOf(lv, pt, tod, pos) }
+                .collectLatest { arr ->
+                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as TimeOfDay; val pos = arr[3] as Posture
+                    apneaRepository.getRecentBySettings(lv, pt.name, tod.name, pos.name, limit = 10).collect { records ->
                         _uiState.update { it.copy(recentRecords = records) }
                     }
                 }
         }
         // Whenever any setting changes, re-subscribe to filtered stats
         viewModelScope.launch {
-            combine(_lungVolume, _prepType, _timeOfDay) { lv, pt, tod -> Triple(lv, pt, tod) }
-                .collectLatest { (lv, pt, tod) ->
-                    apneaRepository.getStats(lv, pt.name, tod.name).collect { stats ->
+            combine(_lungVolume, _prepType, _timeOfDay, _posture) { lv, pt, tod, pos -> arrayOf(lv, pt, tod, pos) }
+                .collectLatest { arr ->
+                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as TimeOfDay; val pos = arr[3] as Posture
+                    apneaRepository.getStats(lv, pt.name, tod.name, pos.name).collect { stats ->
                         _uiState.update { it.copy(filteredStats = stats) }
                     }
                 }
@@ -537,7 +544,8 @@ class ApneaViewModel @Inject constructor(
                 durationMs = duration,
                 lungVolume = state.selectedLungVolume,
                 prepType   = state.prepType.name,
-                timeOfDay  = state.timeOfDay.name
+                timeOfDay  = state.timeOfDay.name,
+                posture    = state.posture.name
             )
             saveFreeHoldRecord(duration, firstContractionMs)
             if (pbResult != null) {
@@ -584,6 +592,7 @@ class ApneaViewModel @Inject constructor(
                     lungVolume = state.selectedLungVolume,
                     prepType = state.prepType.name,
                     timeOfDay = state.timeOfDay.name,
+                    posture = state.posture.name,
                     minHrBpm = minHr,
                     maxHrBpm = maxHr,
                     lowestSpO2 = lowestSpO2,
@@ -648,6 +657,11 @@ class ApneaViewModel @Inject constructor(
     fun setTimeOfDay(tod: TimeOfDay) {
         _timeOfDay.value = tod
         _uiState.update { it.copy(timeOfDay = tod) }
+    }
+
+    fun setPosture(posture: Posture) {
+        _posture.value = posture
+        _uiState.update { it.copy(posture = posture) }
     }
 
     fun setShowTimer(show: Boolean) {

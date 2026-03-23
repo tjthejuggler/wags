@@ -37,6 +37,7 @@ import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.domain.model.ApneaStats
 import com.example.wags.domain.model.PersonalBestCategory
 import com.example.wags.domain.model.trophyEmojis
+import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.model.TableDifficulty
@@ -112,9 +113,11 @@ fun ApneaScreen(
                             selectedLungVolume = state.selectedLungVolume,
                             prepType = state.prepType,
                             timeOfDay = state.timeOfDay,
+                            posture = state.posture,
                             onLungVolumeChange = { viewModel.setLungVolume(it) },
                             onPrepTypeChange = { viewModel.setPrepType(it) },
-                            onTimeOfDayChange = { viewModel.setTimeOfDay(it) }
+                            onTimeOfDayChange = { viewModel.setTimeOfDay(it) },
+                            onPostureChange = { viewModel.setPosture(it) }
                         )
                     }
                     HorizontalDivider(color = SurfaceVariant, modifier = Modifier.padding(top = 8.dp))
@@ -152,6 +155,7 @@ fun ApneaScreen(
                                     lungVolume = state.selectedLungVolume,
                                     prepType   = state.prepType.name,
                                     timeOfDay  = state.timeOfDay.name,
+                                    posture    = state.posture.name,
                                     showTimer  = state.showTimer
                                 )
                             )
@@ -306,6 +310,7 @@ fun ApneaScreen(
                                     lungVolume = state.selectedLungVolume,
                                     prepType   = state.prepType.name,
                                     timeOfDay  = state.timeOfDay.name,
+                                    posture    = state.posture.name,
                                     eventTypes = "ALL"
                                 )
                             )
@@ -330,6 +335,7 @@ fun ApneaScreen(
                         lungVolume = state.selectedLungVolume,
                         prepType = state.prepType,
                         timeOfDay = state.timeOfDay,
+                        posture = state.posture,
                         onRecordClick = { recordId ->
                             navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
                         }
@@ -352,31 +358,35 @@ internal fun NewPersonalBestDialog(
     onDismiss: () -> Unit
 ) {
     val emoji = when (category) {
-        PersonalBestCategory.GLOBAL       -> "🌍"
-        PersonalBestCategory.ONE_SETTING  -> "⭐"
-        PersonalBestCategory.TWO_SETTINGS -> "🏆"
-        PersonalBestCategory.EXACT        -> "🏆"
+        PersonalBestCategory.GLOBAL          -> "🌍"
+        PersonalBestCategory.ONE_SETTING     -> "⭐"
+        PersonalBestCategory.TWO_SETTINGS    -> "🏆"
+        PersonalBestCategory.THREE_SETTINGS  -> "🏆"
+        PersonalBestCategory.EXACT           -> "🏆"
     }
 
     val headline = when (category) {
-        PersonalBestCategory.GLOBAL       -> "New All-Time Personal Best!"
-        PersonalBestCategory.ONE_SETTING  -> "New Personal Best!"
-        PersonalBestCategory.TWO_SETTINGS -> "New Personal Best!"
-        PersonalBestCategory.EXACT        -> "New Personal Best!"
+        PersonalBestCategory.GLOBAL          -> "New All-Time Personal Best!"
+        PersonalBestCategory.ONE_SETTING     -> "New Personal Best!"
+        PersonalBestCategory.TWO_SETTINGS    -> "New Personal Best!"
+        PersonalBestCategory.THREE_SETTINGS  -> "New Personal Best!"
+        PersonalBestCategory.EXACT           -> "New Personal Best!"
     }
 
     val subtitle = when (category) {
-        PersonalBestCategory.GLOBAL       -> "Best across all settings!"
-        PersonalBestCategory.ONE_SETTING  -> "Best for $categoryDescription (any other settings)"
-        PersonalBestCategory.TWO_SETTINGS -> "Best for $categoryDescription"
-        PersonalBestCategory.EXACT        -> "Best for $categoryDescription"
+        PersonalBestCategory.GLOBAL          -> "Best across all settings!"
+        PersonalBestCategory.ONE_SETTING     -> "Best for $categoryDescription (any other settings)"
+        PersonalBestCategory.TWO_SETTINGS    -> "Best for $categoryDescription"
+        PersonalBestCategory.THREE_SETTINGS  -> "Best for $categoryDescription"
+        PersonalBestCategory.EXACT           -> "Best for $categoryDescription"
     }
 
     val confettiCount = when (category) {
-        PersonalBestCategory.GLOBAL       -> 80
-        PersonalBestCategory.ONE_SETTING  -> 60
-        PersonalBestCategory.TWO_SETTINGS -> 50
-        PersonalBestCategory.EXACT        -> 45
+        PersonalBestCategory.GLOBAL          -> 80
+        PersonalBestCategory.ONE_SETTING     -> 60
+        PersonalBestCategory.TWO_SETTINGS    -> 55
+        PersonalBestCategory.THREE_SETTINGS  -> 50
+        PersonalBestCategory.EXACT           -> 45
     }
 
     Dialog(
@@ -561,9 +571,11 @@ private fun ApneaSettingsContent(
     selectedLungVolume: String,
     prepType: PrepType,
     timeOfDay: TimeOfDay,
+    posture: Posture,
     onLungVolumeChange: (String) -> Unit,
     onPrepTypeChange: (PrepType) -> Unit,
-    onTimeOfDayChange: (TimeOfDay) -> Unit
+    onTimeOfDayChange: (TimeOfDay) -> Unit,
+    onPostureChange: (Posture) -> Unit
 ) {
     Column(
         modifier = Modifier.padding(top = 8.dp),
@@ -598,6 +610,17 @@ private fun ApneaSettingsContent(
                     selected = timeOfDay == tod,
                     onClick = { onTimeOfDayChange(tod) },
                     label = { Text(tod.displayName()) }
+                )
+            }
+        }
+
+        Text("Posture", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Posture.entries.forEach { pos ->
+                FilterChip(
+                    selected = posture == pos,
+                    onClick = { onPostureChange(pos) },
+                    label = { Text(pos.displayName()) }
                 )
             }
         }
@@ -1064,6 +1087,7 @@ private fun StatsContent(
     lungVolume: String,
     prepType: com.example.wags.domain.model.PrepType,
     timeOfDay: com.example.wags.domain.model.TimeOfDay,
+    posture: com.example.wags.domain.model.Posture,
     onRecordClick: (Long) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -1082,7 +1106,7 @@ private fun StatsContent(
                 )
                 if (!showAll) {
                     Text(
-                        "${lungVolume.displayLungVolume()}  ·  ${prepType.displayName()}  ·  ${timeOfDay.displayName()}",
+                        "${lungVolume.displayLungVolume()}  ·  ${prepType.displayName()}  ·  ${timeOfDay.displayName()}  ·  ${posture.displayName()}",
                         style = MaterialTheme.typography.labelSmall,
                         color = TextSecondary
                     )

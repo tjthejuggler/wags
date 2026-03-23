@@ -101,6 +101,7 @@ class FreeHoldActiveViewModel @Inject constructor(
     val lungVolume: String = savedStateHandle.get<String>("lungVolume") ?: "FULL"
     val prepType: String   = savedStateHandle.get<String>("prepType")   ?: "NO_PREP"
     val timeOfDay: String  = savedStateHandle.get<String>("timeOfDay")  ?: "DAY"
+    val posture: String    = savedStateHandle.get<String>("posture")    ?: "LAYING"
 
     private val _uiState = MutableStateFlow(
         FreeHoldActiveUiState(
@@ -207,7 +208,8 @@ class FreeHoldActiveViewModel @Inject constructor(
                 durationMs = duration,
                 lungVolume = lungVolume,
                 prepType   = prepType,
-                timeOfDay  = timeOfDay
+                timeOfDay  = timeOfDay,
+                posture    = posture
             )
             saveFreeHoldRecord(duration, firstContractionMs, deviceLabel)
             if (pbResult != null) {
@@ -269,6 +271,7 @@ class FreeHoldActiveViewModel @Inject constructor(
                     lungVolume         = lungVolume,
                     prepType           = prepType,
                     timeOfDay          = timeOfDay,
+                    posture            = posture,
                     minHrBpm           = minHr,
                     maxHrBpm           = maxHr,
                     lowestSpO2         = lowestSpO2,
@@ -350,6 +353,7 @@ fun FreeHoldActiveScreen(
     lungVolume: String,
     prepType: String,
     timeOfDay: String,
+    posture: String,
     showTimer: Boolean,
     viewModel: FreeHoldActiveViewModel = hiltViewModel()
 ) {

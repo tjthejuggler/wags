@@ -60,11 +60,11 @@ fun PersonalBestsScreen(
                 // Group entries by trophy count for section headers
                 val grouped = state.entries.groupBy { it.trophyCount }
 
-                // 4🏆 Global
-                grouped[4]?.let { entries ->
+                // 5🏆 Global
+                grouped[5]?.let { entries ->
                     item {
                         SectionHeader(
-                            trophies = "🏆🏆🏆🏆",
+                            trophies = "🏆🏆🏆🏆🏆",
                             title = "Global Personal Best",
                             subtitle = "Best across all settings"
                         )
@@ -81,11 +81,11 @@ fun PersonalBestsScreen(
                     item { Spacer(modifier = Modifier.height(8.dp)) }
                 }
 
-                // 3🏆 Single setting
-                grouped[3]?.let { entries ->
+                // 4🏆 Single setting
+                grouped[4]?.let { entries ->
                     item {
                         SectionHeader(
-                            trophies = "🏆🏆🏆",
+                            trophies = "🏆🏆🏆🏆",
                             title = "Single Setting Bests",
                             subtitle = "Best for one setting (any other settings)"
                         )
@@ -102,11 +102,11 @@ fun PersonalBestsScreen(
                     item { Spacer(modifier = Modifier.height(8.dp)) }
                 }
 
-                // 2🏆 Two settings
-                grouped[2]?.let { entries ->
+                // 3🏆 Two settings
+                grouped[3]?.let { entries ->
                     item {
                         SectionHeader(
-                            trophies = "🏆🏆",
+                            trophies = "🏆🏆🏆",
                             title = "Two Setting Bests",
                             subtitle = "Best for a pair of settings"
                         )
@@ -115,6 +115,27 @@ fun PersonalBestsScreen(
                         PersonalBestRow(
                             entry = entry,
                             textStyle = TrophyTextStyle.TWO_SETTINGS,
+                            onRecordClick = { recordId ->
+                                navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
+                            }
+                        )
+                    }
+                    item { Spacer(modifier = Modifier.height(8.dp)) }
+                }
+
+                // 2🏆 Three settings
+                grouped[2]?.let { entries ->
+                    item {
+                        SectionHeader(
+                            trophies = "🏆🏆",
+                            title = "Three Setting Bests",
+                            subtitle = "Best for a trio of settings"
+                        )
+                    }
+                    items(entries) { entry ->
+                        PersonalBestRow(
+                            entry = entry,
+                            textStyle = TrophyTextStyle.THREE_SETTINGS,
                             onRecordClick = { recordId ->
                                 navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
                             }
@@ -182,10 +203,11 @@ private fun SectionHeader(trophies: String, title: String, subtitle: String) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 private enum class TrophyTextStyle {
-    GLOBAL,        // largest
+    GLOBAL,           // largest
     ONE_SETTING,
     TWO_SETTINGS,
-    EXACT          // smallest
+    THREE_SETTINGS,
+    EXACT             // smallest
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -199,22 +221,25 @@ private fun PersonalBestRow(
     onRecordClick: (Long) -> Unit
 ) {
     val labelFontSize = when (textStyle) {
-        TrophyTextStyle.GLOBAL       -> 18.sp
-        TrophyTextStyle.ONE_SETTING  -> 16.sp
-        TrophyTextStyle.TWO_SETTINGS -> 14.sp
-        TrophyTextStyle.EXACT        -> 13.sp
+        TrophyTextStyle.GLOBAL         -> 18.sp
+        TrophyTextStyle.ONE_SETTING    -> 16.sp
+        TrophyTextStyle.TWO_SETTINGS   -> 15.sp
+        TrophyTextStyle.THREE_SETTINGS -> 14.sp
+        TrophyTextStyle.EXACT          -> 13.sp
     }
     val durationFontSize = when (textStyle) {
-        TrophyTextStyle.GLOBAL       -> 20.sp
-        TrophyTextStyle.ONE_SETTING  -> 17.sp
-        TrophyTextStyle.TWO_SETTINGS -> 15.sp
-        TrophyTextStyle.EXACT        -> 14.sp
+        TrophyTextStyle.GLOBAL         -> 20.sp
+        TrophyTextStyle.ONE_SETTING    -> 17.sp
+        TrophyTextStyle.TWO_SETTINGS   -> 16.sp
+        TrophyTextStyle.THREE_SETTINGS -> 15.sp
+        TrophyTextStyle.EXACT          -> 14.sp
     }
     val labelColor = when (textStyle) {
-        TrophyTextStyle.GLOBAL       -> Color.White
-        TrophyTextStyle.ONE_SETTING  -> Color.White.copy(alpha = 0.95f)
-        TrophyTextStyle.TWO_SETTINGS -> Color.White.copy(alpha = 0.85f)
-        TrophyTextStyle.EXACT        -> Color.White.copy(alpha = 0.75f)
+        TrophyTextStyle.GLOBAL         -> Color.White
+        TrophyTextStyle.ONE_SETTING    -> Color.White.copy(alpha = 0.95f)
+        TrophyTextStyle.TWO_SETTINGS   -> Color.White.copy(alpha = 0.90f)
+        TrophyTextStyle.THREE_SETTINGS -> Color.White.copy(alpha = 0.85f)
+        TrophyTextStyle.EXACT          -> Color.White.copy(alpha = 0.75f)
     }
 
     Row(

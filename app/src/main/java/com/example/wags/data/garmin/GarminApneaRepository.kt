@@ -87,6 +87,7 @@ class GarminApneaRepository @Inject constructor(
                     lungVolume = payload.lungVolume,
                     prepType = payload.prepType,
                     timeOfDay = payload.timeOfDay,
+                    posture = "LAYING",
                     minHrBpm = minHr,
                     maxHrBpm = maxHr,
                     lowestSpO2 = lowestSpO2,

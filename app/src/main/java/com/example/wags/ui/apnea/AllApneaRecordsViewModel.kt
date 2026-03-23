@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.repository.ApneaRepository
+import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TimeOfDay
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -77,6 +78,7 @@ data class AllApneaRecordsUiState(
     val filterLungVolume: String = "",
     val filterPrepType: String = "",
     val filterTimeOfDay: String = "",
+    val filterPosture: String = "",
 
     // ── Event-type filter ─────────────────────────────────────────────────────
     /**
@@ -124,6 +126,7 @@ class AllApneaRecordsViewModel @Inject constructor(
         val initLungVolume = savedStateHandle.get<String>("lungVolume") ?: ""
         val initPrepType   = savedStateHandle.get<String>("prepType")   ?: ""
         val initTimeOfDay  = savedStateHandle.get<String>("timeOfDay")  ?: ""
+        val initPosture    = savedStateHandle.get<String>("posture")    ?: ""
         val initEventTypes = savedStateHandle.get<String>("eventTypes") ?: "ALL"
 
         val initialSelectedTypes: Set<String?> = when {
@@ -141,9 +144,10 @@ class AllApneaRecordsViewModel @Inject constructor(
 
         _uiState.update {
             it.copy(
-                filterLungVolume  = initLungVolume,
-                filterPrepType    = initPrepType,
-                filterTimeOfDay   = initTimeOfDay,
+                filterLungVolume   = initLungVolume,
+                filterPrepType     = initPrepType,
+                filterTimeOfDay    = initTimeOfDay,
+                filterPosture      = initPosture,
                 selectedEventTypes = initialSelectedTypes
             )
         }
@@ -165,6 +169,11 @@ class AllApneaRecordsViewModel @Inject constructor(
 
     fun setTimeOfDayFilter(value: String) {
         _uiState.update { it.copy(filterTimeOfDay = value) }
+        loadNextPage(reset = true)
+    }
+
+    fun setPostureFilter(value: String) {
+        _uiState.update { it.copy(filterPosture = value) }
         loadNextPage(reset = true)
     }
 
@@ -225,6 +234,7 @@ class AllApneaRecordsViewModel @Inject constructor(
                         lungVolume = s.filterLungVolume,
                         prepType   = s.filterPrepType,
                         timeOfDay  = s.filterTimeOfDay,
+                        posture    = s.filterPosture,
                         pageSize   = PAGE_SIZE,
                         offset     = offset
                     )
@@ -236,6 +246,7 @@ class AllApneaRecordsViewModel @Inject constructor(
                         lungVolume = s.filterLungVolume,
                         prepType   = s.filterPrepType,
                         timeOfDay  = s.filterTimeOfDay,
+                        posture    = s.filterPosture,
                         pageSize   = PAGE_SIZE,
                         offset     = offset
                     )
@@ -249,6 +260,7 @@ class AllApneaRecordsViewModel @Inject constructor(
                         lungVolume = s.filterLungVolume,
                         prepType   = s.filterPrepType,
                         timeOfDay  = s.filterTimeOfDay,
+                        posture    = s.filterPosture,
                         eventTypes = emptyList(),
                         pageSize   = PAGE_SIZE,
                         offset     = offset
@@ -288,6 +300,7 @@ class AllApneaRecordsViewModel @Inject constructor(
             lungVolume = s.filterLungVolume,
             prepType   = s.filterPrepType,
             timeOfDay  = s.filterTimeOfDay,
+            posture    = s.filterPosture,
             eventTypes = realSelected.toList(),
             pageSize   = pageSize,
             offset     = offset

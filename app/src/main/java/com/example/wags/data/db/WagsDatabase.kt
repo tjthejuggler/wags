@@ -23,7 +23,7 @@ import com.example.wags.data.db.entity.*
         MeditationSessionEntity::class,
         MorningReadinessTelemetryEntity::class
     ],
-    version = 17,
+    version = 18,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -553,6 +553,17 @@ abstract class WagsDatabase : RoomDatabase() {
 
                 db.execSQL("DROP TABLE `morning_readiness`")
                 db.execSQL("ALTER TABLE `morning_readiness_new` RENAME TO `morning_readiness`")
+            }
+        }
+
+        /**
+         * v17 → v18: Add posture column to apnea_records.
+         * Existing records default to 'LAYING' so all prior free holds are
+         * treated as laying-posture holds.
+         */
+        val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE apnea_records ADD COLUMN posture TEXT NOT NULL DEFAULT 'LAYING'")
             }
         }
     }

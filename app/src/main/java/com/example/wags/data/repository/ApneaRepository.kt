@@ -8,6 +8,7 @@ import com.example.wags.domain.model.ApneaStats
 import com.example.wags.domain.model.PersonalBestCategory
 import com.example.wags.domain.model.PersonalBestEntry
 import com.example.wags.domain.model.PersonalBestResult
+import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.RecordPbBadge
 import com.example.wags.domain.model.TimeOfDay
@@ -32,8 +33,8 @@ class ApneaRepository @Inject constructor(
         dao.getByType(type)
 
     /** All records matching the current settings combination (for history / recent records). */
-    fun getBySettings(lungVolume: String, prepType: String, timeOfDay: String): Flow<List<ApneaRecordEntity>> =
-        dao.getBySettings(lungVolume, prepType, timeOfDay)
+    fun getBySettings(lungVolume: String, prepType: String, timeOfDay: String, posture: String): Flow<List<ApneaRecordEntity>> =
+        dao.getBySettings(lungVolume, prepType, timeOfDay, posture)
 
     /**
      * The [limit] most recent records for a given settings combination, across ALL event types.
@@ -43,21 +44,22 @@ class ApneaRepository @Inject constructor(
         lungVolume: String,
         prepType: String,
         timeOfDay: String,
+        posture: String,
         limit: Int = 10
     ): Flow<List<ApneaRecordEntity>> =
-        dao.getRecentBySettings(lungVolume, prepType, timeOfDay, limit)
+        dao.getRecentBySettings(lungVolume, prepType, timeOfDay, posture, limit)
 
     /** Best free-hold duration for the current settings combination. */
-    fun getBestFreeHold(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?> =
-        dao.getBestFreeHold(lungVolume, prepType, timeOfDay)
+    fun getBestFreeHold(lungVolume: String, prepType: String, timeOfDay: String, posture: String): Flow<Long?> =
+        dao.getBestFreeHold(lungVolume, prepType, timeOfDay, posture)
 
     /** One-shot (suspend) best free-hold duration for a given settings combination. */
-    suspend fun getBestFreeHoldOnce(lungVolume: String, prepType: String, timeOfDay: String): Long? =
-        withContext(ioDispatcher) { dao.getBestFreeHoldOnce(lungVolume, prepType, timeOfDay) }
+    suspend fun getBestFreeHoldOnce(lungVolume: String, prepType: String, timeOfDay: String, posture: String): Long? =
+        withContext(ioDispatcher) { dao.getBestFreeHoldOnce(lungVolume, prepType, timeOfDay, posture) }
 
     /** recordId of the best free-hold for the current settings combination. */
-    fun getBestFreeHoldRecordId(lungVolume: String, prepType: String, timeOfDay: String): Flow<Long?> =
-        dao.getBestFreeHoldRecordId(lungVolume, prepType, timeOfDay)
+    fun getBestFreeHoldRecordId(lungVolume: String, prepType: String, timeOfDay: String, posture: String): Flow<Long?> =
+        dao.getBestFreeHoldRecordId(lungVolume, prepType, timeOfDay, posture)
 
     // ── Broader personal-best queries (one-shot, for PB celebration) ──────────
 
@@ -65,29 +67,39 @@ class ApneaRepository @Inject constructor(
     suspend fun getBestFreeHoldGlobal(): Long? =
         withContext(ioDispatcher) { dao.getBestFreeHoldGlobal() }
 
-    /** Best free-hold for a given timeOfDay (any lungVolume, any prepType). */
+    // Single-setting
     suspend fun getBestFreeHoldByTimeOfDay(timeOfDay: String): Long? =
         withContext(ioDispatcher) { dao.getBestFreeHoldByTimeOfDay(timeOfDay) }
-
-    /** Best free-hold for a given lungVolume (any prepType, any timeOfDay). */
     suspend fun getBestFreeHoldByLungVolume(lungVolume: String): Long? =
         withContext(ioDispatcher) { dao.getBestFreeHoldByLungVolume(lungVolume) }
-
-    /** Best free-hold for a given prepType (any lungVolume, any timeOfDay). */
     suspend fun getBestFreeHoldByPrepType(prepType: String): Long? =
         withContext(ioDispatcher) { dao.getBestFreeHoldByPrepType(prepType) }
+    suspend fun getBestFreeHoldByPosture(posture: String): Long? =
+        withContext(ioDispatcher) { dao.getBestFreeHoldByPosture(posture) }
 
-    /** Best free-hold for a given timeOfDay + lungVolume (any prepType). */
+    // Two-setting
     suspend fun getBestFreeHoldByTimeOfDayAndLungVolume(timeOfDay: String, lungVolume: String): Long? =
         withContext(ioDispatcher) { dao.getBestFreeHoldByTimeOfDayAndLungVolume(timeOfDay, lungVolume) }
-
-    /** Best free-hold for a given timeOfDay + prepType (any lungVolume). */
     suspend fun getBestFreeHoldByTimeOfDayAndPrepType(timeOfDay: String, prepType: String): Long? =
         withContext(ioDispatcher) { dao.getBestFreeHoldByTimeOfDayAndPrepType(timeOfDay, prepType) }
-
-    /** Best free-hold for a given lungVolume + prepType (any timeOfDay). */
+    suspend fun getBestFreeHoldByTimeOfDayAndPosture(timeOfDay: String, posture: String): Long? =
+        withContext(ioDispatcher) { dao.getBestFreeHoldByTimeOfDayAndPosture(timeOfDay, posture) }
     suspend fun getBestFreeHoldByLungVolumeAndPrepType(lungVolume: String, prepType: String): Long? =
         withContext(ioDispatcher) { dao.getBestFreeHoldByLungVolumeAndPrepType(lungVolume, prepType) }
+    suspend fun getBestFreeHoldByLungVolumeAndPosture(lungVolume: String, posture: String): Long? =
+        withContext(ioDispatcher) { dao.getBestFreeHoldByLungVolumeAndPosture(lungVolume, posture) }
+    suspend fun getBestFreeHoldByPrepTypeAndPosture(prepType: String, posture: String): Long? =
+        withContext(ioDispatcher) { dao.getBestFreeHoldByPrepTypeAndPosture(prepType, posture) }
+
+    // Three-setting
+    suspend fun getBestFreeHoldByTodLvPt(timeOfDay: String, lungVolume: String, prepType: String): Long? =
+        withContext(ioDispatcher) { dao.getBestFreeHoldByTodLvPt(timeOfDay, lungVolume, prepType) }
+    suspend fun getBestFreeHoldByTodLvPos(timeOfDay: String, lungVolume: String, posture: String): Long? =
+        withContext(ioDispatcher) { dao.getBestFreeHoldByTodLvPos(timeOfDay, lungVolume, posture) }
+    suspend fun getBestFreeHoldByTodPtPos(timeOfDay: String, prepType: String, posture: String): Long? =
+        withContext(ioDispatcher) { dao.getBestFreeHoldByTodPtPos(timeOfDay, prepType, posture) }
+    suspend fun getBestFreeHoldByLvPtPos(lungVolume: String, prepType: String, posture: String): Long? =
+        withContext(ioDispatcher) { dao.getBestFreeHoldByLvPtPos(lungVolume, prepType, posture) }
 
     /**
      * Determines the **broadest** personal-best category that a new hold of
@@ -97,18 +109,16 @@ class ApneaRepository @Inject constructor(
      * the queries compare against prior records only.
      *
      * Returns null when the hold is not even a PB for the exact settings combo.
-     *
-     * Display-name helpers use the raw enum names; callers should format them
-     * (e.g. lowercase + capitalise) for the UI.
      */
     suspend fun checkBroaderPersonalBest(
         durationMs: Long,
         lungVolume: String,
         prepType: String,
-        timeOfDay: String
+        timeOfDay: String,
+        posture: String
     ): PersonalBestResult? = withContext(ioDispatcher) {
-        // ── Exact settings (3 constraints) ─────────────────────────────────
-        val exactBest = dao.getBestFreeHoldOnce(lungVolume, prepType, timeOfDay)
+        // ── Exact settings (4 constraints) ─────────────────────────────────
+        val exactBest = dao.getBestFreeHoldOnce(lungVolume, prepType, timeOfDay, posture)
         val isExactPb = exactBest == null || durationMs > exactBest
         if (!isExactPb) return@withContext null   // not even a PB for exact settings
 
@@ -126,67 +136,73 @@ class ApneaRepository @Inject constructor(
             )
         }
 
-        // ── Single-setting categories (1 constraint, 2 relaxed) ────────────
+        // ── Single-setting categories (1 constraint, 3 relaxed) ────────────
         val todBest = dao.getBestFreeHoldByTimeOfDay(timeOfDay)
         if (todBest == null || durationMs > todBest) {
-            return@withContext PersonalBestResult(
-                durationMs  = durationMs,
-                category    = PersonalBestCategory.ONE_SETTING,
-                description = fmt(timeOfDay)
-            )
+            return@withContext PersonalBestResult(durationMs, PersonalBestCategory.ONE_SETTING, fmt(timeOfDay))
         }
-
         val lvBest = dao.getBestFreeHoldByLungVolume(lungVolume)
         if (lvBest == null || durationMs > lvBest) {
-            return@withContext PersonalBestResult(
-                durationMs  = durationMs,
-                category    = PersonalBestCategory.ONE_SETTING,
-                description = fmt(lungVolume)
-            )
+            return@withContext PersonalBestResult(durationMs, PersonalBestCategory.ONE_SETTING, fmt(lungVolume))
         }
-
         val ptBest = dao.getBestFreeHoldByPrepType(prepType)
         if (ptBest == null || durationMs > ptBest) {
-            return@withContext PersonalBestResult(
-                durationMs  = durationMs,
-                category    = PersonalBestCategory.ONE_SETTING,
-                description = fmt(prepType)
-            )
+            return@withContext PersonalBestResult(durationMs, PersonalBestCategory.ONE_SETTING, fmt(prepType))
+        }
+        val posBest = dao.getBestFreeHoldByPosture(posture)
+        if (posBest == null || durationMs > posBest) {
+            return@withContext PersonalBestResult(durationMs, PersonalBestCategory.ONE_SETTING, fmt(posture))
         }
 
-        // ── Two-setting categories (2 constraints, 1 relaxed) ──────────────
+        // ── Two-setting categories (2 constraints, 2 relaxed) ──────────────
         val todLvBest = dao.getBestFreeHoldByTimeOfDayAndLungVolume(timeOfDay, lungVolume)
         if (todLvBest == null || durationMs > todLvBest) {
-            return@withContext PersonalBestResult(
-                durationMs  = durationMs,
-                category    = PersonalBestCategory.TWO_SETTINGS,
-                description = "${fmt(timeOfDay)} · ${fmt(lungVolume)}"
-            )
+            return@withContext PersonalBestResult(durationMs, PersonalBestCategory.TWO_SETTINGS, "${fmt(timeOfDay)} · ${fmt(lungVolume)}")
         }
-
         val todPtBest = dao.getBestFreeHoldByTimeOfDayAndPrepType(timeOfDay, prepType)
         if (todPtBest == null || durationMs > todPtBest) {
-            return@withContext PersonalBestResult(
-                durationMs  = durationMs,
-                category    = PersonalBestCategory.TWO_SETTINGS,
-                description = "${fmt(timeOfDay)} · ${fmt(prepType)}"
-            )
+            return@withContext PersonalBestResult(durationMs, PersonalBestCategory.TWO_SETTINGS, "${fmt(timeOfDay)} · ${fmt(prepType)}")
         }
-
+        val todPosBest = dao.getBestFreeHoldByTimeOfDayAndPosture(timeOfDay, posture)
+        if (todPosBest == null || durationMs > todPosBest) {
+            return@withContext PersonalBestResult(durationMs, PersonalBestCategory.TWO_SETTINGS, "${fmt(timeOfDay)} · ${fmt(posture)}")
+        }
         val lvPtBest = dao.getBestFreeHoldByLungVolumeAndPrepType(lungVolume, prepType)
         if (lvPtBest == null || durationMs > lvPtBest) {
-            return@withContext PersonalBestResult(
-                durationMs  = durationMs,
-                category    = PersonalBestCategory.TWO_SETTINGS,
-                description = "${fmt(lungVolume)} · ${fmt(prepType)}"
-            )
+            return@withContext PersonalBestResult(durationMs, PersonalBestCategory.TWO_SETTINGS, "${fmt(lungVolume)} · ${fmt(prepType)}")
+        }
+        val lvPosBest = dao.getBestFreeHoldByLungVolumeAndPosture(lungVolume, posture)
+        if (lvPosBest == null || durationMs > lvPosBest) {
+            return@withContext PersonalBestResult(durationMs, PersonalBestCategory.TWO_SETTINGS, "${fmt(lungVolume)} · ${fmt(posture)}")
+        }
+        val ptPosBest = dao.getBestFreeHoldByPrepTypeAndPosture(prepType, posture)
+        if (ptPosBest == null || durationMs > ptPosBest) {
+            return@withContext PersonalBestResult(durationMs, PersonalBestCategory.TWO_SETTINGS, "${fmt(prepType)} · ${fmt(posture)}")
+        }
+
+        // ── Three-setting categories (3 constraints, 1 relaxed) ────────────
+        val todLvPtBest = dao.getBestFreeHoldByTodLvPt(timeOfDay, lungVolume, prepType)
+        if (todLvPtBest == null || durationMs > todLvPtBest) {
+            return@withContext PersonalBestResult(durationMs, PersonalBestCategory.THREE_SETTINGS, "${fmt(timeOfDay)} · ${fmt(lungVolume)} · ${fmt(prepType)}")
+        }
+        val todLvPosBest = dao.getBestFreeHoldByTodLvPos(timeOfDay, lungVolume, posture)
+        if (todLvPosBest == null || durationMs > todLvPosBest) {
+            return@withContext PersonalBestResult(durationMs, PersonalBestCategory.THREE_SETTINGS, "${fmt(timeOfDay)} · ${fmt(lungVolume)} · ${fmt(posture)}")
+        }
+        val todPtPosBest = dao.getBestFreeHoldByTodPtPos(timeOfDay, prepType, posture)
+        if (todPtPosBest == null || durationMs > todPtPosBest) {
+            return@withContext PersonalBestResult(durationMs, PersonalBestCategory.THREE_SETTINGS, "${fmt(timeOfDay)} · ${fmt(prepType)} · ${fmt(posture)}")
+        }
+        val lvPtPosBest = dao.getBestFreeHoldByLvPtPos(lungVolume, prepType, posture)
+        if (lvPtPosBest == null || durationMs > lvPtPosBest) {
+            return@withContext PersonalBestResult(durationMs, PersonalBestCategory.THREE_SETTINGS, "${fmt(lungVolume)} · ${fmt(prepType)} · ${fmt(posture)}")
         }
 
         // ── Exact only ─────────────────────────────────────────────────────
         PersonalBestResult(
             durationMs  = durationMs,
             category    = PersonalBestCategory.EXACT,
-            description = "${fmt(timeOfDay)} · ${fmt(lungVolume)} · ${fmt(prepType)}"
+            description = "${fmt(timeOfDay)} · ${fmt(lungVolume)} · ${fmt(prepType)} · ${fmt(posture)}"
         )
     }
 
@@ -199,11 +215,12 @@ class ApneaRepository @Inject constructor(
     suspend fun getBestRecordTrophyLevel(
         lungVolume: String,
         prepType: String,
-        timeOfDay: String
+        timeOfDay: String,
+        posture: String
     ): PersonalBestCategory? = withContext(ioDispatcher) {
-        val recordId = dao.getBestFreeHoldRecordIdOnce(lungVolume, prepType, timeOfDay)
+        val recordId = dao.getBestFreeHoldRecordIdOnce(lungVolume, prepType, timeOfDay, posture)
             ?: return@withContext null
-        computeBroadestCurrentCategory(recordId, lungVolume, prepType, timeOfDay)
+        computeBroadestCurrentCategory(recordId)
     }
 
     /**
@@ -223,72 +240,67 @@ class ApneaRepository @Inject constructor(
         val lv = record.lungVolume
         val pt = record.prepType
         val tod = record.timeOfDay
+        val pos = record.posture
 
         val badges = mutableListOf<RecordPbBadge>()
 
         // Check from broadest to narrowest — only add if it was a PB at the time
         // Global
         if (dao.wasGlobalBestAtTime(recordId)) {
-            badges.add(RecordPbBadge(
-                category = PersonalBestCategory.GLOBAL,
-                description = "All settings",
-                isCurrent = dao.isGlobalBest(recordId)
-            ))
+            badges.add(RecordPbBadge(PersonalBestCategory.GLOBAL, "All settings", dao.isGlobalBest(recordId)))
         }
 
         // Single-setting categories
         if (dao.wasBestForTimeOfDayAtTime(recordId)) {
-            badges.add(RecordPbBadge(
-                category = PersonalBestCategory.ONE_SETTING,
-                description = fmt(tod),
-                isCurrent = dao.isBestForTimeOfDay(recordId)
-            ))
+            badges.add(RecordPbBadge(PersonalBestCategory.ONE_SETTING, fmt(tod), dao.isBestForTimeOfDay(recordId)))
         }
         if (dao.wasBestForLungVolumeAtTime(recordId)) {
-            badges.add(RecordPbBadge(
-                category = PersonalBestCategory.ONE_SETTING,
-                description = fmt(lv),
-                isCurrent = dao.isBestForLungVolume(recordId)
-            ))
+            badges.add(RecordPbBadge(PersonalBestCategory.ONE_SETTING, fmt(lv), dao.isBestForLungVolume(recordId)))
         }
         if (dao.wasBestForPrepTypeAtTime(recordId)) {
-            badges.add(RecordPbBadge(
-                category = PersonalBestCategory.ONE_SETTING,
-                description = fmt(pt),
-                isCurrent = dao.isBestForPrepType(recordId)
-            ))
+            badges.add(RecordPbBadge(PersonalBestCategory.ONE_SETTING, fmt(pt), dao.isBestForPrepType(recordId)))
+        }
+        if (dao.wasBestForPostureAtTime(recordId)) {
+            badges.add(RecordPbBadge(PersonalBestCategory.ONE_SETTING, fmt(pos), dao.isBestForPosture(recordId)))
         }
 
         // Two-setting categories
         if (dao.wasBestForTimeOfDayAndLungVolumeAtTime(recordId)) {
-            badges.add(RecordPbBadge(
-                category = PersonalBestCategory.TWO_SETTINGS,
-                description = "${fmt(tod)} · ${fmt(lv)}",
-                isCurrent = dao.isBestForTimeOfDayAndLungVolume(recordId)
-            ))
+            badges.add(RecordPbBadge(PersonalBestCategory.TWO_SETTINGS, "${fmt(tod)} · ${fmt(lv)}", dao.isBestForTimeOfDayAndLungVolume(recordId)))
         }
         if (dao.wasBestForTimeOfDayAndPrepTypeAtTime(recordId)) {
-            badges.add(RecordPbBadge(
-                category = PersonalBestCategory.TWO_SETTINGS,
-                description = "${fmt(tod)} · ${fmt(pt)}",
-                isCurrent = dao.isBestForTimeOfDayAndPrepType(recordId)
-            ))
+            badges.add(RecordPbBadge(PersonalBestCategory.TWO_SETTINGS, "${fmt(tod)} · ${fmt(pt)}", dao.isBestForTimeOfDayAndPrepType(recordId)))
+        }
+        if (dao.wasBestForTimeOfDayAndPostureAtTime(recordId)) {
+            badges.add(RecordPbBadge(PersonalBestCategory.TWO_SETTINGS, "${fmt(tod)} · ${fmt(pos)}", dao.isBestForTimeOfDayAndPosture(recordId)))
         }
         if (dao.wasBestForLungVolumeAndPrepTypeAtTime(recordId)) {
-            badges.add(RecordPbBadge(
-                category = PersonalBestCategory.TWO_SETTINGS,
-                description = "${fmt(lv)} · ${fmt(pt)}",
-                isCurrent = dao.isBestForLungVolumeAndPrepType(recordId)
-            ))
+            badges.add(RecordPbBadge(PersonalBestCategory.TWO_SETTINGS, "${fmt(lv)} · ${fmt(pt)}", dao.isBestForLungVolumeAndPrepType(recordId)))
+        }
+        if (dao.wasBestForLungVolumeAndPostureAtTime(recordId)) {
+            badges.add(RecordPbBadge(PersonalBestCategory.TWO_SETTINGS, "${fmt(lv)} · ${fmt(pos)}", dao.isBestForLungVolumeAndPosture(recordId)))
+        }
+        if (dao.wasBestForPrepTypeAndPostureAtTime(recordId)) {
+            badges.add(RecordPbBadge(PersonalBestCategory.TWO_SETTINGS, "${fmt(pt)} · ${fmt(pos)}", dao.isBestForPrepTypeAndPosture(recordId)))
         }
 
-        // Exact 3-setting combo
+        // Three-setting categories
+        if (dao.wasBestForTodLvPtAtTime(recordId)) {
+            badges.add(RecordPbBadge(PersonalBestCategory.THREE_SETTINGS, "${fmt(tod)} · ${fmt(lv)} · ${fmt(pt)}", dao.isBestForTodLvPt(recordId)))
+        }
+        if (dao.wasBestForTodLvPosAtTime(recordId)) {
+            badges.add(RecordPbBadge(PersonalBestCategory.THREE_SETTINGS, "${fmt(tod)} · ${fmt(lv)} · ${fmt(pos)}", dao.isBestForTodLvPos(recordId)))
+        }
+        if (dao.wasBestForTodPtPosAtTime(recordId)) {
+            badges.add(RecordPbBadge(PersonalBestCategory.THREE_SETTINGS, "${fmt(tod)} · ${fmt(pt)} · ${fmt(pos)}", dao.isBestForTodPtPos(recordId)))
+        }
+        if (dao.wasBestForLvPtPosAtTime(recordId)) {
+            badges.add(RecordPbBadge(PersonalBestCategory.THREE_SETTINGS, "${fmt(lv)} · ${fmt(pt)} · ${fmt(pos)}", dao.isBestForLvPtPos(recordId)))
+        }
+
+        // Exact 4-setting combo
         if (dao.wasBestForExactSettingsAtTime(recordId)) {
-            badges.add(RecordPbBadge(
-                category = PersonalBestCategory.EXACT,
-                description = "${fmt(tod)} · ${fmt(lv)} · ${fmt(pt)}",
-                isCurrent = dao.isBestForExactSettings(recordId)
-            ))
+            badges.add(RecordPbBadge(PersonalBestCategory.EXACT, "${fmt(tod)} · ${fmt(lv)} · ${fmt(pt)} · ${fmt(pos)}", dao.isBestForExactSettings(recordId)))
         }
 
         badges
@@ -298,21 +310,25 @@ class ApneaRepository @Inject constructor(
      * Helper: determines the broadest category for which a given record is
      * currently the best.
      */
-    private suspend fun computeBroadestCurrentCategory(
-        recordId: Long,
-        lungVolume: String,
-        prepType: String,
-        timeOfDay: String
-    ): PersonalBestCategory {
+    private suspend fun computeBroadestCurrentCategory(recordId: Long): PersonalBestCategory {
         if (dao.isGlobalBest(recordId)) return PersonalBestCategory.GLOBAL
 
         if (dao.isBestForTimeOfDay(recordId)) return PersonalBestCategory.ONE_SETTING
         if (dao.isBestForLungVolume(recordId)) return PersonalBestCategory.ONE_SETTING
         if (dao.isBestForPrepType(recordId)) return PersonalBestCategory.ONE_SETTING
+        if (dao.isBestForPosture(recordId)) return PersonalBestCategory.ONE_SETTING
 
         if (dao.isBestForTimeOfDayAndLungVolume(recordId)) return PersonalBestCategory.TWO_SETTINGS
         if (dao.isBestForTimeOfDayAndPrepType(recordId)) return PersonalBestCategory.TWO_SETTINGS
+        if (dao.isBestForTimeOfDayAndPosture(recordId)) return PersonalBestCategory.TWO_SETTINGS
         if (dao.isBestForLungVolumeAndPrepType(recordId)) return PersonalBestCategory.TWO_SETTINGS
+        if (dao.isBestForLungVolumeAndPosture(recordId)) return PersonalBestCategory.TWO_SETTINGS
+        if (dao.isBestForPrepTypeAndPosture(recordId)) return PersonalBestCategory.TWO_SETTINGS
+
+        if (dao.isBestForTodLvPt(recordId)) return PersonalBestCategory.THREE_SETTINGS
+        if (dao.isBestForTodLvPos(recordId)) return PersonalBestCategory.THREE_SETTINGS
+        if (dao.isBestForTodPtPos(recordId)) return PersonalBestCategory.THREE_SETTINGS
+        if (dao.isBestForLvPtPos(recordId)) return PersonalBestCategory.THREE_SETTINGS
 
         return PersonalBestCategory.EXACT
     }
@@ -321,14 +337,14 @@ class ApneaRepository @Inject constructor(
 
     /**
      * Builds the complete list of personal-best entries across every combination
-     * of settings, ordered from broadest (4🏆 global) to narrowest (1🏆 exact).
+     * of settings, ordered from broadest (5🏆 global) to narrowest (1🏆 exact).
      *
      * Layout:
-     *  • 4🏆  Global (1 entry)
-     *  • 3🏆  Single-setting: 3 timeOfDay + 3 lungVolume + 3 prepType = 9 entries
-     *  • 2🏆  Two-setting pairs: 3×3 tod×lv + 3×3 tod×pt + 3×3 lv×pt = 27 entries
-     *  • 1🏆  Exact 3-setting combos: 3×3×3 = 27 entries
-     *  Total: 64 entries
+     *  • 5🏆  Global (1 entry)
+     *  • 4🏆  Single-setting: 3 tod + 3 lv + 3 pt + 2 posture = 11 entries
+     *  • 3🏆  Two-setting pairs: C(4,2) groups = 6 groups of varying sizes
+     *  • 2🏆  Three-setting combos: C(4,3) groups = 4 groups
+     *  • 1🏆  Exact 4-setting combos: 3×3×3×2 = 54 entries
      */
     suspend fun getAllPersonalBests(): List<PersonalBestEntry> = withContext(ioDispatcher) {
         val entries = mutableListOf<PersonalBestEntry>()
@@ -336,14 +352,16 @@ class ApneaRepository @Inject constructor(
         val lungVolumes = listOf("FULL", "PARTIAL", "EMPTY")
         val prepTypes   = PrepType.entries.map { it.name }
         val timesOfDay  = TimeOfDay.entries.map { it.name }
+        val postures    = Posture.entries.map { it.name }
 
         fun String.displayLv() = if (this == "PARTIAL") "Half" else lowercase().replaceFirstChar { it.uppercase() }
         fun String.displayPt() = PrepType.valueOf(this).displayName()
         fun String.displayTod() = TimeOfDay.valueOf(this).displayName()
+        fun String.displayPos() = Posture.valueOf(this).displayName()
 
         // Helper to query and build an entry
-        suspend fun entry(trophies: Int, label: String, lv: String, pt: String, tod: String): PersonalBestEntry {
-            val best = dao.getBestFreeHoldRecord(lv, pt, tod)
+        suspend fun entry(trophies: Int, label: String, lv: String, pt: String, tod: String, pos: String): PersonalBestEntry {
+            val best = dao.getBestFreeHoldRecord(lv, pt, tod, pos)
             return PersonalBestEntry(
                 trophyCount = trophies,
                 label       = label,
@@ -353,48 +371,74 @@ class ApneaRepository @Inject constructor(
             )
         }
 
-        // ── 4🏆 Global ──────────────────────────────────────────────────────
-        entries += entry(4, "All settings", "", "", "")
+        // ── 5🏆 Global ──────────────────────────────────────────────────────
+        entries += entry(5, "All settings", "", "", "", "")
 
-        // ── 3🏆 Single setting ──────────────────────────────────────────────
+        // ── 4🏆 Single setting ──────────────────────────────────────────────
         for (tod in timesOfDay) {
-            entries += entry(3, tod.displayTod(), "", "", tod)
+            entries += entry(4, tod.displayTod(), "", "", tod, "")
         }
         for (lv in lungVolumes) {
-            entries += entry(3, lv.displayLv(), lv, "", "")
+            entries += entry(4, lv.displayLv(), lv, "", "", "")
         }
         for (pt in prepTypes) {
-            entries += entry(3, pt.displayPt(), "", pt, "")
+            entries += entry(4, pt.displayPt(), "", pt, "", "")
+        }
+        for (pos in postures) {
+            entries += entry(4, pos.displayPos(), "", "", "", pos)
         }
 
-        // ── 2🏆 Two-setting pairs ──────────────────────────────────────────
-        for (tod in timesOfDay) {
-            for (lv in lungVolumes) {
-                entries += entry(2, "${tod.displayTod()} · ${lv.displayLv()}", lv, "", tod)
-            }
+        // ── 3🏆 Two-setting pairs ──────────────────────────────────────────
+        // tod × lv
+        for (tod in timesOfDay) for (lv in lungVolumes) {
+            entries += entry(3, "${tod.displayTod()} · ${lv.displayLv()}", lv, "", tod, "")
         }
-        for (tod in timesOfDay) {
-            for (pt in prepTypes) {
-                entries += entry(2, "${tod.displayTod()} · ${pt.displayPt()}", "", pt, tod)
-            }
+        // tod × pt
+        for (tod in timesOfDay) for (pt in prepTypes) {
+            entries += entry(3, "${tod.displayTod()} · ${pt.displayPt()}", "", pt, tod, "")
         }
-        for (lv in lungVolumes) {
-            for (pt in prepTypes) {
-                entries += entry(2, "${lv.displayLv()} · ${pt.displayPt()}", lv, pt, "")
-            }
+        // tod × pos
+        for (tod in timesOfDay) for (pos in postures) {
+            entries += entry(3, "${tod.displayTod()} · ${pos.displayPos()}", "", "", tod, pos)
+        }
+        // lv × pt
+        for (lv in lungVolumes) for (pt in prepTypes) {
+            entries += entry(3, "${lv.displayLv()} · ${pt.displayPt()}", lv, pt, "", "")
+        }
+        // lv × pos
+        for (lv in lungVolumes) for (pos in postures) {
+            entries += entry(3, "${lv.displayLv()} · ${pos.displayPos()}", lv, "", "", pos)
+        }
+        // pt × pos
+        for (pt in prepTypes) for (pos in postures) {
+            entries += entry(3, "${pt.displayPt()} · ${pos.displayPos()}", "", pt, "", pos)
         }
 
-        // ── 1🏆 Exact 3-setting combos ─────────────────────────────────────
-        for (tod in timesOfDay) {
-            for (lv in lungVolumes) {
-                for (pt in prepTypes) {
-                    entries += entry(
-                        1,
-                        "${tod.displayTod()} · ${lv.displayLv()} · ${pt.displayPt()}",
-                        lv, pt, tod
-                    )
-                }
-            }
+        // ── 2🏆 Three-setting combos ────────────────────────────────────────
+        // tod × lv × pt
+        for (tod in timesOfDay) for (lv in lungVolumes) for (pt in prepTypes) {
+            entries += entry(2, "${tod.displayTod()} · ${lv.displayLv()} · ${pt.displayPt()}", lv, pt, tod, "")
+        }
+        // tod × lv × pos
+        for (tod in timesOfDay) for (lv in lungVolumes) for (pos in postures) {
+            entries += entry(2, "${tod.displayTod()} · ${lv.displayLv()} · ${pos.displayPos()}", lv, "", tod, pos)
+        }
+        // tod × pt × pos
+        for (tod in timesOfDay) for (pt in prepTypes) for (pos in postures) {
+            entries += entry(2, "${tod.displayTod()} · ${pt.displayPt()} · ${pos.displayPos()}", "", pt, tod, pos)
+        }
+        // lv × pt × pos
+        for (lv in lungVolumes) for (pt in prepTypes) for (pos in postures) {
+            entries += entry(2, "${lv.displayLv()} · ${pt.displayPt()} · ${pos.displayPos()}", lv, pt, "", pos)
+        }
+
+        // ── 1🏆 Exact 4-setting combos ──────────────────────────────────────
+        for (tod in timesOfDay) for (lv in lungVolumes) for (pt in prepTypes) for (pos in postures) {
+            entries += entry(
+                1,
+                "${tod.displayTod()} · ${lv.displayLv()} · ${pt.displayPt()} · ${pos.displayPos()}",
+                lv, pt, tod, pos
+            )
         }
 
         entries
@@ -405,15 +449,12 @@ class ApneaRepository @Inject constructor(
     /**
      * Fetches a page of records with optional settings filters and an optional list of
      * event types to include. Pass empty [eventTypes] to include everything.
-     *
-     * [lungVolume], [prepType], [timeOfDay] — pass "" to skip that filter.
-     * [eventTypes] — list of tableType strings to include; null entry means "Free Hold" (tableType IS NULL).
-     *   Pass null or empty list to include all types.
      */
     suspend fun getPagedRecords(
         lungVolume: String,
         prepType: String,
         timeOfDay: String,
+        posture: String,
         eventTypes: List<String?>,   // null element = free hold
         pageSize: Int,
         offset: Int
@@ -424,25 +465,21 @@ class ApneaRepository @Inject constructor(
 
         when {
             includeAll -> {
-                // No type filter — just settings filter
-                dao.getPagedAll(lungVolume, prepType, timeOfDay, pageSize, offset)
+                dao.getPagedAll(lungVolume, prepType, timeOfDay, posture, pageSize, offset)
             }
             includeNullType && namedTypes.isEmpty() -> {
-                // Only free holds
-                dao.getPagedFreeHolds(lungVolume, prepType, timeOfDay, pageSize, offset)
+                dao.getPagedFreeHolds(lungVolume, prepType, timeOfDay, posture, pageSize, offset)
             }
             includeNullType -> {
-                // Free holds + specific named types — fetch both and merge
-                val freeHolds = dao.getPagedFreeHolds(lungVolume, prepType, timeOfDay, pageSize, offset)
+                val freeHolds = dao.getPagedFreeHolds(lungVolume, prepType, timeOfDay, posture, pageSize, offset)
                 val named = namedTypes.flatMap { type ->
-                    dao.getPagedByTableType(lungVolume, prepType, timeOfDay, type, pageSize, offset)
+                    dao.getPagedByTableType(lungVolume, prepType, timeOfDay, posture, type, pageSize, offset)
                 }
                 (freeHolds + named).sortedByDescending { it.timestamp }.take(pageSize)
             }
             else -> {
-                // Only named types (no free holds)
                 namedTypes.flatMap { type ->
-                    dao.getPagedByTableType(lungVolume, prepType, timeOfDay, type, pageSize, offset)
+                    dao.getPagedByTableType(lungVolume, prepType, timeOfDay, posture, type, pageSize, offset)
                 }.sortedByDescending { it.timestamp }.take(pageSize)
             }
         }
@@ -450,16 +487,16 @@ class ApneaRepository @Inject constructor(
 
     /**
      * Fetches a page of free-hold records that were personal bests at the time they happened.
-     * A record qualifies if no earlier free-hold (same settings) had a longer duration.
      */
     suspend fun getPagedPersonalBestFreeHolds(
         lungVolume: String,
         prepType: String,
         timeOfDay: String,
+        posture: String,
         pageSize: Int,
         offset: Int
     ): List<ApneaRecordEntity> = withContext(ioDispatcher) {
-        dao.getPagedPersonalBestFreeHolds(lungVolume, prepType, timeOfDay, pageSize, offset)
+        dao.getPagedPersonalBestFreeHolds(lungVolume, prepType, timeOfDay, posture, pageSize, offset)
     }
 
     suspend fun getById(recordId: Long): ApneaRecordEntity? =
@@ -488,61 +525,59 @@ class ApneaRepository @Inject constructor(
 
     /**
      * Returns a [Flow] of [ApneaStats] that reacts to any DB change.
-     * We split the 35 sub-flows into groups of ≤5 (the max combine arity),
-     * then merge the groups together.
      */
-    fun getStats(lungVolume: String, prepType: String, timeOfDay: String): Flow<ApneaStats> {
+    fun getStats(lungVolume: String, prepType: String, timeOfDay: String, posture: String): Flow<ApneaStats> {
         // Group A: activity counts (5)
         val groupA = combine(
-            dao.countFreeHolds(lungVolume, prepType, timeOfDay),
-            dao.countByTableType(lungVolume, prepType, timeOfDay, "O2"),
-            dao.countByTableType(lungVolume, prepType, timeOfDay, "CO2"),
-            dao.countByTableType(lungVolume, prepType, timeOfDay, "PROGRESSIVE_O2"),
-            dao.countByTableType(lungVolume, prepType, timeOfDay, "MIN_BREATH"),
+            dao.countFreeHolds(lungVolume, prepType, timeOfDay, posture),
+            dao.countByTableType(lungVolume, prepType, timeOfDay, posture, "O2"),
+            dao.countByTableType(lungVolume, prepType, timeOfDay, posture, "CO2"),
+            dao.countByTableType(lungVolume, prepType, timeOfDay, posture, "PROGRESSIVE_O2"),
+            dao.countByTableType(lungVolume, prepType, timeOfDay, posture, "MIN_BREATH"),
         ) { fh, o2, co2, progO2, minB -> listOf<Any?>(fh, o2, co2, progO2, minB) }
 
         // Group B: activity counts cont. + overall HR extremes (5)
         val groupB = combine(
-            dao.countByTableType(lungVolume, prepType, timeOfDay, "WONKA_FIRST_CONTRACTION"),
-            dao.countByTableType(lungVolume, prepType, timeOfDay, "WONKA_ENDURANCE"),
-            dao.getMaxHrEver(lungVolume, prepType, timeOfDay),
-            dao.getMaxHrRecordId(lungVolume, prepType, timeOfDay),
-            dao.getMinHrEver(lungVolume, prepType, timeOfDay),
+            dao.countByTableType(lungVolume, prepType, timeOfDay, posture, "WONKA_FIRST_CONTRACTION"),
+            dao.countByTableType(lungVolume, prepType, timeOfDay, posture, "WONKA_ENDURANCE"),
+            dao.getMaxHrEver(lungVolume, prepType, timeOfDay, posture),
+            dao.getMaxHrRecordId(lungVolume, prepType, timeOfDay, posture),
+            dao.getMinHrEver(lungVolume, prepType, timeOfDay, posture),
         ) { wc, we, maxHr, maxHrId, minHr -> listOf<Any?>(wc, we, maxHr, maxHrId, minHr) }
 
         // Group C: overall HR/SpO2 extremes cont. (5)
         val groupC = combine(
-            dao.getMinHrRecordId(lungVolume, prepType, timeOfDay),
-            dao.getLowestSpO2Ever(lungVolume, prepType, timeOfDay),
-            dao.getLowestSpO2RecordId(lungVolume, prepType, timeOfDay),
-            telemetryDao.getMaxStartHr(lungVolume, prepType, timeOfDay),
-            telemetryDao.getMaxStartHrRecordId(lungVolume, prepType, timeOfDay),
+            dao.getMinHrRecordId(lungVolume, prepType, timeOfDay, posture),
+            dao.getLowestSpO2Ever(lungVolume, prepType, timeOfDay, posture),
+            dao.getLowestSpO2RecordId(lungVolume, prepType, timeOfDay, posture),
+            telemetryDao.getMaxStartHr(lungVolume, prepType, timeOfDay, posture),
+            telemetryDao.getMaxStartHrRecordId(lungVolume, prepType, timeOfDay, posture),
         ) { minHrId, loSpO2, loSpO2Id, mxSHr, mxSHrId -> listOf<Any?>(minHrId, loSpO2, loSpO2Id, mxSHr, mxSHrId) }
 
         // Group D: start extremes (5)
         val groupD = combine(
-            telemetryDao.getMinStartHr(lungVolume, prepType, timeOfDay),
-            telemetryDao.getMinStartHrRecordId(lungVolume, prepType, timeOfDay),
-            telemetryDao.getMaxStartSpO2(lungVolume, prepType, timeOfDay),
-            telemetryDao.getMaxStartSpO2RecordId(lungVolume, prepType, timeOfDay),
-            telemetryDao.getMinStartSpO2(lungVolume, prepType, timeOfDay),
+            telemetryDao.getMinStartHr(lungVolume, prepType, timeOfDay, posture),
+            telemetryDao.getMinStartHrRecordId(lungVolume, prepType, timeOfDay, posture),
+            telemetryDao.getMaxStartSpO2(lungVolume, prepType, timeOfDay, posture),
+            telemetryDao.getMaxStartSpO2RecordId(lungVolume, prepType, timeOfDay, posture),
+            telemetryDao.getMinStartSpO2(lungVolume, prepType, timeOfDay, posture),
         ) { mnSHr, mnSHrId, mxSSp, mxSSpId, mnSSp -> listOf<Any?>(mnSHr, mnSHrId, mxSSp, mxSSpId, mnSSp) }
 
         // Group E: start SpO2 cont. + end extremes (5)
         val groupE = combine(
-            telemetryDao.getMinStartSpO2RecordId(lungVolume, prepType, timeOfDay),
-            telemetryDao.getMaxEndHr(lungVolume, prepType, timeOfDay),
-            telemetryDao.getMaxEndHrRecordId(lungVolume, prepType, timeOfDay),
-            telemetryDao.getMinEndHr(lungVolume, prepType, timeOfDay),
-            telemetryDao.getMinEndHrRecordId(lungVolume, prepType, timeOfDay),
+            telemetryDao.getMinStartSpO2RecordId(lungVolume, prepType, timeOfDay, posture),
+            telemetryDao.getMaxEndHr(lungVolume, prepType, timeOfDay, posture),
+            telemetryDao.getMaxEndHrRecordId(lungVolume, prepType, timeOfDay, posture),
+            telemetryDao.getMinEndHr(lungVolume, prepType, timeOfDay, posture),
+            telemetryDao.getMinEndHrRecordId(lungVolume, prepType, timeOfDay, posture),
         ) { mnSSpId, mxEHr, mxEHrId, mnEHr, mnEHrId -> listOf<Any?>(mnSSpId, mxEHr, mxEHrId, mnEHr, mnEHrId) }
 
         // Group F: end SpO2 extremes (4)
         val groupF = combine(
-            telemetryDao.getMaxEndSpO2(lungVolume, prepType, timeOfDay),
-            telemetryDao.getMaxEndSpO2RecordId(lungVolume, prepType, timeOfDay),
-            telemetryDao.getMinEndSpO2(lungVolume, prepType, timeOfDay),
-            telemetryDao.getMinEndSpO2RecordId(lungVolume, prepType, timeOfDay),
+            telemetryDao.getMaxEndSpO2(lungVolume, prepType, timeOfDay, posture),
+            telemetryDao.getMaxEndSpO2RecordId(lungVolume, prepType, timeOfDay, posture),
+            telemetryDao.getMinEndSpO2(lungVolume, prepType, timeOfDay, posture),
+            telemetryDao.getMinEndSpO2RecordId(lungVolume, prepType, timeOfDay, posture),
         ) { mxESp, mxESpId, mnESp, mnESpId -> listOf<Any?>(mxESp, mxESpId, mnESp, mnESpId) }
 
         // Merge all groups
@@ -550,36 +585,6 @@ class ApneaRepository @Inject constructor(
             a + b + c + d + e
         }.combine(groupF) { abcde, f ->
             val v = abcde + f
-            // Indices:
-            // 0  freeHoldCount
-            // 1  o2TableCount
-            // 2  co2TableCount
-            // 3  progressiveO2Count
-            // 4  minBreathCount
-            // 5  wonkaContractionCount
-            // 6  wonkaEnduranceCount
-            // 7  maxHrEver
-            // 8  maxHrEverRecordId
-            // 9  minHrEver
-            // 10 minHrEverRecordId
-            // 11 lowestSpO2Ever
-            // 12 lowestSpO2EverRecordId
-            // 13 maxStartHr
-            // 14 maxStartHrRecordId
-            // 15 minStartHr
-            // 16 minStartHrRecordId
-            // 17 maxStartSpO2
-            // 18 maxStartSpO2RecordId
-            // 19 minStartSpO2
-            // 20 minStartSpO2RecordId
-            // 21 maxEndHr
-            // 22 maxEndHrRecordId
-            // 23 minEndHr
-            // 24 minEndHrRecordId
-            // 25 maxEndSpO2
-            // 26 maxEndSpO2RecordId
-            // 27 minEndSpO2
-            // 28 minEndSpO2RecordId
             ApneaStats(
                 freeHoldCount            = v[0] as Int,
                 o2TableCount             = v[1] as Int,

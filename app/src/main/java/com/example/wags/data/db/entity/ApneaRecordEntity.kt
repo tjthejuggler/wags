@@ -33,5 +33,8 @@ data class ApneaRecordEntity(
      * Null when no device was connected.
      */
     @ColumnInfo(defaultValue = "NULL")
-    val hrDeviceId: String? = null
+    val hrDeviceId: String? = null,
+    /** One of Posture enum names: SITTING, LAYING */
+    @ColumnInfo(defaultValue = "LAYING")
+    val posture: String = "LAYING"
 )

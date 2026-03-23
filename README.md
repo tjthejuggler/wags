@@ -320,7 +320,7 @@ Combine freely: e.g., "Long + Hard" = 12 rounds at 55%/85% PB intensity.
 
 ## Database Schema
 
-The Room database (`wags.db`) is at version 5 with 9 tables:
+The Room database (`wags.db`) is at version 18 with 9 tables:
 
 | Table | Entity | Purpose |
 |---|---|---|
@@ -342,6 +342,7 @@ The Room database (`wags.db`) is at version 5 with 9 tables:
 | 2 → 3 | Added `morning_readiness` table |
 | 3 → 4 | Added `apnea_sessions`, `contractions`, `telemetry` tables |
 | 4 → 5 | Added `accBreathingUsed` column to `rf_assessments` |
+| 17 → 18 | Added `posture` column to `apnea_records` (default `LAYING`) |
 
 ---
 
@@ -392,6 +393,47 @@ cd wags
 ---
 
 ## Changelog
+
+### 2026-03-23 — Posture Setting for Apnea Free Holds
+
+Added a 4th apnea setting type: **Posture** (Sitting / Laying). This is integrated across the entire apnea feature — database, queries, personal bests, trophy system, history, filters, and navigation.
+
+#### New Model
+
+- **[`Posture.kt`](app/src/main/java/com/example/wags/domain/model/Posture.kt)** — New enum with `SITTING` and `LAYING` values, each with a `displayName()`.
+
+#### Database (v17 → v18)
+
+- **[`ApneaRecordEntity`](app/src/main/java/com/example/wags/data/db/entity/ApneaRecordEntity.kt)** — Added `posture` column with default `"LAYING"`.
+- **[`WagsDatabase`](app/src/main/java/com/example/wags/data/db/WagsDatabase.kt)** — `MIGRATION_17_18` adds the `posture` column; existing records default to `LAYING`.
+- **[`DatabaseModule`](app/src/main/java/com/example/wags/di/DatabaseModule.kt)** — Registered `MIGRATION_17_18`.
+
+#### Data Layer
+
+- **[`ApneaRecordDao`](app/src/main/java/com/example/wags/data/db/dao/ApneaRecordDao.kt)** — All settings-filtered queries now include `posture`. Added single-setting, two-setting, and three-setting posture queries for the expanded PB combinatorics.
+- **[`FreeHoldTelemetryDao`](app/src/main/java/com/example/wags/data/db/dao/FreeHoldTelemetryDao.kt)** — All settings-filtered telemetry stat queries now include `posture`.
+- **[`ApneaRepository`](app/src/main/java/com/example/wags/data/repository/ApneaRepository.kt)** — All methods accept `posture`. PB logic expanded from 3-setting to 4-setting combinatorics (C(4,k) for k=0..4 → 16 category levels).
+
+#### Trophy System (1–5 🏆)
+
+- **[`PersonalBestCategory`](app/src/main/java/com/example/wags/domain/model/PersonalBestCategory.kt)** — Added `THREE_SETTINGS` level. Trophy counts now 1–5: EXACT→1, THREE_SETTINGS→2, TWO_SETTINGS→3, ONE_SETTING→4, GLOBAL→5.
+- **[`PersonalBestsScreen`](app/src/main/java/com/example/wags/ui/apnea/PersonalBestsScreen.kt)** — Added 5🏆 Global section and 2🏆 Three Settings section. Text style tiers expanded to 5 levels.
+
+#### UI Layer
+
+- **[`ApneaViewModel`](app/src/main/java/com/example/wags/ui/apnea/ApneaViewModel.kt)** — Added `_posture` StateFlow, `posture` in `ApneaUiState`, `setPosture()` method. All repo calls pass posture.
+- **[`ApneaScreen`](app/src/main/java/com/example/wags/ui/apnea/ApneaScreen.kt)** — Posture FilterChips in settings panel. Navigation calls include posture. `NewPersonalBestDialog` handles `THREE_SETTINGS` category. Stats subtitle includes posture.
+- **[`FreeHoldActiveScreen`](app/src/main/java/com/example/wags/ui/apnea/FreeHoldActiveScreen.kt)** — ViewModel reads `posture` from nav args. Entity creation and PB check include posture.
+- **[`ApneaRecordDetailViewModel`](app/src/main/java/com/example/wags/ui/apnea/ApneaRecordDetailViewModel.kt)** / **[`ApneaRecordDetailScreen`](app/src/main/java/com/example/wags/ui/apnea/ApneaRecordDetailScreen.kt)** — Posture editable in the edit bottom sheet. Posture displayed in record detail summary.
+- **[`AllApneaRecordsViewModel`](app/src/main/java/com/example/wags/ui/apnea/AllApneaRecordsViewModel.kt)** / **[`AllApneaRecordsScreen`](app/src/main/java/com/example/wags/ui/apnea/AllApneaRecordsScreen.kt)** — Posture filter added to filter UI and all paged queries.
+- **[`ApneaHistoryViewModel`](app/src/main/java/com/example/wags/ui/apnea/ApneaHistoryViewModel.kt)** — Reads posture from nav args; passes to all repo calls.
+- **[`WagsNavGraph`](app/src/main/java/com/example/wags/ui/navigation/WagsNavGraph.kt)** — Routes for `FREE_HOLD_ACTIVE`, `APNEA_HISTORY`, and `APNEA_ALL_RECORDS` now include `{posture}` path segment.
+
+#### Garmin Integration
+
+- **[`GarminApneaRepository`](app/src/main/java/com/example/wags/data/garmin/GarminApneaRepository.kt)** — Garmin-sourced free holds default to `posture = "LAYING"`.
+
+---
 
 ### 2026-03-23 — Critical Fix: RR Interval Polling Stops After CircularBuffer Fills
 
