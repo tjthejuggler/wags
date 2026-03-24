@@ -593,6 +593,33 @@ Fix: synchrony is now the **peak cross-correlation value** (clamped to 0–1), w
 
 - `CoherenceScoreCalculator.kt` — `calculatePhaseSynchrony()` returns `bestCorr.coerceIn(0.0, 1.0)` instead of lag-based penalty
 
+### Advice: Markdown Rendering + Home Screen Banner — 2026-03-24
+
+Added inline Markdown rendering to all advice banners and a new "Home" advice section for the main dashboard screen.
+
+#### New Files
+
+| File | Purpose |
+|---|---|
+| [`MarkdownText.kt`](app/src/main/java/com/example/wags/ui/common/MarkdownText.kt) | `String.toMarkdownAnnotatedString()` extension — converts `**bold**`, `*italic*`, `_italic_`, and `***bold-italic***` to Compose `AnnotatedString` spans with no external dependencies |
+
+#### Modified Files
+
+| File | Change |
+|---|---|
+| [`AdviceBanner.kt`](app/src/main/java/com/example/wags/ui/common/AdviceBanner.kt) | `Text(text = …)` replaced with `Text(text = "💡 $text".toMarkdownAnnotatedString(), …)` so advice text renders with bold/italic formatting |
+| [`AdviceSection.kt`](app/src/main/java/com/example/wags/ui/common/AdviceSection.kt) | Added `HOME = "home"` constant and `"Home"` label; `all` list now starts with `HOME` so it appears first in Settings |
+| [`DashboardScreen.kt`](app/src/main/java/com/example/wags/ui/dashboard/DashboardScreen.kt) | Added `AdviceBanner(section = AdviceSection.HOME)` as the first item in the dashboard `LazyColumn` |
+| [`SettingsScreen.kt`](app/src/main/java/com/example/wags/ui/settings/SettingsScreen.kt) | `AdviceSettingsCard` iterates `AdviceSection.all` which now starts with `HOME`, so the "Home" row appears at the top of the advice list automatically |
+
+#### Details
+
+- Markdown parser handles `***bold-italic***` → `**bold**` → `*italic*` / `_italic_` in longest-match order; unmatched markers are emitted as plain text
+- No external library added — pure Compose `buildAnnotatedString` + `SpanStyle`
+- `AdviceViewModel` already iterates `AdviceSection.all`, so it picks up the new `home` section automatically with no ViewModel changes
+
+---
+
 ### Per-Section Advice Feature — 2026-03-24
 
 Added a user-facing "Advice" system that lets users enter personal tips, reminders, or cues for each of the five main training sections. Advice is displayed as a swipeable banner at the top of each screen and managed from Settings.

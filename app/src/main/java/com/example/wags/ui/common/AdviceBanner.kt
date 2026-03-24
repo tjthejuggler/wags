@@ -105,7 +105,7 @@ fun AdviceBanner(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "💡 $text",
+                text = "$text".toMarkdownAnnotatedString(),
                 style = MaterialTheme.typography.bodySmall.copy(
                     fontSize = 12.sp,
                     fontStyle = FontStyle.Italic,

@@ -16,6 +16,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.db.entity.DailyReadingEntity
 import com.example.wags.data.db.entity.MorningReadinessEntity
+import com.example.wags.ui.common.AdviceBanner
+import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 
@@ -99,6 +101,11 @@ fun DashboardScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // ── Home advice banner ────────────────────────────────────────────
+            item {
+                AdviceBanner(section = AdviceSection.HOME)
+            }
+
             // ── Today's HRV Readiness card (only shown if done today) ─────────
             item {
                 TodayHrvReadinessCard(
