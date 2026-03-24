@@ -27,6 +27,9 @@ import com.example.wags.data.garmin.GarminConnectionState
 import com.example.wags.domain.model.BleConnectionState
 import com.example.wags.domain.model.HabitEntry
 import com.example.wags.domain.model.ScannedDevice
+import com.example.wags.ui.common.AdviceDialog
+import com.example.wags.ui.common.AdviceSection
+import com.example.wags.ui.common.AdviceViewModel
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 
@@ -34,13 +37,16 @@ import com.example.wags.ui.theme.*
 @Composable
 fun SettingsScreen(
     navController: NavController,
-    viewModel: SettingsViewModel = hiltViewModel()
+    viewModel: SettingsViewModel = hiltViewModel(),
+    adviceViewModel: AdviceViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val adviceState by adviceViewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var permissionDenied by remember { mutableStateOf(false) }
     var showImportConfirmDialog by remember { mutableStateOf(false) }
     var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
+    var openAdviceSection by remember { mutableStateOf<String?>(null) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/zip")
@@ -308,7 +314,27 @@ fun SettingsScreen(
                     onDismissMessage = { viewModel.clearExportImportMessage() }
                 )
             }
+
+            // ── Advice ──────────────────────────────────────────────────────
+            item {
+                AdviceSettingsCard(
+                    adviceBySection = adviceState.adviceBySection,
+                    onOpenSection = { openAdviceSection = it }
+                )
+            }
         }
+    }
+
+    // ── Advice dialog ─────────────────────────────────────────────────────────
+    openAdviceSection?.let { section ->
+        AdviceDialog(
+            section = section,
+            adviceList = adviceState.adviceBySection[section] ?: emptyList(),
+            onAdd = { text -> adviceViewModel.addAdvice(section, text) },
+            onUpdate = { entity, text -> adviceViewModel.updateAdvice(entity, text) },
+            onDelete = { id -> adviceViewModel.deleteAdvice(id) },
+            onDismiss = { openAdviceSection = null }
+        )
     }
 
     // ── Import confirmation dialog ───────────────────────────────────────────
@@ -934,6 +960,65 @@ private fun DataExportImportCard(
                         ) {
                             Text("Dismiss", color = ReadinessRed)
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Advice settings card ──────────────────────────────────────────────────────
+
+@Composable
+private fun AdviceSettingsCard(
+    adviceBySection: Map<String, List<com.example.wags.data.db.entity.AdviceEntity>>,
+    onOpenSection: (String) -> Unit
+) {
+    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Advice", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Add personal reminders or tips that appear at the top of each section's screen.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
+
+            HorizontalDivider(color = SurfaceVariant)
+
+            AdviceSection.all.forEach { section ->
+                val count = adviceBySection[section]?.size ?: 0
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            AdviceSection.label(section),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            if (count == 0) "No advice set"
+                            else "$count piece${if (count != 1) "s" else ""} of advice",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (count > 0) ReadinessGreen else TextSecondary
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = { onOpenSection(section) },
+                        modifier = Modifier.height(32.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                    ) {
+                        Text(
+                            if (count > 0) "Manage" else "Add",
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 }
             }

@@ -21,9 +21,10 @@ import com.example.wags.data.db.entity.*
         FreeHoldTelemetryEntity::class,
         MeditationAudioEntity::class,
         MeditationSessionEntity::class,
-        MorningReadinessTelemetryEntity::class
+        MorningReadinessTelemetryEntity::class,
+        AdviceEntity::class
     ],
-    version = 18,
+    version = 19,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -40,6 +41,7 @@ abstract class WagsDatabase : RoomDatabase() {
     abstract fun meditationAudioDao(): MeditationAudioDao
     abstract fun meditationSessionDao(): MeditationSessionDao
     abstract fun morningReadinessTelemetryDao(): MorningReadinessTelemetryDao
+    abstract fun adviceDao(): AdviceDao
 
     companion object {
         /**
@@ -564,6 +566,22 @@ abstract class WagsDatabase : RoomDatabase() {
         val MIGRATION_17_18 = object : Migration(17, 18) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE apnea_records ADD COLUMN posture TEXT NOT NULL DEFAULT 'LAYING'")
+            }
+        }
+
+        /**
+         * v18 → v19: Add advice table for per-section user advice.
+         */
+        val MIGRATION_18_19 = object : Migration(18, 19) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `advice` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `section` TEXT NOT NULL,
+                        `text` TEXT NOT NULL,
+                        `createdAt` INTEGER NOT NULL
+                    )
+                """.trimIndent())
             }
         }
     }

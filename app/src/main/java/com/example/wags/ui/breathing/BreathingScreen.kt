@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.example.wags.ui.common.AdviceBanner
+import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.common.RrIntervalChart
 import com.example.wags.ui.theme.*
@@ -101,11 +103,18 @@ fun BreathingScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // ── Advice Banner ───────────────────────────────────────────────
+            AdviceBanner(section = AdviceSection.BREATHING)
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
             // Only the IDLE phase lives on this hub screen now.
             // PREPARING / BREATHING / COMPLETE all happen on ResonanceSessionScreen.
             BreathingPacerCircle(
@@ -145,6 +154,7 @@ fun BreathingScreen(
                 enabled = state.isHrDeviceConnected
             ) {
                 Text("RF Assessment")
+            }
             }
         }
     }

@@ -31,6 +31,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wags.domain.usecase.readiness.MorningReadinessFsm
 import com.example.wags.domain.usecase.readiness.MorningReadinessState
+import com.example.wags.ui.common.AdviceBanner
+import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.common.RrIntervalChart
 import com.example.wags.ui.theme.*
@@ -124,11 +126,18 @@ fun MorningReadinessScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // ── Advice Banner ───────────────────────────────────────────────
+            AdviceBanner(section = AdviceSection.MORNING)
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
             when (uiState.fsmState) {
                 MorningReadinessState.IDLE ->
                     IdleContent(onStart = { viewModel.startSession() })
@@ -160,6 +169,7 @@ fun MorningReadinessScreen(
                         errorMessage = uiState.errorMessage,
                         onRetry = { viewModel.reset() }
                     )
+            }
             }
         }
     }

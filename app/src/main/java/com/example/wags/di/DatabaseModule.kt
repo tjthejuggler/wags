@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.example.wags.data.db.WagsDatabase
 import com.example.wags.data.db.dao.AccCalibrationDao
+import com.example.wags.data.db.dao.AdviceDao
 import com.example.wags.data.db.dao.ApneaRecordDao
 import com.example.wags.data.db.dao.ApneaSessionDao
 import com.example.wags.data.db.dao.ContractionDao
@@ -48,7 +49,8 @@ object DatabaseModule {
                 WagsDatabase.MIGRATION_14_15,
                 WagsDatabase.MIGRATION_15_16,
                 WagsDatabase.MIGRATION_16_17,
-                WagsDatabase.MIGRATION_17_18
+                WagsDatabase.MIGRATION_17_18,
+                WagsDatabase.MIGRATION_18_19
             )
             .build()
 
@@ -65,4 +67,5 @@ object DatabaseModule {
     @Provides fun provideMeditationAudioDao(db: WagsDatabase): MeditationAudioDao = db.meditationAudioDao()
     @Provides fun provideMeditationSessionDao(db: WagsDatabase): MeditationSessionDao = db.meditationSessionDao()
     @Provides fun provideMorningReadinessTelemetryDao(db: WagsDatabase): MorningReadinessTelemetryDao = db.morningReadinessTelemetryDao()
+    @Provides fun provideAdviceDao(db: WagsDatabase): AdviceDao = db.adviceDao()
 }

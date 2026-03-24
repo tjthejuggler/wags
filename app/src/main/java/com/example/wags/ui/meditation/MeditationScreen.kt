@@ -28,6 +28,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.db.entity.MeditationAudioEntity
+import com.example.wags.ui.common.AdviceBanner
+import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
@@ -66,33 +68,42 @@ fun MeditationScreen(
             )
         }
     ) { padding ->
-        when (state.sessionState) {
-            MeditationSessionState.IDLE -> IdleContent(
-                state = state,
-                onSelectAudio = { viewModel.selectAudio(it) },
-                onEditAudioUrl = { viewModel.openUrlEditor(it) },
-                onRefreshAudios = { viewModel.refreshAudios() },
-                onSonificationToggle = { viewModel.setSonificationEnabled(!state.sonificationEnabled) },
-                onChannelFilterSelected = { viewModel.setChannelFilter(it) },
-                onStart = { viewModel.startSession() },
-                modifier = Modifier.padding(padding)
-            )
-            MeditationSessionState.ACTIVE -> ActiveContent(
-                state = state,
-                onStop = { viewModel.stopSession() },
-                modifier = Modifier.padding(padding)
-            )
-            MeditationSessionState.PROCESSING -> ProcessingContent(
-                modifier = Modifier.padding(padding)
-            )
-            MeditationSessionState.COMPLETE -> CompleteContent(
-                state = state,
-                onViewHistory = {
-                    navController.navigate(WagsRoutes.MEDITATION_HISTORY)
-                },
-                onDone = { viewModel.reset() },
-                modifier = Modifier.padding(padding)
-            )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            // ── Advice Banner ───────────────────────────────────────────────
+            AdviceBanner(section = AdviceSection.MEDITATION)
+
+            when (state.sessionState) {
+                MeditationSessionState.IDLE -> IdleContent(
+                    state = state,
+                    onSelectAudio = { viewModel.selectAudio(it) },
+                    onEditAudioUrl = { viewModel.openUrlEditor(it) },
+                    onRefreshAudios = { viewModel.refreshAudios() },
+                    onSonificationToggle = { viewModel.setSonificationEnabled(!state.sonificationEnabled) },
+                    onChannelFilterSelected = { viewModel.setChannelFilter(it) },
+                    onStart = { viewModel.startSession() },
+                    modifier = Modifier
+                )
+                MeditationSessionState.ACTIVE -> ActiveContent(
+                    state = state,
+                    onStop = { viewModel.stopSession() },
+                    modifier = Modifier
+                )
+                MeditationSessionState.PROCESSING -> ProcessingContent(
+                    modifier = Modifier
+                )
+                MeditationSessionState.COMPLETE -> CompleteContent(
+                    state = state,
+                    onViewHistory = {
+                        navController.navigate(WagsRoutes.MEDITATION_HISTORY)
+                    },
+                    onDone = { viewModel.reset() },
+                    modifier = Modifier
+                )
+            }
         }
     }
 

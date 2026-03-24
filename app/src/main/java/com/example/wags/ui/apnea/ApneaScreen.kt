@@ -46,6 +46,8 @@ import com.example.wags.domain.model.TrainingModality
 import com.example.wags.domain.model.WonkaConfig
 import com.example.wags.domain.usecase.apnea.AdvancedApneaPhase
 import com.example.wags.domain.usecase.apnea.AdvancedApneaState
+import com.example.wags.ui.common.AdviceBanner
+import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.InfoHelpBubble
 import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.navigation.WagsRoutes
@@ -93,12 +95,15 @@ fun ApneaScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // ── Advice Banner ───────────────────────────────────────────────────
+            AdviceBanner(section = AdviceSection.APNEA)
+
             // ── Sticky Settings Header ────────────────────────────────────────
             Surface(
                 color = BackgroundDark,
                 tonalElevation = 2.dp
             ) {
-                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                     CollapsibleSectionHeader(
                         title = "Settings",
                         expanded = state.settingsExpanded,
@@ -495,15 +500,16 @@ private fun CollapsibleSectionHeader(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onToggle)
-            .padding(vertical = 4.dp),
+            .padding(vertical = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Icon(
             imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
             contentDescription = if (expanded) "Collapse" else "Expand",
-            tint = TextSecondary
+            tint = TextSecondary,
+            modifier = Modifier.size(20.dp)
         )
     }
 }
@@ -578,49 +584,53 @@ private fun ApneaSettingsContent(
     onPostureChange: (Posture) -> Unit
 ) {
     Column(
-        modifier = Modifier.padding(top = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        modifier = Modifier.padding(top = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Text("Lung Volume", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Lung Volume", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf("FULL", "PARTIAL", "EMPTY").forEach { volume ->
                 FilterChip(
                     selected = selectedLungVolume == volume,
                     onClick = { onLungVolumeChange(volume) },
-                    label = { Text(volume.displayLungVolume()) }
+                    label = { Text(volume.displayLungVolume(), style = MaterialTheme.typography.bodySmall) },
+                    modifier = Modifier.height(30.dp)
                 )
             }
         }
 
-        Text("Prep Type", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Prep Type", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             PrepType.entries.forEach { type ->
                 FilterChip(
                     selected = prepType == type,
                     onClick = { onPrepTypeChange(type) },
-                    label = { Text(type.displayName()) }
+                    label = { Text(type.displayName(), style = MaterialTheme.typography.bodySmall) },
+                    modifier = Modifier.height(30.dp)
                 )
             }
         }
 
-        Text("Time of Day", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Time of Day", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             TimeOfDay.entries.forEach { tod ->
                 FilterChip(
                     selected = timeOfDay == tod,
                     onClick = { onTimeOfDayChange(tod) },
-                    label = { Text(tod.displayName()) }
+                    label = { Text(tod.displayName(), style = MaterialTheme.typography.bodySmall) },
+                    modifier = Modifier.height(30.dp)
                 )
             }
         }
 
-        Text("Posture", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Posture", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Posture.entries.forEach { pos ->
                 FilterChip(
                     selected = posture == pos,
                     onClick = { onPostureChange(pos) },
-                    label = { Text(pos.displayName()) }
+                    label = { Text(pos.displayName(), style = MaterialTheme.typography.bodySmall) },
+                    modifier = Modifier.height(30.dp)
                 )
             }
         }

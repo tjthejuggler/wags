@@ -29,7 +29,8 @@ The app is designed for competitive freedivers and serious recreational practiti
 - **Personal Best Tracking** — Persistent PB storage; all tables auto-scale to current PB
 - **TTS + Haptic Engine** — Phase announcements, countdown cues, and differentiated vibration patterns
 - **NSDR / Meditation Sessions** — Session logging with HR sonification analytics
-- **Room Database** — 9-table local database with full migration history
+- **Per-Section Advice** — User-entered tips/reminders shown as a swipeable banner at the top of each main screen; managed via Settings
+- **Room Database** — 14-table local database with full migration history (v19)
 
 ---
 
@@ -56,10 +57,11 @@ com.example.wags/
 │   │   ├── CircularBuffer.kt        # Lock-free ring buffer for RR samples
 │   │   └── RxToFlowBridge.kt        # RxJava3 → Kotlin Flow adapter
 │   ├── db/
-│   │   ├── WagsDatabase.kt          # Room DB v4, 9 entities, 3 migrations
-│   │   ├── dao/                     # 9 DAOs (one per entity)
-│   │   └── entity/                  # 9 Room entities
+│   │   ├── WagsDatabase.kt          # Room DB v19, 14 entities, 18 migrations
+│   │   ├── dao/                     # 14 DAOs (one per entity)
+│   │   └── entity/                  # 14 Room entities (incl. AdviceEntity)
 │   └── repository/
+│       ├── AdviceRepository.kt
 │       ├── ApneaRepository.kt
 │       ├── ApneaSessionRepository.kt
 │       ├── MorningReadinessRepository.kt
@@ -111,7 +113,8 @@ com.example.wags/
     │                   AssessmentPickerScreen, AssessmentPickerViewModel,
     │                   AssessmentRunScreen, AssessmentRunViewModel,
     │                   AssessmentResultScreen, AssessmentResultViewModel
-    ├── common/         InfoHelpBubble (reusable ⓘ bottom-sheet)
+    ├── common/         InfoHelpBubble, AdviceBanner, AdviceDialog,
+    │                   AdviceViewModel, AdviceSection
     ├── dashboard/      DashboardScreen, DashboardViewModel
     ├── morning/        MorningReadinessScreen, MorningReadinessResultScreen,
     │                   MorningReadinessViewModel,
@@ -120,7 +123,7 @@ com.example.wags/
     ├── readiness/      ReadinessScreen, ReadinessViewModel
     ├── realtime/       EcgChartView, TachogramView (Canvas-based)
     ├── session/        SessionScreen, SessionViewModel
-    ├── settings/       SettingsScreen (unified device management),
+    ├── settings/       SettingsScreen (unified device management + advice),
     │                   SettingsViewModel
     └── theme/          Color.kt, Theme.kt, Type.kt
 ```
@@ -589,3 +592,39 @@ Fix: `startRrStream()` now delegates to `startHrStream()`, which writes to both 
 Fix: synchrony is now the **peak cross-correlation value** (clamped to 0–1), which measures how well the IHR tracks the breathing pattern regardless of phase offset. The lag search window was also widened from half-cycle to full-cycle to cover all possible phase offsets.
 
 - `CoherenceScoreCalculator.kt` — `calculatePhaseSynchrony()` returns `bestCorr.coerceIn(0.0, 1.0)` instead of lag-based penalty
+
+### Per-Section Advice Feature — 2026-03-24
+
+Added a user-facing "Advice" system that lets users enter personal tips, reminders, or cues for each of the five main training sections. Advice is displayed as a swipeable banner at the top of each screen and managed from Settings.
+
+#### New Files
+
+| File | Purpose |
+|---|---|
+| [`AdviceEntity.kt`](app/src/main/java/com/example/wags/data/db/entity/AdviceEntity.kt) | Room entity for the `advice` table (id, section, text, createdAt) |
+| [`AdviceDao.kt`](app/src/main/java/com/example/wags/data/db/dao/AdviceDao.kt) | DAO with observe/get/insert/update/delete for advice items |
+| [`AdviceRepository.kt`](app/src/main/java/com/example/wags/data/repository/AdviceRepository.kt) | Repository wrapping AdviceDao |
+| [`AdviceSection.kt`](app/src/main/java/com/example/wags/ui/common/AdviceSection.kt) | String constants for the five section keys + display labels |
+| [`AdviceViewModel.kt`](app/src/main/java/com/example/wags/ui/common/AdviceViewModel.kt) | Shared Hilt ViewModel managing advice state, random cycling, and CRUD |
+| [`AdviceBanner.kt`](app/src/main/java/com/example/wags/ui/common/AdviceBanner.kt) | Swipeable banner composable (left = previous, right = next random) |
+| [`AdviceDialog.kt`](app/src/main/java/com/example/wags/ui/common/AdviceDialog.kt) | Full dialog for adding/editing/deleting advice items per section |
+
+#### Modified Files
+
+| File | Change |
+|---|---|
+| [`WagsDatabase.kt`](app/src/main/java/com/example/wags/data/db/WagsDatabase.kt) | Added `AdviceEntity` to entities list; bumped to v19; added `MIGRATION_18_19`; added `adviceDao()` |
+| [`DatabaseModule.kt`](app/src/main/java/com/example/wags/di/DatabaseModule.kt) | Added `MIGRATION_18_19` to builder; added `provideAdviceDao()` |
+| [`SettingsScreen.kt`](app/src/main/java/com/example/wags/ui/settings/SettingsScreen.kt) | Added "Advice" card with per-section manage/add buttons; opens `AdviceDialog` |
+| [`ApneaScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaScreen.kt) | Added `AdviceBanner` below top bar; reduced collapsible settings sizes (smaller chips, labels, spacing) |
+| [`BreathingScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/BreathingScreen.kt) | Added `AdviceBanner` below top bar |
+| [`ReadinessScreen.kt`](app/src/main/java/com/example/wags/ui/readiness/ReadinessScreen.kt) | Added `AdviceBanner` below top bar |
+| [`MorningReadinessScreen.kt`](app/src/main/java/com/example/wags/ui/morning/MorningReadinessScreen.kt) | Added `AdviceBanner` below top bar |
+| [`MeditationScreen.kt`](app/src/main/java/com/example/wags/ui/meditation/MeditationScreen.kt) | Added `AdviceBanner` below top bar |
+
+#### UI Details
+
+- Banner uses monochrome-safe colors (light grey text on dark surface) for greyscale display compatibility
+- Swipe left on banner → previous advice; swipe right → next random advice
+- Banner auto-hides when no advice exists for a section
+- Apnea collapsible settings: reduced chip height to 30dp, label text to `bodySmall`, spacing to 4–6dp

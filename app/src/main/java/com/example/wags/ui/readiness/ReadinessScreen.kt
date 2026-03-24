@@ -29,6 +29,8 @@ import androidx.navigation.NavController
 import com.example.wags.domain.model.HrvMetrics
 import com.example.wags.domain.model.ReadinessInterpretation
 import com.example.wags.domain.model.ReadinessScore
+import com.example.wags.ui.common.AdviceBanner
+import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.common.RrIntervalChart
 import com.example.wags.ui.common.WagsFeedback
@@ -88,11 +90,18 @@ fun ReadinessScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // ── Advice Banner ───────────────────────────────────────────────
+            AdviceBanner(section = AdviceSection.READINESS)
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
             when (state.sessionState) {
                 ReadinessSessionState.IDLE -> IdleContent(
                     onStart = { viewModel.startSession(deviceId, 120L) }
@@ -110,6 +119,7 @@ fun ReadinessScreen(
                     message = state.errorMessage ?: "Unknown error",
                     onReset = { viewModel.reset() }
                 )
+            }
             }
         }
     }
