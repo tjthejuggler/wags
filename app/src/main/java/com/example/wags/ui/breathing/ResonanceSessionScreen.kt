@@ -24,8 +24,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.RrIntervalChart
 import com.example.wags.ui.common.RmssdChart
+import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.common.StripChartColors
 import com.example.wags.ui.common.WagsFeedback
 import com.example.wags.ui.theme.*
@@ -80,6 +82,12 @@ fun ResonanceSessionScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val deviceId = "PLACEHOLDER_H10_ID"
+
+    val isActive = state.sessionPhase == BreathingSessionPhase.PREPARING ||
+            state.sessionPhase == BreathingSessionPhase.BREATHING
+
+    SessionBackHandler(enabled = isActive, onConfirm = onNavigateBack)
+    KeepScreenOn(enabled = isActive)
 
     // True once the phase has moved past IDLE (i.e. PREPARING or beyond).
     // We use this to distinguish "initial IDLE before session starts" from

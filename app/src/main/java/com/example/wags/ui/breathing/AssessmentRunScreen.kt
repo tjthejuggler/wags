@@ -24,8 +24,10 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wags.domain.usecase.breathing.RfProtocol
+import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.RrIntervalChart
 import com.example.wags.ui.common.RmssdChart
+import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.common.StripChartColors
 import com.example.wags.ui.theme.*
 
@@ -84,6 +86,11 @@ fun AssessmentRunScreen(
     viewModel: AssessmentRunViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    val isActive = uiState.phase != "IDLE" && uiState.phase != "COMPLETE"
+
+    SessionBackHandler(enabled = isActive, onConfirm = onNavigateBack)
+    KeepScreenOn(enabled = isActive)
 
     // Navigate once when complete
     LaunchedEffect(uiState.isComplete) {

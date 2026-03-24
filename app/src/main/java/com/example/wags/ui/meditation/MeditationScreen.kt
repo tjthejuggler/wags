@@ -30,7 +30,9 @@ import androidx.navigation.NavController
 import com.example.wags.data.db.entity.MeditationAudioEntity
 import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
+import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.LiveSensorActions
+import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 
@@ -41,6 +43,12 @@ fun MeditationScreen(
     viewModel: MeditationViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    val isActive = state.sessionState == MeditationSessionState.ACTIVE ||
+            state.sessionState == MeditationSessionState.PROCESSING
+
+    SessionBackHandler(enabled = isActive) { navController.popBackStack() }
+    KeepScreenOn(enabled = isActive)
 
     Scaffold(
         containerColor = BackgroundDark,

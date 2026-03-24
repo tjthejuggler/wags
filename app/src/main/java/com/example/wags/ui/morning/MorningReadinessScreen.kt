@@ -33,8 +33,10 @@ import com.example.wags.domain.usecase.readiness.MorningReadinessFsm
 import com.example.wags.domain.usecase.readiness.MorningReadinessState
 import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
+import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.common.RrIntervalChart
+import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.theme.*
 import kotlin.math.PI
 import kotlin.math.cos
@@ -61,6 +63,13 @@ fun MorningReadinessScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+
+    val isActive = uiState.fsmState != MorningReadinessState.IDLE &&
+            uiState.fsmState != MorningReadinessState.COMPLETE &&
+            uiState.fsmState != MorningReadinessState.ERROR
+
+    SessionBackHandler(enabled = isActive, onConfirm = onNavigateBack)
+    KeepScreenOn(enabled = isActive)
 
     // No HRM dialog
     if (uiState.noHrmDialogVisible) {

@@ -31,8 +31,10 @@ import com.example.wags.domain.model.ReadinessInterpretation
 import com.example.wags.domain.model.ReadinessScore
 import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
+import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.common.RrIntervalChart
+import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.common.WagsFeedback
 import com.example.wags.ui.theme.*
 import kotlin.math.cos
@@ -58,6 +60,12 @@ fun ReadinessScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val deviceId = "PLACEHOLDER_H10_ID"
+
+    val isActive = state.sessionState == ReadinessSessionState.RECORDING ||
+            state.sessionState == ReadinessSessionState.PROCESSING
+
+    SessionBackHandler(enabled = isActive) { navController.popBackStack() }
+    KeepScreenOn(enabled = isActive)
 
     // Session-complete feedback: chime + vibration when recording finishes.
     LaunchedEffect(state.sessionState) {

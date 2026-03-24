@@ -114,7 +114,8 @@ com.example.wags/
     │                   AssessmentRunScreen, AssessmentRunViewModel,
     │                   AssessmentResultScreen, AssessmentResultViewModel
     ├── common/         InfoHelpBubble, AdviceBanner, AdviceDialog,
-    │                   AdviceViewModel, AdviceSection
+    │                   AdviceViewModel, AdviceSection,
+    │                   SessionGuards (SessionBackHandler, KeepScreenOn)
     ├── dashboard/      DashboardScreen, DashboardViewModel
     ├── morning/        MorningReadinessScreen, MorningReadinessResultScreen,
     │                   MorningReadinessViewModel,
@@ -655,3 +656,27 @@ Added a user-facing "Advice" system that lets users enter personal tips, reminde
 - Swipe left on banner → previous advice; swipe right → next random advice
 - Banner auto-hides when no advice exists for a section
 - Apnea collapsible settings: reduced chip height to 30dp, label text to `bodySmall`, spacing to 4–6dp
+
+---
+
+### 2026-03-24 — Session Guards: Back Confirmation & Keep Screen On
+
+Added two reusable composable utilities in [`SessionGuards.kt`](app/src/main/java/com/example/wags/ui/common/SessionGuards.kt):
+
+- **`SessionBackHandler`** — Intercepts the system back gesture/button during active sessions and shows a confirmation dialog ("Discard session?") before navigating away. When the session is idle or complete, normal back behaviour applies.
+- **`KeepScreenOn`** — Prevents auto-dim / auto-off during active sessions using `View.keepScreenOn`. Automatically clears the flag when the session ends or the composable leaves composition.
+
+Both guards are applied to all 10 active session/reading screens:
+
+| Screen | Active condition |
+|---|---|
+| [`ReadinessScreen`](app/src/main/java/com/example/wags/ui/readiness/ReadinessScreen.kt) | `RECORDING` or `PROCESSING` |
+| [`MorningReadinessScreen`](app/src/main/java/com/example/wags/ui/morning/MorningReadinessScreen.kt) | Not `IDLE`, `COMPLETE`, or `ERROR` |
+| [`BreathingScreen`](app/src/main/java/com/example/wags/ui/breathing/BreathingScreen.kt) | Not `IDLE` or `COMPLETE` |
+| [`ResonanceSessionScreen`](app/src/main/java/com/example/wags/ui/breathing/ResonanceSessionScreen.kt) | `PREPARING` or `BREATHING` |
+| [`AssessmentRunScreen`](app/src/main/java/com/example/wags/ui/breathing/AssessmentRunScreen.kt) | Not `IDLE` or `COMPLETE` |
+| [`ApneaTableScreen`](app/src/main/java/com/example/wags/ui/apnea/ApneaTableScreen.kt) | Not `IDLE` or `COMPLETE` |
+| [`FreeHoldActiveScreen`](app/src/main/java/com/example/wags/ui/apnea/FreeHoldActiveScreen.kt) | `freeHoldActive == true` |
+| [`AdvancedApneaScreen`](app/src/main/java/com/example/wags/ui/apnea/AdvancedApneaScreen.kt) | Not `IDLE` or `COMPLETE` |
+| [`SessionScreen`](app/src/main/java/com/example/wags/ui/session/SessionScreen.kt) | `ACTIVE` or `PROCESSING` |
+| [`MeditationScreen`](app/src/main/java/com/example/wags/ui/meditation/MeditationScreen.kt) | `ACTIVE` or `PROCESSING` |

@@ -19,6 +19,8 @@ import com.example.wags.domain.model.TableLength
 import com.example.wags.domain.model.WonkaConfig
 import com.example.wags.domain.usecase.apnea.AdvancedApneaPhase
 import com.example.wags.domain.usecase.apnea.AdvancedApneaState
+import com.example.wags.ui.common.KeepScreenOn
+import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,6 +32,14 @@ fun AdvancedApneaScreen(
     viewModel: AdvancedApneaViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+
+    val isActive = state.phase != AdvancedApneaPhase.IDLE && state.phase != AdvancedApneaPhase.COMPLETE
+
+    SessionBackHandler(enabled = isActive) {
+        viewModel.stopSession()
+        navController.popBackStack()
+    }
+    KeepScreenOn(enabled = isActive)
 
     LaunchedEffect(modality, length) {
         if (state.phase == AdvancedApneaPhase.IDLE) {

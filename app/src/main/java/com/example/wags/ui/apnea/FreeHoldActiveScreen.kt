@@ -27,7 +27,9 @@ import com.example.wags.domain.model.PersonalBestResult
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
+import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.LiveSensorActions
+import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.theme.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -358,6 +360,9 @@ fun FreeHoldActiveScreen(
     viewModel: FreeHoldActiveViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    SessionBackHandler(enabled = state.freeHoldActive) { navController.popBackStack() }
+    KeepScreenOn(enabled = state.freeHoldActive)
 
     // True once the user taps Stop — we wait for the async PB check before navigating.
     var stopRequested by remember { mutableStateOf(false) }

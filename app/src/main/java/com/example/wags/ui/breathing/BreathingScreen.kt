@@ -33,8 +33,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
+import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.common.RrIntervalChart
+import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.theme.*
 import kotlin.math.roundToInt
 
@@ -78,6 +80,12 @@ fun BreathingScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val deviceId = "PLACEHOLDER_H10_ID"
+
+    val isActive = state.sessionPhase != BreathingSessionPhase.IDLE &&
+            state.sessionPhase != BreathingSessionPhase.COMPLETE
+
+    SessionBackHandler(enabled = isActive) { navController.popBackStack() }
+    KeepScreenOn(enabled = isActive)
 
     Scaffold(
         containerColor = BackgroundDark,

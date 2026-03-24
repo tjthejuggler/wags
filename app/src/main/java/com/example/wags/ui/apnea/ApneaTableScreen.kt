@@ -16,6 +16,8 @@ import com.example.wags.domain.model.ApneaTableStep
 import com.example.wags.domain.model.ApneaTableType
 import com.example.wags.domain.usecase.apnea.ApneaState
 import com.example.wags.ui.common.InfoHelpBubble
+import com.example.wags.ui.common.KeepScreenOn
+import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -27,6 +29,11 @@ fun ApneaTableScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val parsedType = runCatching { ApneaTableType.valueOf(tableType) }.getOrDefault(ApneaTableType.O2)
+
+    val isActive = state.apneaState != ApneaState.IDLE && state.apneaState != ApneaState.COMPLETE
+
+    SessionBackHandler(enabled = isActive) { navController.popBackStack() }
+    KeepScreenOn(enabled = isActive)
 
     // Load table when screen enters with a valid personal best
     LaunchedEffect(parsedType, state.personalBestMs) {

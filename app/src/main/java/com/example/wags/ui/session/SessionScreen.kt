@@ -13,7 +13,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.domain.model.SessionType
+import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.LiveSensorActions
+import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -25,6 +27,12 @@ fun SessionScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val parsedType = runCatching { SessionType.valueOf(sessionType) }.getOrDefault(SessionType.MEDITATION)
+
+    val isActive = state.sessionState == SessionState.ACTIVE ||
+            state.sessionState == SessionState.PROCESSING
+
+    SessionBackHandler(enabled = isActive) { navController.popBackStack() }
+    KeepScreenOn(enabled = isActive)
 
     LaunchedEffect(parsedType) {
         viewModel.setSessionType(parsedType)
