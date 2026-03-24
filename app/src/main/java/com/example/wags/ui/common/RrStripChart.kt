@@ -31,13 +31,12 @@ import androidx.compose.ui.unit.sp
 //
 //  Behaves like a classic strip-chart recorder / ECG monitor:
 //  • Configurable time window (default 30 s).
-//  • Each RR interval is plotted at its cumulative time position so that
-//    shorter intervals appear closer together on the X axis.
-//  • A continuously-advancing cursor (driven by withFrameNanos) moves the
-//    "now" edge smoothly to the right at real-time speed.
+//  • The X-axis is wall-clock time so scrolling is perfectly smooth and
+//    continuous — it never pauses between heartbeats.
+//  • Each RR interval is plotted at the wall-clock moment it was received.
+//  • The cursor advances every frame via withFrameNanos, producing 60 fps
+//    motion regardless of data arrival rate.
 //  • Once the line fills the window, old data scrolls off the left edge.
-//  • Data arrives in ~500 ms polling chunks but the cursor moves every frame,
-//    producing perfectly smooth motion.
 //  • Catmull-Rom spline interpolation for smooth curves through every point.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -78,23 +77,24 @@ data class TimedBeat(val timeMs: Double, val valueMs: Double)
 
 /**
  * Holds the strip-chart state for RR intervals. Converts raw RR intervals
- * into time-positioned beats and tracks a smoothly-advancing "now" cursor.
+ * into wall-clock-positioned beats for smooth scrolling.
  *
- * The ViewModel provides a **sliding window** of the last ~45 RR intervals
- * from a circular buffer. We detect new beats by comparing the last value
- * in our internal buffer with the tail of the source list.
+ * The X-axis uses wall-clock time (ms since first beat) so the chart
+ * scrolls at a perfectly constant rate driven by withFrameNanos.
+ * Each new beat is placed at the wall-clock moment it arrives.
  */
 @Stable
 class RrStripChartState(private val windowMs: Double = DEFAULT_CHART_WINDOW_MS) {
     val beats = mutableStateListOf<TimedBeat>()
-    var cumulativeTimeMs by mutableDoubleStateOf(0.0)
-        private set
-    var firstBeatNanos: Long = 0L
-        private set
     var started by mutableStateOf(false)
         private set
     /** Wall-clock offset (ms) captured at the moment the first beat arrives. */
     var firstBeatWallMs: Long = 0L
+        private set
+    // Legacy fields kept for API compatibility
+    var cumulativeTimeMs by mutableDoubleStateOf(0.0)
+        private set
+    var firstBeatNanos: Long = 0L
         private set
     private var lastSourceTail = 0.0
 
@@ -119,14 +119,23 @@ class RrStripChartState(private val windowMs: Double = DEFAULT_CHART_WINDOW_MS) 
             lastSourceTail = source.last()
             return
         }
+        val wallNow = System.currentTimeMillis()
+        val wallTimeMs = (wallNow - firstBeatWallMs).toDouble()
         val startIdx = source.size - newBeatsCount
+        // Determine the floor: no beat may appear before the last existing one.
+        val lastBeatTime = if (beats.isNotEmpty()) beats.last().timeMs else 0.0
         for (i in startIdx until source.size) {
             val rrMs = source[i]
             if (beats.isNotEmpty()) cumulativeTimeMs += rrMs
-            beats.add(TimedBeat(timeMs = cumulativeTimeMs, valueMs = rrMs))
+            // Spread batch beats evenly between the last existing beat and
+            // wallTimeMs so they are monotonically increasing in time.
+            val fraction = (i - startIdx + 1).toDouble() / newBeatsCount
+            val beatTime = (lastBeatTime + fraction * (wallTimeMs - lastBeatTime))
+                .coerceAtLeast(if (beats.isNotEmpty()) beats.last().timeMs + 1.0 else 0.0)
+            beats.add(TimedBeat(timeMs = beatTime, valueMs = rrMs))
         }
         lastSourceTail = source.last()
-        val cutoff = cumulativeTimeMs - windowMs * 2
+        val cutoff = wallTimeMs - windowMs * 2
         while (beats.size > 2 && beats.first().timeMs < cutoff) beats.removeAt(0)
     }
 }
@@ -134,18 +143,18 @@ class RrStripChartState(private val windowMs: Double = DEFAULT_CHART_WINDOW_MS) 
 /**
  * Holds the strip-chart state for RMSSD. Computes per-beat RMSSD
  * (|RR[i] − RR[i−1]|) from raw RR intervals and plots them on the same
- * cumulative-time axis as the RR chart.
+ * wall-clock time axis as the RR chart.
  */
 @Stable
 class RmssdStripChartState(private val windowMs: Double = DEFAULT_CHART_WINDOW_MS) {
     val beats = mutableStateListOf<TimedBeat>()
-    var cumulativeTimeMs by mutableDoubleStateOf(0.0)
-        private set
-    var firstBeatNanos: Long = 0L
-        private set
     var started by mutableStateOf(false)
         private set
     var firstBeatWallMs: Long = 0L
+        private set
+    var cumulativeTimeMs by mutableDoubleStateOf(0.0)
+        private set
+    var firstBeatNanos: Long = 0L
         private set
     private var lastSourceTail = 0.0
     private var prevRrMs = Double.NaN
@@ -171,18 +180,34 @@ class RmssdStripChartState(private val windowMs: Double = DEFAULT_CHART_WINDOW_M
             lastSourceTail = source.last()
             return
         }
+        val wallNow = System.currentTimeMillis()
+        val wallTimeMs = (wallNow - firstBeatWallMs).toDouble()
         val startIdx = source.size - newBeatsCount
+        val lastBeatTime = if (beats.isNotEmpty()) beats.last().timeMs else 0.0
+        // Count how many of the new beats will actually produce RMSSD values
+        var rmssdCount = 0
+        for (i in startIdx until source.size) {
+            if (!prevRrMs.isNaN() || (i > startIdx)) rmssdCount++
+        }
+        var rmssdIdx = 0
         for (i in startIdx until source.size) {
             val rrMs = source[i]
             if (beats.isNotEmpty() || !prevRrMs.isNaN()) cumulativeTimeMs += rrMs
             if (!prevRrMs.isNaN()) {
                 val diff = kotlin.math.abs(rrMs - prevRrMs)
-                beats.add(TimedBeat(timeMs = cumulativeTimeMs, valueMs = diff))
+                // Spread batch beats evenly, monotonically increasing
+                val fraction = if (rmssdCount > 0) {
+                    (rmssdIdx + 1).toDouble() / rmssdCount
+                } else 1.0
+                val beatTime = (lastBeatTime + fraction * (wallTimeMs - lastBeatTime))
+                    .coerceAtLeast(if (beats.isNotEmpty()) beats.last().timeMs + 1.0 else 0.0)
+                beats.add(TimedBeat(timeMs = beatTime, valueMs = diff))
+                rmssdIdx++
             }
             prevRrMs = rrMs
         }
         lastSourceTail = source.last()
-        val cutoff = cumulativeTimeMs - windowMs * 2
+        val cutoff = wallTimeMs - windowMs * 2
         while (beats.size > 2 && beats.first().timeMs < cutoff) beats.removeAt(0)
     }
 }
@@ -215,25 +240,14 @@ fun RrIntervalChart(
     }
     LaunchedEffect(fingerprint) { state.ingest(rrIntervals, System.nanoTime()) }
 
-    // Cursor is anchored to the data's cumulative time so the latest data
-    // point is always at the right edge of the chart. A small wall-clock
-    // delta is added between data arrivals for smooth scrolling, but it
-    // never exceeds 600 ms ahead of the last data point (one beat gap).
+    // Pure wall-clock cursor: advances every frame at exactly real-time
+    // speed. Because beats are also placed at wall-clock times, the chart
+    // scrolls at a perfectly constant rate with no pauses or jumps.
     LaunchedEffect(Unit) {
-        var lastDataTime = 0.0
-        var lastDataWallMs = 0L
         while (true) {
             withFrameNanos { _ ->
                 if (state.started) {
-                    val dataTime = state.cumulativeTimeMs
-                    if (dataTime != lastDataTime) {
-                        lastDataTime = dataTime
-                        lastDataWallMs = System.currentTimeMillis()
-                    }
-                    val sinceLastData = (System.currentTimeMillis() - lastDataWallMs).toDouble()
-                    // Advance cursor smoothly past the last data point, but cap
-                    // the look-ahead so the line stays near the right edge.
-                    cursorTimeMs = dataTime + sinceLastData.coerceAtMost(600.0)
+                    cursorTimeMs = (System.currentTimeMillis() - state.firstBeatWallMs).toDouble()
                 }
             }
         }
@@ -279,19 +293,12 @@ fun RmssdChart(
     }
     LaunchedEffect(fingerprint) { state.ingest(rrIntervals, System.nanoTime()) }
 
+    // Pure wall-clock cursor (same as RrIntervalChart)
     LaunchedEffect(Unit) {
-        var lastDataTime = 0.0
-        var lastDataWallMs = 0L
         while (true) {
             withFrameNanos { _ ->
                 if (state.started) {
-                    val dataTime = state.cumulativeTimeMs
-                    if (dataTime != lastDataTime) {
-                        lastDataTime = dataTime
-                        lastDataWallMs = System.currentTimeMillis()
-                    }
-                    val sinceLastData = (System.currentTimeMillis() - lastDataWallMs).toDouble()
-                    cursorTimeMs = dataTime + sinceLastData.coerceAtMost(600.0)
+                    cursorTimeMs = (System.currentTimeMillis() - state.firstBeatWallMs).toDouble()
                 }
             }
         }
