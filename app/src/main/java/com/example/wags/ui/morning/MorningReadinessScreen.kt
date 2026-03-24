@@ -95,9 +95,12 @@ fun MorningReadinessScreen(
         }
     }
 
-    // Session-complete feedback: chime + vibration when the FSM reaches COMPLETE.
+    // Session-complete feedback: chime + vibration when the measurement phase ends
+    // (i.e. entering QUESTIONNAIRE), so the user knows to look at the phone and
+    // fill out the Hooper survey.  Firing at COMPLETE would be too late — the user
+    // has already been interacting with the phone for the questionnaire by then.
     LaunchedEffect(uiState.fsmState) {
-        if (uiState.fsmState == MorningReadinessState.COMPLETE) {
+        if (uiState.fsmState == MorningReadinessState.QUESTIONNAIRE) {
             WagsFeedback.sessionEnd(context)
         }
     }
