@@ -225,7 +225,8 @@ private fun IdleContent(onStart: () -> Unit) {
 private fun InitContent(uiState: MorningReadinessUiState) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Text(
             "GET READY",
