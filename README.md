@@ -398,6 +398,26 @@ cd wags
 
 ## Changelog
 
+### 2026-03-24 — Personal Best Celebration Sound Effects
+
+When a new personal best is set in the apnea free hold section, the confetti celebration dialog now plays a tiered sound effect matching the trophy level:
+
+- **[`apnea_pb1.mp3`](app/src/main/res/raw/apnea_pb1.mp3)** — EXACT (1 🏆): record for the exact 4-setting combination
+- **[`apnea_pb2.mp3`](app/src/main/res/raw/apnea_pb2.mp3)** — THREE_SETTINGS (2 🏆🏆): record across any 3-setting combination
+- **[`apnea_pb3.mp3`](app/src/main/res/raw/apnea_pb3.mp3)** — TWO_SETTINGS (3 🏆🏆🏆): record across any 2-setting combination
+- **[`apnea_pb4.mp3`](app/src/main/res/raw/apnea_pb4.mp3)** — ONE_SETTING (4 🏆🏆🏆🏆): record across any single setting
+- **[`apnea_pb5.mp3`](app/src/main/res/raw/apnea_pb5.mp3)** — GLOBAL (5 🏆🏆🏆🏆🏆): all-time best across all settings
+
+Always plays the best (highest-level) sound the user deserves — never more than one sound per new record.
+
+#### Files changed
+
+- **[`ApneaPbSoundPlayer.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaPbSoundPlayer.kt)** *(new)* — Maps `PersonalBestCategory` → raw MP3 resource; plays once via `MediaPlayer`, self-releases on completion.
+- **[`ApneaScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaScreen.kt)** — `NewPersonalBestDialog` fires `playApneaPbSound()` via `LaunchedEffect(Unit)` when the dialog appears.
+- MP3 files moved from `res/` root to `res/raw/` (required for `MediaPlayer.create` / `R.raw` access).
+
+---
+
 ### 2026-03-23 — Posture Setting for Apnea Free Holds
 
 Added a 4th apnea setting type: **Posture** (Sitting / Laying). This is integrated across the entire apnea feature — database, queries, personal bests, trophy system, history, filters, and navigation.

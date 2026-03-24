@@ -28,6 +28,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -392,6 +393,11 @@ internal fun NewPersonalBestDialog(
         PersonalBestCategory.TWO_SETTINGS    -> 55
         PersonalBestCategory.THREE_SETTINGS  -> 50
         PersonalBestCategory.EXACT           -> 45
+    }
+
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        playApneaPbSound(context, category)
     }
 
     Dialog(
