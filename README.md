@@ -31,7 +31,7 @@ The app is designed for competitive freedivers and serious recreational practiti
 - **NSDR / Meditation Sessions** — Session logging with HR sonification analytics
 - **Per-Section Advice** — User-entered tips/reminders shown as a swipeable banner at the top of each main screen; managed via Settings
 - **Audio Setting** — 5th apnea setting dimension: Silence or Music. When Music is selected, Spotify auto-starts on hold begin and detected songs are logged per record.
-- **Spotify Integration** — Automatic now-playing detection via Spotify broadcast intents; play command via Android MediaSession API; song log stored per free hold record.
+- **Spotify Integration** — Automatic now-playing detection via Spotify broadcast intents (no special permissions) with MediaSession API fallback; play command via AudioManager media key dispatch; song log stored per free hold record and shown in hold detail summary.
 - **Room Database** — 15-table local database with full migration history (v20)
 
 ---
@@ -406,6 +406,22 @@ cd wags
 ---
 
 ## Changelog
+
+### 2026-03-25 — Fix: Spotify song not captured in free hold summary
+
+Fixed the Spotify song not being recorded when a free hold starts with the MUSIC audio setting. The root cause was that song detection relied entirely on the MediaSession API, which requires Notification Access — a special system permission the user must grant manually. Without it, `refreshSpotifyController()` always threw `SecurityException` and `_currentSong` was never populated.
+
+Rewrote [`SpotifyManager`](app/src/main/java/com/example/wags/data/spotify/SpotifyManager.kt) with a dual-strategy approach:
+
+1. **Primary: Spotify broadcast receiver** — Registers a `BroadcastReceiver` for `com.spotify.music.metadatachanged` and `com.spotify.music.playbackstatechanged`. These legacy Spotify broadcasts require **no special permissions** and fire whenever the track changes. The receiver is registered when tracking starts and unregistered when it stops.
+
+2. **Secondary: MediaSession API** — Still attempted as a bonus path (provides richer metadata) but gracefully degrades when Notification Access is not granted.
+
+3. **Timing poll on start:** If no metadata is available immediately after `sendPlayCommand()`, polls every 250 ms for up to 2 s until the broadcast or MediaSession delivers the track info.
+
+4. **Fallback on stop:** If `_sessionSongs` is still empty but `_currentSong` is non-null (e.g. same song resumed, no metadata-change event), uses it as the single session song.
+
+The song now appears correctly in the hold's detail summary ("Song" row) and in the "🎵 Songs Played" card on [`ApneaRecordDetailScreen`](app/src/main/java/com/example/wags/ui/apnea/ApneaRecordDetailScreen.kt).
 
 ### 2026-03-25 — Audio Setting + Spotify Integration
 
