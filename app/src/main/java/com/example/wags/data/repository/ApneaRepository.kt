@@ -709,6 +709,26 @@ class ApneaRepository @Inject constructor(
             )
         }
 
+    /**
+     * Returns distinct songs that have been played during breath holds.
+     * Groups by spotifyUri when available, otherwise by title+artist.
+     * Ordered by most recently played.
+     */
+    suspend fun getDistinctSongs(): List<SpotifySong> =
+        songLogDao.getDistinctSongs().map { entity ->
+            SpotifySong(
+                title      = entity.title,
+                artist     = entity.artist,
+                albumArt   = entity.albumArt,
+                spotifyUri = entity.spotifyUri,
+                startedAtMs = entity.startedAtMs,
+                endedAtMs  = entity.endedAtMs
+            )
+        }
+
+    /** Deletes all song log entries (clears the song picker history). */
+    suspend fun clearSongHistory() = songLogDao.deleteAll()
+
     // ── Stats (filtered by 5 settings) ───────────────────────────────────────
 
     fun getStats(

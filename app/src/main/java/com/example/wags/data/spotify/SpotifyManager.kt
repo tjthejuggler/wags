@@ -10,6 +10,7 @@ import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.os.Build
 import android.os.SystemClock
+import android.util.Log
 import android.view.KeyEvent
 import android.media.AudioManager
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -41,7 +42,9 @@ import javax.inject.Singleton
  */
 @Singleton
 class SpotifyManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val spotifyApiClient: SpotifyApiClient,
+    private val spotifyAuthManager: SpotifyAuthManager
 ) {
 
     companion object {
@@ -89,8 +92,19 @@ class SpotifyManager @Inject constructor(
                 SPOTIFY_METADATA_CHANGED -> {
                     val title = intent.getStringExtra("track") ?: return
                     val artist = intent.getStringExtra("artist") ?: ""
+                    // Log all extras to diagnose what Spotify sends
+                    val keys = intent.extras?.keySet()?.joinToString() ?: "none"
+                    Log.d("SpotifyMgr", "metadatachanged extras keys: $keys")
+                    // Spotify broadcasts the track ID as "id" (e.g. "spotify:track:xxxxx")
+                    val trackId = intent.getStringExtra("id")
+                    val spotifyUri = if (trackId != null && !trackId.startsWith("spotify:")) {
+                        "spotify:track:$trackId"
+                    } else {
+                        trackId
+                    }
+                    Log.d("SpotifyMgr", "metadatachanged: title=$title, artist=$artist, trackId=$trackId, spotifyUri=$spotifyUri")
                     val nowMs = System.currentTimeMillis()
-                    handleNewTrack(title, artist, nowMs)
+                    handleNewTrack(title, artist, nowMs, spotifyUri)
                 }
                 SPOTIFY_PLAYBACK_CHANGED -> {
                     // Playback state changed (play/pause/skip) — if playing
@@ -109,24 +123,37 @@ class SpotifyManager @Inject constructor(
             val title = metadata.getString(MediaMetadata.METADATA_KEY_TITLE) ?: return
             val artist = metadata.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: ""
             val nowMs = System.currentTimeMillis()
-            handleNewTrack(title, artist, nowMs)
+            handleNewTrack(title, artist, nowMs, spotifyUri = null)
         }
     }
 
     /**
      * Common handler for new track metadata from either the broadcast receiver
      * or the MediaSession callback.
+     *
+     * When no [spotifyUri] is provided (broadcast didn't include "id"), and the
+     * user is authenticated, a background search via the Spotify Web API resolves
+     * the URI so it can be persisted for future song-picker use.
      */
-    private fun handleNewTrack(title: String, artist: String, nowMs: Long) {
+    private fun handleNewTrack(title: String, artist: String, nowMs: Long, spotifyUri: String? = null) {
         val newTrack = TrackInfo(
             title = title,
             artist = artist,
+            spotifyUri = spotifyUri,
             startedAtMs = nowMs
         )
 
         // Avoid duplicate entries if both broadcast and MediaSession fire
         val prev = _currentSong.value
         if (prev != null && prev.title == title && prev.artist == artist) {
+            // Same track — but if the previous entry lacked a URI and we now have one, update it
+            if (spotifyUri != null && prev.spotifyUri == null) {
+                val updated = prev.copy(spotifyUri = spotifyUri)
+                _currentSong.value = updated
+                if (isTracking && _sessionSongs.value.isNotEmpty()) {
+                    _sessionSongs.value = _sessionSongs.value.dropLast(1) + updated
+                }
+            }
             return // same track, skip duplicate
         }
 
@@ -139,6 +166,33 @@ class SpotifyManager @Inject constructor(
         _currentSong.value = newTrack
         if (isTracking) {
             _sessionSongs.value = _sessionSongs.value + newTrack
+        }
+
+        // If no URI was provided and user is authenticated, resolve via Search API
+        if (spotifyUri == null && spotifyAuthManager.isConnected.value) {
+            scope.launch {
+                val resolved = spotifyApiClient.searchTrack(title, artist)
+                Log.d("SpotifyMgr", "searchTrack resolved: $resolved for '$title' by '$artist'")
+                if (resolved != null) {
+                    backfillUri(title, artist, resolved)
+                }
+            }
+        }
+    }
+
+    /**
+     * Backfill a resolved Spotify URI into [_currentSong] and [_sessionSongs]
+     * for the track matching [title]+[artist].
+     */
+    private fun backfillUri(title: String, artist: String, uri: String) {
+        val current = _currentSong.value
+        if (current != null && current.title == title && current.artist == artist && current.spotifyUri == null) {
+            _currentSong.value = current.copy(spotifyUri = uri)
+        }
+        _sessionSongs.value = _sessionSongs.value.map { track ->
+            if (track.title == title && track.artist == artist && track.spotifyUri == null) {
+                track.copy(spotifyUri = uri)
+            } else track
         }
     }
 

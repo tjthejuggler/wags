@@ -283,7 +283,13 @@ fun SettingsScreen(
 
             // ── Spotify song detection ─────────────────────────────────────
             item {
-                SpotifyIntegrationCard()
+                SpotifyIntegrationCard(
+                    spotifyConnected = state.spotifyConnected,
+                    onConnectSpotify = {
+                        context.startActivity(viewModel.buildSpotifyLoginIntent())
+                    },
+                    onDisconnectSpotify = { viewModel.disconnectSpotify() }
+                )
             }
 
             // ── Tail App integration ───────────────────────────────────────
@@ -976,7 +982,11 @@ private fun DataExportImportCard(
 // ── Spotify integration card ──────────────────────────────────────────────────
 
 @Composable
-private fun SpotifyIntegrationCard() {
+private fun SpotifyIntegrationCard(
+    spotifyConnected: Boolean,
+    onConnectSpotify: () -> Unit,
+    onDisconnectSpotify: () -> Unit
+) {
     val context = LocalContext.current
     val isGranted = remember {
         android.service.notification.NotificationListenerService::class.java.let {
@@ -992,16 +1002,53 @@ private fun SpotifyIntegrationCard() {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Spotify Song Detection", style = MaterialTheme.typography.titleMedium)
+            Text("Spotify Integration", style = MaterialTheme.typography.titleMedium)
             Text(
-                "Automatically records the song playing during a Music breath hold. " +
-                    "Requires Notification Access permission.",
+                "Connect your Spotify account to load songs directly into playback " +
+                    "before a breath hold. Song detection also records what played during holds.",
                 style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary
             )
 
             HorizontalDivider(color = SurfaceVariant)
 
+            // ── Spotify Account ──────────────────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Spotify Account", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        if (spotifyConnected) "✓ Connected" else "Not connected",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (spotifyConnected) ReadinessGreen else TextSecondary
+                    )
+                }
+                if (spotifyConnected) {
+                    OutlinedButton(
+                        onClick = onDisconnectSpotify,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = ReadinessRed)
+                    ) {
+                        Text("Disconnect")
+                    }
+                } else {
+                    Button(
+                        onClick = onConnectSpotify,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF1DB954), // Spotify green
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Text("Connect Spotify")
+                    }
+                }
+            }
+
+            HorizontalDivider(color = SurfaceVariant)
+
+            // ── Notification Access (song detection) ─────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

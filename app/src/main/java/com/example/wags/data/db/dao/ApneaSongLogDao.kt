@@ -17,4 +17,19 @@ interface ApneaSongLogDao {
 
     @Query("DELETE FROM apnea_song_log WHERE recordId = :recordId")
     suspend fun deleteForRecord(recordId: Long)
+
+    @Query("DELETE FROM apnea_song_log")
+    suspend fun deleteAll()
+
+    /**
+     * Returns distinct songs that have been played during breath holds.
+     * Groups by spotifyUri when available, otherwise by title+artist.
+     * Ordered by most recently played first.
+     */
+    @Query("""
+        SELECT * FROM apnea_song_log
+        GROUP BY COALESCE(spotifyUri, title || '|' || artist)
+        ORDER BY MAX(startedAtMs) DESC
+    """)
+    suspend fun getDistinctSongs(): List<ApneaSongLogEntity>
 }

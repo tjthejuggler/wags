@@ -95,5 +95,8 @@ dependencies {
     // Vico Charts
     implementation(libs.vico.compose)
 
+    // OkHttp – used for Spotify Web API calls (PKCE token exchange, playback control)
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
     // Garmin Connect IQ Companion SDK – resolved via Maven on line 46
 }

@@ -31,7 +31,9 @@ The app is designed for competitive freedivers and serious recreational practiti
 - **NSDR / Meditation Sessions** — Session logging with HR sonification analytics
 - **Per-Section Advice** — User-entered tips/reminders shown as a swipeable banner at the top of each main screen; managed via Settings
 - **Audio Setting** — 5th apnea setting dimension: Silence or Music. When Music is selected, Spotify auto-starts on hold begin and detected songs are logged per record.
-- **Spotify Integration** — Automatic now-playing detection via Spotify broadcast intents (no special permissions) with MediaSession API fallback; play command via AudioManager media key dispatch; song log stored per free hold record and shown in hold detail summary.
+- **Spotify Integration** — Two-tier Spotify integration:
+  - **Song Detection** (passive): Automatic now-playing detection via Spotify broadcast intents (no special permissions) with MediaSession API fallback; song log stored per free hold record and shown in hold detail summary.
+  - **Account Connection** (active, added 2026-03-25): OAuth 2.0 PKCE login from Settings; when connected, a "Choose a Song" button appears on the free-hold screen (Music mode) showing a popup of all previously-played songs with artist, title, and duration; tapping a song card loads it into Spotify playback via the Web API so it plays when the user taps Start.
 - **Room Database** — 15-table local database with full migration history (v20)
 
 ---
@@ -64,6 +66,8 @@ com.example.wags/
 │   │   └── entity/                  # 15 Room entities (incl. AdviceEntity, ApneaSongLogEntity)
 │   ├── spotify/
 │   │   ├── SpotifyManager.kt        # MediaSession play command + Spotify broadcast song detection
+│   │   ├── SpotifyAuthManager.kt    # OAuth 2.0 PKCE login flow + token storage/refresh
+│   │   ├── SpotifyApiClient.kt      # Web API client — track metadata + playback control
 │   │   └── MediaNotificationListener.kt  # NotificationListenerService for MediaSession access
 │   └── repository/
 │       ├── AdviceRepository.kt
@@ -406,6 +410,28 @@ cd wags
 ---
 
 ## Changelog
+
+### 2026-03-25 — Spotify Account Connection + Song Picker
+
+Added full Spotify account integration via OAuth 2.0 PKCE flow. Users can now connect their Spotify account from Settings and choose which song to play before starting a breath hold.
+
+#### New Files
+
+- **[`SpotifyAuthManager.kt`](app/src/main/java/com/example/wags/data/spotify/SpotifyAuthManager.kt)** *(new)* — PKCE OAuth flow: generates code verifier/challenge, opens browser login, exchanges auth code for tokens, auto-refreshes expired tokens. Tokens stored in `spotify_prefs` SharedPreferences.
+- **[`SpotifyApiClient.kt`](app/src/main/java/com/example/wags/data/spotify/SpotifyApiClient.kt)** *(new)* — Spotify Web API client: `getTrackDetail()` fetches title/artist/duration/albumArt; `startPlayback()` starts a specific track on the user's active device.
+- **[`SongPickerComponents.kt`](app/src/main/java/com/example/wags/ui/apnea/SongPickerComponents.kt)** *(new)* — Composables for the song picker: `SongPickerButton`, `SelectedSongBanner`, `SongPickerDialog`, `SongCard`.
+
+#### Modified Files
+
+- **[`build.gradle.kts`](app/build.gradle.kts)** — Added `okhttp:4.12.0` dependency for HTTP calls.
+- **[`AndroidManifest.xml`](app/src/main/AndroidManifest.xml)** — Added `launchMode="singleTask"` to MainActivity; added intent filter for `wags://spotify-callback` redirect URI.
+- **[`MainActivity.kt`](app/src/main/java/com/example/wags/MainActivity.kt)** — Injects `SpotifyAuthManager`; handles Spotify OAuth redirect in `onCreate()` and `onNewIntent()`.
+- **[`AppModule.kt`](app/src/main/java/com/example/wags/di/AppModule.kt)** — Added `@Named("spotify_prefs")` SharedPreferences provider.
+- **[`ApneaSongLogDao.kt`](app/src/main/java/com/example/wags/data/db/dao/ApneaSongLogDao.kt)** — Added `getDistinctSongs()` query: returns unique songs (by spotifyUri) ordered by most recently played.
+- **[`ApneaRepository.kt`](app/src/main/java/com/example/wags/data/repository/ApneaRepository.kt)** — Added `getDistinctSongs()` method exposing the DAO query.
+- **[`SettingsViewModel.kt`](app/src/main/java/com/example/wags/ui/settings/SettingsViewModel.kt)** — Injects `SpotifyAuthManager`; added `spotifyConnected` to UI state; added `buildSpotifyLoginIntent()` and `disconnectSpotify()`.
+- **[`SettingsScreen.kt`](app/src/main/java/com/example/wags/ui/settings/SettingsScreen.kt)** — `SpotifyIntegrationCard` now shows Connect/Disconnect button for Spotify account alongside the existing Notification Access section.
+- **[`FreeHoldActiveScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/FreeHoldActiveScreen.kt)** — ViewModel injects `SpotifyApiClient` + `SpotifyAuthManager`; UI state extended with song picker fields; `loadPreviousSongs()` fetches enriched track details; `selectSong()` loads track into Spotify; `startFreeHold()` uses Web API when a song was pre-selected; screen shows "Choose a Song" button and selected song banner.
 
 ### 2026-03-25 — Fix: Spotify song not captured in free hold summary
 

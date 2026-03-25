@@ -1,6 +1,7 @@
 package com.example.wags
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -12,9 +13,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.navigation.compose.rememberNavController
 import com.example.wags.data.ble.AutoConnectManager
+import com.example.wags.data.spotify.SpotifyAuthManager
 import com.example.wags.ui.navigation.WagsNavGraph
 import com.example.wags.ui.theme.WagsTheme
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -23,11 +29,16 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var autoConnectManager: AutoConnectManager
 
+    @Inject
+    lateinit var spotifyAuthManager: SpotifyAuthManager
+
     /** True while an apnea hold is active; set by ApneaTableScreen. */
     var isApneaHoldActive: Boolean = false
 
     /** Invoked when a volume button is pressed during an active hold. */
     var onContractionLogged: (() -> Unit)? = null
+
+    private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private val blePermissions: Array<String> = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         arrayOf(
@@ -61,6 +72,23 @@ class MainActivity : ComponentActivity() {
         // Start the persistent auto-connect loop.
         // If permissions are already granted this is instant; otherwise we request them.
         triggerAutoConnect()
+
+        // Handle Spotify OAuth redirect if the activity was launched with one
+        handleSpotifyRedirect(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleSpotifyRedirect(intent)
+    }
+
+    private fun handleSpotifyRedirect(intent: Intent?) {
+        val uri = intent?.data ?: return
+        if (uri.scheme == "wags" && uri.host == "spotify-callback") {
+            activityScope.launch {
+                spotifyAuthManager.handleRedirect(uri)
+            }
+        }
     }
 
     private fun triggerAutoConnect() {

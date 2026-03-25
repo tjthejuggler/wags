@@ -1,6 +1,10 @@
 package com.example.wags.ui.apnea
 
+import android.util.Log
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -8,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
@@ -22,7 +27,10 @@ import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
 import com.example.wags.data.ipc.HabitIntegrationRepository
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.data.repository.ApneaRepository
+import com.example.wags.data.spotify.SpotifyApiClient
+import com.example.wags.data.spotify.SpotifyAuthManager
 import com.example.wags.data.spotify.SpotifyManager
+import com.example.wags.data.spotify.SpotifyTrackDetail
 import com.example.wags.data.spotify.TrackInfo
 import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.OximeterReading
@@ -92,7 +100,20 @@ data class FreeHoldActiveUiState(
     /** True while the async personal-best check is still running after a hold ends. */
     val pbCheckPending: Boolean = false,
     /** The song currently playing in Spotify (null when SILENCE or Spotify not active). */
-    val nowPlayingSong: TrackInfo? = null
+    val nowPlayingSong: TrackInfo? = null,
+    // ── Song picker ──────────────────────────────────────────────────────────
+    /** True when the user's Spotify account is connected (PKCE tokens present). */
+    val spotifyConnected: Boolean = false,
+    /** True when audio setting is MUSIC — controls whether the song picker button is shown. */
+    val isMusicMode: Boolean = false,
+    /** Songs previously played during breath holds (loaded from DB + enriched via API). */
+    val previousSongs: List<SpotifyTrackDetail> = emptyList(),
+    /** True while previous songs are being loaded. */
+    val loadingSongs: Boolean = false,
+    /** The song the user selected from the picker (will be loaded into Spotify on Start). */
+    val selectedSong: SpotifyTrackDetail? = null,
+    /** True while a selected song is being loaded into Spotify playback. */
+    val loadingSelectedSong: Boolean = false
 )
 
 @HiltViewModel
@@ -103,7 +124,9 @@ class FreeHoldActiveViewModel @Inject constructor(
     private val apneaRepository: ApneaRepository,
     private val audioHapticEngine: ApneaAudioHapticEngine,
     private val habitRepo: HabitIntegrationRepository,
-    private val spotifyManager: SpotifyManager
+    private val spotifyManager: SpotifyManager,
+    private val spotifyApiClient: SpotifyApiClient,
+    private val spotifyAuthManager: SpotifyAuthManager
 ) : ViewModel() {
 
     // Settings passed in via nav arguments — these are the source of truth for what gets saved
@@ -113,9 +136,12 @@ class FreeHoldActiveViewModel @Inject constructor(
     val posture: String    = savedStateHandle.get<String>("posture")    ?: "LAYING"
     val audio: String      = savedStateHandle.get<String>("audio")      ?: AudioSetting.SILENCE.name
 
+    private val isMusicMode = audio == AudioSetting.MUSIC.name
+
     private val _uiState = MutableStateFlow(
         FreeHoldActiveUiState(
-            showTimer = savedStateHandle.get<Boolean>("showTimer") ?: true
+            showTimer = savedStateHandle.get<Boolean>("showTimer") ?: true,
+            isMusicMode = isMusicMode
         )
     )
 
@@ -123,14 +149,27 @@ class FreeHoldActiveViewModel @Inject constructor(
         _uiState,
         hrDataSource.liveHr,
         hrDataSource.liveSpO2,
-        spotifyManager.currentSong
-    ) { state, hr, spo2, song ->
-        state.copy(liveHr = hr, liveSpO2 = spo2, nowPlayingSong = song)
+        spotifyManager.currentSong,
+        spotifyAuthManager.isConnected
+    ) { args ->
+        @Suppress("UNCHECKED_CAST")
+        val state = args[0] as FreeHoldActiveUiState
+        val hr = args[1] as Int?
+        val spo2 = args[2] as Int?
+        val song = args[3] as TrackInfo?
+        val connected = args[4] as Boolean
+        state.copy(
+            liveHr = hr,
+            liveSpO2 = spo2,
+            nowPlayingSong = song,
+            spotifyConnected = connected
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = FreeHoldActiveUiState(
-            showTimer = savedStateHandle.get<Boolean>("showTimer") ?: true
+            showTimer = savedStateHandle.get<Boolean>("showTimer") ?: true,
+            isMusicMode = isMusicMode
         )
     )
 
@@ -177,10 +216,31 @@ class FreeHoldActiveViewModel @Inject constructor(
                 }
             }
         }
-        // If MUSIC is selected, start Spotify and begin song tracking
+        // If MUSIC is selected, start Spotify and begin song tracking.
+        // When a song was pre-selected via the picker, use the Web API to start
+        // that specific track; otherwise fall back to the generic play command
+        // (resumes whatever was last playing in Spotify).
         if (audio == AudioSetting.MUSIC.name) {
-            spotifyManager.sendPlayCommand()
+            val selected = _uiState.value.selectedSong
+            val hasValidUri = selected != null
+                && selected.spotifyUri.isNotBlank()
+                && spotifyAuthManager.isConnected.value
+            Log.d("FreeHold", "startFreeHold: hasValidUri=$hasValidUri, uri=${selected?.spotifyUri}, connected=${spotifyAuthManager.isConnected.value}")
             spotifyManager.startTracking()
+            if (hasValidUri) {
+                // Use Web API to start the specific pre-selected track.
+                // Fire-and-forget: the API call takes ~500ms but Spotify starts
+                // playback server-side as soon as it receives the request.
+                viewModelScope.launch {
+                    val success = spotifyApiClient.startPlayback(selected!!.spotifyUri)
+                    Log.d("FreeHold", "startPlayback result: success=$success for ${selected.spotifyUri}")
+                    if (!success) {
+                        spotifyManager.sendPlayCommand()
+                    }
+                }
+            } else {
+                spotifyManager.sendPlayCommand()
+            }
         }
     }
 
@@ -251,6 +311,67 @@ class FreeHoldActiveViewModel @Inject constructor(
 
     fun dismissNewPersonalBest() {
         _uiState.update { it.copy(newPersonalBest = null) }
+    }
+
+    // ── Song picker ──────────────────────────────────────────────────────────
+
+    /**
+     * Load distinct songs previously played during breath holds.
+     * For each song with a spotifyUri, fetches track details (duration, art) from the API.
+     * Songs without a URI are still shown with basic info from the DB.
+     */
+    fun loadPreviousSongs() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(loadingSongs = true) }
+            val songs = apneaRepository.getDistinctSongs()
+            val details = songs.map { song ->
+                var uri = song.spotifyUri
+                // If no URI saved, try resolving via Spotify Search API
+                if (uri == null && spotifyAuthManager.isConnected.value) {
+                    uri = spotifyApiClient.searchTrack(song.title, song.artist)
+                    Log.d("FreeHold", "searchTrack backfill: '$uri' for '${song.title}' by '${song.artist}'")
+                }
+                if (uri != null) {
+                    // Try API first for duration/art; fall back to basic info from DB
+                    spotifyApiClient.getTrackDetail(uri) ?: SpotifyTrackDetail(
+                        spotifyUri = uri,
+                        title = song.title,
+                        artist = song.artist,
+                        durationMs = 0L,
+                        albumArt = song.albumArt
+                    )
+                } else {
+                    // No URI and no auth — show with basic info
+                    SpotifyTrackDetail(
+                        spotifyUri = "",
+                        title = song.title,
+                        artist = song.artist,
+                        durationMs = 0L,
+                        albumArt = song.albumArt
+                    )
+                }
+            }
+            _uiState.update { it.copy(previousSongs = details, loadingSongs = false) }
+        }
+    }
+
+    /**
+     * Called when the user taps a song card in the picker.
+     * Just remembers the selection — the actual playback starts in [startFreeHold].
+     */
+    fun selectSong(track: SpotifyTrackDetail) {
+        _uiState.update { it.copy(selectedSong = track) }
+    }
+
+    fun clearSelectedSong() {
+        _uiState.update { it.copy(selectedSong = null) }
+    }
+
+    fun clearSongHistory() {
+        viewModelScope.launch {
+            apneaRepository.clearSongHistory()
+            _uiState.update { it.copy(previousSongs = emptyList(), selectedSong = null) }
+        }
     }
 
     private fun saveFreeHoldRecord(
@@ -454,6 +575,25 @@ fun FreeHoldActiveScreen(
             )
         }
     ) { padding ->
+        // Song picker dialog state
+        var showSongPicker by remember { mutableStateOf(false) }
+
+        if (showSongPicker) {
+            SongPickerDialog(
+                songs = state.previousSongs,
+                isLoading = state.loadingSongs,
+                selectedSong = state.selectedSong,
+                loadingSelectedSong = state.loadingSelectedSong,
+                onSongSelected = { track ->
+                    viewModel.selectSong(track)
+                },
+                onClearHistory = {
+                    viewModel.clearSongHistory()
+                },
+                onDismiss = { showSongPicker = false }
+            )
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -463,6 +603,24 @@ fun FreeHoldActiveScreen(
             if (state.freeHoldActive && state.nowPlayingSong != null) {
                 NowPlayingBanner(track = state.nowPlayingSong!!)
             }
+
+            // Selected song banner — shown before hold starts when a song was picked
+            if (!state.freeHoldActive && state.selectedSong != null) {
+                SelectedSongBanner(track = state.selectedSong!!) {
+                    viewModel.clearSelectedSong()
+                }
+            }
+
+            // Song picker button — shown when MUSIC mode + Spotify connected + hold not active
+            if (!state.freeHoldActive && state.isMusicMode && state.spotifyConnected) {
+                SongPickerButton(
+                    onClick = {
+                        viewModel.loadPreviousSongs()
+                        showSongPicker = true
+                    }
+                )
+            }
+
             FreeHoldActiveContent(
                 freeHoldActive = state.freeHoldActive,
                 showTimer = state.showTimer,

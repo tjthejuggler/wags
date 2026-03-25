@@ -64,4 +64,14 @@ object AppModule {
     @Named("habit_prefs")
     fun provideHabitPrefs(@ApplicationContext context: Context): SharedPreferences =
         context.getSharedPreferences("habit_integration_prefs", Context.MODE_PRIVATE)
+
+    /**
+     * Dedicated SharedPreferences file for Spotify OAuth tokens.
+     * Injected into [com.example.wags.data.spotify.SpotifyAuthManager].
+     */
+    @Provides
+    @Singleton
+    @Named("spotify_prefs")
+    fun provideSpotifyPrefs(@ApplicationContext context: Context): SharedPreferences =
+        context.getSharedPreferences("spotify_prefs", Context.MODE_PRIVATE)
 }

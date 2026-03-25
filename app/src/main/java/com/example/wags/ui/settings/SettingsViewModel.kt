@@ -1,5 +1,6 @@
 package com.example.wags.ui.settings
 
+import android.content.Intent
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,6 +11,7 @@ import com.example.wags.data.garmin.GarminManager
 import com.example.wags.data.ipc.HabitIntegrationRepository
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.data.repository.DataExportImportRepository
+import com.example.wags.data.spotify.SpotifyAuthManager
 import com.example.wags.domain.model.BleConnectionState
 import com.example.wags.domain.model.HabitEntry
 import com.example.wags.domain.model.ScannedDevice
@@ -56,6 +58,8 @@ data class SettingsUiState(
     val morningReadinessHabit: HabitSlotSelection = HabitSlotSelection(),
     val hrvReadinessHabit: HabitSlotSelection = HabitSlotSelection(),
     val resonanceBreathingHabit: HabitSlotSelection = HabitSlotSelection(),
+    // ── Spotify account ───────────────────────────────────────────────────────
+    val spotifyConnected: Boolean = false,
     // ── Data Export / Import ────────────────────────────────────────────────────
     val isExporting: Boolean = false,
     val isImporting: Boolean = false,
@@ -73,7 +77,8 @@ class SettingsViewModel @Inject constructor(
     private val habitRepo: HabitIntegrationRepository,
     private val meditationRepository: com.example.wags.data.repository.MeditationRepository,
     private val garminManager: GarminManager,
-    private val dataExportImportRepo: DataExportImportRepository
+    private val dataExportImportRepo: DataExportImportRepository,
+    private val spotifyAuthManager: SpotifyAuthManager
 ) : ViewModel() {
 
     private val _habitState = MutableStateFlow(buildInitialHabitState())
@@ -120,6 +125,8 @@ class SettingsViewModel @Inject constructor(
             exportImportMessage  = exportImport.exportImportMessage,
             exportImportError    = exportImport.exportImportError
         )
+    }.combine(spotifyAuthManager.isConnected) { state, spotifyConnected ->
+        state.copy(spotifyConnected = spotifyConnected)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -238,6 +245,14 @@ class SettingsViewModel @Inject constructor(
     fun clearExportImportMessage() {
         _exportImportState.update { it.copy(exportImportMessage = null, exportImportError = null) }
     }
+
+    // ── Spotify account ───────────────────────────────────────────────────────
+
+    /** Returns an Intent that opens the Spotify login page in the browser. */
+    fun buildSpotifyLoginIntent(): Intent = spotifyAuthManager.buildLoginIntent()
+
+    /** Disconnect the Spotify account — clears all stored tokens. */
+    fun disconnectSpotify() = spotifyAuthManager.disconnect()
 
     override fun onCleared() {
         stopScan()
