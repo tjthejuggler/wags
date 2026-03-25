@@ -60,11 +60,11 @@ fun PersonalBestsScreen(
                 // Group entries by trophy count for section headers
                 val grouped = state.entries.groupBy { it.trophyCount }
 
-                // 5🏆 Global
-                grouped[5]?.let { entries ->
+                // 6🏆 Global
+                grouped[6]?.let { entries ->
                     item {
                         SectionHeader(
-                            trophies = "🏆🏆🏆🏆🏆",
+                            trophies = "🏆🏆🏆🏆🏆🏆",
                             title = "Global Personal Best",
                             subtitle = "Best across all settings"
                         )
@@ -81,11 +81,11 @@ fun PersonalBestsScreen(
                     item { Spacer(modifier = Modifier.height(8.dp)) }
                 }
 
-                // 4🏆 Single setting
-                grouped[4]?.let { entries ->
+                // 5🏆 Single setting
+                grouped[5]?.let { entries ->
                     item {
                         SectionHeader(
-                            trophies = "🏆🏆🏆🏆",
+                            trophies = "🏆🏆🏆🏆🏆",
                             title = "Single Setting Bests",
                             subtitle = "Best for one setting (any other settings)"
                         )
@@ -102,11 +102,11 @@ fun PersonalBestsScreen(
                     item { Spacer(modifier = Modifier.height(8.dp)) }
                 }
 
-                // 3🏆 Two settings
-                grouped[3]?.let { entries ->
+                // 4🏆 Two settings
+                grouped[4]?.let { entries ->
                     item {
                         SectionHeader(
-                            trophies = "🏆🏆🏆",
+                            trophies = "🏆🏆🏆🏆",
                             title = "Two Setting Bests",
                             subtitle = "Best for a pair of settings"
                         )
@@ -123,11 +123,11 @@ fun PersonalBestsScreen(
                     item { Spacer(modifier = Modifier.height(8.dp)) }
                 }
 
-                // 2🏆 Three settings
-                grouped[2]?.let { entries ->
+                // 3🏆 Three settings
+                grouped[3]?.let { entries ->
                     item {
                         SectionHeader(
-                            trophies = "🏆🏆",
+                            trophies = "🏆🏆🏆",
                             title = "Three Setting Bests",
                             subtitle = "Best for a trio of settings"
                         )
@@ -144,13 +144,34 @@ fun PersonalBestsScreen(
                     item { Spacer(modifier = Modifier.height(8.dp)) }
                 }
 
-                // 1🏆 Exact combo
+                // 2🏆 Four settings
+                grouped[2]?.let { entries ->
+                    item {
+                        SectionHeader(
+                            trophies = "🏆🏆",
+                            title = "Four Setting Bests",
+                            subtitle = "Best for four specific settings"
+                        )
+                    }
+                    items(entries) { entry ->
+                        PersonalBestRow(
+                            entry = entry,
+                            textStyle = TrophyTextStyle.FOUR_SETTINGS,
+                            onRecordClick = { recordId ->
+                                navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
+                            }
+                        )
+                    }
+                    item { Spacer(modifier = Modifier.height(8.dp)) }
+                }
+
+                // 1🏆 Exact combo (all 5 settings)
                 grouped[1]?.let { entries ->
                     item {
                         SectionHeader(
                             trophies = "🏆",
                             title = "Exact Setting Bests",
-                            subtitle = "Best for each specific combination"
+                            subtitle = "Best for each specific combination of all 5 settings"
                         )
                     }
                     items(entries) { entry ->
@@ -207,6 +228,7 @@ private enum class TrophyTextStyle {
     ONE_SETTING,
     TWO_SETTINGS,
     THREE_SETTINGS,
+    FOUR_SETTINGS,
     EXACT             // smallest
 }
 
@@ -225,21 +247,24 @@ private fun PersonalBestRow(
         TrophyTextStyle.ONE_SETTING    -> 16.sp
         TrophyTextStyle.TWO_SETTINGS   -> 15.sp
         TrophyTextStyle.THREE_SETTINGS -> 14.sp
-        TrophyTextStyle.EXACT          -> 13.sp
+        TrophyTextStyle.FOUR_SETTINGS  -> 13.sp
+        TrophyTextStyle.EXACT          -> 12.sp
     }
     val durationFontSize = when (textStyle) {
         TrophyTextStyle.GLOBAL         -> 20.sp
         TrophyTextStyle.ONE_SETTING    -> 17.sp
         TrophyTextStyle.TWO_SETTINGS   -> 16.sp
         TrophyTextStyle.THREE_SETTINGS -> 15.sp
-        TrophyTextStyle.EXACT          -> 14.sp
+        TrophyTextStyle.FOUR_SETTINGS  -> 14.sp
+        TrophyTextStyle.EXACT          -> 13.sp
     }
     val labelColor = when (textStyle) {
         TrophyTextStyle.GLOBAL         -> Color.White
         TrophyTextStyle.ONE_SETTING    -> Color.White.copy(alpha = 0.95f)
         TrophyTextStyle.TWO_SETTINGS   -> Color.White.copy(alpha = 0.90f)
         TrophyTextStyle.THREE_SETTINGS -> Color.White.copy(alpha = 0.85f)
-        TrophyTextStyle.EXACT          -> Color.White.copy(alpha = 0.75f)
+        TrophyTextStyle.FOUR_SETTINGS  -> Color.White.copy(alpha = 0.80f)
+        TrophyTextStyle.EXACT          -> Color.White.copy(alpha = 0.72f)
     }
 
     Row(

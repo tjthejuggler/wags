@@ -22,9 +22,13 @@ import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
 import com.example.wags.data.ipc.HabitIntegrationRepository
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.data.repository.ApneaRepository
+import com.example.wags.data.spotify.SpotifyManager
+import com.example.wags.data.spotify.TrackInfo
+import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.OximeterReading
 import com.example.wags.domain.model.PersonalBestResult
 import com.example.wags.domain.model.PrepType
+import com.example.wags.domain.model.SpotifySong
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
 import com.example.wags.ui.common.KeepScreenOn
@@ -86,7 +90,9 @@ data class FreeHoldActiveUiState(
     /** Non-null when the just-completed hold set a new PB — contains the broadest beaten category. */
     val newPersonalBest: PersonalBestResult? = null,
     /** True while the async personal-best check is still running after a hold ends. */
-    val pbCheckPending: Boolean = false
+    val pbCheckPending: Boolean = false,
+    /** The song currently playing in Spotify (null when SILENCE or Spotify not active). */
+    val nowPlayingSong: TrackInfo? = null
 )
 
 @HiltViewModel
@@ -96,7 +102,8 @@ class FreeHoldActiveViewModel @Inject constructor(
     private val hrDataSource: HrDataSource,
     private val apneaRepository: ApneaRepository,
     private val audioHapticEngine: ApneaAudioHapticEngine,
-    private val habitRepo: HabitIntegrationRepository
+    private val habitRepo: HabitIntegrationRepository,
+    private val spotifyManager: SpotifyManager
 ) : ViewModel() {
 
     // Settings passed in via nav arguments — these are the source of truth for what gets saved
@@ -104,6 +111,7 @@ class FreeHoldActiveViewModel @Inject constructor(
     val prepType: String   = savedStateHandle.get<String>("prepType")   ?: "NO_PREP"
     val timeOfDay: String  = savedStateHandle.get<String>("timeOfDay")  ?: "DAY"
     val posture: String    = savedStateHandle.get<String>("posture")    ?: "LAYING"
+    val audio: String      = savedStateHandle.get<String>("audio")      ?: AudioSetting.SILENCE.name
 
     private val _uiState = MutableStateFlow(
         FreeHoldActiveUiState(
@@ -114,9 +122,10 @@ class FreeHoldActiveViewModel @Inject constructor(
     val uiState: StateFlow<FreeHoldActiveUiState> = combine(
         _uiState,
         hrDataSource.liveHr,
-        hrDataSource.liveSpO2
-    ) { state, hr, spo2 ->
-        state.copy(liveHr = hr, liveSpO2 = spo2)
+        hrDataSource.liveSpO2,
+        spotifyManager.currentSong
+    ) { state, hr, spo2, song ->
+        state.copy(liveHr = hr, liveSpO2 = spo2, nowPlayingSong = song)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -168,12 +177,22 @@ class FreeHoldActiveViewModel @Inject constructor(
                 }
             }
         }
+        // If MUSIC is selected, start Spotify and begin song tracking
+        if (audio == AudioSetting.MUSIC.name) {
+            spotifyManager.sendPlayCommand()
+            spotifyManager.startTracking()
+        }
     }
 
     fun cancelFreeHold() {
         oximeterCollectionJob?.cancel()
         oximeterCollectionJob = null
         oximeterSamples.clear()
+        // Pause Spotify and rewind to start of song if MUSIC was selected
+        if (audio == AudioSetting.MUSIC.name) {
+            spotifyManager.stopTracking()
+            spotifyManager.sendPauseAndRewindCommand()
+        }
         _uiState.update { it.copy(freeHoldActive = false, freeHoldFirstContractionMs = null) }
     }
 
@@ -195,6 +214,12 @@ class FreeHoldActiveViewModel @Inject constructor(
         // fallback for the edge case where the device connected *after* the hold
         // started (e.g. late auto-connect).
         val deviceLabel = holdStartDeviceLabel ?: hrDataSource.activeHrDeviceLabel()
+        // Stop Spotify tracking, collect songs, then pause + rewind to start of song
+        val tracksPlayed: List<TrackInfo> = if (audio == AudioSetting.MUSIC.name) {
+            val tracks = spotifyManager.stopTracking()
+            spotifyManager.sendPauseAndRewindCommand()
+            tracks
+        } else emptyList()
         _uiState.update {
             it.copy(
                 freeHoldActive = false,
@@ -211,9 +236,10 @@ class FreeHoldActiveViewModel @Inject constructor(
                 lungVolume = lungVolume,
                 prepType   = prepType,
                 timeOfDay  = timeOfDay,
-                posture    = posture
+                posture    = posture,
+                audio      = audio
             )
-            saveFreeHoldRecord(duration, firstContractionMs, deviceLabel)
+            saveFreeHoldRecord(duration, firstContractionMs, deviceLabel, tracksPlayed)
             if (pbResult != null) {
                 _uiState.update { it.copy(newPersonalBest = pbResult, pbCheckPending = false) }
                 habitRepo.sendHabitIncrement(Slot.APNEA_NEW_RECORD)
@@ -227,7 +253,12 @@ class FreeHoldActiveViewModel @Inject constructor(
         _uiState.update { it.copy(newPersonalBest = null) }
     }
 
-    private fun saveFreeHoldRecord(durationMs: Long, firstContractionMs: Long? = null, deviceLabel: String? = null) {
+    private fun saveFreeHoldRecord(
+        durationMs: Long,
+        firstContractionMs: Long? = null,
+        deviceLabel: String? = null,
+        tracksPlayed: List<TrackInfo> = emptyList()
+    ) {
         // Only use oximeter data when the oximeter was the primary device at hold-start.
         // When a Polar device is the primary HR source, any background-connected oximeter
         // readings are incidental resting values (typically 99 %) and must be discarded.
@@ -274,6 +305,7 @@ class FreeHoldActiveViewModel @Inject constructor(
                     prepType           = prepType,
                     timeOfDay          = timeOfDay,
                     posture            = posture,
+                    audio              = audio,
                     minHrBpm           = minHr,
                     maxHrBpm           = maxHr,
                     lowestSpO2         = lowestSpO2,
@@ -327,6 +359,20 @@ class FreeHoldActiveViewModel @Inject constructor(
 
             if (samples.isNotEmpty()) {
                 apneaRepository.saveTelemetry(samples)
+            }
+
+            // ── Save Spotify song log ─────────────────────────────────────────
+            if (tracksPlayed.isNotEmpty()) {
+                val songs = tracksPlayed.map { track ->
+                    SpotifySong(
+                        title       = track.title,
+                        artist      = track.artist,
+                        spotifyUri  = track.spotifyUri,
+                        startedAtMs = track.startedAtMs,
+                        endedAtMs   = track.endedAtMs
+                    )
+                }
+                apneaRepository.saveSongLog(recordId, songs)
             }
         }
     }
@@ -408,20 +454,28 @@ fun FreeHoldActiveScreen(
             )
         }
     ) { padding ->
-        FreeHoldActiveContent(
-            freeHoldActive = state.freeHoldActive,
-            showTimer = state.showTimer,
-            firstContractionMs = state.freeHoldFirstContractionMs,
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
-            onStart = { viewModel.startFreeHold() },
-            onFirstContraction = { viewModel.recordFreeHoldFirstContraction() },
-            onStop = {
-                stopRequested = true
-                viewModel.stopFreeHold()
+                .padding(padding)
+        ) {
+            // Now-playing banner — shown when MUSIC is selected and a song is detected
+            if (state.freeHoldActive && state.nowPlayingSong != null) {
+                NowPlayingBanner(track = state.nowPlayingSong!!)
             }
-        )
+            FreeHoldActiveContent(
+                freeHoldActive = state.freeHoldActive,
+                showTimer = state.showTimer,
+                firstContractionMs = state.freeHoldFirstContractionMs,
+                modifier = Modifier.fillMaxSize(),
+                onStart = { viewModel.startFreeHold() },
+                onFirstContraction = { viewModel.recordFreeHoldFirstContraction() },
+                onStop = {
+                    stopRequested = true
+                    viewModel.stopFreeHold()
+                }
+            )
+        }
     }
 }
 

@@ -30,7 +30,9 @@ The app is designed for competitive freedivers and serious recreational practiti
 - **TTS + Haptic Engine** — Phase announcements, countdown cues, and differentiated vibration patterns
 - **NSDR / Meditation Sessions** — Session logging with HR sonification analytics
 - **Per-Section Advice** — User-entered tips/reminders shown as a swipeable banner at the top of each main screen; managed via Settings
-- **Room Database** — 14-table local database with full migration history (v19)
+- **Audio Setting** — 5th apnea setting dimension: Silence or Music. When Music is selected, Spotify auto-starts on hold begin and detected songs are logged per record.
+- **Spotify Integration** — Automatic now-playing detection via Spotify broadcast intents; play command via Android MediaSession API; song log stored per free hold record.
+- **Room Database** — 15-table local database with full migration history (v20)
 
 ---
 
@@ -57,9 +59,12 @@ com.example.wags/
 │   │   ├── CircularBuffer.kt        # Lock-free ring buffer for RR samples
 │   │   └── RxToFlowBridge.kt        # RxJava3 → Kotlin Flow adapter
 │   ├── db/
-│   │   ├── WagsDatabase.kt          # Room DB v19, 14 entities, 18 migrations
-│   │   ├── dao/                     # 14 DAOs (one per entity)
-│   │   └── entity/                  # 14 Room entities (incl. AdviceEntity)
+│   │   ├── WagsDatabase.kt          # Room DB v20, 15 entities, 19 migrations
+│   │   ├── dao/                     # 15 DAOs (one per entity)
+│   │   └── entity/                  # 15 Room entities (incl. AdviceEntity, ApneaSongLogEntity)
+│   ├── spotify/
+│   │   ├── SpotifyManager.kt        # MediaSession play command + Spotify broadcast song detection
+│   │   └── MediaNotificationListener.kt  # NotificationListenerService for MediaSession access
 │   └── repository/
 │       ├── AdviceRepository.kt
 │       ├── ApneaRepository.kt
@@ -324,12 +329,13 @@ Combine freely: e.g., "Long + Hard" = 12 rounds at 55%/85% PB intensity.
 
 ## Database Schema
 
-The Room database (`wags.db`) is at version 18 with 9 tables:
+The Room database (`wags.db`) is at version 20 with 15 tables:
 
 | Table | Entity | Purpose |
 |---|---|---|
 | `daily_readings` | `DailyReadingEntity` | HRV readiness scores and raw metrics per day |
-| `apnea_records` | `ApneaRecordEntity` | Free hold records (duration, lung volume, HR) |
+| `apnea_records` | `ApneaRecordEntity` | Free hold records (duration, lung volume, HR, audio) |
+| `apnea_song_log` | `ApneaSongLogEntity` | Songs detected during a free hold (FK → apnea_records, cascade delete) |
 | `session_logs` | `SessionLogEntity` | NSDR/meditation session logs with HR analytics |
 | `rf_assessments` | `RfAssessmentEntity` | Resonance frequency assessment results |
 | `acc_calibrations` | `AccCalibrationEntity` | Accelerometer respiration calibration data |
@@ -337,6 +343,7 @@ The Room database (`wags.db`) is at version 18 with 9 tables:
 | `apnea_sessions` | `ApneaSessionEntity` | Structured table session records (CO₂/O₂/Advanced) |
 | `contractions` | `ContractionEntity` | Per-round contraction timestamps for analytics |
 | `telemetry` | `TelemetryEntity` | Time-series HR/SpO₂ telemetry per session |
+| `advice` | `AdviceEntity` | Per-section user advice/reminder entries |
 
 ### Migration History
 
@@ -347,6 +354,8 @@ The Room database (`wags.db`) is at version 18 with 9 tables:
 | 3 → 4 | Added `apnea_sessions`, `contractions`, `telemetry` tables |
 | 4 → 5 | Added `accBreathingUsed` column to `rf_assessments` |
 | 17 → 18 | Added `posture` column to `apnea_records` (default `LAYING`) |
+| 18 → 19 | Added `advice` table |
+| 19 → 20 | Added `audio` column to `apnea_records` (default `SILENCE`); added `apnea_song_log` table |
 
 ---
 
@@ -397,6 +406,59 @@ cd wags
 ---
 
 ## Changelog
+
+### 2026-03-25 — Audio Setting + Spotify Integration
+
+Added a 5th apnea setting dimension: **Audio** (Silence / Music). When Music is selected, Spotify auto-starts when a free hold begins and detected songs are logged per record.
+
+#### New Domain Models
+
+- **[`AudioSetting.kt`](app/src/main/java/com/example/wags/domain/model/AudioSetting.kt)** *(new)* — Enum with `SILENCE` and `MUSIC` values, each with a `displayName()`.
+- **[`SpotifySong.kt`](app/src/main/java/com/example/wags/domain/model/SpotifySong.kt)** *(new)* — Data class for track metadata: title, artist, albumArt, spotifyUri, startedAtMs, endedAtMs.
+
+#### Database (v19 → v20)
+
+- **[`ApneaRecordEntity`](app/src/main/java/com/example/wags/data/db/entity/ApneaRecordEntity.kt)** — Added `audio: String = "SILENCE"` column.
+- **[`ApneaSongLogEntity.kt`](app/src/main/java/com/example/wags/data/db/entity/ApneaSongLogEntity.kt)** *(new)* — Room entity for `apnea_song_log` table; FK with cascade delete to `apnea_records`.
+- **[`ApneaSongLogDao.kt`](app/src/main/java/com/example/wags/data/db/dao/ApneaSongLogDao.kt)** *(new)* — `insertAll`, `getForRecord`, `deleteForRecord`.
+- **[`WagsDatabase`](app/src/main/java/com/example/wags/data/db/WagsDatabase.kt)** — `MIGRATION_19_20` adds `audio TEXT NOT NULL DEFAULT 'SILENCE'` to `apnea_records` and creates `apnea_song_log` table. All existing records backfilled with `SILENCE`.
+- **[`DatabaseModule`](app/src/main/java/com/example/wags/di/DatabaseModule.kt)** — Registered `MIGRATION_19_20`; added `ApneaSongLogDao` provider.
+
+#### Data Layer
+
+- **[`ApneaRecordDao`](app/src/main/java/com/example/wags/data/db/dao/ApneaRecordDao.kt)** — Completely rewritten with a **dynamic `@RawQuery` builder** pattern. With 5 settings the combinatorial PB queries would require 96 hand-coded methods; instead three builder functions (`buildBestFreeHoldQuery`, `buildIsBestQuery`, `buildWasBestAtTimeQuery`) construct SQL at runtime. All filtered queries include `audio`.
+- **[`ApneaRepository`](app/src/main/java/com/example/wags/data/repository/ApneaRepository.kt)** — All methods accept `audio: String`. PB logic expanded to 5-setting combinatorics (C(5,k) for k=0..5). Added `saveSongLog()` and `getSongLogForRecord()`.
+
+#### Trophy System (1–6 🏆)
+
+- **[`PersonalBestCategory`](app/src/main/java/com/example/wags/domain/model/PersonalBestCategory.kt)** — Added `FOUR_SETTINGS` level. Trophy counts now 1–6: EXACT→1, FOUR_SETTINGS→2, THREE_SETTINGS→3, TWO_SETTINGS→4, ONE_SETTING→5, GLOBAL→6.
+- **[`PersonalBestsScreen`](app/src/main/java/com/example/wags/ui/apnea/PersonalBestsScreen.kt)** — Added 6🏆 Global and 2🏆 Four Settings sections. Text style tiers expanded to 6 levels.
+
+#### Spotify Integration
+
+- **[`SpotifyManager.kt`](app/src/main/java/com/example/wags/data/spotify/SpotifyManager.kt)** *(new)* — `@Singleton` with `@Inject constructor`. `sendPlayCommand()` uses `AudioManager.dispatchMediaKeyEvent(KEYCODE_MEDIA_PLAY)` + direct `com.spotify.music.PLAY` broadcast. `sendPauseAndRewindCommand()` sends `KEYCODE_MEDIA_PAUSE` + `KEYCODE_MEDIA_PREVIOUS`. `startTracking()` / `stopTracking()` manage session song list. Song detection uses `MediaController.Callback.onMetadataChanged()` via `MediaSessionManager.getActiveSessions()` — requires Notification Access permission.
+- **[`MediaNotificationListener.kt`](app/src/main/java/com/example/wags/data/spotify/MediaNotificationListener.kt)** *(new)* — `NotificationListenerService` subclass. On connect, registers `MediaSessionManager.OnActiveSessionsChangedListener` and forwards session changes to `SpotifyManager.onActiveSessionsChanged()`.
+- **[`AndroidManifest.xml`](app/src/main/AndroidManifest.xml)** — Declared `MediaNotificationListener` with `BIND_NOTIFICATION_LISTENER_SERVICE` permission.
+- **[`SettingsScreen.kt`](app/src/main/java/com/example/wags/ui/settings/SettingsScreen.kt)** — Added `SpotifyIntegrationCard` showing Notification Access grant status (green ✓ / orange ⚠) with an "Open Settings" button that launches `android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS`. Required for song detection to work.
+
+#### ViewModel Updates
+
+- **[`ApneaViewModel`](app/src/main/java/com/example/wags/ui/apnea/ApneaViewModel.kt)** — Added `SpotifyManager` injection, `_audio` StateFlow, `setAudio()`. `startFreeHold()` calls `sendPlayCommand()` + `startTracking()` when MUSIC. `stopFreeHold()` calls `stopTracking()` and saves song log. `ApneaUiState` has `audio` and `nowPlayingSong`.
+- **[`FreeHoldActiveScreen`](app/src/main/java/com/example/wags/ui/apnea/FreeHoldActiveScreen.kt)** — Reads `audio` nav arg; Spotify start/stop wired to hold lifecycle; `NowPlayingBanner` shown during active hold.
+- **[`ApneaRecordDetailViewModel`](app/src/main/java/com/example/wags/ui/apnea/ApneaRecordDetailViewModel.kt)** / **[`ApneaRecordDetailScreen`](app/src/main/java/com/example/wags/ui/apnea/ApneaRecordDetailScreen.kt)** — Audio editable in edit bottom sheet; song log card shown when songs exist.
+- **[`AllApneaRecordsViewModel`](app/src/main/java/com/example/wags/ui/apnea/AllApneaRecordsViewModel.kt)** — `filterAudio` added; `setAudioFilter()` function.
+- **[`ApneaHistoryViewModel`](app/src/main/java/com/example/wags/ui/apnea/ApneaHistoryViewModel.kt)** — Reads `audio` nav arg; passes to all repo calls.
+
+#### UI Layer
+
+- **[`ApneaScreen`](app/src/main/java/com/example/wags/ui/apnea/ApneaScreen.kt)** — Audio FilterChips in settings panel; `NowPlayingBanner` composable; `audio` passed to `freeHoldActive` nav call.
+- **[`WagsNavGraph`](app/src/main/java/com/example/wags/ui/navigation/WagsNavGraph.kt)** — `FREE_HOLD_ACTIVE` route updated with `{audio}` path segment (default `SILENCE` for backward compatibility).
+
+#### Garmin Integration
+
+- **[`GarminApneaRepository`](app/src/main/java/com/example/wags/data/garmin/GarminApneaRepository.kt)** — Garmin-sourced free holds default to `audio = "SILENCE"` (no Spotify on watch).
+
+---
 
 ### 2026-03-24 — Personal Best Celebration Sound Effects
 

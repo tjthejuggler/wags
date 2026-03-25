@@ -7,9 +7,11 @@ import com.example.wags.data.ble.DevicePreferencesRepository
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
 import com.example.wags.data.repository.ApneaRepository
+import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.RecordPbBadge
+import com.example.wags.domain.model.SpotifySong
 import com.example.wags.domain.model.TimeOfDay
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -26,6 +28,7 @@ data class ApneaRecordDetailUiState(
     val record: ApneaRecordEntity? = null,
     val telemetry: List<FreeHoldTelemetryEntity> = emptyList(),
     val pbBadges: List<RecordPbBadge> = emptyList(),
+    val songLog: List<SpotifySong> = emptyList(),
     val isLoading: Boolean = true,
     val notFound: Boolean = false,
     /** True while the edit bottom-sheet is open. */
@@ -35,6 +38,7 @@ data class ApneaRecordDetailUiState(
     val editPrepType: PrepType = PrepType.NO_PREP,
     val editTimeOfDay: TimeOfDay = TimeOfDay.DAY,
     val editPosture: Posture = Posture.LAYING,
+    val editAudio: AudioSetting = AudioSetting.SILENCE,
     /** Editable device label — null means "None recorded". */
     val editHrDeviceId: String? = null,
     /** All device labels ever used, for the edit dropdown. */
@@ -65,11 +69,13 @@ class ApneaRecordDetailViewModel @Inject constructor(
             } else {
                 val telemetry = apneaRepository.getTelemetryForRecord(recordId)
                 val badges = apneaRepository.getRecordPbBadges(recordId)
+                val songLog = apneaRepository.getSongLogForRecord(recordId)
                 _uiState.update {
                     it.copy(
                         record = record,
                         telemetry = telemetry,
                         pbBadges = badges,
+                        songLog = songLog,
                         isLoading = false
                     )
                 }
@@ -92,6 +98,7 @@ class ApneaRecordDetailViewModel @Inject constructor(
         val prepType = runCatching { PrepType.valueOf(record.prepType) }.getOrDefault(PrepType.NO_PREP)
         val timeOfDay = runCatching { TimeOfDay.valueOf(record.timeOfDay) }.getOrDefault(TimeOfDay.DAY)
         val posture = runCatching { Posture.valueOf(record.posture) }.getOrDefault(Posture.LAYING)
+        val audio = runCatching { AudioSetting.valueOf(record.audio) }.getOrDefault(AudioSetting.SILENCE)
         // Build the device label options: all labels from history, plus the
         // record's current label if it's not already in the list.
         val historyLabels = devicePrefs.deviceLabelHistory.toMutableList()
@@ -105,6 +112,7 @@ class ApneaRecordDetailViewModel @Inject constructor(
                 editPrepType       = prepType,
                 editTimeOfDay      = timeOfDay,
                 editPosture        = posture,
+                editAudio          = audio,
                 editHrDeviceId     = record.hrDeviceId,
                 deviceLabelOptions = historyLabels
             )
@@ -131,6 +139,10 @@ class ApneaRecordDetailViewModel @Inject constructor(
         _uiState.update { it.copy(editPosture = posture) }
     }
 
+    fun setEditAudio(audio: AudioSetting) {
+        _uiState.update { it.copy(editAudio = audio) }
+    }
+
     fun setEditHrDeviceId(deviceId: String?) {
         _uiState.update { it.copy(editHrDeviceId = deviceId) }
     }
@@ -145,6 +157,7 @@ class ApneaRecordDetailViewModel @Inject constructor(
                 prepType   = state.editPrepType.name,
                 timeOfDay  = state.editTimeOfDay.name,
                 posture    = state.editPosture.name,
+                audio      = state.editAudio.name,
                 hrDeviceId = state.editHrDeviceId
             )
             apneaRepository.updateRecord(updated)

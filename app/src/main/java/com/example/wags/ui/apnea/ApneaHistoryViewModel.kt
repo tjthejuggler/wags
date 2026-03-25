@@ -7,6 +7,7 @@ import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.ApneaSessionEntity
 import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.data.repository.ApneaSessionRepository
+import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TimeOfDay
@@ -24,6 +25,7 @@ data class ApneaHistoryUiState(
     val prepType: PrepType = PrepType.NO_PREP,
     val timeOfDay: TimeOfDay = TimeOfDay.DAY,
     val posture: Posture = Posture.LAYING,
+    val audio: AudioSetting = AudioSetting.SILENCE,
     val freeHoldRecords: List<ApneaRecordEntity> = emptyList(),
     val tableSessions: List<ApneaSessionEntity> = emptyList(),
     val bestFreeHoldMs: Long = 0L,
@@ -49,19 +51,29 @@ class ApneaHistoryViewModel @Inject constructor(
         val timeOfDay = runCatching { TimeOfDay.valueOf(timeOfDayName) }.getOrDefault(TimeOfDay.DAY)
         val postureName = savedStateHandle.get<String>("posture") ?: Posture.LAYING.name
         val posture = runCatching { Posture.valueOf(postureName) }.getOrDefault(Posture.LAYING)
+        val audioName = savedStateHandle.get<String>("audio") ?: AudioSetting.SILENCE.name
+        val audio = runCatching { AudioSetting.valueOf(audioName) }.getOrDefault(AudioSetting.SILENCE)
 
-        _uiState.update { it.copy(lungVolume = lungVolume, prepType = prepType, timeOfDay = timeOfDay, posture = posture) }
+        _uiState.update {
+            it.copy(
+                lungVolume = lungVolume,
+                prepType   = prepType,
+                timeOfDay  = timeOfDay,
+                posture    = posture,
+                audio      = audio
+            )
+        }
 
-        // Free-hold records filtered by all four settings
+        // Free-hold records filtered by all five settings
         viewModelScope.launch {
-            apneaRepository.getBySettings(lungVolume, prepType.name, timeOfDay.name, posture.name).collectLatest { records ->
+            apneaRepository.getBySettings(lungVolume, prepType.name, timeOfDay.name, posture.name, audio.name).collectLatest { records ->
                 _uiState.update { it.copy(freeHoldRecords = records, isLoading = false) }
             }
         }
 
         // Best free-hold for these settings
         viewModelScope.launch {
-            apneaRepository.getBestFreeHold(lungVolume, prepType.name, timeOfDay.name, posture.name).collectLatest { best ->
+            apneaRepository.getBestFreeHold(lungVolume, prepType.name, timeOfDay.name, posture.name, audio.name).collectLatest { best ->
                 _uiState.update { it.copy(bestFreeHoldMs = best ?: 0L) }
             }
         }

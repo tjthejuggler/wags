@@ -64,7 +64,7 @@ object WagsRoutes {
     const val APNEA_HISTORY = "apnea_history/{lungVolume}/{prepType}/{timeOfDay}/{posture}"
     const val APNEA_RECORD_DETAIL = "apnea_record_detail/{recordId}"
     const val APNEA_ALL_RECORDS = "apnea_all_records/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{eventTypes}"
-    const val FREE_HOLD_ACTIVE = "free_hold_active/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{showTimer}"
+    const val FREE_HOLD_ACTIVE = "free_hold_active/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{showTimer}/{audio}"
     const val PERSONAL_BESTS = "personal_bests"
     // ── Meditation / NSDR ──────────────────────────────────────────────────────
     // ── Garmin Watch ─────────────────────────────────────────────────────────
@@ -85,8 +85,14 @@ object WagsRoutes {
     fun apneaRecordDetail(recordId: Long) = "apnea_record_detail/$recordId"
     fun hrvReadinessDetail(readingId: Long) = "hrv_readiness_detail/$readingId"
     fun morningReadinessDetail(readingId: Long) = "morning_readiness_detail/$readingId"
-    fun freeHoldActive(lungVolume: String, prepType: String, timeOfDay: String, posture: String, showTimer: Boolean) =
-        "free_hold_active/$lungVolume/$prepType/$timeOfDay/$posture/$showTimer"
+    fun freeHoldActive(
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        posture: String,
+        showTimer: Boolean,
+        audio: String = "SILENCE"
+    ) = "free_hold_active/$lungVolume/$prepType/$timeOfDay/$posture/$showTimer/$audio"
     fun meditationSessionDetail(sessionId: Long) = "meditation_session_detail/$sessionId"
 
     /**
@@ -160,7 +166,8 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
                 navArgument("prepType")   { type = NavType.StringType },
                 navArgument("timeOfDay")  { type = NavType.StringType },
                 navArgument("posture")    { type = NavType.StringType },
-                navArgument("showTimer")  { type = NavType.BoolType }
+                navArgument("showTimer")  { type = NavType.BoolType },
+                navArgument("audio")      { type = NavType.StringType; defaultValue = "SILENCE" }
             )
         ) { backStackEntry ->
             val lungVolume = backStackEntry.arguments?.getString("lungVolume") ?: "FULL"

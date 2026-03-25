@@ -12,14 +12,18 @@ import com.example.wags.data.ipc.HabitIntegrationRepository
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.data.repository.ApneaSessionRepository
+import com.example.wags.data.spotify.SpotifyManager
+import com.example.wags.data.spotify.TrackInfo
 import com.example.wags.domain.model.ApneaStats
 import com.example.wags.domain.model.ApneaTable
 import com.example.wags.domain.model.ApneaTableType
+import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.OximeterReading
 import com.example.wags.domain.model.PersonalBestCategory
 import com.example.wags.domain.model.PersonalBestResult
 import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
+import com.example.wags.domain.model.SpotifySong
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.model.TableDifficulty
 import com.example.wags.domain.model.TableLength
@@ -80,6 +84,7 @@ data class ApneaUiState(
     val prepType: PrepType = PrepType.NO_PREP,
     val timeOfDay: TimeOfDay = TimeOfDay.fromCurrentTime(),
     val posture: Posture = Posture.LAYING,
+    val audio: AudioSetting = AudioSetting.SILENCE,
     /** When true, a live elapsed-time counter is shown during the breath hold. */
     val showTimer: Boolean = true,
     /** Best free-hold for the current lungVolume + prepType combination (from DB). */
@@ -88,7 +93,7 @@ data class ApneaUiState(
     val bestTimeForSettingsRecordId: Long? = null,
     /**
      * The broadest PB category that the current best record holds.
-     * Determines how many trophy emojis to show (1–5). Null when no best record exists.
+     * Determines how many trophy emojis to show (1–6). Null when no best record exists.
      */
     val bestTimeTrophyCategory: PersonalBestCategory? = null,
     val selectedLength: TableLength = TableLength.MEDIUM,
@@ -137,6 +142,8 @@ data class ApneaUiState(
      * Null until the user taps "First Contraction" (or if they never tap it).
      */
     val freeHoldFirstContractionMs: Long? = null,
+    /** The song currently playing in Spotify (null when SILENCE or Spotify not active). */
+    val nowPlayingSong: TrackInfo? = null,
 )
 
 @HiltViewModel
@@ -150,6 +157,7 @@ class ApneaViewModel @Inject constructor(
     private val advancedStateMachine: AdvancedApneaStateMachine,
     private val audioHapticEngine: ApneaAudioHapticEngine,
     private val habitRepo: HabitIntegrationRepository,
+    private val spotifyManager: SpotifyManager,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
@@ -191,11 +199,12 @@ class ApneaViewModel @Inject constructor(
      */
     private var oximeterIsPrimary = false
 
-    // Separate flows for the four settings that drive the best-time / filtered-records queries
+    // Separate flows for the five settings that drive the best-time / filtered-records queries
     private val _lungVolume  = MutableStateFlow("FULL")
     private val _prepType    = MutableStateFlow(PrepType.NO_PREP)
     private val _timeOfDay   = MutableStateFlow(TimeOfDay.fromCurrentTime())
     private val _posture     = MutableStateFlow(Posture.LAYING)
+    private val _audio       = MutableStateFlow(AudioSetting.SILENCE)
 
     init {
         // Load persisted PB on startup
@@ -245,10 +254,11 @@ class ApneaViewModel @Inject constructor(
 
         // Whenever any setting changes, re-subscribe to best-time query
         viewModelScope.launch {
-            combine(_lungVolume, _prepType, _timeOfDay, _posture) { lv, pt, tod, pos -> arrayOf(lv, pt, tod, pos) }
+            combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud -> arrayOf(lv, pt, tod, pos, aud) }
                 .collectLatest { arr ->
-                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as TimeOfDay; val pos = arr[3] as Posture
-                    apneaRepository.getBestFreeHold(lv, pt.name, tod.name, pos.name).collect { best ->
+                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as TimeOfDay
+                    val pos = arr[3] as Posture; val aud = arr[4] as AudioSetting
+                    apneaRepository.getBestFreeHold(lv, pt.name, tod.name, pos.name, aud.name).collect { best ->
                         _uiState.update { it.copy(bestTimeForSettingsMs = best ?: 0L) }
                     }
                 }
@@ -256,14 +266,15 @@ class ApneaViewModel @Inject constructor(
         // Whenever any setting changes, re-subscribe to best-time record-id query
         // and recompute the trophy level for the best record.
         viewModelScope.launch {
-            combine(_lungVolume, _prepType, _timeOfDay, _posture) { lv, pt, tod, pos -> arrayOf(lv, pt, tod, pos) }
+            combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud -> arrayOf(lv, pt, tod, pos, aud) }
                 .collectLatest { arr ->
-                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as TimeOfDay; val pos = arr[3] as Posture
-                    apneaRepository.getBestFreeHoldRecordId(lv, pt.name, tod.name, pos.name).collect { id ->
+                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as TimeOfDay
+                    val pos = arr[3] as Posture; val aud = arr[4] as AudioSetting
+                    apneaRepository.getBestFreeHoldRecordId(lv, pt.name, tod.name, pos.name, aud.name).collect { id ->
                         _uiState.update { it.copy(bestTimeForSettingsRecordId = id) }
                         // Compute trophy level for the best record
                         val trophyCategory = if (id != null) {
-                            apneaRepository.getBestRecordTrophyLevel(lv, pt.name, tod.name, pos.name)
+                            apneaRepository.getBestRecordTrophyLevel(lv, pt.name, tod.name, pos.name, aud.name)
                         } else null
                         _uiState.update { it.copy(bestTimeTrophyCategory = trophyCategory) }
                     }
@@ -271,23 +282,31 @@ class ApneaViewModel @Inject constructor(
         }
         // Recent records: 10 most recent across ALL event types, filtered by current settings
         viewModelScope.launch {
-            combine(_lungVolume, _prepType, _timeOfDay, _posture) { lv, pt, tod, pos -> arrayOf(lv, pt, tod, pos) }
+            combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud -> arrayOf(lv, pt, tod, pos, aud) }
                 .collectLatest { arr ->
-                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as TimeOfDay; val pos = arr[3] as Posture
-                    apneaRepository.getRecentBySettings(lv, pt.name, tod.name, pos.name, limit = 10).collect { records ->
+                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as TimeOfDay
+                    val pos = arr[3] as Posture; val aud = arr[4] as AudioSetting
+                    apneaRepository.getRecentBySettings(lv, pt.name, tod.name, pos.name, aud.name, limit = 10).collect { records ->
                         _uiState.update { it.copy(recentRecords = records) }
                     }
                 }
         }
         // Whenever any setting changes, re-subscribe to filtered stats
         viewModelScope.launch {
-            combine(_lungVolume, _prepType, _timeOfDay, _posture) { lv, pt, tod, pos -> arrayOf(lv, pt, tod, pos) }
+            combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud -> arrayOf(lv, pt, tod, pos, aud) }
                 .collectLatest { arr ->
-                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as TimeOfDay; val pos = arr[3] as Posture
-                    apneaRepository.getStats(lv, pt.name, tod.name, pos.name).collect { stats ->
+                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as TimeOfDay
+                    val pos = arr[3] as Posture; val aud = arr[4] as AudioSetting
+                    apneaRepository.getStats(lv, pt.name, tod.name, pos.name, aud.name).collect { stats ->
                         _uiState.update { it.copy(filteredStats = stats) }
                     }
                 }
+        }
+        // Mirror Spotify now-playing into UI state
+        viewModelScope.launch {
+            spotifyManager.currentSong.collect { track ->
+                _uiState.update { it.copy(nowPlayingSong = track) }
+            }
         }
         // All-settings stats (independent of settings changes)
         viewModelScope.launch {
@@ -494,6 +513,12 @@ class ApneaViewModel @Inject constructor(
                 }
             }
         }
+
+        // If MUSIC is selected, start Spotify and begin song tracking
+        if (_audio.value == AudioSetting.MUSIC) {
+            spotifyManager.sendPlayCommand()
+            spotifyManager.startTracking()
+        }
     }
 
     /**
@@ -504,6 +529,11 @@ class ApneaViewModel @Inject constructor(
         oximeterCollectionJob?.cancel()
         oximeterCollectionJob = null
         oximeterSamples.clear()
+        // Pause Spotify and rewind to start of song if MUSIC was selected
+        if (_audio.value == AudioSetting.MUSIC) {
+            spotifyManager.stopTracking()
+            spotifyManager.sendPauseAndRewindCommand()
+        }
         _uiState.update {
             it.copy(
                 freeHoldActive = false,
@@ -536,6 +566,12 @@ class ApneaViewModel @Inject constructor(
             )
         }
         audioHapticEngine.vibrateHoldEnd()
+        // Stop Spotify tracking, collect songs, then pause + rewind to start of song
+        val tracksPlayed = if (state.audio == AudioSetting.MUSIC) {
+            val tracks = spotifyManager.stopTracking()
+            spotifyManager.sendPauseAndRewindCommand()
+            tracks
+        } else emptyList()
         // Signal the Habit app that a free breath hold was successfully completed
         habitRepo.sendHabitIncrement(Slot.FREE_HOLD)
         viewModelScope.launch {
@@ -545,9 +581,10 @@ class ApneaViewModel @Inject constructor(
                 lungVolume = state.selectedLungVolume,
                 prepType   = state.prepType.name,
                 timeOfDay  = state.timeOfDay.name,
-                posture    = state.posture.name
+                posture    = state.posture.name,
+                audio      = state.audio.name
             )
-            saveFreeHoldRecord(duration, firstContractionMs)
+            saveFreeHoldRecord(duration, firstContractionMs, tracksPlayed)
             if (pbResult != null) {
                 _uiState.update { it.copy(newPersonalBest = pbResult) }
                 habitRepo.sendHabitIncrement(Slot.APNEA_NEW_RECORD)
@@ -555,7 +592,11 @@ class ApneaViewModel @Inject constructor(
         }
     }
 
-    private fun saveFreeHoldRecord(durationMs: Long, firstContractionMs: Long? = null) {
+    private fun saveFreeHoldRecord(
+        durationMs: Long,
+        firstContractionMs: Long? = null,
+        tracksPlayed: List<TrackInfo> = emptyList()
+    ) {
         // Only use oximeter data when the oximeter was the primary device at hold-start.
         // When a Polar device is the primary HR source, any background-connected oximeter
         // readings are incidental resting values (typically 99 %) and must be discarded.
@@ -593,6 +634,7 @@ class ApneaViewModel @Inject constructor(
                     prepType = state.prepType.name,
                     timeOfDay = state.timeOfDay.name,
                     posture = state.posture.name,
+                    audio = state.audio.name,
                     minHrBpm = minHr,
                     maxHrBpm = maxHr,
                     lowestSpO2 = lowestSpO2,
@@ -641,6 +683,20 @@ class ApneaViewModel @Inject constructor(
             if (samples.isNotEmpty()) {
                 apneaRepository.saveTelemetry(samples)
             }
+
+            // ── Save Spotify song log ─────────────────────────────────────────
+            if (tracksPlayed.isNotEmpty()) {
+                val songs = tracksPlayed.map { track ->
+                    SpotifySong(
+                        title        = track.title,
+                        artist       = track.artist,
+                        spotifyUri   = track.spotifyUri,
+                        startedAtMs  = track.startedAtMs,
+                        endedAtMs    = track.endedAtMs
+                    )
+                }
+                apneaRepository.saveSongLog(recordId, songs)
+            }
         }
     }
 
@@ -662,6 +718,11 @@ class ApneaViewModel @Inject constructor(
     fun setPosture(posture: Posture) {
         _posture.value = posture
         _uiState.update { it.copy(posture = posture) }
+    }
+
+    fun setAudio(audio: AudioSetting) {
+        _audio.value = audio
+        _uiState.update { it.copy(audio = audio) }
     }
 
     fun setShowTimer(show: Boolean) {

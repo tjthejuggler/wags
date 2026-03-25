@@ -22,9 +22,10 @@ import com.example.wags.data.db.entity.*
         MeditationAudioEntity::class,
         MeditationSessionEntity::class,
         MorningReadinessTelemetryEntity::class,
-        AdviceEntity::class
+        AdviceEntity::class,
+        ApneaSongLogEntity::class
     ],
-    version = 19,
+    version = 20,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -42,6 +43,7 @@ abstract class WagsDatabase : RoomDatabase() {
     abstract fun meditationSessionDao(): MeditationSessionDao
     abstract fun morningReadinessTelemetryDao(): MorningReadinessTelemetryDao
     abstract fun adviceDao(): AdviceDao
+    abstract fun apneaSongLogDao(): ApneaSongLogDao
 
     companion object {
         /**
@@ -582,6 +584,39 @@ abstract class WagsDatabase : RoomDatabase() {
                         `createdAt` INTEGER NOT NULL
                     )
                 """.trimIndent())
+            }
+        }
+
+        /**
+         * v19 → v20: Add audio setting to apnea_records and create song log table.
+         *
+         * Changes:
+         *  1. Add `audio` column to apnea_records (TEXT NOT NULL DEFAULT 'SILENCE').
+         *     All existing records are backfilled with 'SILENCE' automatically.
+         *  2. Create `apnea_song_log` table for Spotify track metadata recorded
+         *     during sessions where audio = 'MUSIC'. Rows are cascade-deleted when
+         *     the parent apnea_records row is deleted.
+         */
+        val MIGRATION_19_20 = object : Migration(19, 20) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 1. Add audio column — all existing records default to SILENCE
+                db.execSQL("ALTER TABLE apnea_records ADD COLUMN audio TEXT NOT NULL DEFAULT 'SILENCE'")
+
+                // 2. Create song log table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `apnea_song_log` (
+                        `songLogId`   INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `recordId`    INTEGER NOT NULL,
+                        `title`       TEXT NOT NULL,
+                        `artist`      TEXT NOT NULL,
+                        `albumArt`    TEXT,
+                        `spotifyUri`  TEXT,
+                        `startedAtMs` INTEGER NOT NULL,
+                        `endedAtMs`   INTEGER,
+                        FOREIGN KEY(`recordId`) REFERENCES `apnea_records`(`recordId`) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_apnea_song_log_recordId` ON `apnea_song_log` (`recordId`)")
             }
         }
     }

@@ -1,6 +1,7 @@
 package com.example.wags.ui.settings
 
 import android.Manifest
+import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -278,6 +279,11 @@ fun SettingsScreen(
                     onChooseDirectory = { meditationDirLauncher.launch(null) },
                     onClearDirectory = { viewModel.clearMeditationAudioDir() }
                 )
+            }
+
+            // ── Spotify song detection ─────────────────────────────────────
+            item {
+                SpotifyIntegrationCard()
             }
 
             // ── Tail App integration ───────────────────────────────────────
@@ -961,6 +967,67 @@ private fun DataExportImportCard(
                             Text("Dismiss", color = ReadinessRed)
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+// ── Spotify integration card ──────────────────────────────────────────────────
+
+@Composable
+private fun SpotifyIntegrationCard() {
+    val context = LocalContext.current
+    val isGranted = remember {
+        android.service.notification.NotificationListenerService::class.java.let {
+            androidx.core.app.NotificationManagerCompat
+                .getEnabledListenerPackages(context)
+                .contains(context.packageName)
+        }
+    }
+    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Spotify Song Detection", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Automatically records the song playing during a Music breath hold. " +
+                    "Requires Notification Access permission.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
+
+            HorizontalDivider(color = SurfaceVariant)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Notification Access", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        if (isGranted) "✓ Granted" else "⚠ Required for song detection",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (isGranted) ReadinessGreen else ReadinessOrange
+                    )
+                }
+                Button(
+                    onClick = {
+                        context.startActivity(
+                            Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = EcgCyan,
+                        contentColor = Color.Black
+                    )
+                ) {
+                    Text("Open Settings")
                 }
             }
         }

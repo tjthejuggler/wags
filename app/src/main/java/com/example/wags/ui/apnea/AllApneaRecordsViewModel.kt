@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.repository.ApneaRepository
+import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TimeOfDay
@@ -79,6 +80,7 @@ data class AllApneaRecordsUiState(
     val filterPrepType: String = "",
     val filterTimeOfDay: String = "",
     val filterPosture: String = "",
+    val filterAudio: String = "",
 
     // ── Event-type filter ─────────────────────────────────────────────────────
     /**
@@ -127,6 +129,7 @@ class AllApneaRecordsViewModel @Inject constructor(
         val initPrepType   = savedStateHandle.get<String>("prepType")   ?: ""
         val initTimeOfDay  = savedStateHandle.get<String>("timeOfDay")  ?: ""
         val initPosture    = savedStateHandle.get<String>("posture")    ?: ""
+        val initAudio      = savedStateHandle.get<String>("audio")      ?: ""
         val initEventTypes = savedStateHandle.get<String>("eventTypes") ?: "ALL"
 
         val initialSelectedTypes: Set<String?> = when {
@@ -148,6 +151,7 @@ class AllApneaRecordsViewModel @Inject constructor(
                 filterPrepType     = initPrepType,
                 filterTimeOfDay    = initTimeOfDay,
                 filterPosture      = initPosture,
+                filterAudio        = initAudio,
                 selectedEventTypes = initialSelectedTypes
             )
         }
@@ -174,6 +178,11 @@ class AllApneaRecordsViewModel @Inject constructor(
 
     fun setPostureFilter(value: String) {
         _uiState.update { it.copy(filterPosture = value) }
+        loadNextPage(reset = true)
+    }
+
+    fun setAudioFilter(value: String) {
+        _uiState.update { it.copy(filterAudio = value) }
         loadNextPage(reset = true)
     }
 
@@ -235,6 +244,7 @@ class AllApneaRecordsViewModel @Inject constructor(
                         prepType   = s.filterPrepType,
                         timeOfDay  = s.filterTimeOfDay,
                         posture    = s.filterPosture,
+                        audio      = s.filterAudio,
                         pageSize   = PAGE_SIZE,
                         offset     = offset
                     )
@@ -247,6 +257,7 @@ class AllApneaRecordsViewModel @Inject constructor(
                         prepType   = s.filterPrepType,
                         timeOfDay  = s.filterTimeOfDay,
                         posture    = s.filterPosture,
+                        audio      = s.filterAudio,
                         pageSize   = PAGE_SIZE,
                         offset     = offset
                     )
@@ -261,6 +272,7 @@ class AllApneaRecordsViewModel @Inject constructor(
                         prepType   = s.filterPrepType,
                         timeOfDay  = s.filterTimeOfDay,
                         posture    = s.filterPosture,
+                        audio      = s.filterAudio,
                         eventTypes = emptyList(),
                         pageSize   = PAGE_SIZE,
                         offset     = offset
@@ -301,6 +313,7 @@ class AllApneaRecordsViewModel @Inject constructor(
             prepType   = s.filterPrepType,
             timeOfDay  = s.filterTimeOfDay,
             posture    = s.filterPosture,
+            audio      = s.filterAudio,
             eventTypes = realSelected.toList(),
             pageSize   = pageSize,
             offset     = offset

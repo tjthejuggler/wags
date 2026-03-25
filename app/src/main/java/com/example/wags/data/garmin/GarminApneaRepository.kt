@@ -88,6 +88,7 @@ class GarminApneaRepository @Inject constructor(
                     prepType = payload.prepType,
                     timeOfDay = payload.timeOfDay,
                     posture = "LAYING",
+                    audio = "SILENCE",  // Garmin holds always silent (no Spotify on watch)
                     minHrBpm = minHr,
                     maxHrBpm = maxHr,
                     lowestSpO2 = lowestSpO2,

@@ -35,7 +35,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.db.entity.ApneaRecordEntity
+import com.example.wags.data.spotify.TrackInfo
 import com.example.wags.domain.model.ApneaStats
+import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.PersonalBestCategory
 import com.example.wags.domain.model.trophyEmojis
 import com.example.wags.domain.model.Posture
@@ -120,10 +122,12 @@ fun ApneaScreen(
                             prepType = state.prepType,
                             timeOfDay = state.timeOfDay,
                             posture = state.posture,
+                            audio = state.audio,
                             onLungVolumeChange = { viewModel.setLungVolume(it) },
                             onPrepTypeChange = { viewModel.setPrepType(it) },
                             onTimeOfDayChange = { viewModel.setTimeOfDay(it) },
-                            onPostureChange = { viewModel.setPosture(it) }
+                            onPostureChange = { viewModel.setPosture(it) },
+                            onAudioChange = { viewModel.setAudio(it) }
                         )
                     }
                     HorizontalDivider(color = SurfaceVariant, modifier = Modifier.padding(top = 8.dp))
@@ -162,7 +166,8 @@ fun ApneaScreen(
                                     prepType   = state.prepType.name,
                                     timeOfDay  = state.timeOfDay.name,
                                     posture    = state.posture.name,
-                                    showTimer  = state.showTimer
+                                    showTimer  = state.showTimer,
+                                    audio      = state.audio.name
                                 )
                             )
                         },
@@ -368,6 +373,7 @@ internal fun NewPersonalBestDialog(
         PersonalBestCategory.ONE_SETTING     -> "⭐"
         PersonalBestCategory.TWO_SETTINGS    -> "🏆"
         PersonalBestCategory.THREE_SETTINGS  -> "🏆"
+        PersonalBestCategory.FOUR_SETTINGS   -> "🏆"
         PersonalBestCategory.EXACT           -> "🏆"
     }
 
@@ -376,6 +382,7 @@ internal fun NewPersonalBestDialog(
         PersonalBestCategory.ONE_SETTING     -> "New Personal Best!"
         PersonalBestCategory.TWO_SETTINGS    -> "New Personal Best!"
         PersonalBestCategory.THREE_SETTINGS  -> "New Personal Best!"
+        PersonalBestCategory.FOUR_SETTINGS   -> "New Personal Best!"
         PersonalBestCategory.EXACT           -> "New Personal Best!"
     }
 
@@ -384,6 +391,7 @@ internal fun NewPersonalBestDialog(
         PersonalBestCategory.ONE_SETTING     -> "Best for $categoryDescription (any other settings)"
         PersonalBestCategory.TWO_SETTINGS    -> "Best for $categoryDescription"
         PersonalBestCategory.THREE_SETTINGS  -> "Best for $categoryDescription"
+        PersonalBestCategory.FOUR_SETTINGS   -> "Best for $categoryDescription"
         PersonalBestCategory.EXACT           -> "Best for $categoryDescription"
     }
 
@@ -392,6 +400,7 @@ internal fun NewPersonalBestDialog(
         PersonalBestCategory.ONE_SETTING     -> 60
         PersonalBestCategory.TWO_SETTINGS    -> 55
         PersonalBestCategory.THREE_SETTINGS  -> 50
+        PersonalBestCategory.FOUR_SETTINGS   -> 47
         PersonalBestCategory.EXACT           -> 45
     }
 
@@ -584,10 +593,12 @@ private fun ApneaSettingsContent(
     prepType: PrepType,
     timeOfDay: TimeOfDay,
     posture: Posture,
+    audio: AudioSetting,
     onLungVolumeChange: (String) -> Unit,
     onPrepTypeChange: (PrepType) -> Unit,
     onTimeOfDayChange: (TimeOfDay) -> Unit,
-    onPostureChange: (Posture) -> Unit
+    onPostureChange: (Posture) -> Unit,
+    onAudioChange: (AudioSetting) -> Unit
 ) {
     Column(
         modifier = Modifier.padding(top = 4.dp),
@@ -637,6 +648,55 @@ private fun ApneaSettingsContent(
                     onClick = { onPostureChange(pos) },
                     label = { Text(pos.displayName(), style = MaterialTheme.typography.bodySmall) },
                     modifier = Modifier.height(30.dp)
+                )
+            }
+        }
+
+        Text("Audio", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            AudioSetting.entries.forEach { aud ->
+                FilterChip(
+                    selected = audio == aud,
+                    onClick = { onAudioChange(aud) },
+                    label = { Text(aud.displayName(), style = MaterialTheme.typography.bodySmall) },
+                    modifier = Modifier.height(30.dp)
+                )
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Now Playing Banner — shown during active free hold when MUSIC is selected
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+fun NowPlayingBanner(track: TrackInfo) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = SurfaceDark,
+        tonalElevation = 4.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("🎵", style = MaterialTheme.typography.bodyMedium)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    track.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White,
+                    maxLines = 1
+                )
+                Text(
+                    track.artist,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    maxLines = 1
                 )
             }
         }

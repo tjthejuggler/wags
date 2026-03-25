@@ -29,10 +29,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
+import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.PersonalBestCategory
 import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.RecordPbBadge
+import com.example.wags.domain.model.SpotifySong
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.model.trophyEmojis
 import com.example.wags.ui.theme.*
@@ -122,6 +124,7 @@ fun ApneaRecordDetailScreen(
                     record = state.record!!,
                     telemetry = state.telemetry,
                     pbBadges = state.pbBadges,
+                    songLog = state.songLog,
                     modifier = Modifier.padding(padding)
                 )
             }
@@ -161,12 +164,14 @@ fun ApneaRecordDetailScreen(
             prepType           = state.editPrepType,
             timeOfDay          = state.editTimeOfDay,
             posture            = state.editPosture,
+            audio              = state.editAudio,
             hrDeviceId         = state.editHrDeviceId,
             deviceLabelOptions = state.deviceLabelOptions,
             onLungVolumeChange   = { viewModel.setEditLungVolume(it) },
             onPrepTypeChange     = { viewModel.setEditPrepType(it) },
             onTimeOfDayChange    = { viewModel.setEditTimeOfDay(it) },
             onPostureChange      = { viewModel.setEditPosture(it) },
+            onAudioChange        = { viewModel.setEditAudio(it) },
             onHrDeviceIdChange   = { viewModel.setEditHrDeviceId(it) },
             onSave    = { viewModel.saveEdits() },
             onDismiss = { viewModel.closeEditSheet() }
@@ -185,12 +190,14 @@ private fun EditRecordSheet(
     prepType: PrepType,
     timeOfDay: TimeOfDay,
     posture: Posture,
+    audio: AudioSetting,
     hrDeviceId: String?,
     deviceLabelOptions: List<String>,
     onLungVolumeChange: (String) -> Unit,
     onPrepTypeChange: (PrepType) -> Unit,
     onTimeOfDayChange: (TimeOfDay) -> Unit,
     onPostureChange: (Posture) -> Unit,
+    onAudioChange: (AudioSetting) -> Unit,
     onHrDeviceIdChange: (String?) -> Unit,
     onSave: () -> Unit,
     onDismiss: () -> Unit
@@ -314,6 +321,31 @@ private fun EditRecordSheet(
                 }
             }
 
+            // ── Audio ─────────────────────────────────────────────────────────
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Audio", style = MaterialTheme.typography.labelLarge, color = TextSecondary)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AudioSetting.entries.forEach { aud ->
+                        val isSelected = audio == aud
+                        FilterChip(
+                            selected = isSelected,
+                            onClick  = { onAudioChange(aud) },
+                            label    = {
+                                Text(
+                                    aud.displayName(),
+                                    color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurface
+                                )
+                            },
+                            colors   = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = EcgCyan,
+                                selectedLabelColor     = Color.Black,
+                                labelColor             = MaterialTheme.colorScheme.onSurface
+                            )
+                        )
+                    }
+                }
+            }
+
             // ── HR/SpO₂ Device ────────────────────────────────────────────────
             if (deviceLabelOptions.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -392,6 +424,7 @@ private fun RecordDetailContent(
     record: ApneaRecordEntity,
     telemetry: List<FreeHoldTelemetryEntity>,
     pbBadges: List<RecordPbBadge>,
+    songLog: List<SpotifySong> = emptyList(),
     modifier: Modifier = Modifier
 ) {
     val dateStr = remember(record.timestamp) {
@@ -458,6 +491,18 @@ private fun RecordDetailContent(
                 DetailRow(label = "Posture",
                     value = record.posture.lowercase().replaceFirstChar { it.uppercase() }
                 )
+                DetailRow(
+                    label = "Audio",
+                    value = record.audio.lowercase().replaceFirstChar { it.uppercase() }
+                )
+                if (songLog.isNotEmpty()) {
+                    val songText = if (songLog.size == 1) {
+                        "♪ ${songLog[0].title} — ${songLog[0].artist}"
+                    } else {
+                        songLog.joinToString(" / ") { "♪ ${it.title}" }
+                    }
+                    DetailRow(label = "Song", value = songText)
+                }
                 DetailRow(label = "Type", value = record.tableType ?: "Free Hold")
                 DetailRow(
                     label = "HR/SpO₂ Device",
@@ -648,6 +693,42 @@ private fun RecordDetailContent(
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondary
                     )
+                }
+            }
+        }
+
+        // ── Song Log ─────────────────────────────────────────────────────────
+        if (songLog.isNotEmpty()) {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text("🎵 Songs Played", style = MaterialTheme.typography.titleLarge)
+                    songLog.forEach { song ->
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                song.title,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White
+                            )
+                            Text(
+                                song.artist,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                            val durationText = if (song.endedAtMs != null) {
+                                val secs = (song.endedAtMs - song.startedAtMs) / 1000L
+                                "${secs / 60}m ${secs % 60}s"
+                            } else "—"
+                            Text(
+                                "Duration: $durationText",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary
+                            )
+                        }
+                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                    }
                 }
             }
         }
