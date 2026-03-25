@@ -70,8 +70,8 @@ class GenericBleManager @Inject constructor(
 
     /** Unified scan results for the UnifiedDeviceManager. */
     val unifiedScanResults: StateFlow<List<ScannedDevice>> = _scanResults.map { results ->
-        results.mapNotNull { result ->
-            val name = result.device.name?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+        results.map { result ->
+            val name = result.device.name?.takeIf { it.isNotBlank() } ?: result.device.address
             ScannedDevice(
                 identifier = result.device.address,
                 name = name,
@@ -129,12 +129,13 @@ class GenericBleManager @Inject constructor(
      */
     private val uiScanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
-            val name = result.device.name?.takeIf { it.isNotBlank() } ?: return
+            val name = result.device.name?.takeIf { it.isNotBlank() }
             // Exclude Polar devices — they belong in the Polar scan only
-            if (name.startsWith("Polar ", ignoreCase = true)) return
+            if (name != null && name.startsWith("Polar ", ignoreCase = true)) return
             val current = _scanResults.value.toMutableList()
             if (current.none { it.device.address == result.device.address }) {
-                Log.d(TAG, "Found BLE device: $name  ${result.device.address}")
+                val displayName = name ?: result.device.address
+                Log.d(TAG, "Found BLE device: $displayName  ${result.device.address}")
                 current.add(result)
                 _scanResults.value = current
                 _connectionState.value = BleConnectionState.Scanning(current.size)
