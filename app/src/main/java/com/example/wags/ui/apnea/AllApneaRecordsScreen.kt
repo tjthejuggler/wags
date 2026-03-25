@@ -4,8 +4,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
@@ -29,7 +27,9 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.wags.data.db.entity.ApneaRecordEntity
+import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TimeOfDay
@@ -46,6 +46,17 @@ fun AllApneaRecordsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
+
+    // Reload list when we return to this screen (e.g. after deleting a record in the detail screen)
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    LaunchedEffect(navBackStackEntry) {
+        val deletedId = navBackStackEntry
+            ?.savedStateHandle
+            ?.remove<Long>("deletedRecordId")
+        if (deletedId != null) {
+            viewModel.removeRecord(deletedId)
+        }
+    }
 
     // Infinite scroll: load next page when we're near the bottom
     val shouldLoadMore by remember {
@@ -113,107 +124,104 @@ fun AllApneaRecordsScreen(
                         }
 
                         if (filtersExpanded) {
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            // ── Settings filters ───────────────────────────
-                            Text(
-                                "Lung Volume",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = TextSecondary
-                            )
                             Spacer(modifier = Modifier.height(4.dp))
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                item {
+
+                            // ── Settings filters (compact) ─────────────────
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("Lung Volume", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     FilterChip(
                                         selected = state.filterLungVolume == "",
                                         onClick = { viewModel.setLungVolumeFilter("") },
-                                        label = { Text("All") }
+                                        label = { Text("All", style = MaterialTheme.typography.bodySmall) },
+                                        modifier = Modifier.height(30.dp)
                                     )
+                                    listOf("FULL", "PARTIAL", "EMPTY").forEach { vol ->
+                                        FilterChip(
+                                            selected = state.filterLungVolume == vol,
+                                            onClick = { viewModel.setLungVolumeFilter(vol) },
+                                            label = { Text(if (vol == "PARTIAL") "Half" else vol.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall) },
+                                            modifier = Modifier.height(30.dp)
+                                        )
+                                    }
                                 }
-                                items(listOf("FULL", "PARTIAL", "EMPTY")) { vol ->
-                                    FilterChip(
-                                        selected = state.filterLungVolume == vol,
-                                        onClick = { viewModel.setLungVolumeFilter(vol) },
-                                        label = { Text(if (vol == "PARTIAL") "Half" else vol.lowercase().replaceFirstChar { it.uppercase() }) }
-                                    )
-                                }
-                            }
 
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                "Prep Type",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = TextSecondary
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                item {
+                                Text("Prep Type", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     FilterChip(
                                         selected = state.filterPrepType == "",
                                         onClick = { viewModel.setPrepTypeFilter("") },
-                                        label = { Text("All") }
+                                        label = { Text("All", style = MaterialTheme.typography.bodySmall) },
+                                        modifier = Modifier.height(30.dp)
                                     )
+                                    PrepType.entries.forEach { pt ->
+                                        FilterChip(
+                                            selected = state.filterPrepType == pt.name,
+                                            onClick = { viewModel.setPrepTypeFilter(pt.name) },
+                                            label = { Text(pt.displayName(), style = MaterialTheme.typography.bodySmall) },
+                                            modifier = Modifier.height(30.dp)
+                                        )
+                                    }
                                 }
-                                items(PrepType.entries) { pt ->
-                                    FilterChip(
-                                        selected = state.filterPrepType == pt.name,
-                                        onClick = { viewModel.setPrepTypeFilter(pt.name) },
-                                        label = { Text(pt.displayName()) }
-                                    )
-                                }
-                            }
 
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                "Time of Day",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = TextSecondary
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                item {
+                                Text("Time of Day", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     FilterChip(
                                         selected = state.filterTimeOfDay == "",
                                         onClick = { viewModel.setTimeOfDayFilter("") },
-                                        label = { Text("All") }
+                                        label = { Text("All", style = MaterialTheme.typography.bodySmall) },
+                                        modifier = Modifier.height(30.dp)
                                     )
+                                    TimeOfDay.entries.forEach { tod ->
+                                        FilterChip(
+                                            selected = state.filterTimeOfDay == tod.name,
+                                            onClick = { viewModel.setTimeOfDayFilter(tod.name) },
+                                            label = { Text(tod.displayName(), style = MaterialTheme.typography.bodySmall) },
+                                            modifier = Modifier.height(30.dp)
+                                        )
+                                    }
                                 }
-                                items(TimeOfDay.entries) { tod ->
+
+                                Text("Posture", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     FilterChip(
-                                        selected = state.filterTimeOfDay == tod.name,
-                                        onClick = { viewModel.setTimeOfDayFilter(tod.name) },
-                                        label = { Text(tod.displayName()) }
+                                        selected = state.filterPosture == "",
+                                        onClick = { viewModel.setPostureFilter("") },
+                                        label = { Text("All", style = MaterialTheme.typography.bodySmall) },
+                                        modifier = Modifier.height(30.dp)
                                     )
+                                    Posture.entries.forEach { pos ->
+                                        FilterChip(
+                                            selected = state.filterPosture == pos.name,
+                                            onClick = { viewModel.setPostureFilter(pos.name) },
+                                            label = { Text(pos.displayName(), style = MaterialTheme.typography.bodySmall) },
+                                            modifier = Modifier.height(30.dp)
+                                        )
+                                    }
+                                }
+
+                                Text("Audio", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    FilterChip(
+                                        selected = state.filterAudio == "",
+                                        onClick = { viewModel.setAudioFilter("") },
+                                        label = { Text("All", style = MaterialTheme.typography.bodySmall) },
+                                        modifier = Modifier.height(30.dp)
+                                    )
+                                    AudioSetting.entries.forEach { audio ->
+                                        FilterChip(
+                                            selected = state.filterAudio == audio.name,
+                                            onClick = { viewModel.setAudioFilter(audio.name) },
+                                            label = { Text(audio.displayName(), style = MaterialTheme.typography.bodySmall) },
+                                            modifier = Modifier.height(30.dp)
+                                        )
+                                    }
                                 }
                             }
 
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                "Posture",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = TextSecondary
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                item {
-                                    FilterChip(
-                                        selected = state.filterPosture == "",
-                                        onClick = { viewModel.setPostureFilter("") },
-                                        label = { Text("All") }
-                                    )
-                                }
-                                items(Posture.entries) { pos ->
-                                    FilterChip(
-                                        selected = state.filterPosture == pos.name,
-                                        onClick = { viewModel.setPostureFilter(pos.name) },
-                                        label = { Text(pos.displayName()) }
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
                             HorizontalDivider(color = SurfaceVariant)
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
 
                             // ── Event type filter ──────────────────────────
                             Row(
@@ -223,54 +231,43 @@ fun AllApneaRecordsScreen(
                             ) {
                                 Text(
                                     "Event Types",
-                                    style = MaterialTheme.typography.labelMedium,
+                                    style = MaterialTheme.typography.bodySmall,
                                     color = TextSecondary
                                 )
-                                // Select All / Deselect All — includes every type including PB sentinel
                                 val allSelected = ApneaEventType.ALL
                                     .all { state.selectedEventTypes.contains(it.tableTypeValue) }
-                                val allRealSelected = allSelected
                                 TextButton(
                                     onClick = {
-                                        if (allRealSelected) viewModel.clearAllEventTypes()
+                                        if (allSelected) viewModel.clearAllEventTypes()
                                         else viewModel.selectAllEventTypes()
                                     },
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                                 ) {
                                     Text(
-                                        if (allRealSelected) "Deselect All" else "Select All",
-                                        style = MaterialTheme.typography.labelMedium,
+                                        if (allSelected) "Deselect All" else "Select All",
+                                        style = MaterialTheme.typography.bodySmall,
                                         color = EcgCyan
                                     )
                                 }
                             }
-                            Spacer(modifier = Modifier.height(4.dp))
 
-                            // Wrap event type chips in a flow-like layout using a Column of Rows
-                            val eventTypes = ApneaEventType.ALL
-                            // Two chips per row for readability
-                            val chunked = eventTypes.chunked(2)
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                chunked.forEach { rowItems ->
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ApneaEventType.ALL.chunked(2).forEach { rowItems ->
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                         rowItems.forEach { eventType ->
-                                            val selected = state.selectedEventTypes.contains(eventType.tableTypeValue)
                                             FilterChip(
-                                                selected = selected,
+                                                selected = state.selectedEventTypes.contains(eventType.tableTypeValue),
                                                 onClick = { viewModel.toggleEventType(eventType.tableTypeValue) },
-                                                label = { Text(eventType.label, style = MaterialTheme.typography.labelSmall) },
-                                                modifier = Modifier.weight(1f)
+                                                label = { Text(eventType.label, style = MaterialTheme.typography.bodySmall) },
+                                                modifier = Modifier.weight(1f).height(30.dp)
                                             )
                                         }
-                                        // If odd number in last row, fill remaining space
-                                        if (rowItems.size == 1) {
-                                            Spacer(modifier = Modifier.weight(1f))
-                                        }
+                                        if (rowItems.size == 1) Spacer(modifier = Modifier.weight(1f))
                                     }
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
                         }
 
                         HorizontalDivider(color = SurfaceVariant)

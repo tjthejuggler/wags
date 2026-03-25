@@ -186,6 +186,11 @@ class AllApneaRecordsViewModel @Inject constructor(
         loadNextPage(reset = true)
     }
 
+    /** Removes a single record from the in-memory list without a full reload. */
+    fun removeRecord(recordId: Long) {
+        _uiState.update { it.copy(records = it.records.filter { r -> r.recordId != recordId }) }
+    }
+
     fun toggleEventType(tableTypeValue: String?) {
         val current = _uiState.value.selectedEventTypes.toMutableSet()
         if (current.contains(tableTypeValue)) {

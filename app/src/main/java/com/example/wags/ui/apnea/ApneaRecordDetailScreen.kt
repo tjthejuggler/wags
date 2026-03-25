@@ -59,9 +59,15 @@ fun ApneaRecordDetailScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showDeleteDialog by remember { mutableStateOf(false) }
 
-    // Pop back when deletion completes
+    // Pop back when deletion completes; signal the previous screen to remove the record
     LaunchedEffect(Unit) {
         viewModel.deleted.collect {
+            val deletedId = viewModel.uiState.value.record?.recordId
+            if (deletedId != null) {
+                navController.previousBackStackEntry
+                    ?.savedStateHandle
+                    ?.set("deletedRecordId", deletedId)
+            }
             navController.popBackStack()
         }
     }
