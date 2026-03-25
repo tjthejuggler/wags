@@ -587,9 +587,6 @@ fun FreeHoldActiveScreen(
                 onSongSelected = { track ->
                     viewModel.selectSong(track)
                 },
-                onClearHistory = {
-                    viewModel.clearSongHistory()
-                },
                 onDismiss = { showSongPicker = false }
             )
         }

@@ -112,7 +112,6 @@ fun SongPickerDialog(
     selectedSong: SpotifyTrackDetail?,
     loadingSelectedSong: Boolean,
     onSongSelected: (SpotifyTrackDetail) -> Unit,
-    onClearHistory: () -> Unit,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -180,13 +179,6 @@ fun SongPickerDialog(
                 )
             }
         },
-        dismissButton = {
-            if (songs.isNotEmpty()) {
-                TextButton(onClick = onClearHistory) {
-                    Text("Clear History", color = Color(0xFFCF6679))
-                }
-            }
-        }
     )
 }
 
