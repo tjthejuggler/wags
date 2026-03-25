@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.db.entity.MeditationAudioEntity
 import com.example.wags.data.db.entity.MeditationSessionEntity
+import com.example.wags.data.db.entity.MeditationTelemetryEntity
 import com.example.wags.data.repository.MeditationRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,6 +18,7 @@ import javax.inject.Inject
 data class MeditationSessionDetailUiState(
     val session: MeditationSessionEntity? = null,
     val audio: MeditationAudioEntity? = null,
+    val telemetry: List<MeditationTelemetryEntity> = emptyList(),
     val isLoading: Boolean = true,
     /** True while the delete-confirmation dialog is visible. */
     val showDeleteConfirm: Boolean = false,
@@ -37,11 +39,13 @@ class MeditationSessionDetailViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            val session = repository.getSessionById(sessionId)
-            val audio = session?.audioId?.let { repository.getAudioById(it) }
+            val session   = repository.getSessionById(sessionId)
+            val audio     = session?.audioId?.let { repository.getAudioById(it) }
+            val telemetry = repository.getTelemetryForSession(sessionId)
             _uiState.value = MeditationSessionDetailUiState(
-                session = session,
-                audio = audio,
+                session   = session,
+                audio     = audio,
+                telemetry = telemetry,
                 isLoading = false
             )
         }

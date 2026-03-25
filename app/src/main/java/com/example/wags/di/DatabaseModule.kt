@@ -13,6 +13,7 @@ import com.example.wags.data.db.dao.DailyReadingDao
 import com.example.wags.data.db.dao.FreeHoldTelemetryDao
 import com.example.wags.data.db.dao.MeditationAudioDao
 import com.example.wags.data.db.dao.MeditationSessionDao
+import com.example.wags.data.db.dao.MeditationTelemetryDao
 import com.example.wags.data.db.dao.MorningReadinessDao
 import com.example.wags.data.db.dao.MorningReadinessTelemetryDao
 import com.example.wags.data.db.dao.RfAssessmentDao
@@ -52,7 +53,8 @@ object DatabaseModule {
                 WagsDatabase.MIGRATION_16_17,
                 WagsDatabase.MIGRATION_17_18,
                 WagsDatabase.MIGRATION_18_19,
-                WagsDatabase.MIGRATION_19_20
+                WagsDatabase.MIGRATION_19_20,
+                WagsDatabase.MIGRATION_20_21
             )
             .build()
 
@@ -68,6 +70,7 @@ object DatabaseModule {
     @Provides fun provideFreeHoldTelemetryDao(db: WagsDatabase): FreeHoldTelemetryDao = db.freeHoldTelemetryDao()
     @Provides fun provideMeditationAudioDao(db: WagsDatabase): MeditationAudioDao = db.meditationAudioDao()
     @Provides fun provideMeditationSessionDao(db: WagsDatabase): MeditationSessionDao = db.meditationSessionDao()
+    @Provides fun provideMeditationTelemetryDao(db: WagsDatabase): MeditationTelemetryDao = db.meditationTelemetryDao()
     @Provides fun provideMorningReadinessTelemetryDao(db: WagsDatabase): MorningReadinessTelemetryDao = db.morningReadinessTelemetryDao()
     @Provides fun provideAdviceDao(db: WagsDatabase): AdviceDao = db.adviceDao()
     @Provides fun provideApneaSongLogDao(db: WagsDatabase): ApneaSongLogDao = db.apneaSongLogDao()

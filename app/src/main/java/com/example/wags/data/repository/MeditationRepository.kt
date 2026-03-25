@@ -6,8 +6,10 @@ import android.provider.DocumentsContract
 import com.example.wags.data.ble.DevicePreferencesRepository
 import com.example.wags.data.db.dao.MeditationAudioDao
 import com.example.wags.data.db.dao.MeditationSessionDao
+import com.example.wags.data.db.dao.MeditationTelemetryDao
 import com.example.wags.data.db.entity.MeditationAudioEntity
 import com.example.wags.data.db.entity.MeditationSessionEntity
+import com.example.wags.data.db.entity.MeditationTelemetryEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
@@ -18,6 +20,7 @@ class MeditationRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val audioDao: MeditationAudioDao,
     private val sessionDao: MeditationSessionDao,
+    private val telemetryDao: MeditationTelemetryDao,
     private val devicePrefs: DevicePreferencesRepository,
     private val youtubeFetcher: YouTubeMetadataFetcher
 ) {
@@ -150,6 +153,14 @@ class MeditationRepository @Inject constructor(
         sessionDao.insert(session)
 
     suspend fun deleteSessionById(id: Long) = sessionDao.deleteById(id)
+
+    // ── Telemetry ──────────────────────────────────────────────────────────────
+
+    suspend fun insertTelemetry(rows: List<MeditationTelemetryEntity>) =
+        telemetryDao.insertAll(rows)
+
+    suspend fun getTelemetryForSession(sessionId: Long): List<MeditationTelemetryEntity> =
+        telemetryDao.getBySessionId(sessionId)
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 

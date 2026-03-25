@@ -21,11 +21,12 @@ import com.example.wags.data.db.entity.*
         FreeHoldTelemetryEntity::class,
         MeditationAudioEntity::class,
         MeditationSessionEntity::class,
+        MeditationTelemetryEntity::class,
         MorningReadinessTelemetryEntity::class,
         AdviceEntity::class,
         ApneaSongLogEntity::class
     ],
-    version = 20,
+    version = 21,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -41,6 +42,7 @@ abstract class WagsDatabase : RoomDatabase() {
     abstract fun freeHoldTelemetryDao(): FreeHoldTelemetryDao
     abstract fun meditationAudioDao(): MeditationAudioDao
     abstract fun meditationSessionDao(): MeditationSessionDao
+    abstract fun meditationTelemetryDao(): MeditationTelemetryDao
     abstract fun morningReadinessTelemetryDao(): MorningReadinessTelemetryDao
     abstract fun adviceDao(): AdviceDao
     abstract fun apneaSongLogDao(): ApneaSongLogDao
@@ -617,6 +619,27 @@ abstract class WagsDatabase : RoomDatabase() {
                     )
                 """.trimIndent())
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_apnea_song_log_recordId` ON `apnea_song_log` (`recordId`)")
+            }
+        }
+
+        /**
+         * v20 → v21: Add meditation_telemetry table for per-beat HR and rolling RMSSD
+         * captured during meditation / NSDR sessions.
+         * Rows are cascade-deleted when the parent meditation_sessions row is deleted.
+         */
+        val MIGRATION_20_21 = object : Migration(20, 21) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `meditation_telemetry` (
+                        `id`              INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `sessionId`       INTEGER NOT NULL,
+                        `timestampMs`     INTEGER NOT NULL,
+                        `hrBpm`           INTEGER,
+                        `rollingRmssdMs`  REAL NOT NULL,
+                        FOREIGN KEY(`sessionId`) REFERENCES `meditation_sessions`(`sessionId`) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_meditation_telemetry_sessionId` ON `meditation_telemetry` (`sessionId`)")
             }
         }
     }

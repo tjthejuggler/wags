@@ -28,13 +28,13 @@ The app is designed for competitive freedivers and serious recreational practiti
 - **SpO₂ Safety Monitor** — Configurable critical threshold (70–95%) with TTS + haptic abort alert
 - **Personal Best Tracking** — Persistent PB storage; all tables auto-scale to current PB
 - **TTS + Haptic Engine** — Phase announcements, countdown cues, and differentiated vibration patterns
-- **NSDR / Meditation Sessions** — Session logging with HR sonification analytics
+- **NSDR / Meditation Sessions** — Session logging with HR sonification analytics; full per-beat HR and rolling RMSSD charts in session detail (added 2026-03-25)
 - **Per-Section Advice** — User-entered tips/reminders shown as a swipeable banner at the top of each main screen; managed via Settings
 - **Audio Setting** — 5th apnea setting dimension: Silence or Music. When Music is selected, Spotify auto-starts on hold begin and detected songs are logged per record.
 - **Spotify Integration** — Two-tier Spotify integration:
   - **Song Detection** (passive): Automatic now-playing detection via Spotify broadcast intents (no special permissions) with MediaSession API fallback; song log stored per free hold record and shown in hold detail summary.
   - **Account Connection** (active, added 2026-03-25): OAuth 2.0 PKCE login from Settings; when connected, a "Choose a Song" button appears on the free-hold screen (Music mode) showing a popup of all previously-played songs with artist, title, and duration; tapping a song card loads it into Spotify playback via the Web API so it plays when the user taps Start.
-- **Room Database** — 15-table local database with full migration history (v20)
+- **Room Database** — 16-table local database with full migration history (v21)
 
 ---
 
@@ -61,9 +61,9 @@ com.example.wags/
 │   │   ├── CircularBuffer.kt        # Lock-free ring buffer for RR samples
 │   │   └── RxToFlowBridge.kt        # RxJava3 → Kotlin Flow adapter
 │   ├── db/
-│   │   ├── WagsDatabase.kt          # Room DB v20, 15 entities, 19 migrations
-│   │   ├── dao/                     # 15 DAOs (one per entity)
-│   │   └── entity/                  # 15 Room entities (incl. AdviceEntity, ApneaSongLogEntity)
+│   │   ├── WagsDatabase.kt          # Room DB v21, 16 entities, 20 migrations
+│   │   ├── dao/                     # 16 DAOs (one per entity)
+│   │   └── entity/                  # 16 Room entities (incl. MeditationTelemetryEntity)
 │   ├── spotify/
 │   │   ├── SpotifyManager.kt        # MediaSession play command + Spotify broadcast song detection
 │   │   ├── SpotifyAuthManager.kt    # OAuth 2.0 PKCE login flow + token storage/refresh

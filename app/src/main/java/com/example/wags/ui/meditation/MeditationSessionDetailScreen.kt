@@ -1,5 +1,6 @@
 package com.example.wags.ui.meditation
 
+import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -14,18 +15,23 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.example.wags.data.db.entity.MeditationTelemetryEntity
 import com.example.wags.ui.theme.*
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import kotlin.math.ln
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,7 +94,6 @@ fun MeditationSessionDetailScreen(
                     }
                 },
                 actions = {
-                    // Only show delete when a session is loaded
                     if (state.session != null) {
                         IconButton(onClick = { viewModel.requestDelete() }) {
                             Text(
@@ -121,9 +126,10 @@ fun MeditationSessionDetailScreen(
                 }
             }
             else -> {
-                val session = state.session!!
-                val audio   = state.audio
-                val zone    = ZoneId.systemDefault()
+                val session   = state.session!!
+                val audio     = state.audio
+                val telemetry = state.telemetry
+                val zone      = ZoneId.systemDefault()
                 val dateLabel = Instant.ofEpochMilli(session.timestamp).atZone(zone)
                     .format(DateTimeFormatter.ofPattern("EEEE, MMMM d yyyy"))
                 val timeLabel = Instant.ofEpochMilli(session.timestamp).atZone(zone)
@@ -204,7 +210,34 @@ fun MeditationSessionDetailScreen(
                         }
                     }
 
-                    // ── HR analytics card + chart ──────────────────────────────
+                    // ── Full HR chart (telemetry) ──────────────────────────────
+                    if (telemetry.isNotEmpty()) {
+                        val hrValues = telemetry.mapNotNull { it.hrBpm?.toFloat() }
+                        if (hrValues.size >= 2) {
+                            TelemetryChartCard(
+                                title         = "Heart Rate",
+                                subtitle      = "BPM over session",
+                                values        = hrValues,
+                                lineColor     = ReadinessOrange,
+                                unit          = "bpm"
+                            )
+                        }
+
+                        val rmssdValues = telemetry
+                            .filter { it.rollingRmssdMs > 0.0 }
+                            .map { it.rollingRmssdMs.toFloat() }
+                        if (rmssdValues.size >= 2) {
+                            TelemetryChartCard(
+                                title         = "Rolling RMSSD",
+                                subtitle      = "ms over session (20-beat window)",
+                                values        = rmssdValues,
+                                lineColor     = ReadinessGreen,
+                                unit          = "ms"
+                            )
+                        }
+                    }
+
+                    // ── HR analytics card ──────────────────────────────────────
                     if (session.avgHrBpm != null) {
                         DetailSection(title = "Heart Rate Analytics") {
                             DetailRow("Avg HR", "${String.format("%.1f", session.avgHrBpm)} BPM")
@@ -216,12 +249,6 @@ fun MeditationSessionDetailScreen(
                                     value = "$sign${String.format("%.2f", slope)} BPM/min",
                                     valueColor = color
                                 )
-                                Spacer(Modifier.height(8.dp))
-                                // HR slope bar chart
-                                HrSlopeChart(
-                                    slopeBpmPerMin = slope,
-                                    modifier = Modifier.fillMaxWidth().height(72.dp)
-                                )
                                 Text(
                                     if (slope <= 0)
                                         "✓ Heart rate decreased during session — good relaxation response"
@@ -229,72 +256,40 @@ fun MeditationSessionDetailScreen(
                                         "Heart rate increased slightly during session",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = if (slope <= 0) ReadinessGreen else TextDisabled,
-                                    modifier = Modifier.padding(top = 4.dp)
+                                    modifier = Modifier.padding(top = 2.dp)
                                 )
                             }
                         }
                     }
 
-                    // ── HRV analytics card + charts ────────────────────────────
+                    // ── HRV analytics card ─────────────────────────────────────
                     if (session.startRmssdMs != null || session.endRmssdMs != null || session.lnRmssdSlope != null) {
                         DetailSection(title = "HRV Analytics") {
 
-                            // Start / End RMSSD comparison
                             if (session.startRmssdMs != null && session.endRmssdMs != null) {
                                 val delta = session.endRmssdMs - session.startRmssdMs
                                 val sign  = if (delta >= 0) "+" else ""
                                 val deltaColor = if (delta >= 0) ReadinessGreen else ReadinessOrange
 
-                                // Side-by-side RMSSD bars
-                                RmssdComparisonChart(
-                                    startMs = session.startRmssdMs,
-                                    endMs   = session.endRmssdMs,
-                                    modifier = Modifier.fillMaxWidth().height(80.dp)
-                                )
-                                Spacer(Modifier.height(8.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text(
-                                            "${String.format("%.1f", session.startRmssdMs)} ms",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            color = EcgCyan,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            "Start RMSSD",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = TextDisabled
-                                        )
-                                    }
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text(
-                                            "$sign${String.format("%.1f", delta)} ms",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            color = deltaColor,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            "Change",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = TextDisabled
-                                        )
-                                    }
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text(
-                                            "${String.format("%.1f", session.endRmssdMs)} ms",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            color = ReadinessGreen,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            "End RMSSD",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = TextDisabled
-                                        )
-                                    }
+                                    HrvStatBox(
+                                        label = "Start RMSSD",
+                                        value = "${String.format("%.1f", session.startRmssdMs)} ms",
+                                        color = EcgCyan
+                                    )
+                                    HrvStatBox(
+                                        label = "Change",
+                                        value = "$sign${String.format("%.1f", delta)} ms",
+                                        color = deltaColor
+                                    )
+                                    HrvStatBox(
+                                        label = "End RMSSD",
+                                        value = "${String.format("%.1f", session.endRmssdMs)} ms",
+                                        color = ReadinessGreen
+                                    )
                                 }
                                 Text(
                                     if (delta >= 0)
@@ -303,11 +298,11 @@ fun MeditationSessionDetailScreen(
                                         "HRV decreased slightly — may indicate residual stress",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = if (delta >= 0) ReadinessGreen else TextDisabled,
-                                    modifier = Modifier.padding(top = 4.dp)
+                                    modifier = Modifier.padding(top = 2.dp)
                                 )
                                 HorizontalDivider(
                                     color = SurfaceDark,
-                                    modifier = Modifier.padding(vertical = 8.dp)
+                                    modifier = Modifier.padding(vertical = 6.dp)
                                 )
                             } else {
                                 session.startRmssdMs?.let {
@@ -318,7 +313,6 @@ fun MeditationSessionDetailScreen(
                                 }
                             }
 
-                            // ln(RMSSD) slope
                             session.lnRmssdSlope?.let { slope ->
                                 val sign  = if (slope >= 0) "+" else ""
                                 val color = if (slope >= 0) ReadinessGreen else ReadinessOrange
@@ -327,11 +321,6 @@ fun MeditationSessionDetailScreen(
                                     value = "$sign${String.format("%.4f", slope)}",
                                     valueColor = color
                                 )
-                                Spacer(Modifier.height(8.dp))
-                                LnRmssdSlopeChart(
-                                    slope = slope,
-                                    modifier = Modifier.fillMaxWidth().height(72.dp)
-                                )
                                 Text(
                                     if (slope >= 0)
                                         "✓ Positive slope — HRV trending upward through session"
@@ -339,7 +328,7 @@ fun MeditationSessionDetailScreen(
                                         "Negative slope — HRV trended downward through session",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = if (slope >= 0) ReadinessGreen else TextDisabled,
-                                    modifier = Modifier.padding(top = 4.dp)
+                                    modifier = Modifier.padding(top = 2.dp)
                                 )
                             }
                         }
@@ -372,6 +361,9 @@ fun MeditationSessionDetailScreen(
                                 .format(DateTimeFormatter.ofPattern("MMM d yyyy, h:mm a"))
                         )
                         DetailRow("Duration (ms)", session.durationMs.toString())
+                        if (telemetry.isNotEmpty()) {
+                            DetailRow("Telemetry samples", telemetry.size.toString())
+                        }
                     }
 
                     Spacer(Modifier.height(16.dp))
@@ -389,6 +381,25 @@ private fun HeaderStat(label: String, value: String, color: Color) {
         Text(
             value,
             style = MaterialTheme.typography.titleMedium,
+            color = color,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = TextDisabled
+        )
+    }
+}
+
+// ── HRV stat box ───────────────────────────────────────────────────────────────
+
+@Composable
+private fun HrvStatBox(label: String, value: String, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            value,
+            style = MaterialTheme.typography.titleSmall,
             color = color,
             fontWeight = FontWeight.Bold
         )
@@ -475,183 +486,196 @@ private fun DetailRowColored(label: String, value: String, valueColor: Color) {
     }
 }
 
-// ── HR slope chart ─────────────────────────────────────────────────────────────
-// Visualises the HR trend as a diagonal line from left to right, with a zero
-// reference line in the middle. Positive slope goes up (orange), negative goes
-// down (green).
+// ── Telemetry chart card ───────────────────────────────────────────────────────
 
 @Composable
-private fun HrSlopeChart(
-    slopeBpmPerMin: Float,
+private fun TelemetryChartCard(
+    title: String,
+    subtitle: String,
+    values: List<Float>,
+    lineColor: Color,
+    unit: String,
     modifier: Modifier = Modifier
 ) {
-    val lineColor = if (slopeBpmPerMin <= 0) ReadinessGreen else ReadinessOrange
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val midY = h / 2f
+    val yMin = (values.minOrNull() ?: 0f) * 0.92f
+    val yMax = (values.maxOrNull() ?: 1f) * 1.08f
+    val avg  = values.average().toFloat()
+    val minV = values.minOrNull() ?: 0f
+    val maxV = values.maxOrNull() ?: 0f
 
-        // Zero reference line
-        drawLine(
-            color = Color.Gray.copy(alpha = 0.35f),
-            start = Offset(0f, midY),
-            end   = Offset(w, midY),
-            strokeWidth = 1.5f
-        )
+    Card(
+        colors = CardDefaults.cardColors(containerColor = SurfaceVariant),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Title + stats row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = lineColor,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(subtitle, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    MiniStat("min", "${minV.toInt()} $unit", TextSecondary)
+                    MiniStat("avg", "${avg.toInt()} $unit", lineColor)
+                    MiniStat("max", "${maxV.toInt()} $unit", TextSecondary)
+                }
+            }
 
-        // Clamp visual deflection to ±40% of half-height
-        val maxDeflect = h * 0.4f
-        val clampedSlope = slopeBpmPerMin.coerceIn(-5f, 5f)
-        val deflect = (clampedSlope / 5f) * maxDeflect
+            HorizontalDivider(color = SurfaceDark)
 
-        val startY = midY + deflect   // positive slope → start high, end low (inverted canvas)
-        val endY   = midY - deflect
-
-        // Fill
-        val fillPath = Path().apply {
-            moveTo(0f, midY)
-            lineTo(0f, startY)
-            lineTo(w, endY)
-            lineTo(w, midY)
-            close()
-        }
-        drawPath(fillPath, color = lineColor.copy(alpha = 0.15f))
-
-        // Trend line
-        drawLine(
-            color = lineColor,
-            start = Offset(0f, startY),
-            end   = Offset(w, endY),
-            strokeWidth = 3f,
-            cap = StrokeCap.Round
-        )
-
-        // Endpoint dot
-        drawCircle(color = lineColor, radius = 6f, center = Offset(w, endY))
-        drawCircle(color = BackgroundDark, radius = 3f, center = Offset(w, endY))
-
-        // Zero label tick marks
-        drawLine(
-            color = Color.Gray.copy(alpha = 0.5f),
-            start = Offset(0f, midY - 2f),
-            end   = Offset(0f, midY + 2f),
-            strokeWidth = 2f
-        )
-    }
-}
-
-// ── RMSSD comparison bar chart ─────────────────────────────────────────────────
-// Two horizontal bars side-by-side: start (cyan) and end (green).
-
-@Composable
-private fun RmssdComparisonChart(
-    startMs: Float,
-    endMs: Float,
-    modifier: Modifier = Modifier
-) {
-    val maxVal = maxOf(startMs, endMs).coerceAtLeast(1f)
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val barH = h * 0.35f
-        val gap  = h * 0.1f
-        val topY1 = h * 0.05f
-        val topY2 = topY1 + barH + gap
-
-        val startFrac = (startMs / maxVal).coerceIn(0f, 1f)
-        val endFrac   = (endMs   / maxVal).coerceIn(0f, 1f)
-
-        // Background tracks
-        drawRoundRect(
-            color = SurfaceDark,
-            topLeft = Offset(0f, topY1),
-            size = androidx.compose.ui.geometry.Size(w, barH),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(barH / 2)
-        )
-        drawRoundRect(
-            color = SurfaceDark,
-            topLeft = Offset(0f, topY2),
-            size = androidx.compose.ui.geometry.Size(w, barH),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(barH / 2)
-        )
-
-        // Start bar (cyan)
-        if (startFrac > 0f) {
-            drawRoundRect(
-                color = EcgCyan,
-                topLeft = Offset(0f, topY1),
-                size = androidx.compose.ui.geometry.Size(w * startFrac, barH),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(barH / 2)
-            )
-        }
-
-        // End bar (green)
-        if (endFrac > 0f) {
-            drawRoundRect(
-                color = ReadinessGreen,
-                topLeft = Offset(0f, topY2),
-                size = androidx.compose.ui.geometry.Size(w * endFrac, barH),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(barH / 2)
+            // Chart
+            SessionLineChart(
+                values    = values,
+                yMin      = yMin,
+                yMax      = yMax,
+                lineColor = lineColor,
+                modifier  = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp)
             )
         }
     }
 }
 
-// ── ln(RMSSD) slope chart ──────────────────────────────────────────────────────
-// Similar to HR slope but uses a simulated ln(RMSSD) curve shape.
+// ── Mini stat chip ─────────────────────────────────────────────────────────────
 
 @Composable
-private fun LnRmssdSlopeChart(
-    slope: Float,
+private fun MiniStat(label: String, value: String, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, style = MaterialTheme.typography.labelMedium, color = color, fontWeight = FontWeight.Bold)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+    }
+}
+
+// ── Canvas line chart ──────────────────────────────────────────────────────────
+
+@Composable
+private fun SessionLineChart(
+    values: List<Float>,
+    yMin: Float,
+    yMax: Float,
+    lineColor: Color,
     modifier: Modifier = Modifier
 ) {
-    val lineColor = if (slope >= 0) ReadinessGreen else ReadinessOrange
+    if (values.size < 2) {
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+            Text("Not enough data", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+        }
+        return
+    }
+
+    val density         = LocalDensity.current
+    val leftPadPx       = with(density) { 36.dp.toPx() }
+    val rightPadPx      = with(density) { 6.dp.toPx() }
+    val topPadPx        = with(density) { 6.dp.toPx() }
+    val bottomPadPx     = with(density) { 18.dp.toPx() }
+    val labelTextSizePx = with(density) { 9.sp.toPx() }
+
+    val yRange    = (yMax - yMin).coerceAtLeast(1f)
+    val gridColor = Color.White.copy(alpha = 0.07f)
+    val labelArgb = Color.White.copy(alpha = 0.45f).toArgb()
+
     Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val midY = h / 2f
+        val totalW    = size.width
+        val totalH    = size.height
+        val plotLeft  = leftPadPx
+        val plotRight = totalW - rightPadPx
+        val plotTop   = topPadPx
+        val plotBot   = totalH - bottomPadPx
+        val plotW     = (plotRight - plotLeft).coerceAtLeast(1f)
+        val plotH     = (plotBot - plotTop).coerceAtLeast(1f)
 
-        // Zero reference
-        drawLine(
-            color = Color.Gray.copy(alpha = 0.35f),
-            start = Offset(0f, midY),
-            end   = Offset(w, midY),
-            strokeWidth = 1.5f
-        )
+        fun xOf(i: Int)   = plotLeft + i.toFloat() / (values.size - 1).toFloat() * plotW
+        fun yOf(v: Float) = plotTop + plotH * (1f - ((v - yMin) / yRange).coerceIn(0f, 1f))
 
-        val maxDeflect = h * 0.38f
-        val clampedSlope = slope.coerceIn(-0.01f, 0.01f)
-        val deflect = (clampedSlope / 0.01f) * maxDeflect
-
-        // Draw a smooth curve using 20 points
-        val points = (0..20).map { i ->
-            val t = i / 20f
-            val x = t * w
-            // Slight S-curve: more change in the middle
-            val curveT = t * t * (3f - 2f * t)
-            val y = midY - deflect * curveT
-            Offset(x, y)
+        // Horizontal grid lines
+        listOf(0.25f, 0.5f, 0.75f, 1.0f).forEach { frac ->
+            val gy = plotTop + plotH * (1f - frac)
+            drawLine(gridColor, Offset(plotLeft, gy), Offset(plotRight, gy), strokeWidth = 1f)
         }
 
-        // Fill
+        // Fill path
         val fillPath = Path().apply {
-            moveTo(0f, midY)
-            points.forEach { lineTo(it.x, it.y) }
-            lineTo(w, midY)
+            moveTo(xOf(0), plotBot)
+            lineTo(xOf(0), yOf(values[0]))
+            for (i in 1 until values.size) lineTo(xOf(i), yOf(values[i]))
+            lineTo(xOf(values.size - 1), plotBot)
             close()
         }
-        drawPath(fillPath, color = lineColor.copy(alpha = 0.15f))
+        drawPath(fillPath, color = lineColor.copy(alpha = 0.12f))
 
-        // Curve line
+        // Line path
         val linePath = Path().apply {
-            moveTo(points.first().x, points.first().y)
-            points.drop(1).forEach { lineTo(it.x, it.y) }
+            moveTo(xOf(0), yOf(values[0]))
+            for (i in 1 until values.size) lineTo(xOf(i), yOf(values[i]))
         }
-        drawPath(linePath, color = lineColor, style = Stroke(width = 3f, cap = StrokeCap.Round))
+        drawPath(
+            linePath,
+            color = lineColor,
+            style = Stroke(width = 2.5f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
 
-        // Endpoint dot
-        val last = points.last()
-        drawCircle(color = lineColor, radius = 6f, center = last)
-        drawCircle(color = BackgroundDark, radius = 3f, center = last)
+        // Start / end dots
+        drawCircle(lineColor, radius = 4.5f, center = Offset(xOf(0), yOf(values.first())))
+        drawCircle(lineColor, radius = 4.5f, center = Offset(xOf(values.size - 1), yOf(values.last())))
+
+        // Y-axis labels
+        val yPaint = Paint().apply {
+            isAntiAlias = true
+            textSize    = labelTextSizePx
+            color       = labelArgb
+            textAlign   = Paint.Align.RIGHT
+        }
+        for (step in 0..3) {
+            val frac  = step / 3f
+            val value = yMin + frac * yRange
+            val gy    = plotTop + plotH * (1f - frac)
+            drawContext.canvas.nativeCanvas.drawText(
+                "${value.toInt()}",
+                plotLeft - with(density) { 3.dp.toPx() },
+                gy + labelTextSizePx / 2f,
+                yPaint
+            )
+        }
+
+        // X-axis time labels: start, mid, end
+        val xPaint = Paint().apply {
+            isAntiAlias = true
+            textSize    = labelTextSizePx
+            color       = labelArgb
+            textAlign   = Paint.Align.CENTER
+        }
+        drawContext.canvas.nativeCanvas.drawText(
+            "Start",
+            plotLeft,
+            totalH - with(density) { 2.dp.toPx() },
+            xPaint
+        )
+        drawContext.canvas.nativeCanvas.drawText(
+            "Mid",
+            plotLeft + plotW * 0.5f,
+            totalH - with(density) { 2.dp.toPx() },
+            xPaint
+        )
+        drawContext.canvas.nativeCanvas.drawText(
+            "End",
+            plotLeft + plotW,
+            totalH - with(density) { 2.dp.toPx() },
+            xPaint
+        )
     }
 }

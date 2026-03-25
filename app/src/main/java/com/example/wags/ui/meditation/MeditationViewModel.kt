@@ -10,6 +10,7 @@ import com.example.wags.data.ble.HrDataSource
 import com.example.wags.data.ble.UnifiedDeviceManager
 import com.example.wags.data.db.entity.MeditationAudioEntity
 import com.example.wags.data.db.entity.MeditationSessionEntity
+import com.example.wags.data.db.entity.MeditationTelemetryEntity
 import com.example.wags.data.repository.MeditationRepository
 import com.example.wags.data.repository.YouTubeMetadataFetcher
 import com.example.wags.di.IoDispatcher
@@ -115,6 +116,8 @@ class MeditationViewModel @Inject constructor(
     private var sessionJob: Job? = null
     private var sessionStartMs = 0L
     private val hrTimeSeries = mutableListOf<Float>()
+    // Per-second telemetry samples accumulated during the session
+    private val telemetrySamples = mutableListOf<MeditationTelemetryEntity>()
 
     // ── Audio playback ─────────────────────────────────────────────────────────
     private var mediaPlayer: MediaPlayer? = null
@@ -257,6 +260,7 @@ class MeditationViewModel @Inject constructor(
         }
 
         hrTimeSeries.clear()
+        telemetrySamples.clear()
         sessionStartMs = System.currentTimeMillis()
 
         // ── Start audio playback ───────────────────────────────────────────────
@@ -303,6 +307,16 @@ class MeditationViewModel @Inject constructor(
                             sonificationEngine.updateHr(currentHr)
                         }
                     }
+
+                    // Accumulate telemetry sample (sessionId = 0 placeholder; set after save)
+                    telemetrySamples.add(
+                        MeditationTelemetryEntity(
+                            sessionId      = 0L,
+                            timestampMs    = System.currentTimeMillis(),
+                            hrBpm          = currentHr?.let { Math.round(it) },
+                            rollingRmssdMs = liveRmssd?.toDouble() ?: 0.0
+                        )
+                    )
 
                     _uiState.update {
                         it.copy(
@@ -438,7 +452,16 @@ class MeditationViewModel @Inject constructor(
                 lnRmssdSlope     = lnSlope
             )
 
-            val savedId = withContext(ioDispatcher) { repository.insertSession(entity) }
+            val savedId = withContext(ioDispatcher) {
+                val id = repository.insertSession(entity)
+                // Persist telemetry with the real session ID
+                if (telemetrySamples.isNotEmpty()) {
+                    repository.insertTelemetry(
+                        telemetrySamples.map { it.copy(sessionId = id) }
+                    )
+                }
+                id
+            }
 
             _uiState.update {
                 it.copy(
