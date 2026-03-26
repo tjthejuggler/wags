@@ -13,6 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.wags.data.spotify.SpotifyTrackDetail
+import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.theme.*
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,7 +41,8 @@ fun SongPickerButton(onClick: () -> Unit) {
                 contentColor = TextPrimary
             )
         ) {
-            Text("🎵  Choose a Song", style = MaterialTheme.typography.bodyMedium)
+            Text("🎵  Choose a Song", style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.grayscale())
         }
     }
 }
@@ -67,7 +69,8 @@ fun SelectedSongBanner(track: SpotifyTrackDetail, onClear: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("🎵", style = MaterialTheme.typography.bodyMedium)
+            Text("🎵", style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.grayscale())
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     track.title,
@@ -231,7 +234,8 @@ private fun SongCard(
                 } else {
                     Text(
                         "🎵",
-                        style = MaterialTheme.typography.headlineSmall
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.grayscale()
                     )
                 }
             }

@@ -53,6 +53,7 @@ import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.InfoHelpBubble
 import com.example.wags.ui.common.LiveSensorActions
+import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 import java.text.SimpleDateFormat
@@ -302,7 +303,7 @@ fun ApneaScreen(
                         onClick = { navController.navigate(WagsRoutes.SESSION_ANALYTICS_HISTORY) },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("📊 View Session Analytics")
+                        Text("📊 View Session Analytics", modifier = Modifier.grayscale())
                     }
                 }
 
@@ -457,7 +458,8 @@ internal fun NewPersonalBestDialog(
                         Text(
                             emoji,
                             style = MaterialTheme.typography.displayMedium,
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.grayscale()
                         )
                         Text(
                             headline,
@@ -491,7 +493,8 @@ internal fun NewPersonalBestDialog(
                             colors = ButtonDefaults.buttonColors(containerColor = SurfaceVariant),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("🎉 Awesome!", color = TextPrimary, fontWeight = FontWeight.Bold)
+                            Text("🎉 Awesome!", color = TextPrimary, fontWeight = FontWeight.Bold,
+                                modifier = Modifier.grayscale())
                         }
                     }
                 }
@@ -611,7 +614,11 @@ private fun ApneaSettingsContent(
                     selected = selectedLungVolume == volume,
                     onClick = { onLungVolumeChange(volume) },
                     label = { Text(volume.displayLungVolume(), style = MaterialTheme.typography.bodySmall) },
-                    modifier = Modifier.height(30.dp)
+                    modifier = Modifier.height(30.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = SurfaceVariant,
+                        selectedLabelColor = TextPrimary
+                    )
                 )
             }
         }
@@ -623,7 +630,11 @@ private fun ApneaSettingsContent(
                     selected = prepType == type,
                     onClick = { onPrepTypeChange(type) },
                     label = { Text(type.displayName(), style = MaterialTheme.typography.bodySmall) },
-                    modifier = Modifier.height(30.dp)
+                    modifier = Modifier.height(30.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = SurfaceVariant,
+                        selectedLabelColor = TextPrimary
+                    )
                 )
             }
         }
@@ -635,7 +646,11 @@ private fun ApneaSettingsContent(
                     selected = timeOfDay == tod,
                     onClick = { onTimeOfDayChange(tod) },
                     label = { Text(tod.displayName(), style = MaterialTheme.typography.bodySmall) },
-                    modifier = Modifier.height(30.dp)
+                    modifier = Modifier.height(30.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = SurfaceVariant,
+                        selectedLabelColor = TextPrimary
+                    )
                 )
             }
         }
@@ -647,7 +662,11 @@ private fun ApneaSettingsContent(
                     selected = posture == pos,
                     onClick = { onPostureChange(pos) },
                     label = { Text(pos.displayName(), style = MaterialTheme.typography.bodySmall) },
-                    modifier = Modifier.height(30.dp)
+                    modifier = Modifier.height(30.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = SurfaceVariant,
+                        selectedLabelColor = TextPrimary
+                    )
                 )
             }
         }
@@ -659,7 +678,11 @@ private fun ApneaSettingsContent(
                     selected = audio == aud,
                     onClick = { onAudioChange(aud) },
                     label = { Text(aud.displayName(), style = MaterialTheme.typography.bodySmall) },
-                    modifier = Modifier.height(30.dp)
+                    modifier = Modifier.height(30.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = SurfaceVariant,
+                        selectedLabelColor = TextPrimary
+                    )
                 )
             }
         }
@@ -684,7 +707,8 @@ fun NowPlayingBanner(track: TrackInfo) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("🎵", style = MaterialTheme.typography.bodyMedium)
+            Text("🎵", style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.grayscale())
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     track.title,
@@ -745,7 +769,7 @@ private fun FreeHoldContent(
                 Text(
                     trophies,
                     style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.clickable { onTrophyClick() }
+                    modifier = Modifier.clickable { onTrophyClick() }.grayscale()
                 )
                 Text(" ", style = MaterialTheme.typography.headlineSmall)
                 // Duration → navigate to record detail
@@ -846,7 +870,11 @@ private fun TableTrainingConfigContent(
                 FilterChip(
                     selected = selectedLength == length,
                     onClick = { onLengthSelected(length) },
-                    label = { Text(label) }
+                    label = { Text(label) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = SurfaceVariant,
+                        selectedLabelColor = TextPrimary
+                    )
                 )
             }
         }
@@ -861,7 +889,11 @@ private fun TableTrainingConfigContent(
                 FilterChip(
                     selected = selectedDifficulty == difficulty,
                     onClick = { onDifficultySelected(difficulty) },
-                    label = { Text(label) }
+                    label = { Text(label) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = SurfaceVariant,
+                        selectedLabelColor = TextPrimary
+                    )
                 )
             }
         }
@@ -1026,7 +1058,8 @@ private fun AdvancedSessionRunningContent(
                     Text("Endurance — cruised ${formatMmSs(state.cruisingElapsedMs)}", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                 }
                 AdvancedApneaPhase.COMPLETE -> {
-                    Text("Session Complete! 🎉", style = MaterialTheme.typography.headlineSmall, color = TextPrimary)
+                    Text("Session Complete! 🎉", style = MaterialTheme.typography.headlineSmall, color = TextPrimary,
+                        modifier = Modifier.grayscale())
                 }
                 AdvancedApneaPhase.IDLE -> Unit
                 else -> {
@@ -1103,7 +1136,8 @@ private fun RecentRecordsContent(
             modifier = Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            Text("📋 All Records", style = MaterialTheme.typography.labelLarge)
+            Text("📋 All Records", style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.grayscale())
         }
 
         if (records.isEmpty()) {

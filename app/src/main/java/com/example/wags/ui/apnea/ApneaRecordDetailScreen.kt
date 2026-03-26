@@ -37,6 +37,7 @@ import com.example.wags.domain.model.RecordPbBadge
 import com.example.wags.domain.model.SpotifySong
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.model.trophyEmojis
+import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -710,7 +711,8 @@ private fun RecordDetailContent(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text("🎵 Songs Played", style = MaterialTheme.typography.titleLarge)
+                    Text("🎵 Songs Played", style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.grayscale())
                     songLog.forEach { song ->
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(

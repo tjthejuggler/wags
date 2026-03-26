@@ -17,6 +17,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.domain.model.PersonalBestEntry
+import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 import java.text.SimpleDateFormat
@@ -205,7 +206,8 @@ private fun SectionHeader(trophies: String, title: String, subtitle: String) {
             "$trophies  $title",
             style = MaterialTheme.typography.titleMedium,
             color = TextPrimary,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.grayscale()
         )
         Text(
             subtitle,

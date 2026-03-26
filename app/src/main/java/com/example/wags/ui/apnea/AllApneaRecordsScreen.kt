@@ -134,14 +134,22 @@ fun AllApneaRecordsScreen(
                                         selected = state.filterLungVolume == "",
                                         onClick = { viewModel.setLungVolumeFilter("") },
                                         label = { Text("All", style = MaterialTheme.typography.bodySmall) },
-                                        modifier = Modifier.height(30.dp)
+                                        modifier = Modifier.height(30.dp),
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = SurfaceVariant,
+                                            selectedLabelColor = TextPrimary
+                                        )
                                     )
                                     listOf("FULL", "PARTIAL", "EMPTY").forEach { vol ->
                                         FilterChip(
                                             selected = state.filterLungVolume == vol,
                                             onClick = { viewModel.setLungVolumeFilter(vol) },
                                             label = { Text(if (vol == "PARTIAL") "Half" else vol.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall) },
-                                            modifier = Modifier.height(30.dp)
+                                            modifier = Modifier.height(30.dp),
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = SurfaceVariant,
+                                                selectedLabelColor = TextPrimary
+                                            )
                                         )
                                     }
                                 }
@@ -152,14 +160,22 @@ fun AllApneaRecordsScreen(
                                         selected = state.filterPrepType == "",
                                         onClick = { viewModel.setPrepTypeFilter("") },
                                         label = { Text("All", style = MaterialTheme.typography.bodySmall) },
-                                        modifier = Modifier.height(30.dp)
+                                        modifier = Modifier.height(30.dp),
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = SurfaceVariant,
+                                            selectedLabelColor = TextPrimary
+                                        )
                                     )
                                     PrepType.entries.forEach { pt ->
                                         FilterChip(
                                             selected = state.filterPrepType == pt.name,
                                             onClick = { viewModel.setPrepTypeFilter(pt.name) },
                                             label = { Text(pt.displayName(), style = MaterialTheme.typography.bodySmall) },
-                                            modifier = Modifier.height(30.dp)
+                                            modifier = Modifier.height(30.dp),
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = SurfaceVariant,
+                                                selectedLabelColor = TextPrimary
+                                            )
                                         )
                                     }
                                 }
@@ -170,14 +186,22 @@ fun AllApneaRecordsScreen(
                                         selected = state.filterTimeOfDay == "",
                                         onClick = { viewModel.setTimeOfDayFilter("") },
                                         label = { Text("All", style = MaterialTheme.typography.bodySmall) },
-                                        modifier = Modifier.height(30.dp)
+                                        modifier = Modifier.height(30.dp),
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = SurfaceVariant,
+                                            selectedLabelColor = TextPrimary
+                                        )
                                     )
                                     TimeOfDay.entries.forEach { tod ->
                                         FilterChip(
                                             selected = state.filterTimeOfDay == tod.name,
                                             onClick = { viewModel.setTimeOfDayFilter(tod.name) },
                                             label = { Text(tod.displayName(), style = MaterialTheme.typography.bodySmall) },
-                                            modifier = Modifier.height(30.dp)
+                                            modifier = Modifier.height(30.dp),
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = SurfaceVariant,
+                                                selectedLabelColor = TextPrimary
+                                            )
                                         )
                                     }
                                 }
@@ -188,14 +212,22 @@ fun AllApneaRecordsScreen(
                                         selected = state.filterPosture == "",
                                         onClick = { viewModel.setPostureFilter("") },
                                         label = { Text("All", style = MaterialTheme.typography.bodySmall) },
-                                        modifier = Modifier.height(30.dp)
+                                        modifier = Modifier.height(30.dp),
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = SurfaceVariant,
+                                            selectedLabelColor = TextPrimary
+                                        )
                                     )
                                     Posture.entries.forEach { pos ->
                                         FilterChip(
                                             selected = state.filterPosture == pos.name,
                                             onClick = { viewModel.setPostureFilter(pos.name) },
                                             label = { Text(pos.displayName(), style = MaterialTheme.typography.bodySmall) },
-                                            modifier = Modifier.height(30.dp)
+                                            modifier = Modifier.height(30.dp),
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = SurfaceVariant,
+                                                selectedLabelColor = TextPrimary
+                                            )
                                         )
                                     }
                                 }
@@ -206,14 +238,22 @@ fun AllApneaRecordsScreen(
                                         selected = state.filterAudio == "",
                                         onClick = { viewModel.setAudioFilter("") },
                                         label = { Text("All", style = MaterialTheme.typography.bodySmall) },
-                                        modifier = Modifier.height(30.dp)
+                                        modifier = Modifier.height(30.dp),
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = SurfaceVariant,
+                                            selectedLabelColor = TextPrimary
+                                        )
                                     )
                                     AudioSetting.entries.forEach { audio ->
                                         FilterChip(
                                             selected = state.filterAudio == audio.name,
                                             onClick = { viewModel.setAudioFilter(audio.name) },
                                             label = { Text(audio.displayName(), style = MaterialTheme.typography.bodySmall) },
-                                            modifier = Modifier.height(30.dp)
+                                            modifier = Modifier.height(30.dp),
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = SurfaceVariant,
+                                                selectedLabelColor = TextPrimary
+                                            )
                                         )
                                     }
                                 }
@@ -259,7 +299,11 @@ fun AllApneaRecordsScreen(
                                                 selected = state.selectedEventTypes.contains(eventType.tableTypeValue),
                                                 onClick = { viewModel.toggleEventType(eventType.tableTypeValue) },
                                                 label = { Text(eventType.label, style = MaterialTheme.typography.bodySmall) },
-                                                modifier = Modifier.weight(1f).height(30.dp)
+                                                modifier = Modifier.weight(1f).height(30.dp),
+                                                colors = FilterChipDefaults.filterChipColors(
+                                                    selectedContainerColor = SurfaceVariant,
+                                                    selectedLabelColor = TextPrimary
+                                                )
                                             )
                                         }
                                         if (rowItems.size == 1) Spacer(modifier = Modifier.weight(1f))

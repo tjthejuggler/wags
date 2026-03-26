@@ -33,6 +33,7 @@ import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.common.SessionBackHandler
+import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 
@@ -69,7 +70,8 @@ fun MeditationScreen(
                     IconButton(onClick = {
                         navController.navigate(WagsRoutes.MEDITATION_HISTORY)
                     }) {
-                        Text("📊", style = MaterialTheme.typography.titleMedium)
+                        Text("📊", style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.grayscale())
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)

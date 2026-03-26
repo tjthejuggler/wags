@@ -16,6 +16,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.ApneaSessionEntity
+import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 import java.text.SimpleDateFormat
@@ -79,12 +80,20 @@ fun ApneaHistoryScreen(
                         FilterChip(
                             selected = true,
                             onClick = {},
-                            label = { Text(if (state.lungVolume == "PARTIAL") "Half" else state.lungVolume.lowercase().replaceFirstChar { it.uppercase() }) }
+                            label = { Text(if (state.lungVolume == "PARTIAL") "Half" else state.lungVolume.lowercase().replaceFirstChar { it.uppercase() }) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = SurfaceVariant,
+                                selectedLabelColor = TextPrimary
+                            )
                         )
                         FilterChip(
                             selected = true,
                             onClick = {},
-                            label = { Text(state.prepType.displayName()) }
+                            label = { Text(state.prepType.displayName()) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = SurfaceVariant,
+                                selectedLabelColor = TextPrimary
+                            )
                         )
                     }
                 }
@@ -109,7 +118,8 @@ fun ApneaHistoryScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("🏆 Personal Best", style = MaterialTheme.typography.bodyLarge)
+                            Text("🏆 Personal Best", style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.grayscale())
                             Text(
                                 formatDuration(state.bestFreeHoldMs),
                                 style = MaterialTheme.typography.headlineSmall,

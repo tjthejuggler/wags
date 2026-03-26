@@ -4,6 +4,17 @@
 
 ## Changelog
 
+### 2026-03-26 — Greyscale emoji filter via ColorMatrix
+Added [`GrayscaleEmoji.kt`](app/src/main/java/com/example/wags/ui/common/GrayscaleEmoji.kt) with a reusable `grayscale()` Modifier extension that applies a zero-saturation `ColorMatrix` to strip colour from emoji glyphs. Applied to all colour emoji `Text()` calls across the app:
+- `ApneaScreen.kt` — 📊, 🌍/⭐/🏆 (PB dialog), 🎉, 🎵, 🏆 (trophy row), 📋
+- `ApneaHistoryScreen.kt` — 🏆 Personal Best banner
+- `ApneaRecordDetailScreen.kt` — 🎵 Songs Played header
+- `SongPickerComponents.kt` — all three 🎵 instances
+- `PersonalBestsScreen.kt` — 🏆 section headers
+- `MeditationScreen.kt` — 📊 history button
+
+---
+
 ### 2026-03-26 — Full greyscale UI conversion (final sweep)
 Follow-up pass fixing remaining colored references missed in the initial conversion:
 - `ApneaRecordDetailScreen.kt` — `SpO2Blue` (`0xFF42A5F5`) → `0xFFB0B0B0`; canvas label `Color.White` → `TextSecondary`
