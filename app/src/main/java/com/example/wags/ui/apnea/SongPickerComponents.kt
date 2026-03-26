@@ -1,20 +1,36 @@
 package com.example.wags.ui.apnea
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.example.wags.data.spotify.SpotifyTrackDetail
 import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.theme.*
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sort options
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Available sort criteria for the song picker list. */
+enum class SongSortOption(val label: String) {
+    RECENT("Recent"),
+    TITLE("Title"),
+    ARTIST("Artist"),
+    LENGTH("Length")
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Song Picker Button
@@ -117,6 +133,27 @@ fun SongPickerDialog(
     onSongSelected: (SpotifyTrackDetail) -> Unit,
     onDismiss: () -> Unit
 ) {
+    // Sort state
+    var sortOption by remember { mutableStateOf(SongSortOption.RECENT) }
+    var sortAscending by remember { mutableStateOf(false) } // false = descending (most recent first)
+
+    val sortedSongs = remember(songs, sortOption, sortAscending) {
+        val sorted = when (sortOption) {
+            SongSortOption.RECENT -> songs // already ordered by most recent from the loader
+            SongSortOption.TITLE -> songs.sortedBy { it.title.lowercase() }
+            SongSortOption.ARTIST -> songs.sortedBy { it.artist.lowercase() }
+            SongSortOption.LENGTH -> songs.sortedBy { it.durationMs }
+        }
+        // For RECENT, default descending = most recent first (original order).
+        // For others, default ascending = A→Z / shortest first.
+        // The ascending flag is toggled relative to the natural order.
+        if (sortOption == SongSortOption.RECENT) {
+            if (sortAscending) sorted.reversed() else sorted
+        } else {
+            if (sortAscending) sorted else sorted.reversed()
+        }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = BackgroundDark,
@@ -128,47 +165,68 @@ fun SongPickerDialog(
             )
         },
         text = {
-            when {
-                isLoading -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(color = EcgCyan)
-                    }
+            Column {
+                // Sort chips row — only show when there are songs to sort
+                if (!isLoading && songs.isNotEmpty()) {
+                    SortChipRow(
+                        currentSort = sortOption,
+                        ascending = sortAscending,
+                        onSortChanged = { option ->
+                            if (option == sortOption) {
+                                // Tapping the same chip toggles direction
+                                sortAscending = !sortAscending
+                            } else {
+                                sortOption = option
+                                // Default direction: Recent → descending, others → ascending
+                                sortAscending = option != SongSortOption.RECENT
+                            }
+                        }
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
-                songs.isEmpty() -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            "No songs recorded yet.\nDo a breath hold with Music to build your library!",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = TextSecondary,
-                            modifier = Modifier.padding(16.dp)
-                        )
+
+                when {
+                    isLoading -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = EcgCyan)
+                        }
                     }
-                }
-                else -> {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 400.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(songs, key = { it.cardKey() }) { track ->
-                            SongCard(
-                                track = track,
-                                isSelected = selectedSong?.cardKey() == track.cardKey(),
-                                isLoading = loadingSelectedSong &&
-                                    selectedSong?.cardKey() == track.cardKey(),
-                                onClick = { onSongSelected(track) }
+                    songs.isEmpty() -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "No songs recorded yet.\nDo a breath hold with Music to build your library!",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TextSecondary,
+                                modifier = Modifier.padding(16.dp)
                             )
+                        }
+                    }
+                    else -> {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 400.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            items(sortedSongs, key = { it.cardKey() }) { track ->
+                                SongCard(
+                                    track = track,
+                                    isSelected = selectedSong?.cardKey() == track.cardKey(),
+                                    isLoading = loadingSelectedSong &&
+                                        selectedSong?.cardKey() == track.cardKey(),
+                                    onClick = { onSongSelected(track) }
+                                )
+                            }
                         }
                     }
                 }
@@ -186,12 +244,51 @@ fun SongPickerDialog(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Sort Chip Row
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun SortChipRow(
+    currentSort: SongSortOption,
+    ascending: Boolean,
+    onSortChanged: (SongSortOption) -> Unit
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        SongSortOption.entries.forEach { option ->
+            val isActive = option == currentSort
+            val arrow = if (isActive) if (ascending) " ↑" else " ↓" else ""
+            val bgColor = if (isActive) SurfaceVariant else SurfaceDark
+            val textColor = if (isActive) TextPrimary else TextSecondary
+
+            Surface(
+                onClick = { onSortChanged(option) },
+                shape = MaterialTheme.shapes.small,
+                color = bgColor,
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = if (isActive) TextSecondary else SurfaceVariant
+                )
+            ) {
+                Text(
+                    text = "${option.label}$arrow",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = textColor,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Song Card
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * A card representing a single song in the picker.
- * Shows title, artist, and duration. Highlights when selected.
+ * A compact card representing a single song in the picker.
+ * Shows album art, title, artist, and duration. Highlights when selected.
  */
 @Composable
 private fun SongCard(
@@ -216,25 +313,34 @@ private fun SongCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Music icon / loading indicator
+            // Album art / loading indicator
             Box(
-                modifier = Modifier.size(40.dp),
+                modifier = Modifier.size(36.dp),
                 contentAlignment = Alignment.Center
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier.size(20.dp),
                         color = TextSecondary,
                         strokeWidth = 2.dp
+                    )
+                } else if (!track.albumArt.isNullOrBlank()) {
+                    AsyncImage(
+                        model = track.albumArt,
+                        contentDescription = "${track.title} album art",
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(4.dp)),
+                        contentScale = ContentScale.Crop
                     )
                 } else {
                     Text(
                         "🎵",
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.bodyLarge,
                         modifier = Modifier.grayscale()
                     )
                 }
@@ -244,7 +350,7 @@ private fun SongCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     track.title,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.SemiBold,
                     color = if (isSelected) TextPrimary else TextSecondary,
                     maxLines = 1,
@@ -252,7 +358,7 @@ private fun SongCard(
                 )
                 Text(
                     track.artist,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelSmall,
                     color = TextSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -263,7 +369,7 @@ private fun SongCard(
             if (track.durationMs > 0) {
                 Text(
                     formatDurationMs(track.durationMs),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelSmall,
                     color = TextSecondary
                 )
             }
@@ -285,4 +391,32 @@ private fun formatDurationMs(ms: Long): String {
     val minutes = totalSeconds / 60L
     val seconds = totalSeconds % 60L
     return "${minutes}:${seconds.toString().padStart(2, '0')}"
+}
+
+/**
+ * Deduplicates a list of [SpotifyTrackDetail] by title+artist (case-insensitive).
+ * When duplicates exist, prefers the entry with a non-blank spotifyUri and albumArt.
+ */
+fun deduplicateTracks(tracks: List<SpotifyTrackDetail>): List<SpotifyTrackDetail> {
+    val seen = mutableMapOf<String, SpotifyTrackDetail>()
+    for (track in tracks) {
+        val key = "${track.title.lowercase().trim()}|${track.artist.lowercase().trim()}"
+        val existing = seen[key]
+        if (existing == null) {
+            seen[key] = track
+        } else {
+            // Prefer the entry with more metadata (URI, album art, duration)
+            val better = if (track.spotifyUri.isNotBlank() && existing.spotifyUri.isBlank()) {
+                track
+            } else if (!track.albumArt.isNullOrBlank() && existing.albumArt.isNullOrBlank()) {
+                track
+            } else if (track.durationMs > 0 && existing.durationMs == 0L) {
+                track
+            } else {
+                existing
+            }
+            seen[key] = better
+        }
+    }
+    return seen.values.toList()
 }

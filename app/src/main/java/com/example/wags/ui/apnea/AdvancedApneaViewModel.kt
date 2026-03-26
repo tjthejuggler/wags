@@ -107,22 +107,11 @@ class AdvancedApneaViewModel @Inject constructor(
         sessionStartMs = System.currentTimeMillis()
         val pbMs = prefs.getLong("pb_ms", 0L)
         stateMachine.start(modality, length, pbMs, wonkaConfig, viewModelScope)
-        // Start Spotify if MUSIC is selected
+        // Start Spotify if MUSIC is selected.
+        // Song was pre-loaded in selectSong() — just resume playback.
         if (audioSetting == AudioSetting.MUSIC) {
-            val selected = _uiState.value.selectedSong
-            val hasValidUri = selected != null
-                && selected.spotifyUri.isNotBlank()
-                && spotifyAuthManager.isConnected.value
             spotifyManager.startTracking()
-            if (hasValidUri) {
-                viewModelScope.launch {
-                    val success = spotifyApiClient.startPlayback(selected!!.spotifyUri)
-                    Log.d("AdvancedApnea", "startPlayback result: $success for ${selected.spotifyUri}")
-                    if (!success) spotifyManager.sendPlayCommand()
-                }
-            } else {
-                spotifyManager.sendPlayCommand()
-            }
+            spotifyManager.sendPlayCommand()
         }
     }
 
@@ -174,12 +163,33 @@ class AdvancedApneaViewModel @Inject constructor(
                         durationMs = 0L, albumArt = song.albumArt)
                 }
             }
-            _uiState.update { it.copy(previousSongs = details, loadingSongs = false) }
+            // Final dedup by title+artist after API enrichment
+            _uiState.update { it.copy(previousSongs = deduplicateTracks(details), loadingSongs = false) }
         }
     }
 
+    /**
+     * Called when the user taps a song card in the picker.
+     * Pre-loads the song into Spotify playback immediately (then pauses) so it
+     * is ready to resume instantly when the user taps Start.
+     */
     fun selectSong(track: SpotifyTrackDetail) {
-        _uiState.update { it.copy(selectedSong = track) }
+        _uiState.update { it.copy(selectedSong = track, loadingSelectedSong = true) }
+        if (track.spotifyUri.isNotBlank() && spotifyAuthManager.isConnected.value) {
+            viewModelScope.launch {
+                // Ensure Spotify is running before attempting playback
+                spotifyManager.ensureSpotifyActive()
+                val success = spotifyApiClient.startPlayback(track.spotifyUri)
+                Log.d("AdvancedApnea", "selectSong pre-load: success=$success for ${track.spotifyUri}")
+                if (success) {
+                    kotlinx.coroutines.delay(1_200L)
+                    spotifyManager.sendPauseAndRewindCommand()
+                }
+                _uiState.update { it.copy(loadingSelectedSong = false) }
+            }
+        } else {
+            _uiState.update { it.copy(loadingSelectedSong = false) }
+        }
     }
 
     fun clearSelectedSong() {
@@ -200,11 +210,16 @@ class AdvancedApneaViewModel @Inject constructor(
     }
 
     private fun mergeSongs(dbSongs: List<SpotifySong>, prefsSongs: List<SpotifySong>): List<SpotifySong> {
-        val seen = mutableSetOf<String>()
+        val seenByUri = mutableSetOf<String>()
+        val seenByTitleArtist = mutableSetOf<String>()
         val result = mutableListOf<SpotifySong>()
         for (song in dbSongs + prefsSongs) {
-            val key = if (!song.spotifyUri.isNullOrBlank()) song.spotifyUri!! else "${song.title}|${song.artist}"
-            if (seen.add(key)) result.add(song)
+            val titleArtistKey = "${song.title.lowercase().trim()}|${song.artist.lowercase().trim()}"
+            if (!seenByTitleArtist.add(titleArtistKey)) continue
+            if (!song.spotifyUri.isNullOrBlank()) {
+                if (!seenByUri.add(song.spotifyUri!!)) continue
+            }
+            result.add(song)
         }
         return result
     }
@@ -213,10 +228,9 @@ class AdvancedApneaViewModel @Inject constructor(
         if (songs.isEmpty()) return
         val existing = loadSongHistoryFromPrefs().toMutableList()
         for (song in songs) {
-            val key = if (!song.spotifyUri.isNullOrBlank()) song.spotifyUri!! else "${song.title}|${song.artist}"
+            val titleArtistKey = "${song.title.lowercase().trim()}|${song.artist.lowercase().trim()}"
             val alreadyPresent = existing.any { s ->
-                val k = if (!s.spotifyUri.isNullOrBlank()) s.spotifyUri!! else "${s.title}|${s.artist}"
-                k == key
+                "${s.title.lowercase().trim()}|${s.artist.lowercase().trim()}" == titleArtistKey
             }
             if (!alreadyPresent) existing.add(0, song)
         }

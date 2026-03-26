@@ -4,6 +4,35 @@
 
 ## Changelog
 
+### 2026-03-26 — Song picker improvements: dedup, sorting, album art, reliable pre-loading
+
+**Duplicate song prevention** ([`ApneaSongLogDao.kt`](app/src/main/java/com/example/wags/data/db/dao/ApneaSongLogDao.kt), [`SongPickerComponents.kt`](app/src/main/java/com/example/wags/ui/apnea/SongPickerComponents.kt), all 3 ViewModels)
+- DB query now groups by `LOWER(TRIM(title)) || '|' || LOWER(TRIM(artist))` instead of `COALESCE(spotifyUri, ...)` — prevents the same song appearing twice when stored with different Spotify URIs.
+- `mergeSongs()` in all ViewModels now deduplicates by case-insensitive title+artist as a primary key (previously only checked URI).
+- New `deduplicateTracks()` utility applied after API enrichment to catch any remaining duplicates from the Spotify Web API resolution step.
+- `persistSongHistory()` also uses case-insensitive title+artist matching.
+
+**Sort buttons** ([`SongPickerComponents.kt`](app/src/main/java/com/example/wags/ui/apnea/SongPickerComponents.kt))
+- Added a `FilterChip` row at the top of the song picker dialog with four sort options: Recent, Title, Artist, Length.
+- Tapping the active chip toggles ascending/descending (arrow indicator ↑/↓ shown on the active chip).
+- Default: Recent (most recently played first).
+
+**Album art on song cards** ([`SongPickerComponents.kt`](app/src/main/java/com/example/wags/ui/apnea/SongPickerComponents.kt), [`build.gradle.kts`](app/build.gradle.kts))
+- Added Coil (`io.coil-kt:coil-compose:2.6.0`) dependency for async image loading.
+- Song cards now display the album art thumbnail (36×36 dp, rounded corners) when available; falls back to the 🎵 emoji when no art URL is present.
+
+**Smaller, more compact song cards** ([`SongPickerComponents.kt`](app/src/main/java/com/example/wags/ui/apnea/SongPickerComponents.kt))
+- Reduced card padding from 12 dp to 8 dp, icon/art size from 40 dp to 36 dp, and card spacing from 8 dp to 6 dp.
+- Text styles downgraded from `bodyMedium`/`bodySmall` to `bodySmall`/`labelSmall` for a tighter layout.
+
+**Reliable song pre-loading** ([`FreeHoldActiveScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/FreeHoldActiveScreen.kt), [`ApneaViewModel.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaViewModel.kt), [`AdvancedApneaViewModel.kt`](app/src/main/java/com/example/wags/ui/apnea/AdvancedApneaViewModel.kt), [`SpotifyManager.kt`](app/src/main/java/com/example/wags/data/spotify/SpotifyManager.kt))
+- New `ensureSpotifyActive()` in `SpotifyManager` — if Spotify is not running, automatically launches it via its package intent and polls up to 3 s for its MediaSession to appear before proceeding.
+- `selectSong()` calls `ensureSpotifyActive()` first, then starts playback of the selected track via the Spotify Web API, waits 1.2 s for Spotify to buffer, then pauses and rewinds. This ensures the track is fully loaded and ready even when Spotify was not open.
+- `startFreeHold()` / `startTableSession()` / `startSession()` now simply call `sendPlayCommand()` to resume the already-buffered track, eliminating the ~500 ms API latency that previously caused intermittent failures.
+- A loading spinner is shown on the selected card while the pre-load is in progress.
+
+---
+
 ### 2026-03-26 — Resonance breathing improvements: end sound, vibration toggle, white flash, fine-tune granularity
 
 **End-of-session sound for RF assessments** ([`AssessmentRunScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/AssessmentRunScreen.kt))

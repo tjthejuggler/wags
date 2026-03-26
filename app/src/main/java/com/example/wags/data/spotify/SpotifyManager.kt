@@ -386,6 +386,53 @@ class SpotifyManager @Inject constructor(
     fun isSpotifyInstalled(): Boolean =
         context.packageManager.getLaunchIntentForPackage(SPOTIFY_PACKAGE) != null
 
+    /**
+     * Ensure Spotify is running in the background before attempting playback.
+     *
+     * Checks whether Spotify has an active MediaSession (meaning it's alive
+     * and ready to accept commands). If not, launches Spotify via its package
+     * launch intent and waits up to [timeoutMs] for it to become active.
+     *
+     * This is a suspend function — call it from a coroutine before
+     * [SpotifyApiClient.startPlayback] to guarantee Spotify is ready.
+     */
+    suspend fun ensureSpotifyActive(timeoutMs: Long = 3_000L) {
+        // Quick check: if we already have a MediaController for Spotify, it's active
+        if (spotifyController != null) return
+
+        // Try refreshing — maybe it's running but we haven't picked it up yet
+        refreshSpotifyController()
+        if (spotifyController != null) return
+
+        // Spotify is not active — launch it in the background
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(SPOTIFY_PACKAGE)
+        if (launchIntent != null) {
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            try {
+                context.startActivity(launchIntent)
+                Log.d("SpotifyMgr", "Launched Spotify to bring it to background")
+            } catch (e: Exception) {
+                Log.w("SpotifyMgr", "Failed to launch Spotify", e)
+                return
+            }
+        } else {
+            Log.w("SpotifyMgr", "Spotify not installed — cannot ensure active")
+            return
+        }
+
+        // Poll until Spotify's MediaSession appears or timeout
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            delay(500L)
+            refreshSpotifyController()
+            if (spotifyController != null) {
+                Log.d("SpotifyMgr", "Spotify became active after launch")
+                return
+            }
+        }
+        Log.w("SpotifyMgr", "Spotify did not become active within ${timeoutMs}ms — proceeding anyway")
+    }
+
     // ── Internal helpers ─────────────────────────────────────────────────────
 
     private fun registerSpotifyReceiver() {

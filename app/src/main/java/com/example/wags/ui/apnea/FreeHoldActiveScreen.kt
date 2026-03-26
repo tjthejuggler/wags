@@ -220,9 +220,10 @@ class FreeHoldActiveViewModel @Inject constructor(
             }
         }
         // If MUSIC is selected, start Spotify and begin song tracking.
-        // When a song was pre-selected via the picker, use the Web API to start
-        // that specific track; otherwise fall back to the generic play command
-        // (resumes whatever was last playing in Spotify).
+        // When a song was pre-selected via the picker, it was already loaded
+        // and paused during selectSong(), so a simple play/resume is enough.
+        // This avoids the ~500ms API latency that previously caused the song
+        // to sometimes not be ready when the hold started.
         if (audio == AudioSetting.MUSIC.name) {
             val selected = _uiState.value.selectedSong
             val hasValidUri = selected != null
@@ -230,20 +231,9 @@ class FreeHoldActiveViewModel @Inject constructor(
                 && spotifyAuthManager.isConnected.value
             Log.d("FreeHold", "startFreeHold: hasValidUri=$hasValidUri, uri=${selected?.spotifyUri}, connected=${spotifyAuthManager.isConnected.value}")
             spotifyManager.startTracking()
-            if (hasValidUri) {
-                // Use Web API to start the specific pre-selected track.
-                // Fire-and-forget: the API call takes ~500ms but Spotify starts
-                // playback server-side as soon as it receives the request.
-                viewModelScope.launch {
-                    val success = spotifyApiClient.startPlayback(selected!!.spotifyUri)
-                    Log.d("FreeHold", "startPlayback result: success=$success for ${selected.spotifyUri}")
-                    if (!success) {
-                        spotifyManager.sendPlayCommand()
-                    }
-                }
-            } else {
-                spotifyManager.sendPlayCommand()
-            }
+            // The song was pre-loaded in selectSong() — just resume playback.
+            // sendPlayCommand() resumes the paused track instantly.
+            spotifyManager.sendPlayCommand()
         }
     }
 
@@ -359,7 +349,9 @@ class FreeHoldActiveViewModel @Inject constructor(
                     )
                 }
             }
-            _uiState.update { it.copy(previousSongs = details, loadingSongs = false) }
+            // Final dedup by title+artist after API enrichment (same track may
+            // have been stored with different URIs or one with/without URI)
+            _uiState.update { it.copy(previousSongs = deduplicateTracks(details), loadingSongs = false) }
         }
     }
 
@@ -380,11 +372,18 @@ class FreeHoldActiveViewModel @Inject constructor(
     }
 
     private fun mergeSongs(dbSongs: List<SpotifySong>, prefsSongs: List<SpotifySong>): List<SpotifySong> {
-        val seen = mutableSetOf<String>()
+        val seenByUri = mutableSetOf<String>()
+        val seenByTitleArtist = mutableSetOf<String>()
         val result = mutableListOf<SpotifySong>()
         for (song in dbSongs + prefsSongs) {
-            val key = if (!song.spotifyUri.isNullOrBlank()) song.spotifyUri!! else "${song.title}|${song.artist}"
-            if (seen.add(key)) result.add(song)
+            val titleArtistKey = "${song.title.lowercase().trim()}|${song.artist.lowercase().trim()}"
+            // Skip if we already have a song with the same title+artist
+            if (!seenByTitleArtist.add(titleArtistKey)) continue
+            // Also track by URI to avoid URI-based duplicates
+            if (!song.spotifyUri.isNullOrBlank()) {
+                if (!seenByUri.add(song.spotifyUri!!)) continue
+            }
+            result.add(song)
         }
         return result
     }
@@ -397,10 +396,9 @@ class FreeHoldActiveViewModel @Inject constructor(
         if (songs.isEmpty()) return
         val existing = loadSongHistoryFromPrefs().toMutableList()
         for (song in songs) {
-            val key = if (!song.spotifyUri.isNullOrBlank()) song.spotifyUri!! else "${song.title}|${song.artist}"
+            val titleArtistKey = "${song.title.lowercase().trim()}|${song.artist.lowercase().trim()}"
             val alreadyPresent = existing.any { s ->
-                val k = if (!s.spotifyUri.isNullOrBlank()) s.spotifyUri!! else "${s.title}|${s.artist}"
-                k == key
+                "${s.title.lowercase().trim()}|${s.artist.lowercase().trim()}" == titleArtistKey
             }
             if (!alreadyPresent) existing.add(0, song)
         }
@@ -413,10 +411,28 @@ class FreeHoldActiveViewModel @Inject constructor(
 
     /**
      * Called when the user taps a song card in the picker.
-     * Just remembers the selection — the actual playback starts in [startFreeHold].
+     * Pre-loads the song into Spotify playback immediately (then pauses) so it
+     * is ready to resume instantly when the user taps Start.
      */
     fun selectSong(track: SpotifyTrackDetail) {
-        _uiState.update { it.copy(selectedSong = track) }
+        _uiState.update { it.copy(selectedSong = track, loadingSelectedSong = true) }
+        if (track.spotifyUri.isNotBlank() && spotifyAuthManager.isConnected.value) {
+            viewModelScope.launch {
+                // Ensure Spotify is running before attempting playback
+                spotifyManager.ensureSpotifyActive()
+                val success = spotifyApiClient.startPlayback(track.spotifyUri)
+                Log.d("FreeHold", "selectSong pre-load: success=$success for ${track.spotifyUri}")
+                if (success) {
+                    // Give Spotify a moment to start, then pause — the track is now
+                    // buffered and will resume instantly on the next play command.
+                    kotlinx.coroutines.delay(1_200L)
+                    spotifyManager.sendPauseAndRewindCommand()
+                }
+                _uiState.update { it.copy(loadingSelectedSong = false) }
+            }
+        } else {
+            _uiState.update { it.copy(loadingSelectedSong = false) }
+        }
     }
 
     fun clearSelectedSong() {

@@ -23,12 +23,13 @@ interface ApneaSongLogDao {
 
     /**
      * Returns distinct songs that have been played during breath holds.
-     * Groups by spotifyUri when available, otherwise by title+artist.
+     * Groups by title+artist (case-insensitive) to prevent duplicates when
+     * the same song was stored with different Spotify URIs.
      * Ordered by most recently played first.
      */
     @Query("""
         SELECT * FROM apnea_song_log
-        GROUP BY COALESCE(spotifyUri, title || '|' || artist)
+        GROUP BY LOWER(TRIM(title)) || '|' || LOWER(TRIM(artist))
         ORDER BY MAX(startedAtMs) DESC
     """)
     suspend fun getDistinctSongs(): List<ApneaSongLogEntity>

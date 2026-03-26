@@ -98,5 +98,8 @@ dependencies {
     // OkHttp – used for Spotify Web API calls (PKCE token exchange, playback control)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
+    // Coil – async image loading for album art in song picker
+    implementation("io.coil-kt:coil-compose:2.6.0")
+
     // Garmin Connect IQ Companion SDK – resolved via Maven on line 46
 }
