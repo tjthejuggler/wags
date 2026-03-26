@@ -71,7 +71,9 @@ class GenericBleManager @Inject constructor(
     /** Unified scan results for the UnifiedDeviceManager. */
     val unifiedScanResults: StateFlow<List<ScannedDevice>> = _scanResults.map { results ->
         results.map { result ->
-            val name = result.device.name?.takeIf { it.isNotBlank() } ?: result.device.address
+            val name = result.scanRecord?.deviceName?.takeIf { it.isNotBlank() }
+                ?: result.device.name?.takeIf { it.isNotBlank() }
+                ?: result.device.address
             ScannedDevice(
                 identifier = result.device.address,
                 name = name,
@@ -129,7 +131,8 @@ class GenericBleManager @Inject constructor(
      */
     private val uiScanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
-            val name = result.device.name?.takeIf { it.isNotBlank() }
+            val name = result.scanRecord?.deviceName?.takeIf { it.isNotBlank() }
+                ?: result.device.name?.takeIf { it.isNotBlank() }
             // Exclude Polar devices — they belong in the Polar scan only
             if (name != null && name.startsWith("Polar ", ignoreCase = true)) return
             val current = _scanResults.value.toMutableList()

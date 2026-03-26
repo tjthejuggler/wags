@@ -411,6 +411,14 @@ cd wags
 
 ## Changelog
 
+### 2026-03-26 — BLE Scan Device Name Fix
+
+Fixed BLE device scan showing MAC addresses (e.g. `AA:BB:CC:DD:EE:FF`) instead of human-readable device names for non-Polar devices. The root cause was that `BluetoothDevice.getName()` returns `null` on Android 10+ for unpaired devices. The fix reads the advertised name from `ScanRecord.getDeviceName()` first, which is always available in the BLE advertisement packet.
+
+#### Modified Files
+
+- **[`GenericBleManager.kt`](app/src/main/java/com/example/wags/data/ble/GenericBleManager.kt)** — Changed name resolution in both `unifiedScanResults` mapping and `uiScanCallback` to prefer `result.scanRecord?.deviceName` over `result.device.name`, falling back to MAC address only when neither is available.
+
 ### 2026-03-25 — Spotify Account Connection + Song Picker
 
 Added full Spotify account integration via OAuth 2.0 PKCE flow. Users can now connect their Spotify account from Settings and choose which song to play before starting a breath hold.
