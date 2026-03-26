@@ -57,6 +57,18 @@ class AdviceViewModel @Inject constructor(
         return list.getOrNull(idx)
     }
 
+    /** Called on screen entry – picks a fresh random index for [section]. */
+    fun randomizeOnEntry(section: String) {
+        _state.update { old ->
+            val list = old.adviceBySection[section] ?: return@update old
+            if (list.isEmpty()) return@update old
+            val newIdx = (0 until list.size).random()
+            val newIndexMap = old.currentIndex.toMutableMap()
+            newIndexMap[section] = newIdx
+            old.copy(currentIndex = newIndexMap)
+        }
+    }
+
     /** Swipe right → show next random advice (not the same as current). */
     fun nextRandom(section: String) {
         _state.update { old ->

@@ -17,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -49,6 +50,12 @@ fun AdviceBanner(
     viewModel: AdviceViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+
+    // Randomize every time this banner enters composition (screen navigation / app start)
+    LaunchedEffect(section) {
+        viewModel.randomizeOnEntry(section)
+    }
+
     val list = state.adviceBySection[section] ?: emptyList()
     if (list.isEmpty()) return
 
