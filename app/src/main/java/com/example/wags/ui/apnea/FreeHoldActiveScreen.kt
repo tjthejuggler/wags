@@ -15,6 +15,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import android.content.SharedPreferences
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -54,6 +55,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import javax.inject.Named
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Physiological sanity bounds
@@ -126,7 +128,8 @@ class FreeHoldActiveViewModel @Inject constructor(
     private val habitRepo: HabitIntegrationRepository,
     private val spotifyManager: SpotifyManager,
     private val spotifyApiClient: SpotifyApiClient,
-    private val spotifyAuthManager: SpotifyAuthManager
+    private val spotifyAuthManager: SpotifyAuthManager,
+    @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
     // Settings passed in via nav arguments — these are the source of truth for what gets saved
@@ -316,15 +319,20 @@ class FreeHoldActiveViewModel @Inject constructor(
     // ── Song picker ──────────────────────────────────────────────────────────
 
     /**
-     * Load distinct songs previously played during breath holds.
+     * Load distinct songs previously played during any apnea session.
+     * Merges DB records (free holds) with SharedPreferences history (all session types).
      * For each song with a spotifyUri, fetches track details (duration, art) from the API.
-     * Songs without a URI are still shown with basic info from the DB.
      */
     fun loadPreviousSongs() {
         viewModelScope.launch {
             _uiState.update { it.copy(loadingSongs = true) }
-            val songs = apneaRepository.getDistinctSongs()
-            val details = songs.map { song ->
+            // Load from DB (free holds with saved records)
+            val dbSongs = apneaRepository.getDistinctSongs()
+            // Load from prefs (all session types, persisted across restarts)
+            val prefsSongs = loadSongHistoryFromPrefs()
+            // Merge: deduplicate by URI then title+artist
+            val merged = mergeSongs(dbSongs, prefsSongs)
+            val details = merged.map { song ->
                 var uri = song.spotifyUri
                 // If no URI saved, try resolving via Spotify Search API
                 if (uri == null && spotifyAuthManager.isConnected.value) {
@@ -353,6 +361,54 @@ class FreeHoldActiveViewModel @Inject constructor(
             }
             _uiState.update { it.copy(previousSongs = details, loadingSongs = false) }
         }
+    }
+
+    private fun loadSongHistoryFromPrefs(): List<SpotifySong> {
+        val raw = prefs.getString("song_history", null) ?: return emptyList()
+        return raw.lines().mapNotNull { line ->
+            val parts = line.split("|")
+            if (parts.size < 2) return@mapNotNull null
+            SpotifySong(
+                title = parts[0],
+                artist = parts[1],
+                albumArt = null,
+                spotifyUri = parts.getOrNull(2)?.takeIf { it.isNotBlank() },
+                startedAtMs = 0L,
+                endedAtMs = 0L
+            )
+        }
+    }
+
+    private fun mergeSongs(dbSongs: List<SpotifySong>, prefsSongs: List<SpotifySong>): List<SpotifySong> {
+        val seen = mutableSetOf<String>()
+        val result = mutableListOf<SpotifySong>()
+        for (song in dbSongs + prefsSongs) {
+            val key = if (!song.spotifyUri.isNullOrBlank()) song.spotifyUri!! else "${song.title}|${song.artist}"
+            if (seen.add(key)) result.add(song)
+        }
+        return result
+    }
+
+    /**
+     * Persists played songs to SharedPreferences so they survive app restarts
+     * and are available for all session types. Stores up to 50 unique songs.
+     */
+    private fun persistSongHistory(songs: List<SpotifySong>) {
+        if (songs.isEmpty()) return
+        val existing = loadSongHistoryFromPrefs().toMutableList()
+        for (song in songs) {
+            val key = if (!song.spotifyUri.isNullOrBlank()) song.spotifyUri!! else "${song.title}|${song.artist}"
+            val alreadyPresent = existing.any { s ->
+                val k = if (!s.spotifyUri.isNullOrBlank()) s.spotifyUri!! else "${s.title}|${s.artist}"
+                k == key
+            }
+            if (!alreadyPresent) existing.add(0, song)
+        }
+        val trimmed = existing.take(50)
+        val json = trimmed.joinToString(separator = "\n") { s ->
+            listOf(s.title, s.artist, s.spotifyUri ?: "").joinToString("|")
+        }
+        prefs.edit().putString("song_history", json).apply()
     }
 
     /**
@@ -494,6 +550,9 @@ class FreeHoldActiveViewModel @Inject constructor(
                     )
                 }
                 apneaRepository.saveSongLog(recordId, songs)
+                // Also persist to SharedPreferences so song history survives restarts
+                // and is available for all session types (table, advanced, etc.)
+                persistSongHistory(songs)
             }
         }
     }

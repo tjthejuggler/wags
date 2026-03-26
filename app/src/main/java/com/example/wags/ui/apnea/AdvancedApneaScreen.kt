@@ -31,7 +31,8 @@ fun AdvancedApneaScreen(
     length: TableLength,
     viewModel: AdvancedApneaViewModel = hiltViewModel()
 ) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val state = uiState.sessionState
 
     val isActive = state.phase != AdvancedApneaPhase.IDLE && state.phase != AdvancedApneaPhase.COMPLETE
 
@@ -67,6 +68,20 @@ fun AdvancedApneaScreen(
             )
         }
     ) { padding ->
+        // Song picker dialog state
+        var showSongPicker by remember { mutableStateOf(false) }
+
+        if (showSongPicker) {
+            SongPickerDialog(
+                songs = uiState.previousSongs,
+                isLoading = uiState.loadingSongs,
+                selectedSong = uiState.selectedSong,
+                loadingSelectedSong = uiState.loadingSelectedSong,
+                onSongSelected = { track -> viewModel.selectSong(track) },
+                onDismiss = { showSongPicker = false }
+            )
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -75,6 +90,19 @@ fun AdvancedApneaScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Song picker — shown when MUSIC mode + Spotify connected + session not yet started
+            if (uiState.isMusicMode && uiState.spotifyConnected && state.phase == AdvancedApneaPhase.IDLE) {
+                if (uiState.selectedSong != null) {
+                    SelectedSongBanner(track = uiState.selectedSong!!) {
+                        viewModel.clearSelectedSong()
+                    }
+                }
+                SongPickerButton(onClick = {
+                    viewModel.loadPreviousSongs()
+                    showSongPicker = true
+                })
+            }
+
             RoundProgressBar(state = state)
             PhaseTimerCard(state = state, modality = modality)
             ActionArea(

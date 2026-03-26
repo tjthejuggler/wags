@@ -8,13 +8,13 @@ import com.example.wags.domain.model.PersonalBestCategory
 /**
  * Maps a [PersonalBestCategory] to its corresponding raw MP3 resource.
  *
- * Trophy count → sound file (6 levels, 5 files — FOUR_SETTINGS and THREE_SETTINGS share pb2/pb3):
+ * Trophy count → sound file (6 levels, 6 files):
  *   EXACT          (1 trophy)  → apnea_pb1.mp3
  *   FOUR_SETTINGS  (2 trophies) → apnea_pb2.mp3
  *   THREE_SETTINGS (3 trophies) → apnea_pb3.mp3
  *   TWO_SETTINGS   (4 trophies) → apnea_pb4.mp3
  *   ONE_SETTING    (5 trophies) → apnea_pb5.mp3
- *   GLOBAL         (6 trophies) → apnea_pb5.mp3  (reuses highest sound)
+ *   GLOBAL         (6 trophies) → apnea_pb6.mp3
  */
 private fun PersonalBestCategory.soundResId(): Int = when (this) {
     PersonalBestCategory.EXACT           -> R.raw.apnea_pb1
@@ -22,7 +22,7 @@ private fun PersonalBestCategory.soundResId(): Int = when (this) {
     PersonalBestCategory.THREE_SETTINGS  -> R.raw.apnea_pb3
     PersonalBestCategory.TWO_SETTINGS    -> R.raw.apnea_pb4
     PersonalBestCategory.ONE_SETTING     -> R.raw.apnea_pb5
-    PersonalBestCategory.GLOBAL          -> R.raw.apnea_pb5
+    PersonalBestCategory.GLOBAL          -> R.raw.apnea_pb6
 }
 
 /**

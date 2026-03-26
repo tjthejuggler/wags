@@ -14,6 +14,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.domain.model.ApneaTableStep
 import com.example.wags.domain.model.ApneaTableType
+import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.usecase.apnea.ApneaState
 import com.example.wags.ui.common.InfoHelpBubble
 import com.example.wags.ui.common.KeepScreenOn
@@ -56,6 +57,20 @@ fun ApneaTableScreen(
             )
         }
     ) { padding ->
+        // Song picker dialog state
+        var showSongPicker by remember { mutableStateOf(false) }
+
+        if (showSongPicker) {
+            SongPickerDialog(
+                songs = state.previousSongs,
+                isLoading = state.loadingSongs,
+                selectedSong = state.selectedSong,
+                loadingSelectedSong = state.loadingSelectedSong,
+                onSongSelected = { track -> viewModel.selectSong(track) },
+                onDismiss = { showSongPicker = false }
+            )
+        }
+
         if (state.personalBestMs <= 0L) {
             NoPbContent(modifier = Modifier.padding(padding))
         } else {
@@ -82,6 +97,21 @@ fun ApneaTableScreen(
                     }
                     item {
                         ContractionSummaryCard(uiState = state)
+                    }
+                    // Song picker — shown when MUSIC is selected, Spotify connected, session not active
+                    if (state.audio == AudioSetting.MUSIC && state.spotifyConnected &&
+                        state.apneaState == ApneaState.IDLE) {
+                        item {
+                            if (state.selectedSong != null) {
+                                SelectedSongBanner(track = state.selectedSong!!) {
+                                    viewModel.clearSelectedSong()
+                                }
+                            }
+                            SongPickerButton(onClick = {
+                                viewModel.loadPreviousSongs()
+                                showSongPicker = true
+                            })
+                        }
                     }
                     item {
                         SessionControlRow(

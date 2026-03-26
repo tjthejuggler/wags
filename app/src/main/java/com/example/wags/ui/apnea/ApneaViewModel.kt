@@ -1,6 +1,7 @@
 package com.example.wags.ui.apnea
 
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.HrDataSource
@@ -12,7 +13,10 @@ import com.example.wags.data.ipc.HabitIntegrationRepository
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.data.repository.ApneaSessionRepository
+import com.example.wags.data.spotify.SpotifyApiClient
+import com.example.wags.data.spotify.SpotifyAuthManager
 import com.example.wags.data.spotify.SpotifyManager
+import com.example.wags.data.spotify.SpotifyTrackDetail
 import com.example.wags.data.spotify.TrackInfo
 import com.example.wags.domain.model.ApneaStats
 import com.example.wags.domain.model.ApneaTable
@@ -144,6 +148,17 @@ data class ApneaUiState(
     val freeHoldFirstContractionMs: Long? = null,
     /** The song currently playing in Spotify (null when SILENCE or Spotify not active). */
     val nowPlayingSong: TrackInfo? = null,
+    // ── Song picker (for table / advanced sessions) ───────────────────────────
+    /** True when the user's Spotify account is connected. */
+    val spotifyConnected: Boolean = false,
+    /** Songs previously played during any apnea session (loaded from DB + prefs). */
+    val previousSongs: List<SpotifyTrackDetail> = emptyList(),
+    /** True while previous songs are being loaded. */
+    val loadingSongs: Boolean = false,
+    /** The song the user selected from the picker for the next session. */
+    val selectedSong: SpotifyTrackDetail? = null,
+    /** True while a selected song is being loaded into Spotify playback. */
+    val loadingSelectedSong: Boolean = false,
 )
 
 @HiltViewModel
@@ -158,6 +173,8 @@ class ApneaViewModel @Inject constructor(
     private val audioHapticEngine: ApneaAudioHapticEngine,
     private val habitRepo: HabitIntegrationRepository,
     private val spotifyManager: SpotifyManager,
+    private val spotifyApiClient: SpotifyApiClient,
+    private val spotifyAuthManager: SpotifyAuthManager,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
@@ -173,9 +190,10 @@ class ApneaViewModel @Inject constructor(
     val uiState: StateFlow<ApneaUiState> = combine(
         _uiState,
         hrDataSource.liveHr,
-        hrDataSource.liveSpO2
-    ) { state, hr, spo2 ->
-        state.copy(liveHr = hr, liveSpO2 = spo2)
+        hrDataSource.liveSpO2,
+        spotifyAuthManager.isConnected
+    ) { state, hr, spo2, connected ->
+        state.copy(liveHr = hr, liveSpO2 = spo2, spotifyConnected = connected)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -207,10 +225,43 @@ class ApneaViewModel @Inject constructor(
     private val _audio       = MutableStateFlow(AudioSetting.SILENCE)
 
     init {
-        // Load persisted PB on startup
+        // ── Restore persisted settings (except Time of Day which is always smart-set) ──
         val savedPb = prefs.getLong("pb_ms", 0L)
-        if (savedPb > 0L) {
-            _uiState.update { it.copy(personalBestMs = savedPb) }
+        val savedLungVolume = prefs.getString("setting_lung_volume", "FULL") ?: "FULL"
+        val savedPrepType = runCatching {
+            PrepType.valueOf(prefs.getString("setting_prep_type", PrepType.NO_PREP.name) ?: PrepType.NO_PREP.name)
+        }.getOrDefault(PrepType.NO_PREP)
+        val savedPosture = runCatching {
+            Posture.valueOf(prefs.getString("setting_posture", Posture.LAYING.name) ?: Posture.LAYING.name)
+        }.getOrDefault(Posture.LAYING)
+        val savedAudio = runCatching {
+            AudioSetting.valueOf(prefs.getString("setting_audio", AudioSetting.SILENCE.name) ?: AudioSetting.SILENCE.name)
+        }.getOrDefault(AudioSetting.SILENCE)
+        val savedShowTimer = prefs.getBoolean("setting_show_timer", true)
+        val savedLength = runCatching {
+            TableLength.valueOf(prefs.getString("setting_length", TableLength.MEDIUM.name) ?: TableLength.MEDIUM.name)
+        }.getOrDefault(TableLength.MEDIUM)
+        val savedDifficulty = runCatching {
+            TableDifficulty.valueOf(prefs.getString("setting_difficulty", TableDifficulty.MEDIUM.name) ?: TableDifficulty.MEDIUM.name)
+        }.getOrDefault(TableDifficulty.MEDIUM)
+
+        // Apply restored settings to flows and UI state
+        _lungVolume.value = savedLungVolume
+        _prepType.value = savedPrepType
+        _posture.value = savedPosture
+        _audio.value = savedAudio
+
+        _uiState.update {
+            it.copy(
+                personalBestMs = if (savedPb > 0L) savedPb else it.personalBestMs,
+                selectedLungVolume = savedLungVolume,
+                prepType = savedPrepType,
+                posture = savedPosture,
+                audio = savedAudio,
+                showTimer = savedShowTimer,
+                selectedLength = savedLength,
+                selectedDifficulty = savedDifficulty
+            )
         }
 
         // Mirror live oximeter readings into UI state so the screen can show them
@@ -426,14 +477,6 @@ class ApneaViewModel @Inject constructor(
         _uiState.update { it.copy(newPersonalBest = null) }
     }
 
-    fun setLength(length: TableLength) {
-        _uiState.update { it.copy(selectedLength = length) }
-    }
-
-    fun setDifficulty(difficulty: TableDifficulty) {
-        _uiState.update { it.copy(selectedDifficulty = difficulty) }
-    }
-
     fun loadTable(type: ApneaTableType) {
         val pb = _uiState.value.personalBestMs
         if (pb <= 0) return
@@ -464,9 +507,35 @@ class ApneaViewModel @Inject constructor(
             onStateChange = { /* state collected via flow in init */ }
         )
         stateMachine.start(viewModelScope)
+        // Start Spotify if MUSIC is selected
+        if (_audio.value == AudioSetting.MUSIC) {
+            val selected = _uiState.value.selectedSong
+            val hasValidUri = selected != null
+                && selected.spotifyUri.isNotBlank()
+                && spotifyAuthManager.isConnected.value
+            spotifyManager.startTracking()
+            if (hasValidUri) {
+                viewModelScope.launch {
+                    val success = spotifyApiClient.startPlayback(selected!!.spotifyUri)
+                    if (!success) spotifyManager.sendPlayCommand()
+                }
+            } else {
+                spotifyManager.sendPlayCommand()
+            }
+        }
     }
 
-    fun stopTableSession() = stateMachine.stop()
+    fun stopTableSession() {
+        val tracksPlayed = if (_audio.value == AudioSetting.MUSIC) {
+            val tracks = spotifyManager.stopTracking()
+            spotifyManager.sendPauseAndRewindCommand()
+            tracks
+        } else emptyList()
+        stateMachine.stop()
+        if (tracksPlayed.isNotEmpty()) {
+            persistSongHistory(tracksPlayed.map { SpotifySong(it.title, it.artist, null, it.spotifyUri, it.startedAtMs, it.endedAtMs) })
+        }
+    }
 
     private fun onWarning(remainingSeconds: Long) {
         audioHapticEngine.announceTimeRemaining(remainingSeconds.toInt())
@@ -703,30 +772,46 @@ class ApneaViewModel @Inject constructor(
     fun setLungVolume(volume: String) {
         _lungVolume.value = volume
         _uiState.update { it.copy(selectedLungVolume = volume) }
+        prefs.edit().putString("setting_lung_volume", volume).apply()
     }
 
     fun setPrepType(type: PrepType) {
         _prepType.value = type
         _uiState.update { it.copy(prepType = type) }
+        prefs.edit().putString("setting_prep_type", type.name).apply()
     }
 
     fun setTimeOfDay(tod: TimeOfDay) {
         _timeOfDay.value = tod
         _uiState.update { it.copy(timeOfDay = tod) }
+        // Time of Day is intentionally NOT persisted — always smart-set from current time on launch.
     }
 
     fun setPosture(posture: Posture) {
         _posture.value = posture
         _uiState.update { it.copy(posture = posture) }
+        prefs.edit().putString("setting_posture", posture.name).apply()
     }
 
     fun setAudio(audio: AudioSetting) {
         _audio.value = audio
         _uiState.update { it.copy(audio = audio) }
+        prefs.edit().putString("setting_audio", audio.name).apply()
     }
 
     fun setShowTimer(show: Boolean) {
         _uiState.update { it.copy(showTimer = show) }
+        prefs.edit().putBoolean("setting_show_timer", show).apply()
+    }
+
+    fun setLength(length: TableLength) {
+        _uiState.update { it.copy(selectedLength = length) }
+        prefs.edit().putString("setting_length", length.name).apply()
+    }
+
+    fun setDifficulty(difficulty: TableDifficulty) {
+        _uiState.update { it.copy(selectedDifficulty = difficulty) }
+        prefs.edit().putString("setting_difficulty", difficulty.name).apply()
     }
 
     // ── Layout / accordion ────────────────────────────────────────────────────
@@ -758,11 +843,36 @@ class ApneaViewModel @Inject constructor(
         advancedSessionStartMs = System.currentTimeMillis()
         _uiState.update { it.copy(activeModalitySession = modality) }
         advancedStateMachine.start(modality, length, pbMs, wonkaConfig, viewModelScope)
+        // Start Spotify if MUSIC is selected
+        if (_audio.value == AudioSetting.MUSIC) {
+            val selected = _uiState.value.selectedSong
+            val hasValidUri = selected != null
+                && selected.spotifyUri.isNotBlank()
+                && spotifyAuthManager.isConnected.value
+            spotifyManager.startTracking()
+            if (hasValidUri) {
+                viewModelScope.launch {
+                    val success = spotifyApiClient.startPlayback(selected!!.spotifyUri)
+                    if (!success) spotifyManager.sendPlayCommand()
+                }
+            } else {
+                spotifyManager.sendPlayCommand()
+            }
+        }
     }
 
     fun stopAdvancedSession() {
+        val tracksPlayed = if (_audio.value == AudioSetting.MUSIC) {
+            val tracks = spotifyManager.stopTracking()
+            spotifyManager.sendPauseAndRewindCommand()
+            tracks
+        } else emptyList()
         advancedStateMachine.stop()
         _uiState.update { it.copy(activeModalitySession = null) }
+        // Persist any tracks played to song history
+        if (tracksPlayed.isNotEmpty()) {
+            persistSongHistory(tracksPlayed.map { SpotifySong(it.title, it.artist, null, it.spotifyUri, it.startedAtMs, it.endedAtMs) })
+        }
     }
 
     fun signalBreathTaken() {
@@ -773,6 +883,107 @@ class ApneaViewModel @Inject constructor(
     fun signalFirstContraction() {
         advancedStateMachine.signalFirstContraction()
         audioHapticEngine.vibrateContractionLogged()
+    }
+
+    // ── Song picker (for table / advanced sessions on the main screen) ────────
+
+    /**
+     * Load distinct songs previously played during any apnea session.
+     * Merges DB records with the SharedPreferences song history so songs
+     * from table/advanced sessions (which have no DB record) are also shown.
+     */
+    fun loadPreviousSongs() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(loadingSongs = true) }
+            // Load from DB (free holds)
+            val dbSongs = apneaRepository.getDistinctSongs()
+            // Load from prefs (table/advanced sessions)
+            val prefsSongs = loadSongHistoryFromPrefs()
+            // Merge: prefer DB entries (they have more metadata), deduplicate by URI then title+artist
+            val merged = mergeSongs(dbSongs, prefsSongs)
+            val details = merged.map { song ->
+                var uri = song.spotifyUri
+                if (uri == null && spotifyAuthManager.isConnected.value) {
+                    uri = spotifyApiClient.searchTrack(song.title, song.artist)
+                }
+                if (uri != null) {
+                    spotifyApiClient.getTrackDetail(uri) ?: SpotifyTrackDetail(
+                        spotifyUri = uri,
+                        title = song.title,
+                        artist = song.artist,
+                        durationMs = 0L,
+                        albumArt = song.albumArt
+                    )
+                } else {
+                    SpotifyTrackDetail(
+                        spotifyUri = "",
+                        title = song.title,
+                        artist = song.artist,
+                        durationMs = 0L,
+                        albumArt = song.albumArt
+                    )
+                }
+            }
+            _uiState.update { it.copy(previousSongs = details, loadingSongs = false) }
+        }
+    }
+
+    fun selectSong(track: SpotifyTrackDetail) {
+        _uiState.update { it.copy(selectedSong = track) }
+    }
+
+    fun clearSelectedSong() {
+        _uiState.update { it.copy(selectedSong = null) }
+    }
+
+    /**
+     * Persists a list of played songs to SharedPreferences so they survive
+     * app restarts and are available for all session types (not just free holds).
+     * Stores up to 50 unique songs (by URI or title+artist), most recent first.
+     */
+    fun persistSongHistory(songs: List<SpotifySong>) {
+        if (songs.isEmpty()) return
+        val existing = loadSongHistoryFromPrefs().toMutableList()
+        for (song in songs) {
+            val key = if (!song.spotifyUri.isNullOrBlank()) song.spotifyUri!! else "${song.title}|${song.artist}"
+            val alreadyPresent = existing.any { s ->
+                val k = if (!s.spotifyUri.isNullOrBlank()) s.spotifyUri!! else "${s.title}|${s.artist}"
+                k == key
+            }
+            if (!alreadyPresent) existing.add(0, song)
+        }
+        // Keep most recent 50
+        val trimmed = existing.take(50)
+        val json = trimmed.joinToString(separator = "\n") { s ->
+            listOf(s.title, s.artist, s.spotifyUri ?: "").joinToString("|")
+        }
+        prefs.edit().putString("song_history", json).apply()
+    }
+
+    private fun loadSongHistoryFromPrefs(): List<SpotifySong> {
+        val raw = prefs.getString("song_history", null) ?: return emptyList()
+        return raw.lines().mapNotNull { line ->
+            val parts = line.split("|")
+            if (parts.size < 2) return@mapNotNull null
+            SpotifySong(
+                title = parts[0],
+                artist = parts[1],
+                albumArt = null,
+                spotifyUri = parts.getOrNull(2)?.takeIf { it.isNotBlank() },
+                startedAtMs = 0L,
+                endedAtMs = 0L
+            )
+        }
+    }
+
+    private fun mergeSongs(dbSongs: List<SpotifySong>, prefsSongs: List<SpotifySong>): List<SpotifySong> {
+        val seen = mutableSetOf<String>()
+        val result = mutableListOf<SpotifySong>()
+        for (song in dbSongs + prefsSongs) {
+            val key = if (!song.spotifyUri.isNullOrBlank()) song.spotifyUri!! else "${song.title}|${song.artist}"
+            if (seen.add(key)) result.add(song)
+        }
+        return result
     }
 
     override fun onCleared() {

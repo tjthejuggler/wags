@@ -1,11 +1,19 @@
 package com.example.wags.ui.apnea
 
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.HrDataSource
 import com.example.wags.data.db.entity.ApneaSessionEntity
+import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.data.repository.ApneaSessionRepository
+import com.example.wags.data.spotify.SpotifyApiClient
+import com.example.wags.data.spotify.SpotifyAuthManager
+import com.example.wags.data.spotify.SpotifyManager
+import com.example.wags.data.spotify.SpotifyTrackDetail
+import com.example.wags.domain.model.AudioSetting
+import com.example.wags.domain.model.SpotifySong
 import com.example.wags.domain.model.TableLength
 import com.example.wags.domain.model.TrainingModality
 import com.example.wags.domain.model.WonkaConfig
@@ -15,10 +23,25 @@ import com.example.wags.domain.usecase.apnea.AdvancedApneaStateMachine
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
 import com.example.wags.domain.usecase.apnea.ProgressiveO2Generator
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Named
+
+data class AdvancedApneaScreenUiState(
+    val sessionState: AdvancedApneaState = AdvancedApneaState(),
+    val spotifyConnected: Boolean = false,
+    val isMusicMode: Boolean = false,
+    val previousSongs: List<SpotifyTrackDetail> = emptyList(),
+    val loadingSongs: Boolean = false,
+    val selectedSong: SpotifyTrackDetail? = null,
+    val loadingSelectedSong: Boolean = false
+)
 
 @HiltViewModel
 class AdvancedApneaViewModel @Inject constructor(
@@ -27,17 +50,43 @@ class AdvancedApneaViewModel @Inject constructor(
     private val stateMachine: AdvancedApneaStateMachine,
     private val sessionRepository: ApneaSessionRepository,
     private val hrDataSource: HrDataSource,
+    private val apneaRepository: ApneaRepository,
+    private val spotifyManager: SpotifyManager,
+    private val spotifyApiClient: SpotifyApiClient,
+    private val spotifyAuthManager: SpotifyAuthManager,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
+    // Keep the raw session state flow for backward compat
     val state: StateFlow<AdvancedApneaState> = stateMachine.state
+
+    private val _uiState = MutableStateFlow(AdvancedApneaScreenUiState())
+
+    val uiState: StateFlow<AdvancedApneaScreenUiState> = combine(
+        _uiState,
+        stateMachine.state,
+        spotifyAuthManager.isConnected
+    ) { ui, sessionState, connected ->
+        ui.copy(sessionState = sessionState, spotifyConnected = connected)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = AdvancedApneaScreenUiState()
+    )
 
     private var modality: TrainingModality = TrainingModality.PROGRESSIVE_O2
     private var length: TableLength = TableLength.MEDIUM
     private var wonkaConfig: WonkaConfig = WonkaConfig()
     private var sessionStartMs: Long = 0L
+    private var audioSetting: AudioSetting = AudioSetting.SILENCE
 
     init {
+        // Read persisted audio setting so we know whether to show the song picker
+        audioSetting = runCatching {
+            AudioSetting.valueOf(prefs.getString("setting_audio", AudioSetting.SILENCE.name) ?: AudioSetting.SILENCE.name)
+        }.getOrDefault(AudioSetting.SILENCE)
+        _uiState.update { it.copy(isMusicMode = audioSetting == AudioSetting.MUSIC) }
+
         viewModelScope.launch {
             stateMachine.state.collect { advancedState ->
                 if (advancedState.phase == AdvancedApneaPhase.COMPLETE) {
@@ -58,6 +107,23 @@ class AdvancedApneaViewModel @Inject constructor(
         sessionStartMs = System.currentTimeMillis()
         val pbMs = prefs.getLong("pb_ms", 0L)
         stateMachine.start(modality, length, pbMs, wonkaConfig, viewModelScope)
+        // Start Spotify if MUSIC is selected
+        if (audioSetting == AudioSetting.MUSIC) {
+            val selected = _uiState.value.selectedSong
+            val hasValidUri = selected != null
+                && selected.spotifyUri.isNotBlank()
+                && spotifyAuthManager.isConnected.value
+            spotifyManager.startTracking()
+            if (hasValidUri) {
+                viewModelScope.launch {
+                    val success = spotifyApiClient.startPlayback(selected!!.spotifyUri)
+                    Log.d("AdvancedApnea", "startPlayback result: $success for ${selected.spotifyUri}")
+                    if (!success) spotifyManager.sendPlayCommand()
+                }
+            } else {
+                spotifyManager.sendPlayCommand()
+            }
+        }
     }
 
     fun signalBreathTaken() {
@@ -70,7 +136,96 @@ class AdvancedApneaViewModel @Inject constructor(
         audioHapticEngine.vibrateContractionLogged()
     }
 
-    fun stopSession() = stateMachine.stop()
+    fun stopSession() {
+        val tracksPlayed = if (audioSetting == AudioSetting.MUSIC) {
+            val tracks = spotifyManager.stopTracking()
+            spotifyManager.sendPauseAndRewindCommand()
+            tracks
+        } else emptyList()
+        stateMachine.stop()
+        if (tracksPlayed.isNotEmpty()) {
+            val songs = tracksPlayed.map { t ->
+                SpotifySong(t.title, t.artist, null, t.spotifyUri, t.startedAtMs, t.endedAtMs)
+            }
+            persistSongHistory(songs)
+        }
+    }
+
+    // ── Song picker ──────────────────────────────────────────────────────────
+
+    fun loadPreviousSongs() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(loadingSongs = true) }
+            val dbSongs = apneaRepository.getDistinctSongs()
+            val prefsSongs = loadSongHistoryFromPrefs()
+            val merged = mergeSongs(dbSongs, prefsSongs)
+            val details = merged.map { song ->
+                var uri = song.spotifyUri
+                if (uri == null && spotifyAuthManager.isConnected.value) {
+                    uri = spotifyApiClient.searchTrack(song.title, song.artist)
+                }
+                if (uri != null) {
+                    spotifyApiClient.getTrackDetail(uri) ?: SpotifyTrackDetail(
+                        spotifyUri = uri, title = song.title, artist = song.artist,
+                        durationMs = 0L, albumArt = song.albumArt
+                    )
+                } else {
+                    SpotifyTrackDetail(spotifyUri = "", title = song.title, artist = song.artist,
+                        durationMs = 0L, albumArt = song.albumArt)
+                }
+            }
+            _uiState.update { it.copy(previousSongs = details, loadingSongs = false) }
+        }
+    }
+
+    fun selectSong(track: SpotifyTrackDetail) {
+        _uiState.update { it.copy(selectedSong = track) }
+    }
+
+    fun clearSelectedSong() {
+        _uiState.update { it.copy(selectedSong = null) }
+    }
+
+    private fun loadSongHistoryFromPrefs(): List<SpotifySong> {
+        val raw = prefs.getString("song_history", null) ?: return emptyList()
+        return raw.lines().mapNotNull { line ->
+            val parts = line.split("|")
+            if (parts.size < 2) return@mapNotNull null
+            SpotifySong(
+                title = parts[0], artist = parts[1], albumArt = null,
+                spotifyUri = parts.getOrNull(2)?.takeIf { it.isNotBlank() },
+                startedAtMs = 0L, endedAtMs = 0L
+            )
+        }
+    }
+
+    private fun mergeSongs(dbSongs: List<SpotifySong>, prefsSongs: List<SpotifySong>): List<SpotifySong> {
+        val seen = mutableSetOf<String>()
+        val result = mutableListOf<SpotifySong>()
+        for (song in dbSongs + prefsSongs) {
+            val key = if (!song.spotifyUri.isNullOrBlank()) song.spotifyUri!! else "${song.title}|${song.artist}"
+            if (seen.add(key)) result.add(song)
+        }
+        return result
+    }
+
+    private fun persistSongHistory(songs: List<SpotifySong>) {
+        if (songs.isEmpty()) return
+        val existing = loadSongHistoryFromPrefs().toMutableList()
+        for (song in songs) {
+            val key = if (!song.spotifyUri.isNullOrBlank()) song.spotifyUri!! else "${song.title}|${song.artist}"
+            val alreadyPresent = existing.any { s ->
+                val k = if (!s.spotifyUri.isNullOrBlank()) s.spotifyUri!! else "${s.title}|${s.artist}"
+                k == key
+            }
+            if (!alreadyPresent) existing.add(0, song)
+        }
+        val trimmed = existing.take(50)
+        val json = trimmed.joinToString(separator = "\n") { s ->
+            listOf(s.title, s.artist, s.spotifyUri ?: "").joinToString("|")
+        }
+        prefs.edit().putString("song_history", json).apply()
+    }
 
     private fun saveCompletedSession(advancedState: AdvancedApneaState) {
         viewModelScope.launch {

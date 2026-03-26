@@ -4,6 +4,31 @@
 
 ## Changelog
 
+### 2026-03-26 — Apnea section improvements: persistent settings, global PB sound, universal song picker
+
+**Persistent settings across app restarts** (`ApneaViewModel.kt`)
+- All apnea settings (Lung Volume, Prep Type, Posture, Audio, Show Timer, Table Length, Table Difficulty) are now saved to `SharedPreferences` (`apnea_prefs`) and restored on next launch.
+- **Time of Day** is intentionally excluded — it continues to be smart-set from the current time on every launch.
+- Settings are saved immediately on each change via the existing setter functions.
+
+**Global best PB sound** (`ApneaPbSoundPlayer.kt`)
+- `apnea_pb6.mp3` is now wired up for the `GLOBAL` personal best category (all-time best across all settings).
+- Previously `GLOBAL` reused `apnea_pb5.mp3`; now each of the 6 PB levels has its own distinct sound.
+
+**Persistent song history** (`FreeHoldActiveScreen.kt`, `ApneaViewModel.kt`, `AdvancedApneaViewModel.kt`)
+- Songs played during any apnea session are now persisted to `SharedPreferences` (`song_history` key) in addition to the existing DB song log.
+- The song picker now merges DB records (free holds) with the SharedPreferences history so songs from table and advanced sessions are also remembered.
+- Song history survives app restarts and is shared across all session types.
+- Up to 50 unique songs are retained (most recent first), deduplicated by Spotify URI or title+artist.
+
+**"Choose a Song" in all session types** (`ApneaTableScreen.kt`, `AdvancedApneaScreen.kt`, `AdvancedApneaViewModel.kt`)
+- The song picker button and dialog are now available in O2/CO2 table sessions (`ApneaTableScreen`) and all advanced modality sessions (`AdvancedApneaScreen`).
+- Shown only when Audio setting is MUSIC and Spotify is connected, before the session starts.
+- Selected song is queued and played via Spotify Web API when the session starts; falls back to generic play if no URI.
+- Spotify tracking starts/stops with table and advanced sessions, and played tracks are persisted to song history.
+
+---
+
 ### 2026-03-26 — Greyscale emoji filter via ColorMatrix
 Added [`GrayscaleEmoji.kt`](app/src/main/java/com/example/wags/ui/common/GrayscaleEmoji.kt) with a reusable `grayscale()` Modifier extension that applies a zero-saturation `ColorMatrix` to strip colour from emoji glyphs. Applied to all colour emoji `Text()` calls across the app:
 - `ApneaScreen.kt` — 📊, 🌍/⭐/🏆 (PB dialog), 🎉, 🎵, 🏆 (trophy row), 📋
