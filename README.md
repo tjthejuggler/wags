@@ -4,6 +4,16 @@
 
 ## Changelog
 
+### 2026-03-26 — Fix: first-time Spotify song selection in apnea free hold
+
+**Cold-start device resolution** ([`SpotifyApiClient.kt`](app/src/main/java/com/example/wags/data/spotify/SpotifyApiClient.kt))
+- Fixed a bug where selecting a song via the picker failed on the first attempt after opening Spotify (i.e. when Spotify had not yet played any audio in the current session).
+- **Root cause:** The Spotify Web API `PUT /me/player/play` endpoint requires an "active device". When Spotify is freshly launched but hasn't played anything yet, no device is registered as active, so the API returns a 404 error. The song selection appeared to succeed (no user-visible error) but Spotify silently ignored the track URI. On subsequent attempts it worked because the first failed call + `sendPlayCommand()` fallback activated a device.
+- **Fix:** When `startPlayback()` receives a 404, it now fetches the available device list via `GET /me/player/devices`, picks the first smartphone device (falling back to any available device), and retries the play command with an explicit `device_id` parameter. This resolves the cold-start race condition without requiring any UI changes.
+- The existing OAuth scopes already include `user-read-playback-state`, so no re-authentication is needed.
+
+---
+
 ### 2026-03-26 — Song picker improvements: dedup, sorting, album art, reliable pre-loading
 
 **Duplicate song prevention** ([`ApneaSongLogDao.kt`](app/src/main/java/com/example/wags/data/db/dao/ApneaSongLogDao.kt), [`SongPickerComponents.kt`](app/src/main/java/com/example/wags/ui/apnea/SongPickerComponents.kt), all 3 ViewModels)

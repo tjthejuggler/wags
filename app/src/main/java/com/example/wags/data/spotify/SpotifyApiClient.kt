@@ -138,6 +138,11 @@ class SpotifyApiClient @Inject constructor(
     /**
      * Start playback of a specific track on the user's active Spotify device.
      *
+     * When Spotify has just been opened and no song has been played yet, the
+     * Web API has no "active device" and the initial PUT returns 404. In that
+     * case we fetch the available device list, pick the first one, and retry
+     * with an explicit `device_id` query parameter.
+     *
      * @param trackUri Spotify URI like "spotify:track:XXXX"
      * @return true if the command was accepted by Spotify.
      */
@@ -155,13 +160,71 @@ class SpotifyApiClient @Inject constructor(
                 .build()
 
             val response = client.newCall(request).execute()
-            if (!response.isSuccessful) {
-                Log.w(TAG, "startPlayback failed (${response.code}): ${response.body?.string()}")
+            val code = response.code
+            val ok = response.isSuccessful || code == 204
+
+            if (ok) return@withContext true
+
+            // 404 = "No active device found" — common on first play after
+            // opening Spotify. Resolve by picking an available device explicitly.
+            if (code == 404) {
+                Log.d(TAG, "startPlayback: no active device (404), resolving device list…")
+                val deviceId = getFirstAvailableDeviceId(token)
+                if (deviceId != null) {
+                    Log.d(TAG, "startPlayback: retrying with device_id=$deviceId")
+                    val retryRequest = Request.Builder()
+                        .url("$BASE_URL/me/player/play?device_id=$deviceId")
+                        .addHeader("Authorization", "Bearer $token")
+                        .put(jsonBody.toString().toRequestBody("application/json".toMediaType()))
+                        .build()
+                    val retryResponse = client.newCall(retryRequest).execute()
+                    if (!retryResponse.isSuccessful && retryResponse.code != 204) {
+                        Log.w(TAG, "startPlayback retry failed (${retryResponse.code}): ${retryResponse.body?.string()}")
+                    }
+                    return@withContext retryResponse.isSuccessful || retryResponse.code == 204
+                } else {
+                    Log.w(TAG, "startPlayback: no available devices found")
+                }
+            } else {
+                Log.w(TAG, "startPlayback failed ($code): ${response.body?.string()}")
             }
-            response.isSuccessful || response.code == 204
+            false
         } catch (e: Exception) {
             Log.e(TAG, "startPlayback error", e)
             false
+        }
+    }
+
+    /**
+     * Fetch the first available Spotify device ID from the Web API.
+     * Returns null if no devices are available or the request fails.
+     */
+    private fun getFirstAvailableDeviceId(token: String): String? {
+        return try {
+            val request = Request.Builder()
+                .url("$BASE_URL/me/player/devices")
+                .addHeader("Authorization", "Bearer $token")
+                .build()
+            val response = client.newCall(request).execute()
+            val body = response.body?.string() ?: return null
+            if (!response.isSuccessful) {
+                Log.w(TAG, "getDevices failed (${response.code}): $body")
+                return null
+            }
+            val devices = JSONObject(body).optJSONArray("devices") ?: return null
+            // Prefer the device on this phone (type = "Smartphone"), fall back to any device
+            var fallbackId: String? = null
+            for (i in 0 until devices.length()) {
+                val device = devices.getJSONObject(i)
+                val id = device.getString("id")
+                val type = device.optString("type", "")
+                if (type.equals("Smartphone", ignoreCase = true)) return id
+                if (fallbackId == null) fallbackId = id
+            }
+            fallbackId
+        } catch (e: Exception) {
+            Log.e(TAG, "getFirstAvailableDeviceId error", e)
+            null
         }
     }
 }
