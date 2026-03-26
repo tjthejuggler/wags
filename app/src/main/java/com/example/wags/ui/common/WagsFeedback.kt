@@ -34,6 +34,13 @@ object WagsFeedback {
      */
     private val PATTERN_STAND_UP = longArrayOf(0, 300, 100, 300, 100, 500)
 
+    /**
+     * Short single pulse for breath phase transitions (inhale ↔ exhale).
+     * 80 ms at medium amplitude — noticeable but not intrusive.
+     */
+    private const val BREATH_TRANSITION_MS = 80L
+    private const val BREATH_TRANSITION_AMPLITUDE = 120 // 0–255
+
     // ── Public API ────────────────────────────────────────────────────────────
 
     /**
@@ -52,6 +59,14 @@ object WagsFeedback {
     fun standUp(context: Context) {
         playSound(context, R.raw.stand)
         vibrate(context, PATTERN_STAND_UP)
+    }
+
+    /**
+     * Fire a short haptic pulse to signal a breath phase transition
+     * (inhale → exhale or exhale → inhale). Only vibrates — no sound.
+     */
+    fun breathTransition(context: Context) {
+        vibrateSingle(context, BREATH_TRANSITION_MS, BREATH_TRANSITION_AMPLITUDE)
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
@@ -75,6 +90,20 @@ object WagsFeedback {
                 context.getSystemService(Vibrator::class.java)
             }
             vibrator?.vibrate(VibrationEffect.createWaveform(pattern, -1))
+        } catch (_: Exception) { /* non-fatal */ }
+    }
+
+    private fun vibrateSingle(context: Context, durationMs: Long, amplitude: Int) {
+        try {
+            val vibrator: Vibrator? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                context.getSystemService(VibratorManager::class.java)?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                context.getSystemService(Vibrator::class.java)
+            }
+            vibrator?.vibrate(
+                VibrationEffect.createOneShot(durationMs, amplitude.coerceIn(1, 255))
+            )
         } catch (_: Exception) { /* non-fatal */ }
     }
 }

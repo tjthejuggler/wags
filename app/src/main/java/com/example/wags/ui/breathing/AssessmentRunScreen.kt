@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -29,6 +30,7 @@ import com.example.wags.ui.common.RrIntervalChart
 import com.example.wags.ui.common.RmssdChart
 import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.common.StripChartColors
+import com.example.wags.ui.common.WagsFeedback
 import com.example.wags.ui.theme.*
 
 private val AsmRmssdColors = StripChartColors(
@@ -83,18 +85,21 @@ fun AssessmentRunScreen(
     protocol: RfProtocol,
     onNavigateBack: () -> Unit,
     onSessionComplete: (sessionId: Long) -> Unit,
+    vibrationEnabled: Boolean = false,
     viewModel: AssessmentRunViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     val isActive = uiState.phase != "IDLE" && uiState.phase != "COMPLETE"
 
     SessionBackHandler(enabled = isActive, onConfirm = onNavigateBack)
     KeepScreenOn(enabled = isActive)
 
-    // Navigate once when complete
+    // Navigate once when complete — play end-of-session sound
     LaunchedEffect(uiState.isComplete) {
         if (uiState.isComplete) {
+            WagsFeedback.sessionEnd(context)
             val id = uiState.sessionId ?: return@LaunchedEffect
             onSessionComplete(id)
         }
@@ -136,6 +141,11 @@ fun AssessmentRunScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Vibration callback — only fires when toggle is on
+            val vibrationCallback: (() -> Unit)? = if (vibrationEnabled) {
+                { WagsFeedback.breathTransition(context) }
+            } else null
+
             // Pacer visual — unified circle for all protocols
             if (protocol.isStepped()) {
                 val overlayLabel = when {
@@ -146,13 +156,15 @@ fun AssessmentRunScreen(
                     progress = uiState.refWave,
                     isInhaling = uiState.isInhaling,
                     size = 200.dp,
-                    overlayLabel = overlayLabel
+                    overlayLabel = overlayLabel,
+                    onPhaseTransition = vibrationCallback
                 )
             } else {
                 BreathingPacerCircle(
                     progress = uiState.refWave,
                     isInhaling = uiState.isInhaling,
-                    size = 200.dp
+                    size = 200.dp,
+                    onPhaseTransition = vibrationCallback
                 )
             }
 

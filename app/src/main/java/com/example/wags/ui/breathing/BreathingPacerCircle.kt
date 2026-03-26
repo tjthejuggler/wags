@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.example.wags.ui.theme.BackgroundDark
 import com.example.wags.ui.theme.PacerExhale
 import com.example.wags.ui.theme.PacerInhale
 import com.example.wags.ui.theme.TextPrimary
@@ -26,6 +27,8 @@ import com.example.wags.ui.theme.TextPrimary
  * - The color changes at the exact transition points:
  *   - Inhale color while expanding (progress 0→1)
  *   - Exhale color while shrinking (progress 1→0)
+ * - When the inhale circle reaches maximum size (progress ≈ 1.0), it turns **white**
+ *   to visually signal the transition to exhale.
  * - The label ("INHALE"/"EXHALE") changes at the exact same transition points.
  *
  * The label text is **always visible** — it never disappears or gets recreated.
@@ -40,6 +43,8 @@ import com.example.wags.ui.theme.TextPrimary
  * @param size the overall size of the pacer circle.
  * @param showLabel whether to show the INHALE/EXHALE label (default true).
  * @param overlayLabel optional label to show instead of INHALE/EXHALE (e.g. "BASELINE", "WASHOUT").
+ * @param onPhaseTransition optional callback fired exactly once each time [isInhaling] changes.
+ *                          Used to trigger haptic feedback at the breath transition.
  */
 @Composable
 fun BreathingPacerCircle(
@@ -48,19 +53,44 @@ fun BreathingPacerCircle(
     modifier: Modifier = Modifier,
     size: Dp = 260.dp,
     showLabel: Boolean = true,
-    overlayLabel: String? = null
+    overlayLabel: String? = null,
+    onPhaseTransition: (() -> Unit)? = null
 ) {
-    // Color is determined by the current phase — greyscale: light for inhale, dark for exhale
-    val color = if (isInhaling) PacerInhale else PacerExhale
-    val label = overlayLabel ?: if (isInhaling) "INHALE" else "EXHALE"
+    // Fire the callback exactly once per phase change
+    var lastPhase by remember { mutableStateOf(isInhaling) }
+    LaunchedEffect(isInhaling) {
+        if (isInhaling != lastPhase) {
+            lastPhase = isInhaling
+            onPhaseTransition?.invoke()
+        }
+    }
 
     // Progress 0.0 = inner circle completely gone, 1.0 = fills the outer circle
     val clampedProgress = progress.coerceIn(0f, 1f)
 
-    // Smoothly animate the text color so it never "pops" or appears to be
-    // removed and recreated. The target color is white when the filled circle
-    // is large enough to be behind the text, otherwise the phase color.
-    val targetTextColor = if (clampedProgress > 0.45f) TextPrimary else color
+    // When inhaling and progress is near max (≥ 0.95), flash the circle white
+    val isAtPeak = isInhaling && clampedProgress >= 0.95f
+
+    // Base color: light for inhale, dark for exhale; white flash at peak
+    val baseColor = when {
+        isAtPeak    -> Color.White
+        isInhaling  -> PacerInhale
+        else        -> PacerExhale
+    }
+    val color by animateColorAsState(
+        targetValue = baseColor,
+        animationSpec = tween(durationMillis = 150),
+        label = "pacer_circle_color"
+    )
+
+    val label = overlayLabel ?: if (isInhaling) "INHALE" else "EXHALE"
+
+    // Text color: dark on white/bright circle, light on dim background
+    val targetTextColor = when {
+        isAtPeak && clampedProgress > 0.45f -> BackgroundDark   // dark text on white circle
+        clampedProgress > 0.45f             -> TextPrimary      // light text on filled circle
+        else                                -> if (isInhaling) PacerInhale else PacerExhale
+    }
     val animatedTextColor by animateColorAsState(
         targetValue = targetTextColor,
         animationSpec = tween(durationMillis = 300),
@@ -91,7 +121,7 @@ fun BreathingPacerCircle(
 
         // Label is always visible and never removed from the composition tree.
         // The color animates smoothly between the phase color (when the inner
-        // circle is small) and white (when the inner circle is large).
+        // circle is small) and a contrasting color (when the inner circle is large).
         if (showLabel) {
             Text(
                 text = label,

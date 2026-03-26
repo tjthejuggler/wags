@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
@@ -20,6 +21,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wags.domain.usecase.breathing.RfProtocol
 import com.example.wags.ui.theme.SurfaceDark
 import com.example.wags.ui.theme.SurfaceVariant
+import com.example.wags.ui.theme.TextDisabled
+import com.example.wags.ui.theme.TextPrimary
 
 // ---------------------------------------------------------------------------
 // Protocol metadata
@@ -59,8 +62,8 @@ private val PROTOCOL_LIST = listOf(
         protocol    = RfProtocol.TARGETED,
         label       = "Targeted",
         duration    = "~10 min",
-        subtitle    = "Optimal ±0.2 BPM × 3 min",
-        description = "Fine-tunes your personal optimal rate. Requires prior history."
+        subtitle    = "Optimal ±0.1 BPM × 3 min",
+        description = "Fine-tunes your personal optimal rate with 0.1 BPM granularity. Requires prior history."
     ),
     ProtocolInfo(
         protocol    = RfProtocol.SLIDING_WINDOW,
@@ -79,10 +82,15 @@ private val PROTOCOL_LIST = listOf(
 @Composable
 fun AssessmentPickerScreen(
     onNavigateBack: () -> Unit,
-    onStartAssessment: (RfProtocol) -> Unit,
+    onStartAssessment: (RfProtocol, Boolean) -> Unit,
     viewModel: AssessmentPickerViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    // Vibration toggle — persisted to SharedPreferences so it survives app restarts
+    val prefs = remember { context.getSharedPreferences("apnea_prefs", android.content.Context.MODE_PRIVATE) }
+    var vibrationEnabled by remember { mutableStateOf(prefs.getBoolean("breathing_vibration", false)) }
 
     Scaffold(
         containerColor = com.example.wags.ui.theme.BackgroundDark,
@@ -150,12 +158,31 @@ fun AssessmentPickerScreen(
                 HrRequiredBanner()
             }
 
-            Button(
-                onClick = { onStartAssessment(state.selectedProtocol) },
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                enabled = state.isHrDeviceConnected
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Start Assessment")
+                Button(
+                    onClick = { onStartAssessment(state.selectedProtocol, vibrationEnabled) },
+                    modifier = Modifier.weight(1f),
+                    enabled = state.isHrDeviceConnected
+                ) {
+                    Text("Start Assessment")
+                }
+
+                IconButton(
+                    onClick = {
+                        vibrationEnabled = !vibrationEnabled
+                        prefs.edit().putBoolean("breathing_vibration", vibrationEnabled).apply()
+                    }
+                ) {
+                    Text(
+                        text = "〰",
+                        color = if (vibrationEnabled) TextPrimary else TextDisabled,
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                }
             }
         }
     }

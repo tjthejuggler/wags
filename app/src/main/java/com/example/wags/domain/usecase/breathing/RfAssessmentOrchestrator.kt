@@ -81,7 +81,7 @@ sealed class RfOrchestratorState {
  * - EXPRESS:        5 rates × 1 min test + 30 s washout  (~8 min)
  * - STANDARD:       5 rates × 2 min test + 60 s washout  (~18 min)
  * - DEEP:          13 rate/IE combos × 3 min test        (~42 min)
- * - TARGETED:      [opt, opt+0.2, opt-0.2] × 3 min       (~10 min)
+ * - TARGETED:      [opt, opt+0.1, opt-0.1] × 3 min       (~10 min)
  * - CONTINUOUS:    5 rates × 2 min, no washout
  * - SLIDING_WINDOW: chirp sweep 6.75→4.5 BPM over 78 breaths (~16 min)
  *
@@ -425,7 +425,7 @@ class RfAssessmentOrchestrator @Inject constructor(
         )
         RfProtocol.DEEP       -> Triple(DEEP_GRID.shuffled(), 180_000L, 60_000L)
         RfProtocol.TARGETED   -> Triple(
-            listOf(optimalBpm to 1.0f, optimalBpm + 0.2f to 1.0f, optimalBpm - 0.2f to 1.0f).shuffled(),
+            listOf(optimalBpm to 1.0f, optimalBpm + 0.1f to 1.0f, optimalBpm - 0.1f to 1.0f).shuffled(),
             180_000L, 60_000L
         )
         RfProtocol.CONTINUOUS -> Triple(

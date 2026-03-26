@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -75,11 +76,16 @@ fun BreathingScreen(
     navController: NavController,
     onNavigateToRfAssessment: () -> Unit = {},
     onNavigateToHistory: () -> Unit = {},
-    onNavigateToSession: () -> Unit = {},
+    onNavigateToSession: (vibration: Boolean) -> Unit = {},
     viewModel: BreathingViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val deviceId = "PLACEHOLDER_H10_ID"
+    val context = LocalContext.current
+
+    // Vibration toggle — persisted to SharedPreferences so it survives app restarts
+    val prefs = remember { context.getSharedPreferences("apnea_prefs", android.content.Context.MODE_PRIVATE) }
+    var vibrationEnabled by remember { mutableStateOf(prefs.getBoolean("breathing_vibration", false)) }
 
     val isActive = state.sessionPhase != BreathingSessionPhase.IDLE &&
             state.sessionPhase != BreathingSessionPhase.COMPLETE
@@ -147,12 +153,31 @@ fun BreathingScreen(
                 )
             }
 
-            // Start session → navigate to the dedicated session screen
-            Button(
-                onClick = onNavigateToSession,
+            // Start session row — button + vibration toggle
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                enabled = state.isHrDeviceConnected
-            ) { Text("Start Session") }
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = { onNavigateToSession(vibrationEnabled) },
+                    modifier = Modifier.weight(1f),
+                    enabled = state.isHrDeviceConnected
+                ) { Text("Start Session") }
+
+                IconButton(
+                    onClick = {
+                        vibrationEnabled = !vibrationEnabled
+                        prefs.edit().putBoolean("breathing_vibration", vibrationEnabled).apply()
+                    }
+                ) {
+                    Text(
+                        text = "〰",
+                        color = if (vibrationEnabled) TextPrimary else TextDisabled,
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                }
+            }
 
             HorizontalDivider(color = SurfaceVariant)
 

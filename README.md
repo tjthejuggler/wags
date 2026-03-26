@@ -4,6 +4,29 @@
 
 ## Changelog
 
+### 2026-03-26 — Resonance breathing improvements: end sound, vibration toggle, white flash, fine-tune granularity
+
+**End-of-session sound for RF assessments** ([`AssessmentRunScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/AssessmentRunScreen.kt))
+- Assessment sessions now play the same `chime_end` sound + haptic pattern as morning readiness and HRV readiness sessions when they complete.
+- Uses the existing [`WagsFeedback.sessionEnd()`](app/src/main/java/com/example/wags/ui/common/WagsFeedback.kt) helper.
+
+**Breath transition vibration toggle** ([`WagsFeedback.kt`](app/src/main/java/com/example/wags/ui/common/WagsFeedback.kt), [`BreathingPacerCircle.kt`](app/src/main/java/com/example/wags/ui/breathing/BreathingPacerCircle.kt))
+- New `WagsFeedback.breathTransition()` fires a short 80 ms haptic pulse at medium amplitude.
+- A vibration toggle button (〰 icon) is placed next to the "Start Session" button on [`BreathingScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/BreathingScreen.kt) and next to the "Start Assessment" button on [`AssessmentPickerScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/AssessmentPickerScreen.kt).
+- When enabled, the phone vibrates at the exact moment the pacer transitions between inhale and exhale phases.
+- Vibration state is passed through navigation to [`ResonanceSessionScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/ResonanceSessionScreen.kt) and [`AssessmentRunScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/AssessmentRunScreen.kt).
+- `BreathingPacerCircle` now accepts an `onPhaseTransition` callback that fires exactly once per `isInhaling` change.
+
+**White flash at peak inhale** ([`BreathingPacerCircle.kt`](app/src/main/java/com/example/wags/ui/breathing/BreathingPacerCircle.kt))
+- When the inhale circle reaches ≥ 95% of its maximum size, the circle color smoothly transitions to white (`Color.White`) to visually signal the upcoming exhale transition.
+- Text color switches to dark (`BackgroundDark`) on the white circle for contrast, maintaining the greyscale aesthetic.
+
+**Targeted assessment finer granularity** ([`RfAssessmentOrchestrator.kt`](app/src/main/java/com/example/wags/domain/usecase/breathing/RfAssessmentOrchestrator.kt), [`AssessmentPickerScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/AssessmentPickerScreen.kt))
+- The Targeted (fine-tune) protocol now tests at `optimal ± 0.1 BPM` instead of `± 0.2 BPM` for finer granularity.
+- Updated the protocol description in the assessment picker to reflect the new 0.1 BPM step size.
+
+---
+
 ### 2026-03-26 — Apnea section improvements: persistent settings, global PB sound, universal song picker
 
 **Persistent settings across app restarts** (`ApneaViewModel.kt`)

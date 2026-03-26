@@ -77,6 +77,7 @@ private fun rsCoherenceZoneLabel(ratio: Float): String = when {
 @Composable
 fun ResonanceSessionScreen(
     onNavigateBack: () -> Unit,
+    vibrationEnabled: Boolean = false,
     viewModel: BreathingViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -158,11 +159,17 @@ fun ResonanceSessionScreen(
                 }
 
                 BreathingSessionPhase.BREATHING -> {
+                    // Vibration callback — only fires when toggle is on
+                    val vibrationCallback: (() -> Unit)? = if (vibrationEnabled) {
+                        { WagsFeedback.breathTransition(context) }
+                    } else null
+
                     // ── Pacer circle ──────────────────────────────────────────
                     BreathingPacerCircle(
                         progress = state.pacerRadius,
                         isInhaling = state.isInhaling,
-                        size = 200.dp
+                        size = 200.dp,
+                        onPhaseTransition = vibrationCallback
                     )
 
                     // ── Coherence zone traffic light ──────────────────────────
