@@ -57,7 +57,7 @@ fun AdvancedApneaScreen(
                         viewModel.stopSession()
                         navController.popBackStack()
                     }) {
-                        Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                        Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
                 },
                 actions = {
@@ -149,7 +149,7 @@ private fun PhaseTimerCard(state: AdvancedApneaState, modality: TrainingModality
                     Text(
                         "Waiting for breath…",
                         style = MaterialTheme.typography.displaySmall,
-                        color = EcgCyan
+                        color = TextSecondary
                     )
                 }
                 AdvancedApneaPhase.WONKA_CRUISING -> {
@@ -180,7 +180,7 @@ private fun PhaseTimerCard(state: AdvancedApneaState, modality: TrainingModality
                     Text(
                         "Session Complete!",
                         style = MaterialTheme.typography.displaySmall,
-                        color = ReadinessGreen
+                        color = TextPrimary
                     )
                 }
                 else -> {
@@ -214,7 +214,7 @@ private fun ActionArea(
                     .height(72.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = ButtonSuccess,
-                    contentColor = Color.White
+                    contentColor = TextPrimary
                 )
             ) {
                 Text(
@@ -243,7 +243,7 @@ private fun ActionArea(
             OutlinedButton(
                 onClick = onStop,
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
             ) {
                 Text("Stop Session")
             }
@@ -271,7 +271,7 @@ private fun WonkaCruisingActions(
                 .height(72.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = ButtonDanger,
-                contentColor = Color.White
+                contentColor = TextPrimary
             )
         ) {
             Text("LOG CONTRACTION", style = MaterialTheme.typography.titleLarge)
@@ -285,7 +285,7 @@ private fun WonkaCruisingActions(
         OutlinedButton(
             onClick = onStop,
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
         ) {
             Text("Stop Session")
         }
@@ -385,11 +385,11 @@ private fun AdvancedApneaPhase.phaseColor(): androidx.compose.ui.graphics.Color 
     AdvancedApneaPhase.IDLE               -> TextSecondary
     AdvancedApneaPhase.VENTILATION        -> ApneaVentilation
     AdvancedApneaPhase.APNEA              -> ApneaHold
-    AdvancedApneaPhase.WAITING_FOR_BREATH -> EcgCyan
+    AdvancedApneaPhase.WAITING_FOR_BREATH -> TextSecondary
     AdvancedApneaPhase.WONKA_CRUISING     -> ApneaHold
-    AdvancedApneaPhase.WONKA_ENDURANCE    -> ReadinessOrange
+    AdvancedApneaPhase.WONKA_ENDURANCE    -> TextSecondary
     AdvancedApneaPhase.RECOVERY           -> ApneaRecovery
-    AdvancedApneaPhase.COMPLETE           -> ReadinessGreen
+    AdvancedApneaPhase.COMPLETE           -> TextPrimary
 }
 
 private fun formatMmSs(ms: Long): String {

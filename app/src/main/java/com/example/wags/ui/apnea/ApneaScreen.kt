@@ -83,7 +83,7 @@ fun ApneaScreen(
                 title = { Text("Apnea Training", style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                        Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
                 },
                 actions = {
@@ -421,7 +421,7 @@ internal fun NewPersonalBestDialog(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.6f))
+                    .background(BackgroundDark.copy(alpha = 0.85f))
                     .clickable(onClick = onDismiss)
             )
 
@@ -462,14 +462,14 @@ internal fun NewPersonalBestDialog(
                         Text(
                             headline,
                             style = MaterialTheme.typography.headlineSmall,
-                            color = EcgCyan,
+                            color = TextPrimary,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center
                         )
                         Text(
                             formatMs(newPbMs),
                             style = MaterialTheme.typography.displaySmall,
-                            color = EcgCyan,
+                            color = TextPrimary,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center
                         )
@@ -488,10 +488,10 @@ internal fun NewPersonalBestDialog(
                         Spacer(modifier = Modifier.height(4.dp))
                         Button(
                             onClick = onDismiss,
-                            colors = ButtonDefaults.buttonColors(containerColor = EcgCyan),
+                            colors = ButtonDefaults.buttonColors(containerColor = SurfaceVariant),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("🎉 Awesome!", color = BackgroundDark, fontWeight = FontWeight.Bold)
+                            Text("🎉 Awesome!", color = TextPrimary, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -689,7 +689,7 @@ fun NowPlayingBanner(track: TrackInfo) {
                 Text(
                     track.title,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White,
+                    color = TextPrimary,
                     maxLines = 1
                 )
                 Text(
@@ -752,7 +752,7 @@ private fun FreeHoldContent(
                 Text(
                     formatMs(bestTimeMs),
                     style = MaterialTheme.typography.headlineSmall,
-                    color = EcgCyan,
+                    color = TextPrimary,
                     fontWeight = FontWeight.Bold,
                     modifier = if (bestTimeRecordId != null)
                         Modifier.clickable { onBestTimeClick(bestTimeRecordId) }
@@ -767,13 +767,13 @@ private fun FreeHoldContent(
             Text(
                 "Last: ${formatMs(freeHoldDurationMs)}",
                 style = MaterialTheme.typography.headlineMedium,
-                color = EcgCyan
+                color = TextPrimary
             )
         }
 
         Button(
             onClick = onStartHold,
-            colors = ButtonDefaults.buttonColors(containerColor = ButtonSuccess, contentColor = Color.White),
+            colors = ButtonDefaults.buttonColors(containerColor = ButtonSuccess, contentColor = TextPrimary),
             modifier = Modifier.fillMaxWidth()
         ) { Text("Start Hold") }
     }
@@ -808,7 +808,7 @@ private fun TableTrainingConfigContent(
             Text(
                 "Personal Best: ${personalBestMs / 1000L}s",
                 style = MaterialTheme.typography.bodyLarge,
-                color = EcgCyan
+                color = TextPrimary
             )
         }
 
@@ -935,7 +935,7 @@ private fun InlineAdvancedSessionContent(
             Text(
                 "Another session is currently active. Stop it first.",
                 style = MaterialTheme.typography.bodySmall,
-                color = ReadinessOrange
+                color = TextSecondary
             )
         }
 
@@ -945,7 +945,7 @@ private fun InlineAdvancedSessionContent(
                 onClick = onStart,
                 enabled = enabled && !anotherActive,
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = ButtonSuccess, contentColor = Color.White)
+                colors = ButtonDefaults.buttonColors(containerColor = ButtonSuccess, contentColor = TextPrimary)
             ) { Text("Start Session") }
         } else {
             // Active session UI
@@ -1015,7 +1015,7 @@ private fun AdvancedSessionRunningContent(
             )
             when (state.phase) {
                 AdvancedApneaPhase.WAITING_FOR_BREATH -> {
-                    Text("Waiting for breath…", style = MaterialTheme.typography.headlineSmall, color = EcgCyan)
+                    Text("Waiting for breath…", style = MaterialTheme.typography.headlineSmall, color = TextSecondary)
                 }
                 AdvancedApneaPhase.WONKA_CRUISING -> {
                     Text(formatMmSs(state.timerMs), style = MaterialTheme.typography.displayMedium, color = ApneaHold, fontWeight = FontWeight.Bold)
@@ -1026,7 +1026,7 @@ private fun AdvancedSessionRunningContent(
                     Text("Endurance — cruised ${formatMmSs(state.cruisingElapsedMs)}", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                 }
                 AdvancedApneaPhase.COMPLETE -> {
-                    Text("Session Complete! 🎉", style = MaterialTheme.typography.headlineSmall, color = ReadinessGreen)
+                    Text("Session Complete! 🎉", style = MaterialTheme.typography.headlineSmall, color = TextPrimary)
                 }
                 AdvancedApneaPhase.IDLE -> Unit
                 else -> {
@@ -1042,7 +1042,7 @@ private fun AdvancedSessionRunningContent(
             Button(
                 onClick = onBreathTaken,
                 modifier = Modifier.fillMaxWidth().height(64.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = ButtonSuccess, contentColor = Color.White)
+                colors = ButtonDefaults.buttonColors(containerColor = ButtonSuccess, contentColor = TextPrimary)
             ) { Text("ONE BREATH TAKEN →", style = MaterialTheme.typography.titleMedium) }
         }
         AdvancedApneaPhase.WONKA_CRUISING -> {
@@ -1055,7 +1055,7 @@ private fun AdvancedSessionRunningContent(
                 Button(
                     onClick = onFirstContraction,
                     modifier = Modifier.fillMaxWidth().height(64.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = ButtonDanger, contentColor = Color.White)
+                    colors = ButtonDefaults.buttonColors(containerColor = ButtonDanger, contentColor = TextPrimary)
                 ) { Text("LOG CONTRACTION", style = MaterialTheme.typography.titleMedium) }
                 Text(
                     "or double-tap anywhere",
@@ -1081,7 +1081,7 @@ private fun AdvancedSessionRunningContent(
         OutlinedButton(
             onClick = onStop,
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
         ) { Text("Stop Session") }
     }
 }
@@ -1139,7 +1139,7 @@ private fun RecentRecordRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text(formatMs(record.durationMs), style = MaterialTheme.typography.bodyLarge, color = EcgCyan, fontWeight = FontWeight.SemiBold)
+                Text(formatMs(record.durationMs), style = MaterialTheme.typography.bodyLarge, color = TextPrimary, fontWeight = FontWeight.SemiBold)
                 Text(dateStr, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1178,7 +1178,7 @@ private fun StatsContent(
                 Text(
                     if (showAll) "All settings" else "Current settings",
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (showAll) EcgCyan else TextSecondary
+                    color = if (showAll) TextPrimary else TextSecondary
                 )
                 if (!showAll) {
                     Text(
@@ -1205,7 +1205,7 @@ private fun StatsContent(
             "Activity Counts",
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
-            color = EcgCyan
+            color = TextPrimary
         )
         val activities = listOf(
             "Free Hold"           to stats.freeHoldCount,
@@ -1229,7 +1229,7 @@ private fun StatsContent(
             "Overall Session Extremes",
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
-            color = EcgCyan
+            color = TextPrimary
         )
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             ExtremeRow(
@@ -1259,7 +1259,7 @@ private fun StatsContent(
             "Session Start Extremes",
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
-            color = EcgCyan
+            color = TextPrimary
         )
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             ExtremeRow(
@@ -1295,7 +1295,7 @@ private fun StatsContent(
             "Session End Extremes",
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
-            color = EcgCyan
+            color = TextPrimary
         )
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             ExtremeRow(
@@ -1362,7 +1362,7 @@ private fun ExtremeRow(
                 Text(
                     value,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (clickable) EcgCyan else Color.White,
+                    color = if (clickable) TextPrimary else TextSecondary,
                     fontWeight = FontWeight.Medium
                 )
                 if (clickable) {
@@ -1381,7 +1381,7 @@ private fun StatsRow(label: String, value: String) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(label, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-        Text(value, style = MaterialTheme.typography.bodySmall, color = Color.White, fontWeight = FontWeight.Medium)
+        Text(value, style = MaterialTheme.typography.bodySmall, color = TextPrimary, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -1425,11 +1425,11 @@ private fun AdvancedApneaPhase.phaseColor(): Color = when (this) {
     AdvancedApneaPhase.IDLE               -> TextSecondary
     AdvancedApneaPhase.VENTILATION        -> ApneaVentilation
     AdvancedApneaPhase.APNEA              -> ApneaHold
-    AdvancedApneaPhase.WAITING_FOR_BREATH -> EcgCyan
+    AdvancedApneaPhase.WAITING_FOR_BREATH -> TextSecondary
     AdvancedApneaPhase.WONKA_CRUISING     -> ApneaHold
-    AdvancedApneaPhase.WONKA_ENDURANCE    -> ReadinessOrange
+    AdvancedApneaPhase.WONKA_ENDURANCE    -> TextSecondary
     AdvancedApneaPhase.RECOVERY           -> ApneaRecovery
-    AdvancedApneaPhase.COMPLETE           -> ReadinessGreen
+    AdvancedApneaPhase.COMPLETE           -> TextPrimary
 }
 
 @Composable

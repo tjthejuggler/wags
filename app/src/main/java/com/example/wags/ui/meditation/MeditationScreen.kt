@@ -60,7 +60,7 @@ fun MeditationScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = EcgCyan
+                            tint = TextSecondary
                         )
                     }
                 },
@@ -187,7 +187,7 @@ private fun IdleContent(
                 if (state.isLoadingAudios) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(20.dp),
-                        color = EcgCyan,
+                        color = TextSecondary,
                         strokeWidth = 2.dp
                     )
                 } else {
@@ -196,10 +196,10 @@ private fun IdleContent(
                             Icons.Default.Refresh,
                             contentDescription = "Refresh",
                             modifier = Modifier.size(16.dp),
-                            tint = EcgCyan
+                            tint = TextSecondary
                         )
                         Spacer(Modifier.width(4.dp))
-                        Text("Refresh", style = MaterialTheme.typography.bodySmall, color = EcgCyan)
+                        Text("Refresh", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                     }
                 }
             }
@@ -324,15 +324,15 @@ private fun ChannelFilterRow(
                 onClick = { onChannelSelected(null) },
                 label = { Text("All") },
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = EcgCyan.copy(alpha = 0.2f),
-                    selectedLabelColor = EcgCyan
-                ),
-                border = FilterChipDefaults.filterChipBorder(
-                    enabled = true,
-                    selected = selectedChannel == null,
-                    selectedBorderColor = EcgCyan,
-                    borderColor = SurfaceVariant
-                )
+                        selectedContainerColor = TextSecondary.copy(alpha = 0.2f),
+                        selectedLabelColor = TextPrimary
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = selectedChannel == null,
+                        selectedBorderColor = TextSecondary,
+                        borderColor = SurfaceVariant
+                    )
             )
             // One chip per channel
             channels.forEach { channel ->
@@ -347,13 +347,13 @@ private fun ChannelFilterRow(
                         )
                     },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = EcgCyan.copy(alpha = 0.2f),
-                        selectedLabelColor = EcgCyan
+                        selectedContainerColor = TextSecondary.copy(alpha = 0.2f),
+                        selectedLabelColor = TextPrimary
                     ),
                     border = FilterChipDefaults.filterChipBorder(
                         enabled = true,
                         selected = selectedChannel == channel,
-                        selectedBorderColor = EcgCyan,
+                        selectedBorderColor = TextSecondary,
                         borderColor = SurfaceVariant
                     )
                 )
@@ -371,8 +371,8 @@ private fun AudioListItem(
     onSelect: () -> Unit,
     onEditUrl: () -> Unit
 ) {
-    val borderColor = if (isSelected) EcgCyan else Color.Transparent
-    val bgColor = if (isSelected) EcgCyan.copy(alpha = 0.08f) else SurfaceDark
+    val borderColor = if (isSelected) TextSecondary else Color.Transparent
+    val bgColor = if (isSelected) TextSecondary.copy(alpha = 0.08f) else SurfaceDark
 
     Card(
         modifier = Modifier
@@ -400,7 +400,7 @@ private fun AudioListItem(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (isSelected) {
-                        Text("✓", color = EcgCyan, style = MaterialTheme.typography.bodyMedium)
+                        Text("✓", color = TextPrimary, style = MaterialTheme.typography.bodyMedium)
                     }
                     Text(
                         text = when {
@@ -408,7 +408,7 @@ private fun AudioListItem(
                             else -> audio.displayName
                         },
                         style = MaterialTheme.typography.bodyLarge,
-                        color = if (isSelected) EcgCyan else TextPrimary,
+                        color = if (isSelected) TextPrimary else TextPrimary,
                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
@@ -424,7 +424,7 @@ private fun AudioListItem(
                         Text(
                             "▶",
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFFFF0000) // YouTube red
+                            color = TextSecondary
                         )
                         Text(
                             text = audio.youtubeChannel,
@@ -484,7 +484,7 @@ private fun AudioListItem(
 private fun MonitorStatusBanner(hasHrMonitor: Boolean, deviceId: String?) {
     val bgColor = if (hasHrMonitor) SurfaceDark else SurfaceVariant
     val dot = if (hasHrMonitor) "●" else "○"
-    val dotColor = if (hasHrMonitor) ReadinessGreen else Color.Gray
+    val dotColor = if (hasHrMonitor) TextPrimary else TextDisabled
     val text = if (hasHrMonitor) {
         "Monitor connected: ${deviceId ?: "Unknown"}"
     } else {
@@ -520,7 +520,7 @@ private fun ActiveContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Session Active", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+        Text("Session Active", style = MaterialTheme.typography.headlineMedium, color = TextPrimary)
 
         // Selected audio label
         state.selectedAudio?.let { audio ->
@@ -548,7 +548,7 @@ private fun ActiveContent(
         Text(
             "${minutes}:${String.format("%02d", seconds)}",
             style = MaterialTheme.typography.displayLarge,
-            color = EcgCyan
+            color = TextPrimary
         )
 
         if (state.hasHrMonitor) {
@@ -573,7 +573,7 @@ private fun ActiveContent(
                     "Timer only — no HR monitor connected",
                     modifier = Modifier.padding(12.dp),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Gray
+                    color = TextSecondary
                 )
             }
         }
@@ -581,7 +581,7 @@ private fun ActiveContent(
         OutlinedButton(
             onClick = onStop,
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
         ) {
             Text("Stop Session")
         }
@@ -602,7 +602,7 @@ private fun LiveMetricCard(label: String, value: String, modifier: Modifier = Mo
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(label, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-            Text(value, style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+            Text(value, style = MaterialTheme.typography.headlineMedium, color = TextPrimary)
         }
     }
 }
@@ -616,7 +616,7 @@ private fun ProcessingContent(modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        CircularProgressIndicator(color = EcgCyan)
+        CircularProgressIndicator(color = TextSecondary)
         Spacer(Modifier.height(16.dp))
         Text("Analyzing session…", style = MaterialTheme.typography.bodyLarge)
     }
@@ -639,7 +639,7 @@ private fun CompleteContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Session Complete", style = MaterialTheme.typography.headlineMedium, color = ReadinessGreen)
+        Text("Session Complete", style = MaterialTheme.typography.headlineMedium, color = TextPrimary)
 
         // Audio used
         state.selectedAudio?.let { audio ->
@@ -674,7 +674,7 @@ private fun CompleteContent(
                 SummaryRow("Monitor", state.monitorId ?: "None (no HR data)")
 
                 if (state.avgHrBpm != null) {
-                    HorizontalDivider(color = Color.Gray.copy(alpha = 0.3f))
+                    HorizontalDivider(color = TextDisabled.copy(alpha = 0.3f))
                     Text("HR Analytics", style = MaterialTheme.typography.titleMedium)
                     SummaryRow("Avg HR", "${String.format("%.1f", state.avgHrBpm)} BPM")
                     state.hrSlopeBpmPerMin?.let {
@@ -695,7 +695,7 @@ private fun CompleteContent(
                     Text(
                         "Connect a monitor next time for full HR analytics.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Gray
+                        color = TextSecondary
                     )
                 }
             }
@@ -704,7 +704,7 @@ private fun CompleteContent(
         OutlinedButton(
             onClick = onViewHistory,
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = EcgCyan)
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
         ) {
             Text("View History")
         }
@@ -722,7 +722,7 @@ private fun SummaryRow(label: String, value: String) {
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-        Text(value, style = MaterialTheme.typography.bodyLarge, color = EcgCyan)
+        Text(value, style = MaterialTheme.typography.bodyLarge, color = TextPrimary)
     }
 }
 
@@ -767,10 +767,10 @@ fun AudioUrlEditDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = EcgCyan,
+                        focusedBorderColor = TextSecondary,
                         unfocusedBorderColor = SurfaceVariant,
-                        focusedLabelColor = EcgCyan,
-                        cursorColor = EcgCyan
+                        focusedLabelColor = TextSecondary,
+                        cursorColor = TextPrimary
                     )
                 )
 
@@ -784,12 +784,12 @@ fun AudioUrlEditDialog(
                         OutlinedButton(
                             onClick = { onFetchPreview(urlText) },
                             enabled = !isFetching && urlText.isNotBlank(),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = EcgCyan)
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
                         ) {
                             if (isFetching) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(14.dp),
-                                    color = EcgCyan,
+                                    color = TextSecondary,
                                     strokeWidth = 2.dp
                                 )
                                 Spacer(Modifier.width(6.dp))
@@ -806,7 +806,7 @@ fun AudioUrlEditDialog(
                     fetchedMetadata != null -> {
                         Card(
                             colors = CardDefaults.cardColors(
-                                containerColor = EcgCyan.copy(alpha = 0.08f)
+                                containerColor = SurfaceVariant
                             ),
                             shape = RoundedCornerShape(8.dp)
                         ) {
@@ -821,12 +821,12 @@ fun AudioUrlEditDialog(
                                     Text(
                                         "✓",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = ReadinessGreen
+                                        color = TextPrimary
                                     )
                                     Text(
                                         "YouTube info found",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = ReadinessGreen
+                                        color = TextPrimary
                                     )
                                 }
                                 Text(
@@ -842,7 +842,7 @@ fun AudioUrlEditDialog(
                                     Text(
                                         "▶",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = Color(0xFFFF0000)
+                                        color = TextSecondary
                                     )
                                     Text(
                                         fetchedMetadata.channel,
@@ -881,7 +881,7 @@ fun AudioUrlEditDialog(
                                         Text(
                                             "▶",
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = Color(0xFFFF0000)
+                                            color = TextSecondary
                                         )
                                         Text(
                                             audio.youtubeChannel,
@@ -905,7 +905,7 @@ fun AudioUrlEditDialog(
         },
         confirmButton = {
             TextButton(onClick = { onSave(urlText) }) {
-                Text("Save", color = EcgCyan)
+                Text("Save", color = TextSecondary)
             }
         },
         dismissButton = {

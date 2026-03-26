@@ -565,7 +565,7 @@ fun FreeHoldActiveScreen(
                         if (state.freeHoldActive) viewModel.cancelFreeHold()
                         navController.popBackStack()
                     }) {
-                        Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                        Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
                 },
                 actions = {
@@ -728,7 +728,7 @@ private fun FreeHoldActiveContent(
                         shape = MaterialTheme.shapes.large,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = ButtonSuccess,
-                            contentColor = Color.White
+                            contentColor = TextPrimary
                         )
                     ) {
                         Text(
@@ -755,7 +755,7 @@ private fun FreeHoldActiveContent(
                             shape = MaterialTheme.shapes.large,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = ReadinessOrange,
-                                contentColor = Color.White
+                                contentColor = TextPrimary
                             )
                         ) {
                             Text(
@@ -774,7 +774,7 @@ private fun FreeHoldActiveContent(
                             shape = MaterialTheme.shapes.large,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = ButtonDanger,
-                                contentColor = Color.White
+                                contentColor = TextPrimary
                             )
                         ) {
                             Text(
@@ -796,7 +796,7 @@ private fun FreeHoldActiveContent(
                         shape = MaterialTheme.shapes.large,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = ButtonDanger,
-                            contentColor = Color.White
+                            contentColor = TextPrimary
                         )
                     ) {
                         Text(

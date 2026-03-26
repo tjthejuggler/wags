@@ -32,14 +32,14 @@ fun LiveSensorActions(liveHr: Int?, liveSpO2: Int?) {
                     Icon(
                         imageVector = Icons.Default.Favorite,
                         contentDescription = "Heart rate",
-                        tint = ReadinessRed,
+                        tint = TextSecondary,
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
                         text = "$bpm",
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.SemiBold,
-                        color = ReadinessRed
+                        color = TextPrimary
                     )
                 }
             }
@@ -51,13 +51,13 @@ fun LiveSensorActions(liveHr: Int?, liveSpO2: Int?) {
                     Text(
                         text = "SpO₂",
                         style = MaterialTheme.typography.labelSmall,
-                        color = EcgCyan
+                        color = TextSecondary
                     )
                     Text(
                         text = "$spo2%",
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.SemiBold,
-                        color = EcgCyan
+                        color = TextPrimary
                     )
                 }
             }

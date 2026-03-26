@@ -2,6 +2,39 @@
 
 ---
 
+## Changelog
+
+### 2026-03-26 — Full greyscale UI conversion (final sweep)
+Follow-up pass fixing remaining colored references missed in the initial conversion:
+- `ApneaRecordDetailScreen.kt` — `SpO2Blue` (`0xFF42A5F5`) → `0xFFB0B0B0`; canvas label `Color.White` → `TextSecondary`
+- `ApneaScreen.kt` — scrim overlay `Color.Black` → `BackgroundDark`
+- `MeditationSessionDetailScreen.kt` — canvas grid/label `Color.White` → `TextDisabled`/`TextSecondary`
+- `MorningReadinessScreen.kt` — `SkipButtonBg` dark red `0xFF8B0000` → `0xFF333333`
+- `ContractionOverlay.kt` — contraction count text `0xFFFF6B35` (orange) → `TextSecondary`
+- `BreathingPacerCircle.kt` — pacer text `Color.White` → `TextPrimary`
+- `Theme.kt` — `onPrimary`/`onSecondary`/`onError` `Color.White` → `TextPrimary`
+
+Final regex sweep confirmed **0 remaining** `Color.White`, `Color.Black`, `Color.Gray`, or colored `Color(0xFF...)` references across all UI files.
+
+### 2026-03-26 — Full greyscale UI conversion
+Converted the entire app UI to black-and-white greyscale monochrome. All colored elements (buttons, text, cards, charts, emojis, indicators, progress bars, canvas drawings) now use the greyscale palette defined in [`Color.kt`](app/src/main/java/com/example/wags/ui/theme/Color.kt).
+
+**Files updated:**
+- `ui/theme/Color.kt` — Complete greyscale palette rewrite; all named colors remapped to grey values
+- `ui/theme/Theme.kt` — Updated Material3 color scheme references
+- All 35+ UI screen/component files — Replaced `Color.White`, `Color.Black`, `Color.Gray`, `Color(0xFF1DB954)` (Spotify green), `Color(0xFF0D2818)` (dark green), and all inline colored hex literals with greyscale theme tokens (`TextPrimary`, `TextSecondary`, `TextDisabled`, `SurfaceVariant`, `SurfaceDark`, etc.)
+
+**Greyscale palette:**
+- Background: `0xFF0A0A0A` (near-black)
+- Surface Dark: `0xFF141414`
+- Surface Variant: `0xFF242424`
+- Text Primary: `0xFFE8E8E8` (near-white)
+- Text Secondary: `0xFFB0B0B0` (mid-light grey)
+- Text Disabled: `0xFF606060` (dim grey)
+- Accent (EcgCyan): `0xFFD0D0D0` (light grey)
+
+---
+
 ## Overview
 
 Wags is a professional-grade Android freediving training app built with Kotlin and Jetpack Compose. It combines HRV-based readiness assessment, structured apnea table training, unified BLE-connected biometric monitoring (any BLE device — Polar H10/Verity Sense, Wellue/Viatom oximeters, generic HR sensors — auto-detected by name), and real-time safety monitoring into a single cohesive training ecosystem.

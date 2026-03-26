@@ -6,11 +6,11 @@ import androidx.compose.ui.graphics.Color
 
 private val WagsDarkColorScheme = darkColorScheme(
     primary = ButtonPrimary,
-    onPrimary = Color.White,
-    primaryContainer = EcgCyanDim,
+    onPrimary = TextPrimary,
+    primaryContainer = SurfaceVariant,
     onPrimaryContainer = TextPrimary,
     secondary = ButtonSuccess,
-    onSecondary = Color.White,
+    onSecondary = TextPrimary,
     background = BackgroundDark,
     onBackground = TextPrimary,
     surface = SurfaceDark,
@@ -18,9 +18,9 @@ private val WagsDarkColorScheme = darkColorScheme(
     surfaceVariant = SurfaceVariant,
     onSurfaceVariant = TextSecondary,
     error = ButtonDanger,
-    onError = Color.White,
-    outline = Color.White,
-    outlineVariant = TextSecondary
+    onError = TextPrimary,
+    outline = Color(0xFF606060),
+    outlineVariant = TextDisabled
 )
 
 @Composable

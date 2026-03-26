@@ -14,6 +14,7 @@ import com.example.wags.MainActivity
 import com.example.wags.domain.usecase.apnea.ApneaState
 import com.example.wags.ui.common.InfoHelpBubble
 import com.example.wags.ui.theme.SurfaceVariant
+import com.example.wags.ui.theme.TextSecondary
 
 private const val CONTRACTION_HELP_TITLE = "Diaphragmatic Contractions"
 private const val CONTRACTION_HELP_CONTENT = """
@@ -72,7 +73,7 @@ fun ContractionOverlay(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(16.dp),
-                    color = Color(0xFFFF6B35),
+                    color = TextSecondary,
                     style = MaterialTheme.typography.labelMedium
                 )
             }

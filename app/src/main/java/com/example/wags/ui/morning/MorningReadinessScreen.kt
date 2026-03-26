@@ -52,7 +52,7 @@ private val Charcoal = Color(0xFF1C1C1C)      // Subtle divider / track
 private val Ink = Color(0xFF0A0A0A)           // Deep background
 private val ArcFill = Color(0xFFCCCCCC)       // Countdown arc — bright
 private val ArcTrack = Color(0xFF2A2A2A)      // Countdown arc track — barely visible
-private val SkipButtonBg = Color(0xFF8B0000)   // Dark red for skip standing button
+private val SkipButtonBg = Color(0xFF333333)   // Dark grey for skip standing button
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,7 +84,7 @@ fun MorningReadinessScreen(
             },
             confirmButton = {
                 TextButton(onClick = { viewModel.dismissNoHrmDialog() }) {
-                    Text("OK", color = EcgCyan)
+                    Text("OK", color = TextSecondary)
                 }
             },
             containerColor = SurfaceDark
@@ -121,13 +121,13 @@ fun MorningReadinessScreen(
                 title = { Text("Morning Readiness", style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                        Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
                 },
                 actions = {
                     LiveSensorActions(liveHr = uiState.liveHr, liveSpO2 = uiState.liveSpO2)
                     TextButton(onClick = onNavigateToHistory) {
-                        Text("History", color = EcgCyan)
+                        Text("History", color = TextSecondary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
@@ -209,7 +209,7 @@ private fun IdleContent(onStart: () -> Unit) {
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Before you begin:", style = MaterialTheme.typography.titleMedium, color = EcgCyan)
+                Text("Before you begin:", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
                 Text("1. Connect your Polar H10 heart rate monitor", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 Text("2. Lie down flat on your back", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 Text("3. Relax and breathe normally", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
@@ -344,14 +344,14 @@ private fun StandPromptContent(onSkipStanding: () -> Unit) {
             "STAND UP NOW\nAND REMAIN STILL",
             style = MaterialTheme.typography.displaySmall,
             fontWeight = FontWeight.ExtraBold,
-            color = ReadinessRed,
+            color = TextSecondary,
             textAlign = TextAlign.Center,
             modifier = Modifier.scale(scale)
         )
         Text(
             "Stand up immediately and stay as still as possible",
             style = MaterialTheme.typography.bodyLarge,
-            color = ReadinessOrange,
+            color = TextSecondary,
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(8.dp))
@@ -465,7 +465,7 @@ private fun QuestionnaireContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Hooper Wellness Check", style = MaterialTheme.typography.headlineSmall, color = EcgCyan)
+        Text("Hooper Wellness Check", style = MaterialTheme.typography.headlineSmall, color = TextPrimary)
         Text(
             "Slide to rate how you feel right now",
             style = MaterialTheme.typography.bodyMedium,
@@ -541,10 +541,10 @@ private fun HooperSlider(
     //   61–80 → green
     //   81–100→ green    (best)
     val trackColor = when {
-        value <= 20f  -> ReadinessRed
-        value <= 40f  -> ReadinessOrange
+        value <= 20f  -> TextDisabled
+        value <= 40f  -> TextSecondary
         value <= 60f  -> Silver
-        else          -> ReadinessGreen
+        else          -> TextPrimary
     }
 
     // Map the continuous [1, 100] value to one of the five descriptor strings.
@@ -636,7 +636,7 @@ private fun CalculatingContent() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        CircularProgressIndicator(color = EcgCyan, modifier = Modifier.size(64.dp))
+        CircularProgressIndicator(color = TextSecondary, modifier = Modifier.size(64.dp))
         Text("Analyzing your data...", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
     }
 }
@@ -647,7 +647,7 @@ internal fun ErrorContent(errorMessage: String?, onRetry: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Error", style = MaterialTheme.typography.headlineMedium, color = ReadinessRed)
+        Text("Error", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
         Text(
             errorMessage ?: "An unknown error occurred",
             style = MaterialTheme.typography.bodyMedium,
@@ -742,7 +742,7 @@ private fun MinimalistArcCountdown(
                 val dotX = centerX + radius * cos(angleRad).toFloat()
                 val dotY = centerY + radius * sin(angleRad).toFloat()
                 drawCircle(
-                    color = Color.White,
+                    color = TextPrimary,
                     radius = 4.dp.toPx(),
                     center = Offset(dotX, dotY)
                 )
@@ -939,6 +939,6 @@ private fun PulsingDot() {
         modifier = Modifier
             .size(16.dp)
             .scale(scale)
-            .border(2.dp, EcgCyanDim, CircleShape)
+            .border(2.dp, TextDisabled, CircleShape)
     )
 }

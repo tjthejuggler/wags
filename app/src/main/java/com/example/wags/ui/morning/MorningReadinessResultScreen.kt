@@ -129,9 +129,9 @@ fun MorningReadinessResultScreen(
 @Composable
 private fun ReadinessScoreCard(result: MorningReadinessResult) {
     val scoreColor = when (result.readinessColor) {
-        ReadinessColor.GREEN -> ReadinessGreen
-        ReadinessColor.YELLOW -> ReadinessOrange
-        ReadinessColor.RED -> ReadinessRed
+        ReadinessColor.GREEN -> TextPrimary
+        ReadinessColor.YELLOW -> TextSecondary
+        ReadinessColor.RED -> TextDisabled
     }
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -176,7 +176,7 @@ private fun ReadinessScoreCard(result: MorningReadinessResult) {
 private fun SlowBreathingBanner() {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = ReadinessOrange.copy(alpha = 0.15f))
+        colors = CardDefaults.cardColors(containerColor = SurfaceVariant)
     ) {
         Row(
             modifier = Modifier.padding(12.dp).fillMaxWidth(),
@@ -185,7 +185,7 @@ private fun SlowBreathingBanner() {
             Text(
                 "⚠ Slow Breathing Detected — score adjusted",
                 style = MaterialTheme.typography.bodyMedium,
-                color = ReadinessOrange,
+                color = TextSecondary,
                 modifier = Modifier.weight(1f)
             )
             HelpBubble(title = HELP_SLOW_BREATH_TITLE, text = HELP_SLOW_BREATH_TEXT)
@@ -211,7 +211,7 @@ private fun HrvCard(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(title, style = MaterialTheme.typography.titleMedium, color = EcgCyan)
+                Text(title, style = MaterialTheme.typography.titleMedium, color = TextPrimary)
                 if (showSupineVsStandingHelp) {
                     HelpBubble(
                         title = HELP_SUPINE_VS_STANDING_TITLE,
@@ -255,7 +255,7 @@ private fun OrthostaticCard(result: MorningReadinessResult) {
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("Orthostatic Response", style = MaterialTheme.typography.titleMedium, color = EcgCyan)
+            Text("Orthostatic Response", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
             result.peakStandHr?.let { SimpleMetricRow("Peak Stand HR", "$it bpm") }
 
             result.thirtyFifteenRatio?.let { ratio ->
@@ -296,7 +296,7 @@ private fun HooperSummaryCard(result: MorningReadinessResult, total: Float) {
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("Hooper Wellness Index", style = MaterialTheme.typography.titleMedium, color = EcgCyan)
+            Text("Hooper Wellness Index", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
             Text(
                 "Total: ${String.format("%.0f", total)} / 20",
                 style = MaterialTheme.typography.bodyLarge,
@@ -394,7 +394,7 @@ private fun SimpleMetricRow(label: String, value: String) {
 
 @Composable
 private fun FlagChip(applied: Boolean) {
-    val (label, color) = if (applied) "Applied" to ReadinessOrange else "None" to ReadinessGreen
+    val (label, color) = if (applied) "Applied" to TextSecondary else "None" to TextPrimary
     Surface(
         shape = MaterialTheme.shapes.small,
         color = color.copy(alpha = 0.15f)

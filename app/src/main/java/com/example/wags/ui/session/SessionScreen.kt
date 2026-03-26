@@ -50,7 +50,7 @@ fun SessionScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                        Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
                 },
                 actions = {
@@ -141,7 +141,7 @@ private fun IdleContent(
 private fun MonitorStatusBanner(hasHrMonitor: Boolean, deviceId: String?) {
     val bgColor = if (hasHrMonitor) SurfaceDark else SurfaceVariant
     val dot = if (hasHrMonitor) "●" else "○"
-    val dotColor = if (hasHrMonitor) ReadinessGreen else Color.Gray
+    val dotColor = if (hasHrMonitor) TextPrimary else TextDisabled
     val text = if (hasHrMonitor) {
         "Monitor connected: ${deviceId ?: "Unknown"}"
     } else {
@@ -166,7 +166,7 @@ private fun ActiveContent(state: SessionUiState, onStop: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Session Active", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+        Text("Session Active", style = MaterialTheme.typography.headlineMedium, color = TextPrimary)
 
         val elapsed = state.elapsedSeconds
         val minutes = elapsed / 60L
@@ -174,7 +174,7 @@ private fun ActiveContent(state: SessionUiState, onStop: () -> Unit) {
         Text(
             "${minutes}:${String.format("%02d", seconds)}",
             style = MaterialTheme.typography.displayLarge,
-            color = EcgCyan
+            color = TextPrimary
         )
 
         if (state.hasHrMonitor) {
@@ -199,7 +199,7 @@ private fun ActiveContent(state: SessionUiState, onStop: () -> Unit) {
                     "Timer only — no HR monitor connected",
                     modifier = Modifier.padding(12.dp),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Gray
+                    color = TextSecondary
                 )
             }
         }
@@ -207,7 +207,7 @@ private fun ActiveContent(state: SessionUiState, onStop: () -> Unit) {
         OutlinedButton(
             onClick = onStop,
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
         ) {
             Text("Stop Session")
         }
@@ -226,7 +226,7 @@ private fun LiveMetricCard(label: String, value: String, modifier: Modifier = Mo
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(label, style = MaterialTheme.typography.bodyMedium)
-            Text(value, style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+            Text(value, style = MaterialTheme.typography.headlineMedium, color = TextPrimary)
         }
     }
 }
@@ -237,7 +237,7 @@ private fun ProcessingContent() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        CircularProgressIndicator(color = EcgCyan)
+        CircularProgressIndicator(color = TextSecondary)
         Text("Analyzing session...", style = MaterialTheme.typography.bodyLarge)
     }
 }
@@ -248,7 +248,7 @@ private fun CompleteContent(state: SessionUiState, onReset: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Session Complete", style = MaterialTheme.typography.headlineMedium, color = ReadinessGreen)
+        Text("Session Complete", style = MaterialTheme.typography.headlineMedium, color = TextPrimary)
 
         Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
             Column(
@@ -262,7 +262,7 @@ private fun CompleteContent(state: SessionUiState, onReset: () -> Unit) {
                 )
 
                 if (state.avgHrBpm != null) {
-                    Divider(color = Color.Gray.copy(alpha = 0.3f))
+                    Divider(color = TextDisabled.copy(alpha = 0.3f))
                     Text("Analytics", style = MaterialTheme.typography.titleMedium)
                     AnalyticsRow("Avg HR", "${String.format("%.1f", state.avgHrBpm)} BPM")
                     state.hrSlopeBpmPerMin?.let {
@@ -283,7 +283,7 @@ private fun CompleteContent(state: SessionUiState, onReset: () -> Unit) {
                     Text(
                         "Connect a monitor next time for full HR analytics.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Gray
+                        color = TextSecondary
                     )
                 }
             }
@@ -302,6 +302,6 @@ private fun AnalyticsRow(label: String, value: String) {
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(label, style = MaterialTheme.typography.bodyMedium)
-        Text(value, style = MaterialTheme.typography.bodyLarge, color = EcgCyan)
+        Text(value, style = MaterialTheme.typography.bodyLarge, color = TextPrimary)
     }
 }

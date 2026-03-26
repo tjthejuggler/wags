@@ -80,7 +80,7 @@ fun AllApneaRecordsScreen(
                 title = { Text("All Records") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                        Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
@@ -246,7 +246,7 @@ fun AllApneaRecordsScreen(
                                     Text(
                                         if (allSelected) "Deselect All" else "Select All",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = EcgCyan
+                                        color = TextSecondary
                                     )
                                 }
                             }
@@ -312,7 +312,7 @@ fun AllApneaRecordsScreen(
                             .padding(32.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(color = EcgCyan)
+                        CircularProgressIndicator(color = TextSecondary)
                     }
                 }
             } else {
@@ -337,7 +337,7 @@ fun AllApneaRecordsScreen(
                     ) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(24.dp),
-                            color = EcgCyan,
+                            color = TextSecondary,
                             strokeWidth = 2.dp
                         )
                     }
@@ -403,8 +403,8 @@ private fun ApneaProgressChart(
 
     val isDuration = yLabel == "Hold duration"
 
-    val lineColor   = EcgCyan
-    val dotColor    = EcgCyan
+    val lineColor   = TextPrimary
+    val dotColor    = TextPrimary
     val axisColor   = TextSecondary
     val gridColor   = SurfaceVariant.copy(alpha = 0.5f)
     val labelColor  = TextSecondary
@@ -424,7 +424,7 @@ private fun ApneaProgressChart(
                     "Progress",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = EcgCyan
+                    color = TextPrimary
                 )
                 Text(
                     yLabel,

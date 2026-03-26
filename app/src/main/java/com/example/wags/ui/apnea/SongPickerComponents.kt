@@ -36,8 +36,8 @@ fun SongPickerButton(onClick: () -> Unit) {
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF1DB954), // Spotify green
-                contentColor = Color.White
+                containerColor = SurfaceVariant,
+                contentColor = TextPrimary
             )
         ) {
             Text("🎵  Choose a Song", style = MaterialTheme.typography.bodyMedium)
@@ -72,7 +72,7 @@ fun SelectedSongBanner(track: SpotifyTrackDetail, onClear: () -> Unit) {
                 Text(
                     track.title,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF1DB954), // Spotify green
+                    color = TextPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -121,7 +121,7 @@ fun SongPickerDialog(
             Text(
                 "Choose a Song",
                 style = MaterialTheme.typography.titleLarge,
-                color = Color.White
+                color = TextPrimary
             )
         },
         text = {
@@ -175,7 +175,7 @@ fun SongPickerDialog(
             TextButton(onClick = onDismiss) {
                 Text(
                     if (selectedSong != null) "Done" else "Cancel",
-                    color = EcgCyan
+                    color = TextSecondary
                 )
             }
         },
@@ -197,7 +197,7 @@ private fun SongCard(
     isLoading: Boolean,
     onClick: () -> Unit
 ) {
-    val borderColor = if (isSelected) Color(0xFF1DB954) else SurfaceVariant
+    val borderColor = if (isSelected) TextSecondary else SurfaceVariant
     val bgColor = if (isSelected) SurfaceVariant else SurfaceDark
 
     Card(
@@ -225,7 +225,7 @@ private fun SongCard(
                 if (isLoading) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
-                        color = Color(0xFF1DB954),
+                        color = TextSecondary,
                         strokeWidth = 2.dp
                     )
                 } else {
@@ -242,7 +242,7 @@ private fun SongCard(
                     track.title,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (isSelected) Color(0xFF1DB954) else Color.White,
+                    color = if (isSelected) TextPrimary else TextSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -266,7 +266,7 @@ private fun SongCard(
 
             // Selected indicator
             if (isSelected && !isLoading) {
-                Text("✓", color = Color(0xFF1DB954), fontWeight = FontWeight.Bold)
+                Text("✓", color = TextPrimary, fontWeight = FontWeight.Bold)
             }
         }
     }

@@ -107,7 +107,7 @@ fun MeditationHistoryScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = EcgCyan
+                            tint = TextSecondary
                         )
                     }
                 },
@@ -123,7 +123,7 @@ fun MeditationHistoryScreen(
             TabRow(
                 selectedTabIndex = selectedTab.ordinal,
                 containerColor = SurfaceDark,
-                contentColor = EcgCyan
+                contentColor = TextSecondary
             ) {
                 MeditationHistoryTab.entries.forEach { tab ->
                     val isSelected = selectedTab == tab
@@ -131,13 +131,13 @@ fun MeditationHistoryScreen(
                         selected = isSelected,
                         onClick = { selectedTab = tab },
                         modifier = Modifier.background(
-                            if (isSelected) EcgCyan.copy(alpha = 0.15f)
+                            if (isSelected) SurfaceVariant
                             else Color.Transparent
                         ),
                         text = {
                             Text(
                                 tab.label,
-                                color = if (isSelected) EcgCyan else TextDisabled,
+                                color = if (isSelected) TextPrimary else TextDisabled,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                             )
                         }
@@ -190,7 +190,7 @@ private fun GraphsContent(uiState: MeditationHistoryUiState) {
         GraphSection(title = "Session Duration", subtitle = "Minutes per session") {
             MeditationLineChart(
                 points = uiState.chartData.durationMin,
-                lineColor = EcgCyan,
+                lineColor = TextPrimary,
                 label = "Duration (min)"
             )
         }
@@ -200,7 +200,7 @@ private fun GraphsContent(uiState: MeditationHistoryUiState) {
             GraphSection(title = "Average Heart Rate", subtitle = "BPM over session") {
                 MeditationLineChart(
                     points = uiState.chartData.avgHr,
-                    lineColor = ReadinessOrange,
+                    lineColor = TextSecondary,
                     label = "Avg HR (bpm)"
                 )
             }
@@ -215,8 +215,8 @@ private fun GraphsContent(uiState: MeditationHistoryUiState) {
                 DualLineChart(
                     pointsA = uiState.chartData.startRmssd,
                     pointsB = uiState.chartData.endRmssd,
-                    colorA = EcgCyan,
-                    colorB = ReadinessGreen,
+                    colorA = TextPrimary,
+                    colorB = TextSecondary,
                     labelA = "Start RMSSD",
                     labelB = "End RMSSD"
                 )
@@ -231,7 +231,7 @@ private fun GraphsContent(uiState: MeditationHistoryUiState) {
             ) {
                 MeditationLineChart(
                     points = uiState.chartData.lnRmssdSlope,
-                    lineColor = ReadinessBlue,
+                    lineColor = TextSecondary,
                     label = "ln(RMSSD) slope",
                     showZeroLine = true
                 )
@@ -303,7 +303,7 @@ private fun MeditationCalendar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onPreviousMonth) {
-                    Text("‹", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                    Text("‹", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                 }
                 Text(
                     text = displayedMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
@@ -312,7 +312,7 @@ private fun MeditationCalendar(
                     fontWeight = FontWeight.Bold
                 )
                 IconButton(onClick = onNextMonth) {
-                    Text("›", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                    Text("›", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                 }
             }
 
@@ -364,7 +364,7 @@ private fun MeditationCalendar(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(EcgCyan))
+                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(TextSecondary))
                 Spacer(Modifier.width(6.dp))
                 Text(
                     "Session recorded — tap to view",
@@ -386,12 +386,12 @@ private fun CalendarDay(
     modifier: Modifier = Modifier
 ) {
     val bgColor = when {
-        isSelected -> EcgCyan.copy(alpha = 0.25f)
+        isSelected -> SurfaceVariant
         isToday    -> SurfaceDark
         else       -> Color.Transparent
     }
     val textColor = when {
-        isSelected -> EcgCyan
+        isSelected -> TextPrimary
         isToday    -> TextPrimary
         hasSession -> TextPrimary
         else       -> TextDisabled
@@ -418,7 +418,7 @@ private fun CalendarDay(
                 modifier = Modifier
                     .size(5.dp)
                     .clip(CircleShape)
-                    .background(if (isSelected) EcgCyan else EcgCyanDim)
+                    .background(if (isSelected) TextSecondary else TextDisabled)
             )
         } else {
             Spacer(Modifier.height(5.dp))
@@ -523,7 +523,7 @@ private fun SessionSummaryCard(
                 Text(
                     audioName,
                     style = MaterialTheme.typography.labelSmall,
-                    color = EcgCyan
+                    color = TextPrimary
                 )
                 Text(
                     "${durationMin}m ${durationSec}s" +
@@ -565,13 +565,13 @@ private fun SummaryCard(uiState: MeditationHistoryUiState) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                SummaryChip("Sessions", count.toString(), EcgCyan)
-                SummaryChip("Total Min", totalMinutes.toString(), ReadinessGreen)
+                SummaryChip("Sessions", count.toString(), TextPrimary)
+                SummaryChip("Total Min", totalMinutes.toString(), TextSecondary)
                 avgDuration?.let {
-                    SummaryChip("Avg Min", String.format("%.1f", it), EcgCyanDim)
+                    SummaryChip("Avg Min", String.format("%.1f", it), TextDisabled)
                 }
                 latestAvgHr?.let {
-                    SummaryChip("Last HR", "${String.format("%.0f", it)} bpm", ReadinessOrange)
+                    SummaryChip("Last HR", "${String.format("%.0f", it)} bpm", TextSecondary)
                 }
             }
         }
@@ -759,7 +759,7 @@ private fun LineChartCanvas(
         zeroLine?.let { z ->
             val zy = yOf(z)
             drawLine(
-                color = Color.Gray.copy(alpha = 0.4f),
+                color = TextDisabled.copy(alpha = 0.4f),
                 start = Offset(0f, zy),
                 end = Offset(w, zy),
                 strokeWidth = 1.5f

@@ -49,7 +49,7 @@ fun ApneaTableScreen(
                 title = { Text("${parsedType.name} Table") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                        Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
@@ -172,7 +172,7 @@ private fun SessionStatusCard(
             }
             if (apneaState == ApneaState.COMPLETE) {
                 Text("Session Complete!", style = MaterialTheme.typography.titleLarge,
-                    color = ReadinessGreen)
+                    color = TextPrimary)
             }
         }
     }
@@ -194,7 +194,7 @@ private fun SessionControlRow(
             OutlinedButton(
                 onClick = onStop,
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
             ) {
                 Text("Stop Session")
             }
@@ -236,7 +236,7 @@ private fun TableStepRow(
                     Text(
                         "${step.apneaDurationMs / 1000L}s",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = if (isActive) ApneaHold else EcgCyan
+                        color = if (isActive) ApneaHold else TextPrimary
                     )
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -255,9 +255,9 @@ private fun TableStepRow(
                 }
             }
             if (isActive) {
-                Text("▶", style = MaterialTheme.typography.titleLarge, color = EcgCyan)
+                Text("▶", style = MaterialTheme.typography.titleLarge, color = TextSecondary)
             } else if (isComplete) {
-                Text("✓", style = MaterialTheme.typography.titleLarge, color = ReadinessGreen)
+                Text("✓", style = MaterialTheme.typography.titleLarge, color = TextPrimary)
             }
         }
     }
@@ -268,7 +268,7 @@ private fun apneaStateColor(state: ApneaState) = when (state) {
     ApneaState.VENTILATION -> ApneaVentilation
     ApneaState.APNEA -> ApneaHold
     ApneaState.RECOVERY -> ApneaRecovery
-    ApneaState.COMPLETE -> ReadinessGreen
+    ApneaState.COMPLETE -> TextPrimary
 }
 
 private const val REST_HELP_TITLE = "Rest Phase (Ventilation)"

@@ -41,7 +41,7 @@ import com.example.wags.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
 
-private val SpO2Blue = Color(0xFF42A5F5)
+private val SpO2Blue = Color(0xFFB0B0B0)   // mid-light grey (replaces blue)
 
 // Physiological bounds for display-layer filtering (mirrors PhysiologicalBounds in FreeHoldActiveScreen)
 // HR: 20–250 bpm | SpO2: 1–100% (0 = no-signal glitch; real extreme dives can go very low)
@@ -79,7 +79,7 @@ fun ApneaRecordDetailScreen(
                 title = { Text("Hold Detail") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                        Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
                 },
                 actions = {
@@ -89,7 +89,7 @@ fun ApneaRecordDetailScreen(
                             Icon(
                                 imageVector = Icons.Outlined.Edit,
                                 contentDescription = "Edit record settings",
-                                tint = EcgCyan
+                                tint = TextSecondary
                             )
                         }
                         // Delete button
@@ -97,7 +97,7 @@ fun ApneaRecordDetailScreen(
                             Icon(
                                 imageVector = Icons.Outlined.Delete,
                                 contentDescription = "Delete record",
-                                tint = ButtonDanger
+                                tint = TextDisabled
                             )
                         }
                     }
@@ -111,7 +111,7 @@ fun ApneaRecordDetailScreen(
                 Box(
                     modifier = Modifier.fillMaxSize().padding(padding),
                     contentAlignment = Alignment.Center
-                ) { CircularProgressIndicator(color = EcgCyan) }
+                ) { CircularProgressIndicator(color = TextSecondary) }
             }
             state.notFound -> {
                 Box(
@@ -154,7 +154,7 @@ fun ApneaRecordDetailScreen(
                         showDeleteDialog = false
                         viewModel.deleteRecord()
                     },
-                    colors = ButtonDefaults.textButtonColors(contentColor = ButtonDanger)
+                    colors = ButtonDefaults.textButtonColors(contentColor = TextDisabled)
                 ) { Text("Delete") }
             },
             dismissButton = {
@@ -239,12 +239,12 @@ private fun EditRecordSheet(
                             label    = {
                                 Text(
                                     displayLabel,
-                                    color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurface
+                                    color = if (isSelected) TextPrimary else MaterialTheme.colorScheme.onSurface
                                 )
                             },
                             colors   = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = EcgCyan,
-                                selectedLabelColor     = Color.Black,
+                                selectedContainerColor = SurfaceVariant,
+                                selectedLabelColor     = TextPrimary,
                                 labelColor             = MaterialTheme.colorScheme.onSurface
                             )
                         )
@@ -264,12 +264,12 @@ private fun EditRecordSheet(
                             label    = {
                                 Text(
                                     pt.displayName(),
-                                    color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurface
+                                    color = if (isSelected) TextPrimary else MaterialTheme.colorScheme.onSurface
                                 )
                             },
                             colors   = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = EcgCyan,
-                                selectedLabelColor     = Color.Black,
+                                selectedContainerColor = SurfaceVariant,
+                                selectedLabelColor     = TextPrimary,
                                 labelColor             = MaterialTheme.colorScheme.onSurface
                             )
                         )
@@ -289,12 +289,12 @@ private fun EditRecordSheet(
                             label    = {
                                 Text(
                                     tod.name.lowercase().replaceFirstChar { it.uppercase() },
-                                    color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurface
+                                    color = if (isSelected) TextPrimary else MaterialTheme.colorScheme.onSurface
                                 )
                             },
                             colors   = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = EcgCyan,
-                                selectedLabelColor     = Color.Black,
+                                selectedContainerColor = SurfaceVariant,
+                                selectedLabelColor     = TextPrimary,
                                 labelColor             = MaterialTheme.colorScheme.onSurface
                             )
                         )
@@ -314,12 +314,12 @@ private fun EditRecordSheet(
                             label    = {
                                 Text(
                                     pos.displayName(),
-                                    color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurface
+                                    color = if (isSelected) TextPrimary else MaterialTheme.colorScheme.onSurface
                                 )
                             },
                             colors   = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = EcgCyan,
-                                selectedLabelColor     = Color.Black,
+                                selectedContainerColor = SurfaceVariant,
+                                selectedLabelColor     = TextPrimary,
                                 labelColor             = MaterialTheme.colorScheme.onSurface
                             )
                         )
@@ -339,12 +339,12 @@ private fun EditRecordSheet(
                             label    = {
                                 Text(
                                     aud.displayName(),
-                                    color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurface
+                                    color = if (isSelected) TextPrimary else MaterialTheme.colorScheme.onSurface
                                 )
                             },
                             colors   = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = EcgCyan,
-                                selectedLabelColor     = Color.Black,
+                                selectedContainerColor = SurfaceVariant,
+                                selectedLabelColor     = TextPrimary,
                                 labelColor             = MaterialTheme.colorScheme.onSurface
                             )
                         )
@@ -372,7 +372,7 @@ private fun EditRecordSheet(
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = MaterialTheme.colorScheme.onSurface,
                                 unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                focusedBorderColor = EcgCyan,
+                                focusedBorderColor = TextSecondary,
                                 unfocusedBorderColor = TextSecondary
                             )
                         )
@@ -414,7 +414,7 @@ private fun EditRecordSheet(
                 Button(
                     onClick = onSave,
                     modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = EcgCyan, contentColor = BackgroundDark)
+                    colors = ButtonDefaults.buttonColors(containerColor = SurfaceVariant, contentColor = TextPrimary)
                 ) { Text("Save", fontWeight = FontWeight.Bold) }
             }
         }
@@ -478,7 +478,7 @@ private fun RecordDetailContent(
                 DetailRow(
                     label = "Duration",
                     value = formatMsDetail(record.durationMs),
-                    valueColor = EcgCyan,
+                    valueColor = TextPrimary,
                     valueBold = true
                 )
                 DetailRow(
@@ -518,7 +518,7 @@ private fun RecordDetailContent(
                     DetailRow(
                         label = "First Contraction",
                         value = formatMsDetail(fcMs),
-                        valueColor = Color(0xFFFF9800),
+                        valueColor = TextSecondary,
                         valueBold = true
                     )
                 }
@@ -526,18 +526,18 @@ private fun RecordDetailContent(
                 // ── Personal Best badges ────────────────────────────────────
                 if (pbBadges.isNotEmpty()) {
                     HorizontalDivider(
-                        color = Color.White.copy(alpha = 0.12f),
+                        color = TextDisabled.copy(alpha = 0.3f),
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
                     Text(
                         "Personal Best",
                         style = MaterialTheme.typography.titleMedium,
-                        color = EcgCyan
+                        color = TextPrimary
                     )
                     pbBadges.forEach { badge ->
                         val trophies = badge.category.trophyEmojis()
                         val status = if (badge.isCurrent) "Current" else "Former"
-                        val statusColor = if (badge.isCurrent) EcgCyan else TextSecondary
+                        val statusColor = if (badge.isCurrent) TextPrimary else TextSecondary
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -546,7 +546,7 @@ private fun RecordDetailContent(
                             Text(
                                 "$trophies ${badge.description}",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = if (badge.isCurrent) Color.White else TextSecondary
+                                color = if (badge.isCurrent) TextPrimary else TextSecondary
                             )
                             Text(
                                 status,
@@ -576,17 +576,17 @@ private fun RecordDetailContent(
                         StatBox(
                             label = "Start",
                             value = "${hrValues.first().toInt()}",
-                            color = Color.White
+                            color = TextPrimary
                         )
                         StatBox(
                             label = "Min",
                             value = "${hrValues.min().toInt()}",
-                            color = EcgCyan
+                            color = TextPrimary
                         )
                         StatBox(
                             label = "Avg",
                             value = "${hrValues.average().toInt()}",
-                            color = Color.White
+                            color = TextPrimary
                         )
                         StatBox(
                             label = "Max",
@@ -596,12 +596,12 @@ private fun RecordDetailContent(
                         StatBox(
                             label = "End",
                             value = "${hrValues.last().toInt()}",
-                            color = Color.White
+                            color = TextPrimary
                         )
                     }
                     LineChart(
                         samples = hrValues,
-                        lineColor = EcgCyan,
+                        lineColor = TextPrimary,
                         durationMs = record.durationMs,
                         firstContractionMs = record.firstContractionMs,
                         showYLabels = true,
@@ -619,7 +619,7 @@ private fun RecordDetailContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        StatBox(label = "Min", value = "${record.minHrBpm.toInt()} bpm", color = EcgCyan)
+                        StatBox(label = "Min", value = "${record.minHrBpm.toInt()} bpm", color = TextPrimary)
                         StatBox(label = "Max", value = "${record.maxHrBpm.toInt()} bpm", color = ApneaHold)
                     }
                     Text(
@@ -653,7 +653,7 @@ private fun RecordDetailContent(
                         StatBox(
                             label = "Start",
                             value = "${spO2Values.first().toInt()}",
-                            color = Color.White
+                            color = TextPrimary
                         )
                         StatBox(
                             label = "Min",
@@ -663,17 +663,17 @@ private fun RecordDetailContent(
                         StatBox(
                             label = "Avg",
                             value = "${spO2Values.average().toInt()}",
-                            color = Color.White
+                            color = TextPrimary
                         )
                         StatBox(
                             label = "Max",
                             value = "${spO2Values.max().toInt()}",
-                            color = Color.White
+                            color = TextPrimary
                         )
                         StatBox(
                             label = "End",
                             value = "${spO2Values.last().toInt()}",
-                            color = Color.White
+                            color = TextPrimary
                         )
                     }
                     LineChart(
@@ -716,7 +716,7 @@ private fun RecordDetailContent(
                             Text(
                                 song.title,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White
+                                color = TextPrimary
                             )
                             Text(
                                 song.artist,
@@ -733,7 +733,7 @@ private fun RecordDetailContent(
                                 color = TextSecondary
                             )
                         }
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                        HorizontalDivider(color = TextDisabled.copy(alpha = 0.2f))
                     }
                 }
             }
@@ -769,7 +769,7 @@ private fun LineChart(
     val rightPadPx  = with(density) { 4.dp.toPx() }
 
     val labelTextSizePx = with(density) { 9.sp.toPx() }
-    val labelColor      = Color.White.copy(alpha = 0.45f)
+    val labelColor      = TextSecondary.copy(alpha = 0.7f)
     val labelArgb       = labelColor.toArgb()
 
     val yRange = (yMax - yMin).coerceAtLeast(1f)
@@ -792,7 +792,7 @@ private fun LineChart(
         listOf(0.25f, 0.5f, 0.75f).forEach { frac ->
             val y = plotTop + plotH * (1f - frac)
             drawLine(
-                color = Color.White.copy(alpha = 0.07f),
+                color = TextDisabled.copy(alpha = 0.15f),
                 start = Offset(plotLeft, y),
                 end   = Offset(plotRight, y),
                 strokeWidth = 1f

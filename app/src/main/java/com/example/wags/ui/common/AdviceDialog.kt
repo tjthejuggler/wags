@@ -103,9 +103,9 @@ fun AdviceDialog(
                 modifier = Modifier.fillMaxWidth(),
                 textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = EcgCyan,
+                    focusedBorderColor = TextSecondary,
                     unfocusedBorderColor = Color(0xFF444444),
-                    cursorColor = EcgCyan
+                    cursorColor = TextSecondary
                 ),
                 maxLines = 3
             )
@@ -119,7 +119,7 @@ fun AdviceDialog(
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = ButtonPrimary,
-                    contentColor = Color.White
+                    contentColor = TextPrimary
                 )
             ) {
                 Text("Add Advice")
@@ -160,9 +160,9 @@ fun AdviceDialog(
                                         color = TextPrimary
                                     ),
                                     colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = EcgCyan,
+                                        focusedBorderColor = TextSecondary,
                                         unfocusedBorderColor = Color(0xFF444444),
-                                        cursorColor = EcgCyan
+                                        cursorColor = TextSecondary
                                     ),
                                     maxLines = 3
                                 )
@@ -176,14 +176,14 @@ fun AdviceDialog(
                                         enabled = editText.isNotBlank(),
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = ButtonPrimary,
-                                            contentColor = Color.White
+                                            contentColor = TextPrimary
                                         ),
                                         modifier = Modifier.weight(1f)
                                     ) { Text("Save", fontSize = 12.sp) }
                                     OutlinedButton(
                                         onClick = { editingId = null },
                                         colors = ButtonDefaults.outlinedButtonColors(
-                                            contentColor = Color.White
+                                            contentColor = TextPrimary
                                         ),
                                         modifier = Modifier.weight(1f)
                                     ) { Text("Cancel", fontSize = 12.sp) }
@@ -244,7 +244,7 @@ fun AdviceDialog(
             OutlinedButton(
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
             ) {
                 Text("Close")
             }

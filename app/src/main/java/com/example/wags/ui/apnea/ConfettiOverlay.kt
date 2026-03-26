@@ -11,8 +11,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.rotate
-import com.example.wags.ui.theme.EcgCyan
-import com.example.wags.ui.theme.ReadinessGreen
+import com.example.wags.ui.theme.TextDisabled
+import com.example.wags.ui.theme.TextPrimary
+import com.example.wags.ui.theme.TextSecondary
 import kotlin.math.sin
 import kotlin.random.Random
 
@@ -34,12 +35,12 @@ private data class ConfettiParticle(
 )
 
 private val confettiColors = listOf(
-    EcgCyan,
-    ReadinessGreen,
-    Color(0xFFFFD700),  // gold
-    Color(0xFFFF6B6B),  // soft coral
-    Color(0xFF7C4DFF),  // soft purple
-    Color(0xFFFFFFFF),  // white
+    TextPrimary,
+    TextSecondary,
+    Color(0xFFD0D0D0),  // light grey
+    Color(0xFFB0B0B0),  // mid-light grey
+    Color(0xFF909090),  // mid grey
+    TextDisabled,
 )
 
 private fun generateParticles(count: Int): List<ConfettiParticle> {

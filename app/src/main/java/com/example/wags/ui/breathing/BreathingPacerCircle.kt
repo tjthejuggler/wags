@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.wags.ui.theme.PacerExhale
 import com.example.wags.ui.theme.PacerInhale
+import com.example.wags.ui.theme.TextPrimary
 
 /**
  * Unified breathing pacer circle used across all resonance breathing screens.
@@ -49,7 +50,7 @@ fun BreathingPacerCircle(
     showLabel: Boolean = true,
     overlayLabel: String? = null
 ) {
-    // Color is determined by the current phase
+    // Color is determined by the current phase — greyscale: light for inhale, dark for exhale
     val color = if (isInhaling) PacerInhale else PacerExhale
     val label = overlayLabel ?: if (isInhaling) "INHALE" else "EXHALE"
 
@@ -59,7 +60,7 @@ fun BreathingPacerCircle(
     // Smoothly animate the text color so it never "pops" or appears to be
     // removed and recreated. The target color is white when the filled circle
     // is large enough to be behind the text, otherwise the phase color.
-    val targetTextColor = if (clampedProgress > 0.45f) Color.White else color
+    val targetTextColor = if (clampedProgress > 0.45f) TextPrimary else color
     val animatedTextColor by animateColorAsState(
         targetValue = targetTextColor,
         animationSpec = tween(durationMillis = 300),

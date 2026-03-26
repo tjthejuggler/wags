@@ -100,7 +100,7 @@ fun GarminScreen(
                 title = { Text("Garmin Watch", style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                        Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
@@ -127,30 +127,30 @@ fun GarminScreen(
                         Text(
                             text = "Connection Status",
                             style = MaterialTheme.typography.titleSmall,
-                            color = Color.White
+                            color = TextPrimary
                         )
                         Spacer(modifier = Modifier.height(12.dp))
 
                         val (statusText, statusColor) = when (val state = connectionState) {
                             is GarminConnectionState.Uninitialized -> {
                                 if (viewModel.hasPairedDevice) {
-                                    "Saved: ${viewModel.pairedDeviceName}\nNot yet connected" to Color.Gray
-                                } else {
-                                    "Not Connected" to Color.Gray
-                                }
+                                        "Saved: ${viewModel.pairedDeviceName}\nNot yet connected" to TextSecondary
+                                    } else {
+                                        "Not Connected" to TextSecondary
+                                    }
                             }
                             is GarminConnectionState.Initializing ->
-                                "Initializing SDK..." to ReadinessOrange
+                                "Initializing SDK..." to TextSecondary
                             is GarminConnectionState.SdkReady ->
-                                "SDK Ready — Searching..." to ReadinessOrange
+                                "SDK Ready — Searching..." to TextSecondary
                             is GarminConnectionState.DeviceFound ->
-                                "Found: ${state.deviceName}\nWaiting for connection..." to ReadinessOrange
+                                "Found: ${state.deviceName}\nWaiting for connection..." to TextSecondary
                             is GarminConnectionState.WagsAppNotFound ->
-                                "Connected to ${state.deviceName}\nbut WAGS app not found" to ButtonDanger
+                                "Connected to ${state.deviceName}\nbut WAGS app not found" to TextDisabled
                             is GarminConnectionState.Connected ->
-                                "Connected: ${state.deviceName}" to ButtonSuccess
+                                "Connected: ${state.deviceName}" to TextPrimary
                             is GarminConnectionState.Error ->
-                                state.message to ButtonDanger
+                                state.message to TextDisabled
                         }
 
                         Text(
@@ -182,8 +182,8 @@ fun GarminScreen(
                                 onClick = { viewModel.initializeGarmin() },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = EcgCyan,
-                                    contentColor = Color.Black
+                                    containerColor = SurfaceVariant,
+                                    contentColor = TextPrimary
                                 )
                             ) {
                                 Text(
@@ -199,7 +199,7 @@ fun GarminScreen(
                                     onClick = { viewModel.forgetDevice() },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Text("Forget Device", color = ButtonDanger)
+                                    Text("Forget Device", color = TextDisabled)
                                 }
                             }
                         }
@@ -215,7 +215,7 @@ fun GarminScreen(
                                     Text(
                                         text = "⚠ WAGS App Not Found",
                                         style = MaterialTheme.typography.titleSmall,
-                                        color = ButtonDanger,
+                                        color = TextSecondary,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
@@ -224,7 +224,7 @@ fun GarminScreen(
                                                 "was not detected. Make sure you've copied wags.prg " +
                                                 "to GARMIN/APPS/ on the watch and rebooted it.",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = Color.LightGray
+                                        color = TextSecondary
                                     )
                                 }
                             }
@@ -233,8 +233,8 @@ fun GarminScreen(
                                 onClick = { viewModel.initializeGarmin() },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = EcgCyan,
-                                    contentColor = Color.Black
+                                    containerColor = SurfaceVariant,
+                                    contentColor = TextPrimary
                                 )
                             ) {
                                 Text("Retry", fontWeight = FontWeight.Bold)
@@ -247,7 +247,7 @@ fun GarminScreen(
                     is GarminConnectionState.DeviceFound -> {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             CircularProgressIndicator(
-                                color = EcgCyan,
+                                color = TextSecondary,
                                 modifier = Modifier.size(48.dp)
                             )
                             Spacer(modifier = Modifier.height(12.dp))
@@ -258,7 +258,7 @@ fun GarminScreen(
                                     else -> "Searching for Garmin devices..."
                                 },
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = Color.LightGray,
+                                color = TextSecondary,
                                 textAlign = TextAlign.Center
                             )
                             Spacer(modifier = Modifier.height(12.dp))
@@ -266,7 +266,7 @@ fun GarminScreen(
                                 onClick = { viewModel.shutdownGarmin() },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("Cancel", color = Color.LightGray)
+                                Text("Cancel", color = TextSecondary)
                             }
                         }
                     }
@@ -281,7 +281,7 @@ fun GarminScreen(
                                     Text(
                                         text = "✓ Watch Connected",
                                         style = MaterialTheme.typography.titleSmall,
-                                        color = ButtonSuccess,
+                                        color = TextPrimary,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
@@ -290,7 +290,7 @@ fun GarminScreen(
                                                 "automatically sync to this phone. You'll see a " +
                                                 "toast notification when holds are transferred.",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = Color.LightGray
+                                        color = TextSecondary
                                     )
                                 }
                             }
@@ -301,8 +301,8 @@ fun GarminScreen(
                                 onClick = { viewModel.requestSync() },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = EcgCyan,
-                                    contentColor = Color.Black
+                                    containerColor = SurfaceVariant,
+                                    contentColor = TextPrimary
                                 )
                             ) {
                                 Text("Sync Now", fontWeight = FontWeight.Bold)
@@ -314,7 +314,7 @@ fun GarminScreen(
                                 onClick = { viewModel.forgetDevice() },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("Forget Device", color = ButtonDanger)
+                                Text("Forget Device", color = TextDisabled)
                             }
                         }
                     }
@@ -338,20 +338,20 @@ fun GarminScreen(
                             Text(
                                 text = "Garmin Sync Log",
                                 style = MaterialTheme.typography.titleSmall,
-                                color = Color.White,
+                                color = TextPrimary,
                                 fontWeight = FontWeight.Bold
                             )
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (syncLog.isNotEmpty()) {
                                     TextButton(onClick = { viewModel.clearSyncLog() }) {
-                                        Text("Clear", style = MaterialTheme.typography.bodySmall, color = ButtonDanger)
+                                        Text("Clear", style = MaterialTheme.typography.bodySmall, color = TextDisabled)
                                     }
                                 }
                                 TextButton(onClick = { showSyncLog = !showSyncLog }) {
                                     Text(
                                         if (showSyncLog) "Hide" else "Show (${syncLog.size})",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = EcgCyan
+                                        color = TextSecondary
                                     )
                                 }
                             }
@@ -380,11 +380,11 @@ fun GarminScreen(
                     val entry = syncLog[index]
                     val entryColor = when {
                         entry.contains("OK") || entry.contains("SYNCED") || entry.contains("connected") ->
-                            ReadinessGreen
+                            TextPrimary
                         entry.contains("FAIL") || entry.contains("ERR") || entry.contains("DECODE") ->
-                            ButtonDanger
+                            TextDisabled
                         entry.contains("SEND") || entry.contains("RX") || entry.contains("SYNC_REQUEST") ->
-                            ReadinessOrange
+                            TextSecondary
                         else -> TextSecondary
                     }
                     Text(
@@ -410,7 +410,7 @@ fun GarminScreen(
                         Text(
                             text = "How It Works",
                             style = MaterialTheme.typography.titleSmall,
-                            color = Color.White,
+                            color = TextPrimary,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -427,7 +427,7 @@ fun GarminScreen(
                             Text(
                                 text = step,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color.LightGray,
+                                color = TextSecondary,
                                 modifier = Modifier.padding(vertical = 2.dp)
                             )
                         }

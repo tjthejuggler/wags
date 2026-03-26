@@ -36,7 +36,7 @@ fun ApneaHistoryScreen(
                 title = { Text("History") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                        Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
@@ -48,7 +48,7 @@ fun ApneaHistoryScreen(
                 modifier = Modifier.fillMaxSize().padding(padding),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(color = EcgCyan)
+                CircularProgressIndicator(color = TextSecondary)
             }
             return@Scaffold
         }
@@ -113,7 +113,7 @@ fun ApneaHistoryScreen(
                             Text(
                                 formatDuration(state.bestFreeHoldMs),
                                 style = MaterialTheme.typography.headlineSmall,
-                                color = EcgCyan,
+                                color = TextPrimary,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -190,7 +190,7 @@ private fun FreeHoldHistoryRow(record: ApneaRecordEntity, onClick: () -> Unit) {
                 Text(
                     formatDuration(record.durationMs),
                     style = MaterialTheme.typography.titleMedium,
-                    color = EcgCyan
+                    color = TextPrimary
                 )
                 Text(
                     dateStr,
@@ -240,7 +240,7 @@ private fun TableSessionHistoryRow(session: ApneaSessionEntity) {
                 Text(
                     session.tableType,
                     style = MaterialTheme.typography.titleMedium,
-                    color = EcgCyan
+                    color = TextPrimary
                 )
                 Text(
                     "${session.roundsCompleted}/${session.totalRounds} rounds  •  ${session.tableVariant}",

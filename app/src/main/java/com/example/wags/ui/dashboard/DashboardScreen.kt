@@ -51,14 +51,14 @@ fun DashboardScreen(
                                     Icon(
                                         imageVector = Icons.Default.Favorite,
                                         contentDescription = "Heart rate",
-                                        tint = ReadinessRed,
+                                        tint = TextSecondary,
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Text(
                                         text = "$bpm",
                                         style = MaterialTheme.typography.bodyLarge,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = ReadinessRed
+                                        color = TextPrimary
                                     )
                                 }
                             }
@@ -71,13 +71,13 @@ fun DashboardScreen(
                                     Text(
                                         text = "SpO₂",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = EcgCyan
+                                        color = TextSecondary
                                     )
                                     Text(
                                         text = "$spo2%",
                                         style = MaterialTheme.typography.bodyLarge,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = EcgCyan
+                                        color = TextPrimary
                                     )
                                 }
                             }
@@ -199,11 +199,7 @@ private fun TodayHrvReadinessCard(
                 Text(
                     text = reading.readinessScore.toString(),
                     style = MaterialTheme.typography.displayLarge,
-                    color = when {
-                        reading.readinessScore >= 80 -> ReadinessGreen
-                        reading.readinessScore >= 60 -> ReadinessOrange
-                        else                         -> ReadinessRed
-                    }
+                    color = TextPrimary
                 )
             }
             Column(horizontalAlignment = Alignment.End) {
@@ -211,10 +207,10 @@ private fun TodayHrvReadinessCard(
                 Text(
                     String.format("%.2f", reading.lnRmssd),
                     style = MaterialTheme.typography.headlineMedium,
-                    color = EcgCyan
+                    color = TextPrimary
                 )
                 Spacer(Modifier.height(4.dp))
-                Text("Tap for details →", style = MaterialTheme.typography.labelSmall, color = EcgCyanDim)
+                Text("Tap for details →", style = MaterialTheme.typography.labelSmall, color = TextDisabled)
             }
         }
     }
@@ -259,11 +255,7 @@ private fun TodayMorningReadinessCard(
         return
     }
 
-    val scoreColor = when (reading.readinessColor) {
-        "GREEN" -> ReadinessGreen
-        "RED"   -> ReadinessRed
-        else    -> ReadinessOrange
-    }
+    val scoreColor = TextPrimary
 
     Card(
         onClick = onClick,
@@ -286,14 +278,14 @@ private fun TodayMorningReadinessCard(
                 Text(
                     text = reading.readinessScore.toString(),
                     style = MaterialTheme.typography.displayLarge,
-                    color = scoreColor
+                    color = TextPrimary
                 )
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(
                     reading.readinessColor,
                     style = MaterialTheme.typography.labelLarge,
-                    color = scoreColor,
+                    color = TextSecondary,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(Modifier.height(4.dp))
@@ -303,7 +295,7 @@ private fun TodayMorningReadinessCard(
                     color = TextSecondary
                 )
                 Spacer(Modifier.height(4.dp))
-                Text("Tap for details →", style = MaterialTheme.typography.labelSmall, color = EcgCyanDim)
+                Text("Tap for details →", style = MaterialTheme.typography.labelSmall, color = TextDisabled)
             }
         }
     }
@@ -329,7 +321,7 @@ private fun NavigationCard(title: String, subtitle: String, onClick: () -> Unit)
                 Text(title, style = MaterialTheme.typography.titleLarge)
                 Text(subtitle, style = MaterialTheme.typography.bodyMedium)
             }
-            Text("→", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+            Text("→", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
         }
     }
 }

@@ -19,8 +19,8 @@ import com.example.wags.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
 
-private val CruisingGreen = Color(0xFF4CAF50)
-private val StruggleOrange = Color(0xFFFF6B35)
+private val CruisingGreen  = Color(0xFFD0D0D0)   // light grey (replaces green)
+private val StruggleOrange = Color(0xFF707070)    // mid grey (replaces orange)
 
 private const val DELTA_CHART_HELP_TITLE = "Contraction Delta Chart"
 private const val DELTA_CHART_HELP_CONTENT = """
@@ -79,7 +79,7 @@ fun SessionAnalyticsScreen(
                 title = { Text("Session Analytics") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                        Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
@@ -132,7 +132,7 @@ fun SessionAnalyticsHistoryScreen(
                 title = { Text("Session Analytics") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                        Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)

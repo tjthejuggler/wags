@@ -66,7 +66,7 @@ fun HrvReadinessHistoryScreen(
                 title = { Text("HRV Readiness History") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                        Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
@@ -82,7 +82,7 @@ fun HrvReadinessHistoryScreen(
             TabRow(
                 selectedTabIndex = selectedTab.ordinal,
                 containerColor = SurfaceDark,
-                contentColor = EcgCyan
+                contentColor = TextSecondary
             ) {
                 HrvHistoryTab.entries.forEach { tab ->
                     val isSelected = selectedTab == tab
@@ -90,13 +90,13 @@ fun HrvReadinessHistoryScreen(
                         selected = isSelected,
                         onClick = { selectedTab = tab },
                         modifier = Modifier.background(
-                            if (isSelected) EcgCyan.copy(alpha = 0.15f)
+                            if (isSelected) TextSecondary.copy(alpha = 0.15f)
                             else Color.Transparent
                         ),
                         text = {
                             Text(
                                 tab.label,
-                                color = if (isSelected) EcgCyan else TextDisabled,
+                                color = if (isSelected) TextPrimary else TextDisabled,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                             )
                         }
@@ -162,7 +162,7 @@ private fun HrvGraphsContent(uiState: HrvReadinessHistoryUiState) {
             HrvMetricChart(
                 label = "RMSSD (ms)",
                 points = uiState.chartData.rmssd,
-                lineColor = EcgCyan
+                lineColor = TextPrimary
             )
         }
 
@@ -174,7 +174,7 @@ private fun HrvGraphsContent(uiState: HrvReadinessHistoryUiState) {
             HrvMetricChart(
                 label = "ln(RMSSD)",
                 points = uiState.chartData.lnRmssd,
-                lineColor = ReadinessGreen
+                lineColor = Color(0xFFD0D0D0)
             )
         }
 
@@ -186,7 +186,7 @@ private fun HrvGraphsContent(uiState: HrvReadinessHistoryUiState) {
             HrvMetricChart(
                 label = "SDNN (ms)",
                 points = uiState.chartData.sdnn,
-                lineColor = ReadinessBlue
+                lineColor = Color(0xFFB0B0B0)
             )
         }
 
@@ -198,7 +198,7 @@ private fun HrvGraphsContent(uiState: HrvReadinessHistoryUiState) {
             HrvMetricChart(
                 label = "Resting HR (bpm)",
                 points = uiState.chartData.restingHr,
-                lineColor = ReadinessOrange,
+                lineColor = Color(0xFF909090),
                 invertGood = true
             )
         }
@@ -270,7 +270,7 @@ private fun HrvReadinessCalendar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onPreviousMonth) {
-                    Text("‹", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                    Text("‹", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                 }
                 Text(
                     text = displayedMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
@@ -279,7 +279,7 @@ private fun HrvReadinessCalendar(
                     fontWeight = FontWeight.Bold
                 )
                 IconButton(onClick = onNextMonth) {
-                    Text("›", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                    Text("›", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                 }
             }
 
@@ -334,7 +334,7 @@ private fun HrvReadinessCalendar(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(EcgCyan))
+                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(TextSecondary))
                 Spacer(Modifier.width(6.dp))
                 Text(
                     "Session recorded — tap to view",
@@ -356,12 +356,12 @@ private fun HrvCalendarDay(
     modifier: Modifier = Modifier
 ) {
     val bgColor = when {
-        isSelected -> EcgCyan.copy(alpha = 0.25f)
+        isSelected -> TextSecondary.copy(alpha = 0.25f)
         isToday    -> SurfaceDark
         else       -> Color.Transparent
     }
     val textColor = when {
-        isSelected -> EcgCyan
+        isSelected -> TextPrimary
         isToday    -> TextPrimary
         hasReading -> TextPrimary
         else       -> TextDisabled
@@ -388,7 +388,7 @@ private fun HrvCalendarDay(
                 modifier = Modifier
                     .size(5.dp)
                     .clip(CircleShape)
-                    .background(if (isSelected) EcgCyan else EcgCyanDim)
+                    .background(if (isSelected) TextPrimary else TextSecondary)
             )
         } else {
             Spacer(Modifier.height(5.dp))
@@ -462,11 +462,7 @@ private fun HrvSessionSummaryCard(
     val timeLabel = Instant.ofEpochMilli(reading.timestamp).atZone(zone)
         .format(DateTimeFormatter.ofPattern("h:mm a"))
 
-    val scoreColor = when {
-        reading.readinessScore >= 80 -> ReadinessGreen
-        reading.readinessScore >= 60 -> ReadinessOrange
-        else                         -> ReadinessRed
-    }
+    val scoreColor = TextPrimary
 
     Card(
         modifier = Modifier
@@ -503,7 +499,7 @@ private fun HrvSessionSummaryCard(
                 Text(
                     reading.readinessScore.toString(),
                     style = MaterialTheme.typography.titleLarge,
-                    color = scoreColor,
+                    color = TextPrimary,
                     fontWeight = FontWeight.ExtraBold
                 )
                 Text(
@@ -547,12 +543,12 @@ private fun HrvHistorySummaryCard(uiState: HrvReadinessHistoryUiState) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                HrvSummaryChip(label = "Sessions", value = count.toString(), color = EcgCyan)
+                HrvSummaryChip(label = "Sessions", value = count.toString(), color = TextPrimary)
                 latestScore?.let {
-                    HrvSummaryChip(label = "Latest Score", value = it.toString(), color = hrvScoreColor(it.toFloat()))
+                    HrvSummaryChip(label = "Latest Score", value = it.toString(), color = TextPrimary)
                 }
                 avgScore?.let {
-                    HrvSummaryChip(label = "Avg Score", value = it.toString(), color = hrvScoreColor(it.toFloat()))
+                    HrvSummaryChip(label = "Avg Score", value = it.toString(), color = TextSecondary)
                 }
             }
             if (latestRmssd != null && avgRmssd != null) {
@@ -563,12 +559,12 @@ private fun HrvHistorySummaryCard(uiState: HrvReadinessHistoryUiState) {
                     HrvSummaryChip(
                         label = "Latest RMSSD",
                         value = String.format("%.1f ms", latestRmssd),
-                        color = EcgCyan
+                        color = TextPrimary
                     )
                     HrvSummaryChip(
                         label = "Avg RMSSD",
                         value = String.format("%.1f ms", avgRmssd),
-                        color = EcgCyanDim
+                        color = TextSecondary
                     )
                 }
             }
@@ -631,11 +627,11 @@ private fun HrvReadinessScoreChart(points: List<HrvChartPoint>) {
 
         HrvLineChartCanvas(
             points = points.map { it.index to it.value },
-            lineColor = EcgCyan,
+            lineColor = TextPrimary,
             fillAlpha = 0.15f,
             yMin = 0f,
             yMax = 100f,
-            referenceLines = listOf(80f to ReadinessGreen, 60f to ReadinessOrange),
+            referenceLines = listOf(80f to Color(0xFF606060), 60f to Color(0xFF404040)),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(120.dp)
@@ -645,9 +641,9 @@ private fun HrvReadinessScoreChart(points: List<HrvChartPoint>) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            HrvZoneLegend("≥80 Green",    ReadinessGreen)
-            HrvZoneLegend("60–79 Yellow", ReadinessOrange)
-            HrvZoneLegend("<60 Red",      ReadinessRed)
+            HrvZoneLegend("≥80",   Color(0xFF606060))
+            HrvZoneLegend("60–79", Color(0xFF404040))
+            HrvZoneLegend("<60",   Color(0xFF282828))
         }
     }
 }
@@ -846,7 +842,7 @@ private fun HrvEmptyHistoryContent(modifier: Modifier = Modifier) {
 }
 
 private fun hrvScoreColor(score: Float) = when {
-    score >= 80f -> ReadinessGreen
-    score >= 60f -> ReadinessOrange
-    else         -> ReadinessRed
+    score >= 80f -> Color(0xFFE8E8E8)
+    score >= 60f -> Color(0xFFB0B0B0)
+    else         -> Color(0xFF888888)
 }

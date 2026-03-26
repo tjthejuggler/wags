@@ -42,18 +42,18 @@ private val RsInk       = Color(0xFF0A0A0A)
 private val RsChartLine = Color(0xFFD0D0D0)
 private val RsChartDot  = Color(0xFFFFFFFF)
 private val RsChartGlow = Color(0xFF909090)
-private val RsGold      = Color(0xFFFFD700)
+private val RsGold      = Color(0xFFD0D0D0)   // light grey (replaces gold)
 
-// Coherence zone colours
-private val RsZoneRed   = Color(0xFFE53935)
-private val RsZoneBlue  = Color(0xFF42A5F5)
-private val RsZoneGreen = Color(0xFF66BB6A)
+// Coherence zone colours — greyscale
+private val RsZoneRed   = Color(0xFF606060)   // dim grey  = low coherence
+private val RsZoneBlue  = Color(0xFF909090)   // mid grey  = medium coherence
+private val RsZoneGreen = Color(0xFFD0D0D0)   // light grey = high coherence
 
-// RMSSD chart accent — warm amber so it's visually distinct from the RR chart
+// RMSSD chart — slightly lighter grey to distinguish from RR chart
 private val RmssdColors = StripChartColors(
-    lineColor = Color(0xFFFFB300),
-    dotColor  = Color(0xFFFFB300),
-    glowColor = Color(0xFF7A5500)
+    lineColor = Color(0xFFB0B0B0),
+    dotColor  = Color(0xFFD0D0D0),
+    glowColor = Color(0xFF505050)
 )
 private const val RS_CHART_WINDOW_MS = 20_000.0
 
@@ -211,7 +211,7 @@ fun ResonanceSessionScreen(
                             onNavigateBack()
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
                     ) { Text("Stop Session") }
                 }
 

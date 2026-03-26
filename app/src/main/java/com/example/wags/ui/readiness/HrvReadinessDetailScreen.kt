@@ -103,7 +103,7 @@ fun HrvReadinessDetailScreen(
                     showDeleteDialog = false
                     viewModel.deleteReading()
                 }) {
-                    Text("Delete", color = ReadinessRed, fontWeight = FontWeight.Bold)
+                    Text("Delete", color = TextSecondary, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -121,17 +121,17 @@ fun HrvReadinessDetailScreen(
                 title = { Text("HRV Readiness Detail") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                        Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
                 },
                 actions = {
                     if (uiState.reading != null) {
                         IconButton(onClick = { showDeleteDialog = true }) {
                             Text(
-                                "🗑",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = ReadinessRed
-                            )
+                                    "🗑",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = TextSecondary
+                                )
                         }
                     }
                 },
@@ -151,7 +151,7 @@ fun HrvReadinessDetailScreen(
                         .padding(padding),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = EcgCyan)
+                    CircularProgressIndicator(color = TextSecondary)
                 }
             }
             uiState.reading == null -> {
@@ -189,11 +189,7 @@ private fun HrvDetailContent(
     val dateLabel = dateTime.format(DateTimeFormatter.ofPattern("EEEE, MMMM d yyyy"))
     val timeLabel = dateTime.format(DateTimeFormatter.ofPattern("h:mm a"))
 
-    val scoreColor = when {
-        reading.readinessScore >= 80 -> ReadinessGreen
-        reading.readinessScore >= 60 -> ReadinessOrange
-        else                         -> ReadinessRed
-    }
+    val scoreColor = TextPrimary
     val scoreLabel = when {
         reading.readinessScore >= 80 -> "GREEN"
         reading.readinessScore >= 60 -> "YELLOW"
@@ -302,7 +298,7 @@ private fun HrvDetailSection(
             Text(
                 title,
                 style = MaterialTheme.typography.titleSmall,
-                color = EcgCyan,
+                color = TextPrimary,
                 fontWeight = FontWeight.Bold
             )
             HorizontalDivider(color = SurfaceDark)

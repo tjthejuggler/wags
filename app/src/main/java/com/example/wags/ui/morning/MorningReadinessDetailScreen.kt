@@ -736,8 +736,8 @@ private fun TelemetryLineChart(
     val labelTextSizePx = with(density) { 9.sp.toPx() }
 
     val yRange         = (yMax - yMin).coerceAtLeast(1f)
-    val gridColor      = Color.White.copy(alpha = 0.07f)
-    val labelArgb      = Color.White.copy(alpha = 0.45f).toArgb()
+    val gridColor      = TextDisabled.copy(alpha = 0.15f)
+    val labelArgb      = TextSecondary.copy(alpha = 0.7f).toArgb()
     val standColor     = ReadinessOrange
 
     Canvas(modifier = modifier) {

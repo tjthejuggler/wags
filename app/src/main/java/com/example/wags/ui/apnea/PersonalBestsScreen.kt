@@ -37,7 +37,7 @@ fun PersonalBestsScreen(
                 title = { Text("Personal Bests") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                        Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
@@ -48,7 +48,7 @@ fun PersonalBestsScreen(
             Box(
                 modifier = Modifier.fillMaxSize().padding(padding),
                 contentAlignment = Alignment.Center
-            ) { CircularProgressIndicator(color = EcgCyan) }
+            ) { CircularProgressIndicator(color = TextSecondary) }
         } else {
             LazyColumn(
                 modifier = Modifier
@@ -204,7 +204,7 @@ private fun SectionHeader(trophies: String, title: String, subtitle: String) {
         Text(
             "$trophies  $title",
             style = MaterialTheme.typography.titleMedium,
-            color = EcgCyan,
+            color = TextPrimary,
             fontWeight = FontWeight.Bold
         )
         Text(
@@ -213,7 +213,7 @@ private fun SectionHeader(trophies: String, title: String, subtitle: String) {
             color = TextSecondary
         )
         HorizontalDivider(
-            color = EcgCyan.copy(alpha = 0.3f),
+            color = TextDisabled.copy(alpha = 0.3f),
             modifier = Modifier.padding(top = 6.dp)
         )
     }
@@ -259,12 +259,12 @@ private fun PersonalBestRow(
         TrophyTextStyle.EXACT          -> 13.sp
     }
     val labelColor = when (textStyle) {
-        TrophyTextStyle.GLOBAL         -> Color.White
-        TrophyTextStyle.ONE_SETTING    -> Color.White.copy(alpha = 0.95f)
-        TrophyTextStyle.TWO_SETTINGS   -> Color.White.copy(alpha = 0.90f)
-        TrophyTextStyle.THREE_SETTINGS -> Color.White.copy(alpha = 0.85f)
-        TrophyTextStyle.FOUR_SETTINGS  -> Color.White.copy(alpha = 0.80f)
-        TrophyTextStyle.EXACT          -> Color.White.copy(alpha = 0.72f)
+        TrophyTextStyle.GLOBAL         -> TextPrimary
+        TrophyTextStyle.ONE_SETTING    -> TextPrimary.copy(alpha = 0.95f)
+        TrophyTextStyle.TWO_SETTINGS   -> TextPrimary.copy(alpha = 0.90f)
+        TrophyTextStyle.THREE_SETTINGS -> TextPrimary.copy(alpha = 0.85f)
+        TrophyTextStyle.FOUR_SETTINGS  -> TextPrimary.copy(alpha = 0.80f)
+        TrophyTextStyle.EXACT          -> TextPrimary.copy(alpha = 0.72f)
     }
 
     Row(
@@ -291,13 +291,13 @@ private fun PersonalBestRow(
                 Text(
                     formatPbDuration(entry.durationMs),
                     fontSize = durationFontSize,
-                    color = EcgCyan,
+                    color = TextPrimary,
                     fontWeight = FontWeight.Bold
-                )
-                Text(
-                    formatPbDate(entry.timestamp ?: 0L),
-                    fontSize = 11.sp,
-                    color = EcgCyan.copy(alpha = 0.7f),
+                    )
+                    Text(
+                        formatPbDate(entry.timestamp ?: 0L),
+                        fontSize = 11.sp,
+                        color = TextSecondary,
                     modifier = Modifier.clickable { onRecordClick(entry.recordId) }
                 )
             }

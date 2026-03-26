@@ -37,17 +37,17 @@ import java.util.*
 // Colors
 // ---------------------------------------------------------------------------
 
-private val GoldAccent = Color(0xFFFFD700)
-private val ChartCyan = Color(0xFF00E5FF)
-private val ChartMagenta = Color(0xFFE040FB)
-private val ChartGreen = Color(0xFF66BB6A)
-private val ChartOrange = Color(0xFFFF9800)
-private val Graphite = Color(0xFF383838)
-private val Charcoal = Color(0xFF1C1C1C)
-private val Ink = Color(0xFF0A0A0A)
-private val Bone = Color(0xFFE8E8E8)
-private val Silver = Color(0xFFB0B0B0)
-private val Ash = Color(0xFF707070)
+private val GoldAccent   = Color(0xFFD0D0D0)   // light grey (replaces gold)
+private val ChartCyan    = Color(0xFFD0D0D0)   // light grey (replaces cyan)
+private val ChartMagenta = Color(0xFFB0B0B0)   // mid-light grey
+private val ChartGreen   = Color(0xFFD0D0D0)   // light grey (replaces green)
+private val ChartOrange  = Color(0xFF909090)   // mid grey (replaces orange)
+private val Graphite     = Color(0xFF383838)
+private val Charcoal     = Color(0xFF1C1C1C)
+private val Ink          = Color(0xFF0A0A0A)
+private val Bone         = Color(0xFFE8E8E8)
+private val Silver       = Color(0xFFB0B0B0)
+private val Ash          = Color(0xFF707070)
 
 // ---------------------------------------------------------------------------
 // Main screen
@@ -88,12 +88,12 @@ fun AssessmentResultScreen(
                     showDeleteDialog = false
                     viewModel.deleteSession()
                 }) {
-                    Text("Delete", color = ButtonDanger)
+                    Text("Delete", color = TextSecondary)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Cancel", color = EcgCyan)
+                    Text("Cancel", color = TextPrimary)
                 }
             }
         )
@@ -106,7 +106,7 @@ fun AssessmentResultScreen(
                 title = { Text("Assessment Results") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                        Text("←", style = MaterialTheme.typography.headlineMedium, color = TextPrimary)
                     }
                 },
                 actions = {
@@ -115,7 +115,7 @@ fun AssessmentResultScreen(
                             Icon(
                                 imageVector = Icons.Outlined.Delete,
                                 contentDescription = "Delete assessment",
-                                tint = ButtonDanger
+                                tint = TextSecondary
                             )
                         }
                     }
@@ -132,7 +132,7 @@ fun AssessmentResultScreen(
                 modifier = Modifier.fillMaxSize().padding(padding),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(color = EcgCyan)
+                CircularProgressIndicator(color = TextSecondary)
             }
             return@Scaffold
         }
@@ -263,7 +263,7 @@ private fun RecommendedRateCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = if (isValid) Color(0xFF0D2818) else SurfaceVariant
+            containerColor = SurfaceDark
         ),
         shape = RoundedCornerShape(16.dp)
     ) {
@@ -277,7 +277,7 @@ private fun RecommendedRateCard(
             Text(
                 text = if (isValid) "YOUR RESONANCE FREQUENCY" else "ASSESSMENT INCOMPLETE",
                 style = MaterialTheme.typography.labelMedium,
-                color = if (isValid) GoldAccent else ReadinessOrange,
+                color = if (isValid) TextPrimary else TextSecondary,
                 letterSpacing = 3.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -289,7 +289,7 @@ private fun RecommendedRateCard(
                         fontSize = 64.sp,
                         fontWeight = FontWeight.Bold
                     ),
-                    color = Color.White
+                    color = TextPrimary
                 )
                 Text(
                     text = "breaths per minute",
@@ -428,11 +428,11 @@ private fun ResonanceCurveChart(
                 val x = xAt(pt.bpm)
                 val y = yAt(pt.score)
                 val isOptimal = kotlin.math.abs(pt.bpm - optimalBpm) < 0.05f
-                val dotColor = if (isOptimal) GoldAccent else if (pt.valid) ChartCyan else ReadinessRed
+                val dotColor = if (isOptimal) TextPrimary else if (pt.valid) ChartCyan else TextDisabled
                 val dotRadius = if (isOptimal) 8.dp.toPx() else 5.dp.toPx()
                 drawCircle(dotColor, radius = dotRadius, center = Offset(x, y))
                 if (isOptimal) {
-                    drawCircle(GoldAccent.copy(alpha = 0.3f), radius = 14.dp.toPx(), center = Offset(x, y))
+                    drawCircle(TextPrimary.copy(alpha = 0.3f), radius = 14.dp.toPx(), center = Offset(x, y))
                 }
             }
         }
@@ -723,7 +723,7 @@ private fun MetricRow(label: String, value: String, description: String) {
         Text(
             text = value,
             style = MaterialTheme.typography.bodyLarge,
-            color = EcgCyan,
+            color = TextPrimary,
             fontWeight = FontWeight.Bold
         )
     }
@@ -766,8 +766,8 @@ private fun parseLeaderboard(json: String): List<LeaderboardEntry> {
 
 @Composable
 private fun LeaderboardRow(rank: Int, entry: LeaderboardEntry, isOptimal: Boolean) {
-    val bgColor = if (isOptimal) Color(0xFF0D2818) else SurfaceDark
-    val accentColor = if (isOptimal) GoldAccent else if (entry.isValid) EcgCyan else ReadinessRed
+    val bgColor = if (isOptimal) SurfaceVariant else SurfaceDark
+    val accentColor = if (isOptimal) GoldAccent else if (entry.isValid) TextPrimary else TextDisabled
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -816,7 +816,7 @@ private fun LeaderboardRow(rank: Int, entry: LeaderboardEntry, isOptimal: Boolea
                     fontWeight = FontWeight.SemiBold
                 )
                 if (!entry.isValid) {
-                    Text("⚠", color = ReadinessOrange, style = MaterialTheme.typography.bodyMedium)
+                    Text("⚠", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
                 }
                 if (isOptimal) {
                     Text("★", color = GoldAccent, style = MaterialTheme.typography.bodyMedium)
@@ -861,7 +861,7 @@ private fun HistoryRow(
                 Text(
                     text = "%.1f".format(session.compositeScore),
                     style = MaterialTheme.typography.bodyLarge,
-                    color = EcgCyan,
+                    color = TextPrimary,
                     fontWeight = FontWeight.Bold
                 )
                 if (isCurrent) {
@@ -899,7 +899,7 @@ private fun BottomButtons(onRunAgain: () -> Unit, onDone: () -> Unit) {
             OutlinedButton(
                 onClick  = onRunAgain,
                 modifier = Modifier.weight(1f),
-                colors   = ButtonDefaults.outlinedButtonColors(contentColor = EcgCyan)
+                colors   = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
             ) {
                 Text("Run Again")
             }

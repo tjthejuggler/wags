@@ -81,13 +81,13 @@ fun ReadinessScreen(
                 title = { Text("HRV Readiness", style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                        Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
                 },
                 actions = {
                     LiveSensorActions(liveHr = state.liveHr, liveSpO2 = state.liveSpO2)
                     TextButton(onClick = onNavigateToHistory) {
-                        Text("History", color = EcgCyan)
+                        Text("History", color = TextSecondary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
@@ -155,7 +155,7 @@ private fun IdleContent(onStart: () -> Unit) {
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("2-minute resting HRV measurement", style = MaterialTheme.typography.titleMedium, color = EcgCyan)
+                Text("2-minute resting HRV measurement", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
                 Text("1. Ensure Polar H10 is connected and worn correctly", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 Text("2. Sit or lie down comfortably", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 Text("3. Breathe normally and stay still", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
@@ -248,7 +248,7 @@ private fun ProcessingContent() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        CircularProgressIndicator(color = EcgCyan, modifier = Modifier.size(64.dp))
+        CircularProgressIndicator(color = TextSecondary, modifier = Modifier.size(64.dp))
         Text(
             "analyzing hrv…",
             style = MaterialTheme.typography.bodyMedium,
@@ -430,7 +430,7 @@ private fun ErrorContent(message: String, onReset: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Error", style = MaterialTheme.typography.headlineMedium, color = ReadinessRed)
+        Text("Error", style = MaterialTheme.typography.headlineMedium, color = TextPrimary)
         Text(message, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, textAlign = TextAlign.Center)
         Button(
             onClick = onReset,
@@ -508,7 +508,7 @@ private fun MinimalistArcCountdown(remainingSeconds: Int, totalSeconds: Int) {
                 val dotX = centerX + radius * cos(angleRad).toFloat()
                 val dotY = centerY + radius * sin(angleRad).toFloat()
                 drawCircle(
-                    color = Color.White,
+                    color = TextPrimary,
                     radius = 4.dp.toPx(),
                     center = Offset(dotX, dotY)
                 )
@@ -629,9 +629,9 @@ private fun ThinDivider() {
 }
 
 private fun interpretationColor(interpretation: ReadinessInterpretation) = when (interpretation) {
-    ReadinessInterpretation.OPTIMAL      -> ReadinessGreen
-    ReadinessInterpretation.ELEVATED     -> ReadinessBlue
-    ReadinessInterpretation.REDUCED      -> ReadinessOrange
-    ReadinessInterpretation.LOW          -> ReadinessRed
-    ReadinessInterpretation.OVERREACHING -> ReadinessRed
+    ReadinessInterpretation.OPTIMAL      -> Color(0xFFE8E8E8)
+    ReadinessInterpretation.ELEVATED     -> Color(0xFFB8B8B8)
+    ReadinessInterpretation.REDUCED      -> Color(0xFFB0B0B0)
+    ReadinessInterpretation.LOW          -> Color(0xFF888888)
+    ReadinessInterpretation.OVERREACHING -> Color(0xFF888888)
 }

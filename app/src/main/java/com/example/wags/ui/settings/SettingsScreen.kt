@@ -180,7 +180,7 @@ fun SettingsScreen(
                             Text(
                                 text = "⌚ Garmin Watch",
                                 style = MaterialTheme.typography.titleMedium,
-                                color = Color.White
+                                color = TextPrimary
                             )
                             val (garminStatusText, garminStatusColor) = when (val gs = state.garminState) {
                                 is GarminConnectionState.Connected ->
@@ -206,8 +206,8 @@ fun SettingsScreen(
                         Button(
                             onClick = { navController.navigate(WagsRoutes.GARMIN) },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = EcgCyan,
-                                contentColor = Color.Black
+                                containerColor = SurfaceVariant,
+                                contentColor = TextPrimary
                             )
                         ) {
                             Text(
@@ -239,7 +239,7 @@ fun SettingsScreen(
                             )
                             OutlinedButton(
                                 onClick = { viewModel.stopScan() },
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
                             ) {
                                 Text("Stop")
                             }
@@ -361,7 +361,7 @@ fun SettingsScreen(
                 Text(
                     "Restore Backup?",
                     style = MaterialTheme.typography.titleLarge,
-                    color = Color.White
+                    color = TextPrimary
                 )
             },
             text = {
@@ -383,7 +383,7 @@ fun SettingsScreen(
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = ButtonDanger,
-                        contentColor = Color.White
+                        contentColor = TextPrimary
                     )
                 ) {
                     Text("Restore")
@@ -395,7 +395,7 @@ fun SettingsScreen(
                         showImportConfirmDialog = false
                         pendingImportUri = null
                     },
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
                 ) {
                     Text("Cancel")
                 }
@@ -460,7 +460,7 @@ private fun ConnectedDeviceCard(
                 if (deviceState is BleConnectionState.Connected) {
                     OutlinedButton(
                         onClick = onDisconnect,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
                     ) { Text("Disconnect") }
                 }
             }
@@ -600,7 +600,7 @@ private fun MeditationAudioDirectoryCard(
                         onClick = onChooseDirectory,
                         modifier = Modifier.height(32.dp),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
                     ) {
                         Text(
                             if (dirUri.isNotBlank()) "Change" else "Choose Folder",
@@ -762,7 +762,7 @@ private fun HabitSlotRow(
                     onClick = onToggle,
                     modifier = Modifier.height(32.dp),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
                 ) {
                     Text(
                         if (selection.isSet) "Change" else "Set",
@@ -802,7 +802,7 @@ private fun HabitPickerRow(
 ) {
     Surface(
         onClick = onClick,
-        color = if (isSelected) EcgCyan.copy(alpha = 0.12f) else Color.Transparent,
+        color = if (isSelected) SurfaceVariant else Color.Transparent,
         shape = MaterialTheme.shapes.small,
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -816,11 +816,11 @@ private fun HabitPickerRow(
             Text(
                 text = entry.habitName,
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (isSelected) EcgCyan else Color.White,
+                color = if (isSelected) TextPrimary else TextSecondary,
                 modifier = Modifier.weight(1f)
             )
             if (isSelected) {
-                Text("✓", style = MaterialTheme.typography.bodyMedium, color = EcgCyan)
+                Text("✓", style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
             }
         }
     }
@@ -879,8 +879,8 @@ private fun DataExportImportCard(
                         onClick = onExport,
                         enabled = !isImporting,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = EcgCyan,
-                            contentColor = Color.Black
+                            containerColor = SurfaceVariant,
+                            contentColor = TextPrimary
                         )
                     ) {
                         Text("Export")
@@ -913,7 +913,7 @@ private fun DataExportImportCard(
                     OutlinedButton(
                         onClick = onImport,
                         enabled = !isExporting,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
                     ) {
                         Text("Import")
                     }
@@ -1029,7 +1029,7 @@ private fun SpotifyIntegrationCard(
                 if (spotifyConnected) {
                     OutlinedButton(
                         onClick = onDisconnectSpotify,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = ReadinessRed)
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
                     ) {
                         Text("Disconnect")
                     }
@@ -1037,8 +1037,8 @@ private fun SpotifyIntegrationCard(
                     Button(
                         onClick = onConnectSpotify,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF1DB954), // Spotify green
-                            contentColor = Color.White
+                            containerColor = SurfaceVariant,
+                            contentColor = TextPrimary
                         )
                     ) {
                         Text("Connect Spotify")
@@ -1070,8 +1070,8 @@ private fun SpotifyIntegrationCard(
                         )
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = EcgCyan,
-                        contentColor = Color.Black
+                        containerColor = SurfaceVariant,
+                        contentColor = TextPrimary
                     )
                 ) {
                     Text("Open Settings")
@@ -1127,7 +1127,7 @@ private fun AdviceSettingsCard(
                         onClick = { onOpenSection(section) },
                         modifier = Modifier.height(32.dp),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
                     ) {
                         Text(
                             if (count > 0) "Manage" else "Add",

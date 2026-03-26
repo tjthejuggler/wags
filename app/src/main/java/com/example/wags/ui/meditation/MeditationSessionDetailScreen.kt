@@ -68,7 +68,7 @@ fun MeditationSessionDetailScreen(
             },
             confirmButton = {
                 TextButton(onClick = { viewModel.confirmDelete() }) {
-                    Text("Delete", color = ReadinessRed, fontWeight = FontWeight.Bold)
+                    Text("Delete", color = TextDisabled, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -89,7 +89,7 @@ fun MeditationSessionDetailScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = EcgCyan
+                            tint = TextSecondary
                         )
                     }
                 },
@@ -99,7 +99,7 @@ fun MeditationSessionDetailScreen(
                             Text(
                                 "🗑",
                                 style = MaterialTheme.typography.titleMedium,
-                                color = ReadinessRed
+                                color = TextDisabled
                             )
                         }
                     }
@@ -114,7 +114,7 @@ fun MeditationSessionDetailScreen(
                     modifier = Modifier.fillMaxSize().padding(padding),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = EcgCyan)
+                    CircularProgressIndicator(color = TextSecondary)
                 }
             }
             state.session == null -> {
@@ -177,20 +177,20 @@ fun MeditationSessionDetailScreen(
                                 HeaderStat(
                                     label = "Duration",
                                     value = "${durationMin}m ${durationSec}s",
-                                    color = EcgCyan
+                                    color = TextPrimary
                                 )
                                 if (session.avgHrBpm != null) {
                                     HeaderStat(
                                         label = "Avg HR",
                                         value = "${String.format("%.0f", session.avgHrBpm)} bpm",
-                                        color = ReadinessOrange
+                                        color = TextSecondary
                                     )
                                 }
                                 if (session.endRmssdMs != null) {
                                     HeaderStat(
                                         label = "End RMSSD",
                                         value = "${String.format("%.1f", session.endRmssdMs)} ms",
-                                        color = ReadinessGreen
+                                        color = TextSecondary
                                     )
                                 }
                             }
@@ -218,7 +218,7 @@ fun MeditationSessionDetailScreen(
                                 title         = "Heart Rate",
                                 subtitle      = "BPM over session",
                                 values        = hrValues,
-                                lineColor     = ReadinessOrange,
+                                lineColor     = TextSecondary,
                                 unit          = "bpm"
                             )
                         }
@@ -231,7 +231,7 @@ fun MeditationSessionDetailScreen(
                                 title         = "Rolling RMSSD",
                                 subtitle      = "ms over session (20-beat window)",
                                 values        = rmssdValues,
-                                lineColor     = ReadinessGreen,
+                                lineColor     = TextPrimary,
                                 unit          = "ms"
                             )
                         }
@@ -243,7 +243,7 @@ fun MeditationSessionDetailScreen(
                             DetailRow("Avg HR", "${String.format("%.1f", session.avgHrBpm)} BPM")
                             session.hrSlopeBpmPerMin?.let { slope ->
                                 val sign  = if (slope >= 0) "+" else ""
-                                val color = if (slope <= 0) ReadinessGreen else ReadinessOrange
+                                val color = if (slope <= 0) TextPrimary else TextSecondary
                                 DetailRowColored(
                                     label = "HR Trend",
                                     value = "$sign${String.format("%.2f", slope)} BPM/min",
@@ -255,7 +255,7 @@ fun MeditationSessionDetailScreen(
                                     else
                                         "Heart rate increased slightly during session",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = if (slope <= 0) ReadinessGreen else TextDisabled,
+                                    color = if (slope <= 0) TextPrimary else TextDisabled,
                                     modifier = Modifier.padding(top = 2.dp)
                                 )
                             }
@@ -269,7 +269,7 @@ fun MeditationSessionDetailScreen(
                             if (session.startRmssdMs != null && session.endRmssdMs != null) {
                                 val delta = session.endRmssdMs - session.startRmssdMs
                                 val sign  = if (delta >= 0) "+" else ""
-                                val deltaColor = if (delta >= 0) ReadinessGreen else ReadinessOrange
+                                val deltaColor = if (delta >= 0) TextPrimary else TextSecondary
 
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -278,7 +278,7 @@ fun MeditationSessionDetailScreen(
                                     HrvStatBox(
                                         label = "Start RMSSD",
                                         value = "${String.format("%.1f", session.startRmssdMs)} ms",
-                                        color = EcgCyan
+                                        color = TextSecondary
                                     )
                                     HrvStatBox(
                                         label = "Change",
@@ -288,7 +288,7 @@ fun MeditationSessionDetailScreen(
                                     HrvStatBox(
                                         label = "End RMSSD",
                                         value = "${String.format("%.1f", session.endRmssdMs)} ms",
-                                        color = ReadinessGreen
+                                        color = TextPrimary
                                     )
                                 }
                                 Text(
@@ -297,7 +297,7 @@ fun MeditationSessionDetailScreen(
                                     else
                                         "HRV decreased slightly — may indicate residual stress",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = if (delta >= 0) ReadinessGreen else TextDisabled,
+                                    color = if (delta >= 0) TextPrimary else TextDisabled,
                                     modifier = Modifier.padding(top = 2.dp)
                                 )
                                 HorizontalDivider(
@@ -315,7 +315,7 @@ fun MeditationSessionDetailScreen(
 
                             session.lnRmssdSlope?.let { slope ->
                                 val sign  = if (slope >= 0) "+" else ""
-                                val color = if (slope >= 0) ReadinessGreen else ReadinessOrange
+                                val color = if (slope >= 0) TextPrimary else TextSecondary
                                 DetailRowColored(
                                     label = "ln(RMSSD) Slope",
                                     value = "$sign${String.format("%.4f", slope)}",
@@ -327,7 +327,7 @@ fun MeditationSessionDetailScreen(
                                     else
                                         "Negative slope — HRV trended downward through session",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = if (slope >= 0) ReadinessGreen else TextDisabled,
+                                    color = if (slope >= 0) TextPrimary else TextDisabled,
                                     modifier = Modifier.padding(top = 2.dp)
                                 )
                             }
@@ -429,7 +429,7 @@ private fun DetailSection(
             Text(
                 title,
                 style = MaterialTheme.typography.titleSmall,
-                color = EcgCyan,
+                color = TextPrimary,
                 fontWeight = FontWeight.Bold
             )
             HorizontalDivider(color = SurfaceDark)
@@ -586,8 +586,8 @@ private fun SessionLineChart(
     val labelTextSizePx = with(density) { 9.sp.toPx() }
 
     val yRange    = (yMax - yMin).coerceAtLeast(1f)
-    val gridColor = Color.White.copy(alpha = 0.07f)
-    val labelArgb = Color.White.copy(alpha = 0.45f).toArgb()
+    val gridColor = TextDisabled.copy(alpha = 0.15f)
+    val labelArgb = TextSecondary.copy(alpha = 0.7f).toArgb()
 
     Canvas(modifier = modifier) {
         val totalW    = size.width

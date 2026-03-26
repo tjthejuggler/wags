@@ -32,9 +32,9 @@ import com.example.wags.ui.common.StripChartColors
 import com.example.wags.ui.theme.*
 
 private val AsmRmssdColors = StripChartColors(
-    lineColor = Color(0xFFFFB300),
-    dotColor  = Color(0xFFFFB300),
-    glowColor = Color(0xFF7A5500)
+    lineColor = Color(0xFFB0B0B0),
+    dotColor  = Color(0xFFD0D0D0),
+    glowColor = Color(0xFF505050)
 )
 private const val ASM_CHART_WINDOW_MS = 20_000.0
 
@@ -54,12 +54,12 @@ private fun RfProtocol.displayName(): String = when (this) {
 private fun RfProtocol.isStepped(): Boolean = this != RfProtocol.SLIDING_WINDOW
 
 // ---------------------------------------------------------------------------
-// Coherence zone colors
+// Coherence zone colors — greyscale
 // ---------------------------------------------------------------------------
 
-private val CoherenceZoneRed = Color(0xFFE53935)
-private val CoherenceZoneBlue = Color(0xFF42A5F5)
-private val CoherenceZoneGreen = Color(0xFF66BB6A)
+private val CoherenceZoneRed   = Color(0xFF606060)   // dim grey  = low coherence
+private val CoherenceZoneBlue  = Color(0xFF909090)   // mid grey  = medium coherence
+private val CoherenceZoneGreen = Color(0xFFD0D0D0)   // light grey = high coherence
 
 private fun coherenceZoneColor(ratio: Float): Color = when {
     ratio >= 3f -> CoherenceZoneGreen
@@ -180,7 +180,7 @@ fun AssessmentRunScreen(
             LinearProgressIndicator(
                 progress         = { uiState.progress },
                 modifier         = Modifier.fillMaxWidth(),
-                color            = EcgCyan,
+                color            = TextSecondary,
                 trackColor       = SurfaceVariant
             )
 
@@ -218,7 +218,7 @@ fun AssessmentRunScreen(
                     onNavigateBack()
                 },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
             ) {
                 Text("Cancel Assessment")
             }
@@ -344,7 +344,7 @@ private fun AssessmentHud(
         Text(
             text  = phase,
             style = MaterialTheme.typography.headlineSmall,
-            color = EcgCyan
+            color = TextPrimary
         )
         if (currentBpm > 0f) {
             Text(
@@ -374,7 +374,7 @@ private fun QualityWarningCard(message: String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors   = CardDefaults.cardColors(
-            containerColor = Color(0xFF3A2800)  // amber-dark background
+            containerColor = SurfaceVariant
         )
     ) {
         Row(
@@ -385,13 +385,13 @@ private fun QualityWarningCard(message: String) {
             Icon(
                 imageVector        = Icons.Default.Warning,
                 contentDescription = "Warning",
-                tint               = ReadinessOrange,
+                tint               = TextSecondary,
                 modifier           = Modifier.size(20.dp)
             )
             Text(
                 text  = message,
                 style = MaterialTheme.typography.bodySmall,
-                color = ReadinessOrange
+                color = TextSecondary
             )
         }
     }

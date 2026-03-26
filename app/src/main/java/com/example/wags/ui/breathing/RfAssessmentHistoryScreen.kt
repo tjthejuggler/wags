@@ -66,7 +66,7 @@ fun RfAssessmentHistoryScreen(
                 title = { Text("RF Assessment History") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                        Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
@@ -82,7 +82,7 @@ fun RfAssessmentHistoryScreen(
             TabRow(
                 selectedTabIndex = selectedTab.ordinal,
                 containerColor = SurfaceDark,
-                contentColor = EcgCyan
+                contentColor = TextSecondary
             ) {
                 RfHistoryTab.entries.forEach { tab ->
                     val isSelected = selectedTab == tab
@@ -90,13 +90,13 @@ fun RfAssessmentHistoryScreen(
                         selected = isSelected,
                         onClick = { selectedTab = tab },
                         modifier = Modifier.background(
-                            if (isSelected) EcgCyan.copy(alpha = 0.15f)
+                            if (isSelected) TextSecondary.copy(alpha = 0.15f)
                             else Color.Transparent
                         ),
                         text = {
                             Text(
                                 tab.label,
-                                color = if (isSelected) EcgCyan else TextDisabled,
+                                color = if (isSelected) TextPrimary else TextDisabled,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                             )
                         }
@@ -154,7 +154,7 @@ private fun RfGraphsContent(uiState: RfAssessmentHistoryUiState) {
             RfMetricChart(
                 label = "Optimal BPM",
                 points = uiState.chartData.optimalBpm,
-                lineColor = EcgCyan
+                lineColor = TextPrimary
             )
         }
 
@@ -166,7 +166,7 @@ private fun RfGraphsContent(uiState: RfAssessmentHistoryUiState) {
             RfMetricChart(
                 label = "Coherence Ratio",
                 points = uiState.chartData.coherenceRatio,
-                lineColor = ReadinessGreen
+                lineColor = Color(0xFFD0D0D0)
             )
         }
 
@@ -178,7 +178,7 @@ private fun RfGraphsContent(uiState: RfAssessmentHistoryUiState) {
             RfMetricChart(
                 label = "LF Power (ms²/Hz)",
                 points = uiState.chartData.lfPower,
-                lineColor = ReadinessBlue
+                lineColor = Color(0xFFB0B0B0)
             )
         }
 
@@ -190,7 +190,7 @@ private fun RfGraphsContent(uiState: RfAssessmentHistoryUiState) {
             RfMetricChart(
                 label = "RMSSD (ms)",
                 points = uiState.chartData.rmssd,
-                lineColor = ReadinessOrange
+                lineColor = Color(0xFF909090)
             )
         }
 
@@ -202,7 +202,7 @@ private fun RfGraphsContent(uiState: RfAssessmentHistoryUiState) {
             RfMetricChart(
                 label = "SDNN (ms)",
                 points = uiState.chartData.sdnn,
-                lineColor = CoherencePink
+                lineColor = Color(0xFF808080)
             )
         }
 
@@ -280,7 +280,7 @@ private fun RfCalendar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onPreviousMonth) {
-                    Text("‹", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                    Text("‹", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                 }
                 Text(
                     text = displayedMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
@@ -289,7 +289,7 @@ private fun RfCalendar(
                     fontWeight = FontWeight.Bold
                 )
                 IconButton(onClick = onNextMonth) {
-                    Text("›", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
+                    Text("›", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                 }
             }
 
@@ -344,7 +344,7 @@ private fun RfCalendar(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(EcgCyan))
+                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(TextSecondary))
                 Spacer(Modifier.width(6.dp))
                 Text(
                     "Assessment recorded — tap to view",
@@ -366,12 +366,12 @@ private fun RfCalendarDay(
     modifier: Modifier = Modifier
 ) {
     val bgColor = when {
-        isSelected -> EcgCyan.copy(alpha = 0.25f)
+        isSelected -> TextSecondary.copy(alpha = 0.25f)
         isToday    -> SurfaceDark
         else       -> Color.Transparent
     }
     val textColor = when {
-        isSelected    -> EcgCyan
+        isSelected    -> TextPrimary
         isToday       -> TextPrimary
         hasAssessment -> TextPrimary
         else          -> TextDisabled
@@ -398,7 +398,7 @@ private fun RfCalendarDay(
                 modifier = Modifier
                     .size(5.dp)
                     .clip(CircleShape)
-                    .background(if (isSelected) EcgCyan else EcgCyanDim)
+                    .background(if (isSelected) TextPrimary else TextSecondary)
             )
         } else {
             Spacer(Modifier.height(5.dp))
@@ -472,11 +472,7 @@ private fun RfSessionSummaryCard(
     val timeLabel = Instant.ofEpochMilli(assessment.timestamp).atZone(zone)
         .format(DateTimeFormatter.ofPattern("h:mm a"))
 
-    val bpmColor = when {
-        assessment.optimalBpm in 4.5f..6.5f -> ReadinessGreen
-        assessment.optimalBpm in 4.0f..7.0f -> ReadinessOrange
-        else                                -> ReadinessRed
-    }
+    val bpmColor = TextPrimary
 
     Card(
         modifier = Modifier
@@ -513,7 +509,7 @@ private fun RfSessionSummaryCard(
                 Text(
                     String.format("%.1f", assessment.optimalBpm),
                     style = MaterialTheme.typography.titleLarge,
-                    color = bpmColor,
+                    color = TextPrimary,
                     fontWeight = FontWeight.ExtraBold
                 )
                 Text(
@@ -557,19 +553,19 @@ private fun RfHistorySummaryCard(uiState: RfAssessmentHistoryUiState) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                RfSummaryChip(label = "Assessments", value = count.toString(), color = EcgCyan)
+                RfSummaryChip(label = "Assessments", value = count.toString(), color = TextPrimary)
                 latestBpm?.let {
                     RfSummaryChip(
                         label = "Latest BPM",
                         value = String.format("%.1f", it),
-                        color = EcgCyan
+                        color = TextPrimary
                     )
                 }
                 avgBpm?.let {
                     RfSummaryChip(
                         label = "Avg BPM",
                         value = String.format("%.1f", it),
-                        color = EcgCyanDim
+                        color = TextSecondary
                     )
                 }
             }
@@ -581,12 +577,12 @@ private fun RfHistorySummaryCard(uiState: RfAssessmentHistoryUiState) {
                     RfSummaryChip(
                         label = "Latest Coherence",
                         value = String.format("%.2f", latestCoherence),
-                        color = ReadinessGreen
+                        color = TextPrimary
                     )
                     RfSummaryChip(
                         label = "Avg Coherence",
                         value = String.format("%.2f", avgCoherence),
-                        color = ReadinessGreen.copy(alpha = 0.7f)
+                        color = TextSecondary
                     )
                 }
             }
@@ -650,7 +646,7 @@ private fun RfScoreChart(points: List<RfChartPoint>) {
 
         RfLineChartCanvas(
             points = points.map { it.index to it.value },
-            lineColor = EcgCyan,
+            lineColor = TextPrimary,
             fillAlpha = 0.15f,
             yMin = (min - yPad).coerceAtLeast(0f),
             yMax = max + yPad,
@@ -835,7 +831,7 @@ private fun RfEmptyHistoryContent(modifier: Modifier = Modifier) {
 }
 
 private fun rfScoreColor(score: Float) = when {
-    score >= 80f -> ReadinessGreen
-    score >= 60f -> ReadinessOrange
-    else         -> ReadinessRed
+    score >= 80f -> Color(0xFFE8E8E8)
+    score >= 60f -> Color(0xFFB0B0B0)
+    else         -> Color(0xFF888888)
 }

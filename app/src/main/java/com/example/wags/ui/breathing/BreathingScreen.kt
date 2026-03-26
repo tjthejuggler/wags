@@ -51,11 +51,11 @@ private val ChartLine  = Color(0xFFD0D0D0)
 private val ChartDot   = Color(0xFFFFFFFF)
 private val ChartGlow  = Color(0xFF909090)
 
-// ── Coherence zone colors ─────────────────────────────────────────────────────
-private val CoherenceZoneRed = Color(0xFFE53935)
-private val CoherenceZoneBlue = Color(0xFF42A5F5)
-private val CoherenceZoneGreen = Color(0xFF66BB6A)
-private val GoldAccent = Color(0xFFFFD700)
+// ── Coherence zone colors — greyscale ────────────────────────────────────────
+private val CoherenceZoneRed   = Color(0xFF606060)   // dim grey  = low coherence
+private val CoherenceZoneBlue  = Color(0xFF909090)   // mid grey  = medium coherence
+private val CoherenceZoneGreen = Color(0xFFD0D0D0)   // light grey = high coherence
+private val GoldAccent         = Color(0xFFD0D0D0)   // light grey (replaces gold)
 
 private fun coherenceZoneColor(ratio: Float): Color = when {
     ratio >= 3f -> CoherenceZoneGreen
@@ -186,7 +186,7 @@ private fun SessionCompleteContent(
     // Hero card
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0D2818)),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(
@@ -207,7 +207,7 @@ private fun SessionCompleteContent(
                     fontSize = 56.sp,
                     fontWeight = FontWeight.Bold
                 ),
-                color = Color.White
+                color = TextPrimary
             )
             Text(
                 text = "points earned",
@@ -496,11 +496,11 @@ private fun CoherenceHistoryChart(history: List<Float>, modifier: Modifier = Mod
 
             val maxVal = history.max().coerceAtLeast(1f)
 
-            // Zone threshold lines
+            // Zone threshold lines — greyscale
             val highY = h - (3f / maxVal * h).coerceIn(0f, h)
             val medY = h - (1f / maxVal * h).coerceIn(0f, h)
-            drawLine(CoherenceZoneGreen.copy(alpha = 0.3f), Offset(0f, highY), Offset(w, highY), strokeWidth = 1f)
-            drawLine(CoherenceZoneBlue.copy(alpha = 0.3f), Offset(0f, medY), Offset(w, medY), strokeWidth = 1f)
+            drawLine(Color(0xFF505050), Offset(0f, highY), Offset(w, highY), strokeWidth = 1f)
+            drawLine(Color(0xFF383838), Offset(0f, medY), Offset(w, medY), strokeWidth = 1f)
 
             // Draw coherence line
             val path = Path()
