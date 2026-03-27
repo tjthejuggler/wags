@@ -4,6 +4,47 @@
 
 ## Changelog
 
+### 2026-03-26 — Apnea History screen: All Records tab, unfiltered calendar, Stats settings popup, "History" button
+
+**All Records tab** ([`ApneaHistoryScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaHistoryScreen.kt))
+- The All Records tab now renders `AllApneaRecordsScreen` directly (with full paging, chart, filters) instead of a filtered list. No wrapper — the full screen is embedded in the tab.
+
+**Calendar tab shows all sessions** ([`ApneaRecordDao.kt`](app/src/main/java/com/example/wags/data/db/dao/ApneaRecordDao.kt), [`ApneaRepository.kt`](app/src/main/java/com/example/wags/data/repository/ApneaRepository.kt), [`ApneaHistoryViewModel.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaHistoryViewModel.kt))
+- Added `observeAll()` DAO query and `getAllRecords()` repository method to stream every apnea record regardless of settings.
+- Calendar tab now uses `allDatesWithRecords` / `allRecordsByDate` (all sessions, not filtered by the current 5-setting combination). Tapping a day still auto-navigates for single sessions and shows a picker list for multiple sessions.
+
+**Stats tab: audio in settings label + settings popup** ([`ApneaHistoryScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaHistoryScreen.kt), [`ApneaHistoryViewModel.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaHistoryViewModel.kt))
+- The current-settings label now includes the audio setting (was missing before).
+- Tapping the settings label opens a `StatsSettingsDialog` — an `AlertDialog` with `FilterChip` rows for all 5 settings (Lung Volume, Prep, Time of Day, Posture, Audio). Changes take effect immediately and update the stats reactively via `flatMapLatest`.
+- Settings in the ViewModel are now `MutableStateFlow` (initialized from nav args) so they can be changed from within the History screen.
+
+**"History" text button** ([`ApneaScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaScreen.kt))
+- Replaced the 📋 `IconButton` in the apnea top bar with a `TextButton` showing the word "History" in `TextSecondary` colour.
+
+---
+
+### 2026-03-26 — Apnea section: celebration trophies, Free Hold card, History screen with 3 tabs
+
+**Celebration dialog trophies** ([`ApneaScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaScreen.kt))
+- `NewPersonalBestDialog` now calls `category.trophyEmojis()` to display the correct number of trophy emojis matching the breadth of the personal best (1 trophy for exact-settings PB up to 6 for all-time global PB), consistent with the trophy display on the Free Hold card.
+
+**"Best Time" renamed to "Free Hold" + last-hold time** ([`ApneaScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaScreen.kt), [`ApneaViewModel.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaViewModel.kt), [`ApneaRecordDao.kt`](app/src/main/java/com/example/wags/data/db/dao/ApneaRecordDao.kt), [`ApneaRepository.kt`](app/src/main/java/com/example/wags/data/repository/ApneaRepository.kt))
+- The "Best Time" accordion card is renamed to "Free Hold".
+- A new `getLastFreeHold()` DAO query returns the most recent free-hold duration for the current 5-setting combination.
+- `ApneaUiState` gains `lastFreeHoldForSettingsMs` (updated reactively when settings change).
+- `FreeHoldContent` now shows a smaller "last: X" time beneath the personal best — using the in-memory last hold if one was just completed, otherwise the DB value.
+
+**History screen with 3 tabs** ([`ApneaHistoryScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaHistoryScreen.kt), [`ApneaHistoryViewModel.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaHistoryViewModel.kt), [`WagsNavGraph.kt`](app/src/main/java/com/example/wags/ui/navigation/WagsNavGraph.kt))
+- "Recent Records" and "Stats" accordion sections removed from the main apnea screen.
+- A 📋 icon button in the top-right of the apnea top bar navigates to the new History screen, passing all 5 current settings (including audio) as nav args.
+- `APNEA_HISTORY` route updated to include the `audio` path segment; `apneaHistory()` helper accepts `audio` with default `"SILENCE"`.
+- **All Records tab**: settings filter badge, "All Records" button (→ `AllApneaRecordsScreen`), personal best card, scrollable list of free-hold records.
+- **Stats tab**: toggle between current-settings and all-settings stats; full activity counts and session extremes.
+- **Calendar tab**: month calendar with dots on days that have records; tapping a day with 1 session navigates directly to its detail screen (`LaunchedEffect` auto-navigate); tapping a day with multiple sessions shows a dismissible list of `ApneaSessionSummaryCard` items.
+- `ApneaHistoryViewModel` uses nested `combine()` (two groups of 3 flows each) to merge 6 reactive flows into a single `StateFlow<ApneaHistoryUiState>`.
+
+---
+
 ### 2026-03-26 — Fix: first-time Spotify song selection in apnea free hold
 
 **Cold-start device resolution** ([`SpotifyApiClient.kt`](app/src/main/java/com/example/wags/data/spotify/SpotifyApiClient.kt))

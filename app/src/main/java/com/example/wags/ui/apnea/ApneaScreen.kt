@@ -1,11 +1,9 @@
 package com.example.wags.ui.apnea
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
@@ -34,9 +32,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
-import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.spotify.TrackInfo
-import com.example.wags.domain.model.ApneaStats
 import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.PersonalBestCategory
 import com.example.wags.domain.model.trophyEmojis
@@ -56,8 +52,6 @@ import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
-import java.text.SimpleDateFormat
-import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,6 +82,23 @@ fun ApneaScreen(
                     }
                 },
                 actions = {
+                    TextButton(onClick = {
+                        navController.navigate(
+                            WagsRoutes.apneaHistory(
+                                lungVolume = state.selectedLungVolume,
+                                prepType   = state.prepType.name,
+                                timeOfDay  = state.timeOfDay.name,
+                                posture    = state.posture.name,
+                                audio      = state.audio.name
+                            )
+                        )
+                    }) {
+                        Text(
+                            "History",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = TextSecondary
+                        )
+                    }
                     LiveSensorActions(liveHr = state.liveHr, liveSpO2 = state.liveSpO2)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
@@ -146,17 +157,18 @@ fun ApneaScreen(
             ) {
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // ── Best Time (Free Hold) ─────────────────────────────────────
+                // ── Free Hold ─────────────────────────────────────────────────
                 val bestTimeOpen = state.openSection == ApneaSection.BEST_TIME
                 CollapsibleCard(
-                    title = "Best Time",
+                    title = "Free Hold",
                     expanded = bestTimeOpen,
                     onToggle = { viewModel.toggleSection(ApneaSection.BEST_TIME) }
                 ) {
                     FreeHoldContent(
                         freeHoldDurationMs = state.freeHoldDurationMs,
-                        bestTimeMs = state.bestTimeForSettingsMs,
-                        bestTimeRecordId = state.bestTimeForSettingsRecordId,
+                        bestTimeMs         = state.bestTimeForSettingsMs,
+                        lastTimeMs         = state.lastFreeHoldForSettingsMs,
+                        bestTimeRecordId   = state.bestTimeForSettingsRecordId,
                         bestTimeTrophyCategory = state.bestTimeTrophyCategory,
                         showTimer = state.showTimer,
                         onShowTimerChange = { viewModel.setShowTimer(it) },
@@ -306,53 +318,6 @@ fun ApneaScreen(
                         Text("📊 View Session Analytics", modifier = Modifier.grayscale())
                     }
                 }
-
-                // ── Recent Records ────────────────────────────────────────────
-                val recentOpen = state.openSection == ApneaSection.RECENT_RECORDS
-                CollapsibleCard(
-                    title = "Recent Records",
-                    expanded = recentOpen,
-                    onToggle = { viewModel.toggleSection(ApneaSection.RECENT_RECORDS) }
-                ) {
-                    RecentRecordsContent(
-                        records = state.recentRecords,
-                        onAllRecordsClick = {
-                            navController.navigate(
-                                WagsRoutes.apneaAllRecords(
-                                    lungVolume = state.selectedLungVolume,
-                                    prepType   = state.prepType.name,
-                                    timeOfDay  = state.timeOfDay.name,
-                                    posture    = state.posture.name,
-                                    eventTypes = "ALL"
-                                )
-                            )
-                        },
-                        onRecordClick = { record ->
-                            navController.navigate(WagsRoutes.apneaRecordDetail(record.recordId))
-                        }
-                    )
-                }
-
-                // ── Stats ─────────────────────────────────────────────────────
-                val statsOpen = state.openSection == ApneaSection.STATS
-                CollapsibleCard(
-                    title = "Stats",
-                    expanded = statsOpen,
-                    onToggle = { viewModel.toggleSection(ApneaSection.STATS) }
-                ) {
-                    StatsContent(
-                        stats = if (state.showAllStats) state.allStats else state.filteredStats,
-                        showAll = state.showAllStats,
-                        onToggleShowAll = { viewModel.toggleShowAllStats() },
-                        lungVolume = state.selectedLungVolume,
-                        prepType = state.prepType,
-                        timeOfDay = state.timeOfDay,
-                        posture = state.posture,
-                        onRecordClick = { recordId ->
-                            navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
-                        }
-                    )
-                }
             }
         }
     }
@@ -369,40 +334,26 @@ internal fun NewPersonalBestDialog(
     category: PersonalBestCategory = PersonalBestCategory.EXACT,
     onDismiss: () -> Unit
 ) {
-    val emoji = when (category) {
-        PersonalBestCategory.GLOBAL          -> "🌍"
-        PersonalBestCategory.ONE_SETTING     -> "⭐"
-        PersonalBestCategory.TWO_SETTINGS    -> "🏆"
-        PersonalBestCategory.THREE_SETTINGS  -> "🏆"
-        PersonalBestCategory.FOUR_SETTINGS   -> "🏆"
-        PersonalBestCategory.EXACT           -> "🏆"
-    }
+    val trophies = category.trophyEmojis()
 
     val headline = when (category) {
-        PersonalBestCategory.GLOBAL          -> "New All-Time Personal Best!"
-        PersonalBestCategory.ONE_SETTING     -> "New Personal Best!"
-        PersonalBestCategory.TWO_SETTINGS    -> "New Personal Best!"
-        PersonalBestCategory.THREE_SETTINGS  -> "New Personal Best!"
-        PersonalBestCategory.FOUR_SETTINGS   -> "New Personal Best!"
-        PersonalBestCategory.EXACT           -> "New Personal Best!"
+        PersonalBestCategory.GLOBAL -> "New All-Time Personal Best!"
+        else                        -> "New Personal Best!"
     }
 
     val subtitle = when (category) {
-        PersonalBestCategory.GLOBAL          -> "Best across all settings!"
-        PersonalBestCategory.ONE_SETTING     -> "Best for $categoryDescription (any other settings)"
-        PersonalBestCategory.TWO_SETTINGS    -> "Best for $categoryDescription"
-        PersonalBestCategory.THREE_SETTINGS  -> "Best for $categoryDescription"
-        PersonalBestCategory.FOUR_SETTINGS   -> "Best for $categoryDescription"
-        PersonalBestCategory.EXACT           -> "Best for $categoryDescription"
+        PersonalBestCategory.GLOBAL      -> "Best across all settings!"
+        PersonalBestCategory.ONE_SETTING -> "Best for $categoryDescription (any other settings)"
+        else                             -> "Best for $categoryDescription"
     }
 
     val confettiCount = when (category) {
-        PersonalBestCategory.GLOBAL          -> 80
-        PersonalBestCategory.ONE_SETTING     -> 60
-        PersonalBestCategory.TWO_SETTINGS    -> 55
-        PersonalBestCategory.THREE_SETTINGS  -> 50
-        PersonalBestCategory.FOUR_SETTINGS   -> 47
-        PersonalBestCategory.EXACT           -> 45
+        PersonalBestCategory.GLOBAL         -> 80
+        PersonalBestCategory.ONE_SETTING    -> 60
+        PersonalBestCategory.TWO_SETTINGS   -> 55
+        PersonalBestCategory.THREE_SETTINGS -> 50
+        PersonalBestCategory.FOUR_SETTINGS  -> 47
+        PersonalBestCategory.EXACT          -> 45
     }
 
     val context = LocalContext.current
@@ -455,8 +406,9 @@ internal fun NewPersonalBestDialog(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        // Trophies matching the number of settings broken
                         Text(
-                            emoji,
+                            trophies,
                             style = MaterialTheme.typography.displayMedium,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.grayscale()
@@ -735,6 +687,7 @@ fun NowPlayingBanner(track: TrackInfo) {
 private fun FreeHoldContent(
     freeHoldDurationMs: Long,
     bestTimeMs: Long,
+    lastTimeMs: Long,
     bestTimeRecordId: Long?,
     bestTimeTrophyCategory: PersonalBestCategory?,
     showTimer: Boolean,
@@ -758,41 +711,56 @@ private fun FreeHoldContent(
             Checkbox(checked = showTimer, onCheckedChange = onShowTimerChange)
         }
 
-        // Personal best for current settings
+        // Personal best for current settings — big trophies + big time
         if (bestTimeMs > 0L) {
             val trophies = bestTimeTrophyCategory?.trophyEmojis() ?: "🏆"
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                // Trophies → navigate to Personal Bests screen
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    // Trophies → navigate to Personal Bests screen
+                    Text(
+                        trophies,
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.clickable { onTrophyClick() }.grayscale()
+                    )
+                    Text(" ", style = MaterialTheme.typography.headlineSmall)
+                    // Duration → navigate to record detail
+                    Text(
+                        formatMs(bestTimeMs),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = if (bestTimeRecordId != null)
+                            Modifier.clickable { onBestTimeClick(bestTimeRecordId) }
+                        else
+                            Modifier
+                    )
+                }
+                // Last hold for these settings — smaller, beneath the best time
+                val displayLast = if (freeHoldDurationMs > 0L) freeHoldDurationMs else lastTimeMs
+                if (displayLast > 0L) {
+                    Text(
+                        "last: ${formatMs(displayLast)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
+                }
+            }
+        } else {
+            // No best time yet — still show last hold if available
+            val displayLast = if (freeHoldDurationMs > 0L) freeHoldDurationMs else lastTimeMs
+            if (displayLast > 0L) {
                 Text(
-                    trophies,
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.clickable { onTrophyClick() }.grayscale()
-                )
-                Text(" ", style = MaterialTheme.typography.headlineSmall)
-                // Duration → navigate to record detail
-                Text(
-                    formatMs(bestTimeMs),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = TextPrimary,
-                    fontWeight = FontWeight.Bold,
-                    modifier = if (bestTimeRecordId != null)
-                        Modifier.clickable { onBestTimeClick(bestTimeRecordId) }
-                    else
-                        Modifier
+                    "last: ${formatMs(displayLast)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary
                 )
             }
-        }
-
-        // Last hold result (shown after returning from the active-hold screen)
-        if (freeHoldDurationMs > 0L) {
-            Text(
-                "Last: ${formatMs(freeHoldDurationMs)}",
-                style = MaterialTheme.typography.headlineMedium,
-                color = TextPrimary
-            )
         }
 
         Button(
@@ -1116,306 +1084,6 @@ private fun AdvancedSessionRunningContent(
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
         ) { Text("Stop Session") }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Recent Records Content
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun RecentRecordsContent(
-    records: List<ApneaRecordEntity>,
-    onAllRecordsClick: () -> Unit,
-    onRecordClick: (ApneaRecordEntity) -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        // "All Records" button always at the top
-        OutlinedButton(
-            onClick = onAllRecordsClick,
-            modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-        ) {
-            Text("📋 All Records", style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.grayscale())
-        }
-
-        if (records.isEmpty()) {
-            Text(
-                "No records yet. Complete a session to see it here.",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary,
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
-        } else {
-            records.take(10).forEach { record ->
-                RecentRecordRow(record = record, onClick = { onRecordClick(record) })
-            }
-        }
-    }
-}
-
-@Composable
-private fun RecentRecordRow(
-    record: ApneaRecordEntity,
-    onClick: () -> Unit
-) {
-    val dateStr = remember(record.timestamp) {
-        SimpleDateFormat("MMM d  HH:mm", Locale.getDefault()).format(Date(record.timestamp))
-    }
-    Surface(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        color = Color.Transparent
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(formatMs(record.durationMs), style = MaterialTheme.typography.bodyLarge, color = TextPrimary, fontWeight = FontWeight.SemiBold)
-                Text(dateStr, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(record.tableType ?: "Free Hold", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
-                Text("›", style = MaterialTheme.typography.titleMedium, color = TextSecondary)
-            }
-        }
-    }
-    HorizontalDivider(color = SurfaceVariant.copy(alpha = 0.5f))
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Stats Content
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun StatsContent(
-    stats: ApneaStats,
-    showAll: Boolean,
-    onToggleShowAll: () -> Unit,
-    lungVolume: String,
-    prepType: com.example.wags.domain.model.PrepType,
-    timeOfDay: com.example.wags.domain.model.TimeOfDay,
-    posture: com.example.wags.domain.model.Posture,
-    onRecordClick: (Long) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-
-        // ── All-settings toggle ───────────────────────────────────────────────
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    if (showAll) "All settings" else "Current settings",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (showAll) TextPrimary else TextSecondary
-                )
-                if (!showAll) {
-                    Text(
-                        "${lungVolume.displayLungVolume()}  ·  ${prepType.displayName()}  ·  ${timeOfDay.displayName()}  ·  ${posture.displayName()}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondary
-                    )
-                }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("All", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                Switch(
-                    checked = showAll,
-                    onCheckedChange = { onToggleShowAll() },
-                    modifier = Modifier.padding(start = 6.dp)
-                )
-            }
-        }
-
-        HorizontalDivider(color = SurfaceVariant)
-
-        // ── Activity counts ───────────────────────────────────────────────────
-        Text(
-            "Activity Counts",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = TextPrimary
-        )
-        val activities = listOf(
-            "Free Hold"           to stats.freeHoldCount,
-            "O₂ Table"            to stats.o2TableCount,
-            "CO₂ Table"           to stats.co2TableCount,
-            "Progressive O₂"      to stats.progressiveO2Count,
-            "Min Breath"          to stats.minBreathCount,
-            "Wonka: Contraction"  to stats.wonkaContractionCount,
-            "Wonka: Endurance"    to stats.wonkaEnduranceCount,
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            activities.forEach { (label, count) ->
-                StatsRow(label = label, value = count.toString())
-            }
-        }
-
-        HorizontalDivider(color = SurfaceVariant)
-
-        // ── Overall HR / SpO2 extremes ────────────────────────────────────────
-        Text(
-            "Overall Session Extremes",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = TextPrimary
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            ExtremeRow(
-                label = "Highest HR",
-                value = stats.maxHrEver?.let { "%.0f bpm".format(it) } ?: "—",
-                recordId = stats.maxHrEverRecordId,
-                onRecordClick = onRecordClick
-            )
-            ExtremeRow(
-                label = "Lowest HR",
-                value = stats.minHrEver?.let { "%.0f bpm".format(it) } ?: "—",
-                recordId = stats.minHrEverRecordId,
-                onRecordClick = onRecordClick
-            )
-            ExtremeRow(
-                label = "Lowest SpO₂",
-                value = stats.lowestSpO2Ever?.let { "$it%" } ?: "—",
-                recordId = stats.lowestSpO2EverRecordId,
-                onRecordClick = onRecordClick
-            )
-        }
-
-        HorizontalDivider(color = SurfaceVariant)
-
-        // ── Session-start extremes ────────────────────────────────────────────
-        Text(
-            "Session Start Extremes",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = TextPrimary
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            ExtremeRow(
-                label = "Highest HR at start",
-                value = stats.maxStartHr?.let { "$it bpm" } ?: "—",
-                recordId = stats.maxStartHrRecordId,
-                onRecordClick = onRecordClick
-            )
-            ExtremeRow(
-                label = "Lowest HR at start",
-                value = stats.minStartHr?.let { "$it bpm" } ?: "—",
-                recordId = stats.minStartHrRecordId,
-                onRecordClick = onRecordClick
-            )
-            ExtremeRow(
-                label = "Highest SpO₂ at start",
-                value = stats.maxStartSpO2?.let { "$it%" } ?: "—",
-                recordId = stats.maxStartSpO2RecordId,
-                onRecordClick = onRecordClick
-            )
-            ExtremeRow(
-                label = "Lowest SpO₂ at start",
-                value = stats.minStartSpO2?.let { "$it%" } ?: "—",
-                recordId = stats.minStartSpO2RecordId,
-                onRecordClick = onRecordClick
-            )
-        }
-
-        HorizontalDivider(color = SurfaceVariant)
-
-        // ── Session-end extremes ──────────────────────────────────────────────
-        Text(
-            "Session End Extremes",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = TextPrimary
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            ExtremeRow(
-                label = "Highest HR at end",
-                value = stats.maxEndHr?.let { "$it bpm" } ?: "—",
-                recordId = stats.maxEndHrRecordId,
-                onRecordClick = onRecordClick
-            )
-            ExtremeRow(
-                label = "Lowest HR at end",
-                value = stats.minEndHr?.let { "$it bpm" } ?: "—",
-                recordId = stats.minEndHrRecordId,
-                onRecordClick = onRecordClick
-            )
-            ExtremeRow(
-                label = "Highest SpO₂ at end",
-                value = stats.maxEndSpO2?.let { "$it%" } ?: "—",
-                recordId = stats.maxEndSpO2RecordId,
-                onRecordClick = onRecordClick
-            )
-            ExtremeRow(
-                label = "Lowest SpO₂ at end",
-                value = stats.minEndSpO2?.let { "$it%" } ?: "—",
-                recordId = stats.minEndSpO2RecordId,
-                onRecordClick = onRecordClick
-            )
-        }
-    }
-}
-
-/**
- * A stat row for an extreme value. When [recordId] is non-null the row is
- * tappable and shows a `›` chevron; tapping navigates to that record's detail.
- */
-@Composable
-private fun ExtremeRow(
-    label: String,
-    value: String,
-    recordId: Long?,
-    onRecordClick: (Long) -> Unit,
-) {
-    val clickable = recordId != null
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(
-                if (clickable) Modifier.clickable { onRecordClick(recordId!!) }
-                else Modifier
-            ),
-        color = Color.Transparent
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(label, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    value,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (clickable) TextPrimary else TextSecondary,
-                    fontWeight = FontWeight.Medium
-                )
-                if (clickable) {
-                    Text("›", style = MaterialTheme.typography.titleMedium, color = TextSecondary)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun StatsRow(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(label, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-        Text(value, style = MaterialTheme.typography.bodySmall, color = TextPrimary, fontWeight = FontWeight.Medium)
     }
 }
 

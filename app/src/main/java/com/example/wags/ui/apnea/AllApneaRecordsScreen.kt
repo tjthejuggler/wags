@@ -75,17 +75,6 @@ fun AllApneaRecordsScreen(
 
     Scaffold(
         containerColor = BackgroundDark,
-        topBar = {
-            TopAppBar(
-                title = { Text("All Records") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
-            )
-        }
     ) { padding ->
         LazyColumn(
             state = listState,

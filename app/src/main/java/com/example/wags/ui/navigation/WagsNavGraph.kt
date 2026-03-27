@@ -61,7 +61,7 @@ object WagsRoutes {
     const val RF_ASSESSMENT_RESULT = "rf_assessment_result/{sessionTimestamp}"
     const val RF_ASSESSMENT_HISTORY = "rf_assessment_history"
     const val RESONANCE_SESSION = "resonance_session?vibration={vibration}"
-    const val APNEA_HISTORY = "apnea_history/{lungVolume}/{prepType}/{timeOfDay}/{posture}"
+    const val APNEA_HISTORY = "apnea_history/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{audio}"
     const val APNEA_RECORD_DETAIL = "apnea_record_detail/{recordId}"
     const val APNEA_ALL_RECORDS = "apnea_all_records/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{eventTypes}"
     const val FREE_HOLD_ACTIVE = "free_hold_active/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{showTimer}/{audio}"
@@ -81,8 +81,13 @@ object WagsRoutes {
     fun rfAssessmentRun(protocol: String, vibration: Boolean = false) =
         "rf_assessment_run/$protocol?vibration=$vibration"
     fun rfAssessmentResult(sessionTimestamp: Long) = "rf_assessment_result/$sessionTimestamp"
-    fun apneaHistory(lungVolume: String, prepType: String, timeOfDay: String, posture: String) =
-        "apnea_history/$lungVolume/$prepType/$timeOfDay/$posture"
+    fun apneaHistory(
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        posture: String,
+        audio: String = "SILENCE"
+    ) = "apnea_history/$lungVolume/$prepType/$timeOfDay/$posture/$audio"
     fun apneaRecordDetail(recordId: Long) = "apnea_record_detail/$recordId"
     fun hrvReadinessDetail(readingId: Long) = "hrv_readiness_detail/$readingId"
     fun morningReadinessDetail(readingId: Long) = "morning_readiness_detail/$readingId"
@@ -265,7 +270,8 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
                 navArgument("lungVolume") { type = NavType.StringType },
                 navArgument("prepType")   { type = NavType.StringType },
                 navArgument("timeOfDay")  { type = NavType.StringType },
-                navArgument("posture")    { type = NavType.StringType }
+                navArgument("posture")    { type = NavType.StringType },
+                navArgument("audio")      { type = NavType.StringType; defaultValue = "SILENCE" }
             )
         ) {
             ApneaHistoryScreen(navController = navController)

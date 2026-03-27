@@ -50,6 +50,9 @@ class ApneaRepository @Inject constructor(
     ): Flow<List<ApneaRecordEntity>> =
         dao.getBySettings(lungVolume, prepType, timeOfDay, posture, audio)
 
+    /** All records ever, newest first — used for the calendar tab. */
+    fun getAllRecords(): Flow<List<ApneaRecordEntity>> = dao.observeAll()
+
     /** The [limit] most recent records for a given 5-setting combination, across ALL event types. */
     fun getRecentBySettings(
         lungVolume: String,
@@ -60,6 +63,16 @@ class ApneaRepository @Inject constructor(
         limit: Int = 10
     ): Flow<List<ApneaRecordEntity>> =
         dao.getRecentBySettings(lungVolume, prepType, timeOfDay, posture, audio, limit)
+
+    /** Most recent free-hold duration for the current 5-setting combination. */
+    fun getLastFreeHold(
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        posture: String,
+        audio: String
+    ): Flow<Long?> =
+        dao.getLastFreeHold(lungVolume, prepType, timeOfDay, posture, audio)
 
     /** Best free-hold duration for the current 5-setting combination. */
     fun getBestFreeHold(

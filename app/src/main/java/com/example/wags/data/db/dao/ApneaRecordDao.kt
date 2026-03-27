@@ -122,6 +122,10 @@ interface ApneaRecordDao {
     @Query("SELECT * FROM apnea_records ORDER BY timestamp DESC LIMIT :limit")
     fun getLatest(limit: Int): Flow<List<ApneaRecordEntity>>
 
+    /** All records ever, newest first — used for the calendar tab. */
+    @Query("SELECT * FROM apnea_records ORDER BY timestamp DESC")
+    fun observeAll(): Flow<List<ApneaRecordEntity>>
+
     @Query("SELECT * FROM apnea_records WHERE tableType = :type ORDER BY timestamp DESC")
     fun getByType(type: String): Flow<List<ApneaRecordEntity>>
 
@@ -173,6 +177,25 @@ interface ApneaRecordDao {
         ORDER BY durationMs DESC LIMIT 1
     """)
     fun getBestFreeHoldRecordId(
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        posture: String,
+        audio: String
+    ): Flow<Long?>
+
+    /** Most recent free-hold duration for a given 5-setting combination (as a Flow). */
+    @Query("""
+        SELECT durationMs FROM apnea_records
+        WHERE lungVolume = :lungVolume
+          AND prepType   = :prepType
+          AND timeOfDay  = :timeOfDay
+          AND posture    = :posture
+          AND audio      = :audio
+          AND tableType IS NULL
+        ORDER BY timestamp DESC LIMIT 1
+    """)
+    fun getLastFreeHold(
         lungVolume: String,
         prepType: String,
         timeOfDay: String,
