@@ -5,8 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.AccRespirationEngine
 import com.example.wags.data.ble.HrDataSource
 import com.example.wags.data.ble.UnifiedDeviceManager
+import com.example.wags.data.db.entity.ResonanceSessionEntity
 import com.example.wags.data.ipc.HabitIntegrationRepository
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
+import com.example.wags.data.repository.ResonanceSessionRepository
+import com.example.wags.data.repository.RfAssessmentRepository
 import com.example.wags.di.MathDispatcher
 import com.example.wags.domain.usecase.breathing.CoherenceScoreCalculator
 import com.example.wags.domain.usecase.breathing.ContinuousPacerEngine
@@ -84,6 +87,16 @@ data class BreathingUiState(
     /** Elapsed session time in seconds. */
     val sessionElapsedSeconds: Int = 0,
 
+    // ── Duration / timer ─────────────────────────────────────────────────────
+    /** Duration in minutes for the session timer. */
+    val sessionDurationMinutes: Int = 5,
+    /** Whether infinity mode is enabled (no timer limit). */
+    val infinityMode: Boolean = false,
+    /** The auto-determined best breathing rate from last 2 months. Null if no data. */
+    val bestRateBpm: Float? = null,
+    /** Remaining seconds on the session timer (only used when not in infinity mode). */
+    val sessionRemainingSeconds: Int = 0,
+
     // ── Session complete data ────────────────────────────────────────────────
     /** Summary data available when sessionPhase == COMPLETE. */
     val sessionSummary: SessionSummary? = null
@@ -105,7 +118,8 @@ data class SessionSummary(
     val artifactPercent: Float,
     val totalPoints: Float,
     val coherenceHistory: List<Float>,
-    val breathingRateBpm: Float
+    val breathingRateBpm: Float,
+    val ieRatio: Float
 )
 
 @HiltViewModel
@@ -119,6 +133,8 @@ class BreathingViewModel @Inject constructor(
     private val habitRepo: HabitIntegrationRepository,
     private val artifactCorrection: ArtifactCorrectionUseCase,
     private val timeDomainCalc: TimeDomainHrvCalculator,
+    private val rfAssessmentRepo: RfAssessmentRepository,
+    private val resonanceSessionRepo: ResonanceSessionRepository,
     @MathDispatcher private val mathDispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
@@ -153,6 +169,55 @@ class BreathingViewModel @Inject constructor(
     private val allSessionRrIntervals = mutableListOf<Double>()
     private var sessionStartTimeMs = 0L
 
+    init {
+        loadBestBreathingRate()
+    }
+
+    /**
+     * Loads the best breathing rate from the last 2 months of assessment + session data.
+     * Groups by rate (rounded to 0.1 BPM) and picks the rate with the highest average coherence.
+     */
+    private fun loadBestBreathingRate() {
+        viewModelScope.launch {
+            val twoMonthsAgoMs = System.currentTimeMillis() - (60L * 24 * 60 * 60 * 1000) // 60 days
+
+            val assessments = rfAssessmentRepo.getSince(twoMonthsAgoMs)
+            val sessions = resonanceSessionRepo.getSince(twoMonthsAgoMs)
+
+            data class RateScore(val rateBpm: Float, val coherenceScore: Float)
+
+            val rateScores = mutableListOf<RateScore>()
+
+            assessments.forEach { a ->
+                if (a.isValid && a.optimalBpm in 4f..7f) {
+                    rateScores.add(RateScore(a.optimalBpm, a.maxCoherenceRatio))
+                }
+            }
+
+            sessions.forEach { s ->
+                if (s.breathingRateBpm in 4f..7f && s.durationSeconds >= 60) {
+                    rateScores.add(RateScore(s.breathingRateBpm, s.meanCoherenceRatio))
+                }
+            }
+
+            if (rateScores.isEmpty()) return@launch
+
+            val grouped = rateScores.groupBy { (it.rateBpm * 10).toInt() / 10f }
+            val bestRate = grouped.maxByOrNull { (_, scores) ->
+                scores.map { it.coherenceScore.toDouble() }.average()
+            }?.key
+
+            if (bestRate != null) {
+                _uiState.update {
+                    it.copy(
+                        breathingRateBpm = bestRate,
+                        bestRateBpm = bestRate
+                    )
+                }
+            }
+        }
+    }
+
     // Coherence zone time tracking
     private var highCoherenceSeconds = 0
     private var mediumCoherenceSeconds = 0
@@ -165,6 +230,14 @@ class BreathingViewModel @Inject constructor(
 
     fun setIeRatio(ratio: Float) {
         _uiState.update { it.copy(ieRatio = ratio.coerceIn(0.5f, 3.0f)) }
+    }
+
+    fun setSessionDuration(minutes: Int) {
+        _uiState.update { it.copy(sessionDurationMinutes = minutes.coerceIn(1, 60)) }
+    }
+
+    fun setInfinityMode(enabled: Boolean) {
+        _uiState.update { it.copy(infinityMode = enabled) }
     }
 
     fun startSession(deviceId: String) {
@@ -191,6 +264,7 @@ class BreathingViewModel @Inject constructor(
                 coherenceHistory = emptyList(),
                 sessionPoints = 0f,
                 sessionElapsedSeconds = 0,
+                sessionRemainingSeconds = if (it.infinityMode) 0 else it.sessionDurationMinutes * 60,
                 sessionSummary = null
             )
         }
@@ -227,9 +301,15 @@ class BreathingViewModel @Inject constructor(
 
         val currentState = _uiState.value
 
-        // If we were actually breathing (not just preparing), compute summary
-        if (currentState.sessionPhase == BreathingSessionPhase.BREATHING && allSessionRrIntervals.size >= 10) {
+        // Save session if we were actually breathing (even if stopped early)
+        if (currentState.sessionPhase == BreathingSessionPhase.BREATHING) {
             val summary = computeSessionSummary(currentState)
+
+            // Persist to database
+            viewModelScope.launch {
+                saveSessionToDb(summary, currentState)
+            }
+
             _uiState.update {
                 it.copy(
                     isSessionActive = false,
@@ -248,6 +328,30 @@ class BreathingViewModel @Inject constructor(
 
         // Signal the Habit app that a Resonance Breathing session was completed
         habitRepo.sendHabitIncrement(Slot.RESONANCE_BREATHING)
+    }
+
+    private suspend fun saveSessionToDb(summary: SessionSummary, state: BreathingUiState) {
+        val coherenceHistoryJson = summary.coherenceHistory
+            .joinToString(",", "[", "]") { "%.2f".format(it) }
+        val entity = ResonanceSessionEntity(
+            timestamp = System.currentTimeMillis(),
+            breathingRateBpm = summary.breathingRateBpm,
+            ieRatio = summary.ieRatio,
+            durationSeconds = summary.durationSeconds,
+            totalBeats = summary.totalBeats,
+            meanCoherenceRatio = summary.meanCoherenceRatio,
+            maxCoherenceRatio = summary.maxCoherenceRatio,
+            timeInHighCoherence = summary.timeInHighCoherence,
+            timeInMediumCoherence = summary.timeInMediumCoherence,
+            timeInLowCoherence = summary.timeInLowCoherence,
+            meanRmssdMs = summary.meanRmssdMs,
+            meanSdnnMs = summary.meanSdnnMs,
+            artifactPercent = summary.artifactPercent,
+            totalPoints = summary.totalPoints,
+            coherenceHistoryJson = coherenceHistoryJson,
+            hrDeviceId = hrDataSource.activeHrDeviceLabel()
+        )
+        resonanceSessionRepo.save(entity)
     }
 
     /** Called from the session complete screen to return to idle. */
@@ -288,7 +392,8 @@ class BreathingViewModel @Inject constructor(
             artifactPercent = artifactPct,
             totalPoints = sessionPoints,
             coherenceHistory = coherenceHistory,
-            breathingRateBpm = currentState.breathingRateBpm
+            breathingRateBpm = currentState.breathingRateBpm,
+            ieRatio = currentState.ieRatio
         )
     }
 
@@ -386,13 +491,30 @@ class BreathingViewModel @Inject constructor(
         }
     }
 
-    /** Tracks elapsed session time. */
+    /** Tracks elapsed session time and handles countdown / auto-stop. */
     private fun startSessionTimer() {
         timerJob = viewModelScope.launch {
             while (isActive) {
                 delay(1_000L)
                 val elapsed = ((System.currentTimeMillis() - sessionStartTimeMs) / 1000).toInt()
-                _uiState.update { it.copy(sessionElapsedSeconds = elapsed) }
+                val currentState = _uiState.value
+
+                if (!currentState.infinityMode) {
+                    val remaining = (currentState.sessionDurationMinutes * 60) - elapsed
+                    _uiState.update {
+                        it.copy(
+                            sessionElapsedSeconds = elapsed,
+                            sessionRemainingSeconds = remaining.coerceAtLeast(0)
+                        )
+                    }
+                    if (remaining <= 0) {
+                        // Timer expired — stop session (which will save it)
+                        stopSession()
+                        return@launch
+                    }
+                } else {
+                    _uiState.update { it.copy(sessionElapsedSeconds = elapsed) }
+                }
             }
         }
     }

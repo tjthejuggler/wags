@@ -78,6 +78,8 @@ private fun rsCoherenceZoneLabel(ratio: Float): String = when {
 fun ResonanceSessionScreen(
     onNavigateBack: () -> Unit,
     vibrationEnabled: Boolean = false,
+    durationMinutes: Int = 5,
+    infinityMode: Boolean = false,
     viewModel: BreathingViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -87,7 +89,7 @@ fun ResonanceSessionScreen(
     val isActive = state.sessionPhase == BreathingSessionPhase.PREPARING ||
             state.sessionPhase == BreathingSessionPhase.BREATHING
 
-    SessionBackHandler(enabled = isActive, onConfirm = onNavigateBack)
+    SessionBackHandler(enabled = isActive, onConfirm = { viewModel.stopSession() })
     KeepScreenOn(enabled = isActive)
 
     // True once the phase has moved past IDLE (i.e. PREPARING or beyond).
@@ -113,6 +115,8 @@ fun ResonanceSessionScreen(
 
     // Kick off the session on first composition
     LaunchedEffect(Unit) {
+        viewModel.setSessionDuration(durationMinutes)
+        viewModel.setInfinityMode(infinityMode)
         viewModel.startSession(deviceId)
     }
 
@@ -122,10 +126,7 @@ fun ResonanceSessionScreen(
             TopAppBar(
                 title = { Text("Resonance Breathing", style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
-                    IconButton(onClick = {
-                        viewModel.stopSession()
-                        onNavigateBack()
-                    }) {
+                    IconButton(onClick = { viewModel.stopSession() }) {
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
                             contentDescription = "Stop & back",
@@ -151,17 +152,17 @@ fun ResonanceSessionScreen(
                     RsPreparationContent(
                         countdownSeconds = state.prepCountdownSeconds,
                         breathingRateBpm = state.breathingRateBpm,
-                        onCancel = {
-                            viewModel.stopSession()
-                            onNavigateBack()
-                        }
+                        onCancel = { viewModel.stopSession() }
                     )
                 }
 
                 BreathingSessionPhase.BREATHING -> {
                     // Vibration callback — only fires when toggle is on
-                    val vibrationCallback: (() -> Unit)? = if (vibrationEnabled) {
-                        { WagsFeedback.breathTransition(context) }
+                    val vibrationCallback: ((Boolean) -> Unit)? = if (vibrationEnabled) {
+                        { inhaling ->
+                            if (inhaling) WagsFeedback.breathInhale(context)
+                            else WagsFeedback.breathExhale(context)
+                        }
                     } else null
 
                     // ── Pacer circle ──────────────────────────────────────────
@@ -181,6 +182,17 @@ fun ResonanceSessionScreen(
                         elapsedSeconds = state.sessionElapsedSeconds,
                         coherenceRatio = state.liveCoherenceRatio
                     )
+
+                    // ── Remaining time (when timer is active) ──────────────
+                    if (!state.infinityMode && state.sessionRemainingSeconds > 0) {
+                        Text(
+                            text = "${rsFmtDuration(state.sessionRemainingSeconds)} remaining",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = RsAsh,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center
+                        )
+                    }
 
                     // ── Live HRV metrics ──────────────────────────────────────
                     RsHrvMetricsRow(
@@ -213,13 +225,10 @@ fun ResonanceSessionScreen(
 
                     // ── Stop button ───────────────────────────────────────────
                     OutlinedButton(
-                        onClick = {
-                            viewModel.stopSession()
-                            onNavigateBack()
-                        },
+                        onClick = { viewModel.stopSession() },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
-                    ) { Text("Stop Session") }
+                    ) { Text("Stop & Save Session") }
                 }
 
                 // IDLE / COMPLETE handled by LaunchedEffect → pop back

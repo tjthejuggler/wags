@@ -29,4 +29,7 @@ interface RfAssessmentDao {
 
     @Query("DELETE FROM rf_assessments WHERE timestamp = :timestamp")
     suspend fun deleteByTimestamp(timestamp: Long)
+
+    @Query("SELECT * FROM rf_assessments WHERE timestamp >= :sinceMs ORDER BY timestamp DESC")
+    suspend fun getSince(sinceMs: Long): List<RfAssessmentEntity>
 }

@@ -4,6 +4,31 @@
 
 ## Changelog
 
+### 2026-03-28 — Resonance Breathing Enhancements
+
+#### New Features
+- **Auto-detect best breathing rate**: The breathing rate slider is now automatically set to the user's optimal rate, determined by analyzing coherence scores from the last 2 months of assessments and normal sessions. The rate with the highest average coherence is selected.
+- **Session duration timer**: Added a 1–30 minute duration slider for normal resonance breathing sessions. An ∞ (infinity) toggle disables the timer for open-ended sessions.
+- **Normal session persistence**: Normal resonance breathing sessions are now saved to the database with full metrics (coherence, HRV, points, duration, etc.).
+- **Session history integration**: Normal sessions now appear in the Resonance Breathing History calendar (with cyan dots, distinct from grey assessment dots) and have their own dedicated graphs section (coherence, RMSSD, SDNN, points, duration over time).
+- **Distinct vibration patterns**: Inhale transitions use a rapid double vibration, exhale transitions use a rapid single vibration, and "breathe naturally" phases in assessments trigger a longer vibration.
+
+#### Improvements
+- **Removed redundant coherence card** from the main Resonance Breathing screen (coherence is shown during active sessions).
+- **Stop & Save behavior**: Stopping a normal session (even early) now always saves the session data. In infinity mode, the Stop & Save button is the only way to end the session.
+- **Timer auto-stop**: When the duration timer expires, the session automatically stops, saves, and plays the end-session chime.
+- **Screen stays on**: Screen wake lock is active during both normal sessions and assessments (was already implemented, verified).
+
+#### Database
+- Added `resonance_sessions` table (DB version 22) for persisting normal breathing sessions.
+- Added `getSince()` query to [`RfAssessmentDao`](app/src/main/java/com/example/wags/data/db/dao/RfAssessmentDao.kt) for time-range queries.
+
+#### Files Changed
+- **New**: [`ResonanceSessionEntity.kt`](app/src/main/java/com/example/wags/data/db/entity/ResonanceSessionEntity.kt), [`ResonanceSessionDao.kt`](app/src/main/java/com/example/wags/data/db/dao/ResonanceSessionDao.kt), [`ResonanceSessionRepository.kt`](app/src/main/java/com/example/wags/data/repository/ResonanceSessionRepository.kt)
+- **Modified**: [`WagsFeedback.kt`](app/src/main/java/com/example/wags/ui/common/WagsFeedback.kt), [`BreathingPacerCircle.kt`](app/src/main/java/com/example/wags/ui/breathing/BreathingPacerCircle.kt), [`BreathingViewModel.kt`](app/src/main/java/com/example/wags/ui/breathing/BreathingViewModel.kt), [`BreathingScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/BreathingScreen.kt), [`ResonanceSessionScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/ResonanceSessionScreen.kt), [`AssessmentRunScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/AssessmentRunScreen.kt), [`RfAssessmentHistoryScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/RfAssessmentHistoryScreen.kt), [`RfAssessmentHistoryViewModel.kt`](app/src/main/java/com/example/wags/ui/breathing/RfAssessmentHistoryViewModel.kt), [`WagsNavGraph.kt`](app/src/main/java/com/example/wags/ui/navigation/WagsNavGraph.kt), [`WagsDatabase.kt`](app/src/main/java/com/example/wags/data/db/WagsDatabase.kt), [`DatabaseModule.kt`](app/src/main/java/com/example/wags/di/DatabaseModule.kt), [`RfAssessmentDao.kt`](app/src/main/java/com/example/wags/data/db/dao/RfAssessmentDao.kt), [`RfAssessmentRepository.kt`](app/src/main/java/com/example/wags/data/repository/RfAssessmentRepository.kt)
+
+---
+
 ### 2026-03-27 — Device connection bug fixes + Wellue O2Ring support
 
 **Bug fix: crash when disconnecting from a turned-off device** ([`GenericBleManager.kt`](app/src/main/java/com/example/wags/data/ble/GenericBleManager.kt), [`PolarBleManager.kt`](app/src/main/java/com/example/wags/data/ble/PolarBleManager.kt), [`UnifiedDeviceManager.kt`](app/src/main/java/com/example/wags/data/ble/UnifiedDeviceManager.kt))

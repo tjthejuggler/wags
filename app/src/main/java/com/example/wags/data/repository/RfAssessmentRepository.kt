@@ -42,4 +42,7 @@ class RfAssessmentRepository @Inject constructor(
     /** Delete a session by its timestamp. */
     suspend fun deleteByTimestamp(timestamp: Long) =
         dao.deleteByTimestamp(timestamp)
+
+    /** Get all assessments since a given timestamp. */
+    suspend fun getSince(sinceMs: Long): List<RfAssessmentEntity> = dao.getSince(sinceMs)
 }

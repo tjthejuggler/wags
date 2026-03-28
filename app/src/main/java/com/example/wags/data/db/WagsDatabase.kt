@@ -24,9 +24,10 @@ import com.example.wags.data.db.entity.*
         MeditationTelemetryEntity::class,
         MorningReadinessTelemetryEntity::class,
         AdviceEntity::class,
-        ApneaSongLogEntity::class
+        ApneaSongLogEntity::class,
+        ResonanceSessionEntity::class
     ],
-    version = 21,
+    version = 22,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -46,6 +47,7 @@ abstract class WagsDatabase : RoomDatabase() {
     abstract fun morningReadinessTelemetryDao(): MorningReadinessTelemetryDao
     abstract fun adviceDao(): AdviceDao
     abstract fun apneaSongLogDao(): ApneaSongLogDao
+    abstract fun resonanceSessionDao(): ResonanceSessionDao
 
     companion object {
         /**
@@ -640,7 +642,36 @@ abstract class WagsDatabase : RoomDatabase() {
                     )
                 """.trimIndent())
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_meditation_telemetry_sessionId` ON `meditation_telemetry` (`sessionId`)")
+                }
+            }
+    
+            /**
+             * v21 → v22: Add resonance_sessions table for normal resonance breathing sessions.
+             */
+            val MIGRATION_21_22 = object : Migration(21, 22) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("""
+                        CREATE TABLE IF NOT EXISTS `resonance_sessions` (
+                            `sessionId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `timestamp` INTEGER NOT NULL,
+                            `breathingRateBpm` REAL NOT NULL,
+                            `ieRatio` REAL NOT NULL,
+                            `durationSeconds` INTEGER NOT NULL,
+                            `totalBeats` INTEGER NOT NULL,
+                            `meanCoherenceRatio` REAL NOT NULL,
+                            `maxCoherenceRatio` REAL NOT NULL,
+                            `timeInHighCoherence` INTEGER NOT NULL,
+                            `timeInMediumCoherence` INTEGER NOT NULL,
+                            `timeInLowCoherence` INTEGER NOT NULL,
+                            `meanRmssdMs` REAL NOT NULL,
+                            `meanSdnnMs` REAL NOT NULL,
+                            `artifactPercent` REAL NOT NULL,
+                            `totalPoints` REAL NOT NULL,
+                            `coherenceHistoryJson` TEXT NOT NULL DEFAULT '',
+                            `hrDeviceId` TEXT DEFAULT NULL
+                        )
+                    """.trimIndent())
+                }
             }
         }
     }
-}

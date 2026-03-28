@@ -105,6 +105,13 @@ fun AssessmentRunScreen(
         }
     }
 
+    // Fire longer vibration when "breathe naturally" phase starts
+    LaunchedEffect(uiState.phase) {
+        if (vibrationEnabled && (uiState.phase == "BASELINE" || uiState.phase == "BREATHE NATURALLY")) {
+            WagsFeedback.breathNaturallyStart(context)
+        }
+    }
+
     // Animate background tint based on coherence zone
     val zoneColor by animateColorAsState(
         targetValue = coherenceZoneColor(uiState.liveCoherenceRatio),
@@ -142,8 +149,11 @@ fun AssessmentRunScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Vibration callback — only fires when toggle is on
-            val vibrationCallback: (() -> Unit)? = if (vibrationEnabled) {
-                { WagsFeedback.breathTransition(context) }
+            val vibrationCallback: ((Boolean) -> Unit)? = if (vibrationEnabled) {
+                { inhaling ->
+                    if (inhaling) WagsFeedback.breathInhale(context)
+                    else WagsFeedback.breathExhale(context)
+                }
             } else null
 
             // Pacer visual — unified circle for all protocols

@@ -2,7 +2,9 @@ package com.example.wags.ui.breathing
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.wags.data.db.entity.ResonanceSessionEntity
 import com.example.wags.data.db.entity.RfAssessmentEntity
+import com.example.wags.data.repository.ResonanceSessionRepository
 import com.example.wags.data.repository.RfAssessmentRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,52 +35,85 @@ data class RfHistoryChartData(
     val compositeScore: List<RfChartPoint> = emptyList(),
 )
 
+data class SessionHistoryChartData(
+    val coherenceRatio: List<RfChartPoint> = emptyList(),
+    val rmssd: List<RfChartPoint> = emptyList(),
+    val sdnn: List<RfChartPoint> = emptyList(),
+    val totalPoints: List<RfChartPoint> = emptyList(),
+    val duration: List<RfChartPoint> = emptyList(),
+)
+
 data class RfAssessmentHistoryUiState(
     val allAssessments: List<RfAssessmentEntity> = emptyList(),
+    val allSessions: List<ResonanceSessionEntity> = emptyList(),
     val chartData: RfHistoryChartData = RfHistoryChartData(),
+    val sessionChartData: SessionHistoryChartData = SessionHistoryChartData(),
     /** Set of dates that have at least one assessment — used to show calendar dots. */
     val datesWithAssessments: Set<LocalDate> = emptySet(),
+    /** Set of dates that have at least one session — used to show calendar dots. */
+    val datesWithSessions: Set<LocalDate> = emptySet(),
     /** Map from date → all assessments on that date (sorted newest first). */
     val assessmentsByDate: Map<LocalDate, List<RfAssessmentEntity>> = emptyMap(),
+    /** Map from date → all sessions on that date (sorted newest first). */
+    val sessionsByDate: Map<LocalDate, List<ResonanceSessionEntity>> = emptyMap(),
     /** Currently selected calendar date (null = nothing selected). */
     val selectedDate: LocalDate? = null,
     /** Assessments for the selected date. */
     val selectedDayAssessments: List<RfAssessmentEntity> = emptyList(),
+    /** Sessions for the selected date. */
+    val selectedDaySessions: List<ResonanceSessionEntity> = emptyList(),
 )
 
 @HiltViewModel
 class RfAssessmentHistoryViewModel @Inject constructor(
-    repository: RfAssessmentRepository
+    repository: RfAssessmentRepository,
+    private val sessionRepository: ResonanceSessionRepository
 ) : ViewModel() {
 
     private val _selectedDate = MutableStateFlow<LocalDate?>(null)
 
     val uiState: StateFlow<RfAssessmentHistoryUiState> = combine(
         repository.observeAll(),
+        sessionRepository.observeAll(),
         _selectedDate
-    ) { assessments, selectedDate ->
+    ) { assessments, sessions, selectedDate ->
         val zone = ZoneId.systemDefault()
 
         // Build date → assessments map
-        val byDate: Map<LocalDate, List<RfAssessmentEntity>> = assessments
+        val assessmentsByDate: Map<LocalDate, List<RfAssessmentEntity>> = assessments
             .groupBy { Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate() }
 
-        val dates = byDate.keys
+        // Build date → sessions map
+        val sessionsByDate: Map<LocalDate, List<ResonanceSessionEntity>> = sessions
+            .groupBy { Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate() }
+
+        val assessmentDates = assessmentsByDate.keys
+        val sessionDates = sessionsByDate.keys
 
         val selectedDayAssessments = if (selectedDate != null) {
-            byDate[selectedDate] ?: emptyList()
+            assessmentsByDate[selectedDate] ?: emptyList()
+        } else emptyList()
+
+        val selectedDaySessions = if (selectedDate != null) {
+            sessionsByDate[selectedDate] ?: emptyList()
         } else emptyList()
 
         // Chronological order (oldest → newest) for charts
-        val chronological = assessments.reversed()
+        val chronologicalAssessments = assessments.reversed()
+        val chronologicalSessions = sessions.reversed()
 
         RfAssessmentHistoryUiState(
             allAssessments = assessments,
-            chartData = buildChartData(chronological, zone),
-            datesWithAssessments = dates,
-            assessmentsByDate = byDate,
+            allSessions = sessions,
+            chartData = buildChartData(chronologicalAssessments, zone),
+            sessionChartData = buildSessionChartData(chronologicalSessions, zone),
+            datesWithAssessments = assessmentDates,
+            datesWithSessions = sessionDates,
+            assessmentsByDate = assessmentsByDate,
+            sessionsByDate = sessionsByDate,
             selectedDate = selectedDate,
             selectedDayAssessments = selectedDayAssessments,
+            selectedDaySessions = selectedDaySessions,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -96,7 +131,7 @@ class RfAssessmentHistoryViewModel @Inject constructor(
         _selectedDate.value = null
     }
 
-    // ── Chart builder ──────────────────────────────────────────────────────────
+    // ── Chart builders ─────────────────────────────────────────────────────────
 
     private fun buildChartData(
         chronological: List<RfAssessmentEntity>,
@@ -131,6 +166,39 @@ class RfAssessmentHistoryViewModel @Inject constructor(
             rmssd = rmssd,
             sdnn = sdnn,
             compositeScore = compositeScore,
+        )
+    }
+
+    private fun buildSessionChartData(
+        chronological: List<ResonanceSessionEntity>,
+        zone: ZoneId
+    ): SessionHistoryChartData {
+        if (chronological.isEmpty()) return SessionHistoryChartData()
+
+        val coherenceRatio = mutableListOf<RfChartPoint>()
+        val rmssd = mutableListOf<RfChartPoint>()
+        val sdnn = mutableListOf<RfChartPoint>()
+        val totalPoints = mutableListOf<RfChartPoint>()
+        val duration = mutableListOf<RfChartPoint>()
+
+        chronological.forEachIndexed { idx, s ->
+            val x = idx.toFloat()
+            val label = Instant.ofEpochMilli(s.timestamp)
+                .atZone(zone).toLocalDate().toString()
+
+            coherenceRatio.add(RfChartPoint(x, s.meanCoherenceRatio, label))
+            rmssd.add(RfChartPoint(x, s.meanRmssdMs, label))
+            sdnn.add(RfChartPoint(x, s.meanSdnnMs, label))
+            totalPoints.add(RfChartPoint(x, s.totalPoints, label))
+            duration.add(RfChartPoint(x, s.durationSeconds.toFloat() / 60f, label))
+        }
+
+        return SessionHistoryChartData(
+            coherenceRatio = coherenceRatio,
+            rmssd = rmssd,
+            sdnn = sdnn,
+            totalPoints = totalPoints,
+            duration = duration,
         )
     }
 }

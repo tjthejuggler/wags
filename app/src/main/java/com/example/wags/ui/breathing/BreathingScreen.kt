@@ -76,7 +76,7 @@ fun BreathingScreen(
     navController: NavController,
     onNavigateToRfAssessment: () -> Unit = {},
     onNavigateToHistory: () -> Unit = {},
-    onNavigateToSession: (vibration: Boolean) -> Unit = {},
+    onNavigateToSession: (vibration: Boolean, duration: Int, infinity: Boolean) -> Unit = { _, _, _ -> },
     viewModel: BreathingViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -137,13 +137,19 @@ fun BreathingScreen(
                 size = 200.dp
             )
 
-            CoherenceDisplay(score = state.coherenceScore)
-
             BreathingControls(
                 rateBpm = state.breathingRateBpm,
                 ieRatio = state.ieRatio,
                 onRateChange = { viewModel.setBreathingRate(it) },
                 onIeRatioChange = { viewModel.setIeRatio(it) }
+            )
+
+            // ── Duration controls ──────────────────────────────────────────
+            DurationControls(
+                durationMinutes = state.sessionDurationMinutes,
+                infinityMode = state.infinityMode,
+                onDurationChange = { viewModel.setSessionDuration(it) },
+                onInfinityToggle = { viewModel.setInfinityMode(it) }
             )
 
             // ── HR device gate ────────────────────────────────────────────────
@@ -160,7 +166,7 @@ fun BreathingScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Button(
-                    onClick = { onNavigateToSession(vibrationEnabled) },
+                    onClick = { onNavigateToSession(vibrationEnabled, state.sessionDurationMinutes, state.infinityMode) },
                     modifier = Modifier.weight(1f),
                     enabled = state.isHrDeviceConnected
                 ) { Text("Start Session") }
@@ -864,4 +870,51 @@ private fun coherenceColor(score: Float) = when {
     score >= 2f -> CoherenceYellow
     score >= 1f -> CoherenceOrange
     else -> CoherenceRed
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  DURATION CONTROLS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@Composable
+private fun DurationControls(
+    durationMinutes: Int,
+    infinityMode: Boolean,
+    onDurationChange: (Int) -> Unit,
+    onInfinityToggle: (Boolean) -> Unit
+) {
+    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (infinityMode) "Duration: ∞ (no limit)"
+                           else "Duration: $durationMinutes min",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                IconButton(onClick = { onInfinityToggle(!infinityMode) }) {
+                    Text(
+                        text = "∞",
+                        color = if (infinityMode) EcgCyan else TextDisabled,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = if (infinityMode) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
+            }
+            if (!infinityMode) {
+                Slider(
+                    value = durationMinutes.toFloat(),
+                    onValueChange = { onDurationChange(it.roundToInt()) },
+                    valueRange = 1f..30f,
+                    steps = 28  // 1 to 30 in 1-minute steps = 29 intervals = 28 steps
+                )
+            }
+        }
+    }
 }

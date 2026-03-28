@@ -60,7 +60,7 @@ object WagsRoutes {
     const val RF_ASSESSMENT_RUN = "rf_assessment_run/{protocol}?vibration={vibration}"
     const val RF_ASSESSMENT_RESULT = "rf_assessment_result/{sessionTimestamp}"
     const val RF_ASSESSMENT_HISTORY = "rf_assessment_history"
-    const val RESONANCE_SESSION = "resonance_session?vibration={vibration}"
+    const val RESONANCE_SESSION = "resonance_session?vibration={vibration}&duration={duration}&infinity={infinity}"
     const val APNEA_HISTORY = "apnea_history/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{audio}"
     const val APNEA_RECORD_DETAIL = "apnea_record_detail/{recordId}"
     const val APNEA_ALL_RECORDS = "apnea_all_records/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{eventTypes}"
@@ -100,7 +100,8 @@ object WagsRoutes {
         audio: String = "SILENCE"
     ) = "free_hold_active/$lungVolume/$prepType/$timeOfDay/$posture/$showTimer/$audio"
     fun meditationSessionDetail(sessionId: Long) = "meditation_session_detail/$sessionId"
-    fun resonanceSession(vibration: Boolean = false) = "resonance_session?vibration=$vibration"
+    fun resonanceSession(vibration: Boolean = false, duration: Int = 5, infinity: Boolean = false) =
+        "resonance_session?vibration=$vibration&duration=$duration&infinity=$infinity"
 
     /**
      * Navigate to All Records pre-filtered to the given settings.
@@ -147,19 +148,27 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
                 navController = navController,
                 onNavigateToRfAssessment = { navController.navigate(WagsRoutes.RF_ASSESSMENT_PICKER) },
                 onNavigateToHistory = { navController.navigate(WagsRoutes.RF_ASSESSMENT_HISTORY) },
-                onNavigateToSession = { vibration ->
-                    navController.navigate(WagsRoutes.resonanceSession(vibration))
+                onNavigateToSession = { vibration, duration, infinity ->
+                    navController.navigate(WagsRoutes.resonanceSession(vibration, duration, infinity))
                 }
             )
         }
         composable(
             route = WagsRoutes.RESONANCE_SESSION,
-            arguments = listOf(navArgument("vibration") { type = NavType.BoolType; defaultValue = false })
+            arguments = listOf(
+                navArgument("vibration") { type = NavType.BoolType; defaultValue = false },
+                navArgument("duration") { type = NavType.IntType; defaultValue = 5 },
+                navArgument("infinity") { type = NavType.BoolType; defaultValue = false }
+            )
         ) { backStackEntry ->
             val vibration = backStackEntry.arguments?.getBoolean("vibration") ?: false
+            val duration = backStackEntry.arguments?.getInt("duration") ?: 5
+            val infinity = backStackEntry.arguments?.getBoolean("infinity") ?: false
             ResonanceSessionScreen(
                 onNavigateBack = { navController.popBackStack() },
-                vibrationEnabled = vibration
+                vibrationEnabled = vibration,
+                durationMinutes = duration,
+                infinityMode = infinity
             )
         }
         composable(WagsRoutes.RF_ASSESSMENT_HISTORY) {

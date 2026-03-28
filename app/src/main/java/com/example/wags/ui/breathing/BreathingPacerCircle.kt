@@ -54,14 +54,14 @@ fun BreathingPacerCircle(
     size: Dp = 260.dp,
     showLabel: Boolean = true,
     overlayLabel: String? = null,
-    onPhaseTransition: (() -> Unit)? = null
+    onPhaseTransition: ((isInhaling: Boolean) -> Unit)? = null
 ) {
     // Fire the callback exactly once per phase change
     var lastPhase by remember { mutableStateOf(isInhaling) }
     LaunchedEffect(isInhaling) {
         if (isInhaling != lastPhase) {
             lastPhase = isInhaling
-            onPhaseTransition?.invoke()
+            onPhaseTransition?.invoke(isInhaling)
         }
     }
 

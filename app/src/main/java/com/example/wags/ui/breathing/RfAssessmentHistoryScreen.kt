@@ -20,8 +20,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.wags.data.db.entity.ResonanceSessionEntity
 import com.example.wags.data.db.entity.RfAssessmentEntity
 import com.example.wags.ui.theme.*
 import java.time.Instant
@@ -50,10 +52,10 @@ fun RfAssessmentHistoryScreen(
     var selectedTab by remember { mutableStateOf(RfHistoryTab.GRAPHS) }
     var displayedMonth by remember { mutableStateOf(YearMonth.now()) }
 
-    // Single-session auto-navigate: when exactly 1 assessment is selected, navigate immediately
+    // Single-assessment auto-navigate: when exactly 1 assessment and no sessions selected
     val selectedDayAssessments = uiState.selectedDayAssessments
     LaunchedEffect(selectedDayAssessments) {
-        if (selectedDayAssessments.size == 1) {
+        if (selectedDayAssessments.size == 1 && uiState.selectedDaySessions.isEmpty()) {
             onNavigateToDetail(selectedDayAssessments.first().timestamp)
             viewModel.clearSelection()
         }
@@ -104,7 +106,7 @@ fun RfAssessmentHistoryScreen(
                 }
             }
 
-            if (uiState.allAssessments.isEmpty()) {
+            if (uiState.allAssessments.isEmpty() && uiState.allSessions.isEmpty()) {
                 RfEmptyHistoryContent()
             } else {
                 when (selectedTab) {
@@ -112,8 +114,9 @@ fun RfAssessmentHistoryScreen(
                     RfHistoryTab.CALENDAR -> RfCalendarContent(
                         uiState = uiState,
                         displayedMonth = displayedMonth,
+                        viewModel = viewModel,
                         onDayClick = { date ->
-                            if (date in uiState.datesWithAssessments) {
+                            if (date in uiState.datesWithAssessments || date in uiState.datesWithSessions) {
                                 if (uiState.selectedDate == date) viewModel.clearSelection()
                                 else viewModel.selectDate(date)
                             }
@@ -143,75 +146,161 @@ private fun RfGraphsContent(uiState: RfAssessmentHistoryUiState) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // Header summary
-        RfHistorySummaryCard(uiState = uiState)
-
-        // ── 1. Optimal BPM ──────────────────────────────────────────────
-        RfGraphSection(
-            title = "Optimal Breathing Rate",
-            subtitle = "Your resonance frequency (BPM) over time"
-        ) {
-            RfMetricChart(
-                label = "Optimal BPM",
-                points = uiState.chartData.optimalBpm,
-                lineColor = TextPrimary
+        // ── ASSESSMENT GRAPHS ───────────────────────────────────────────
+        if (uiState.allAssessments.isNotEmpty()) {
+            Text(
+                "ASSESSMENT HISTORY",
+                style = MaterialTheme.typography.titleMedium,
+                color = TextPrimary,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 2.sp,
+                modifier = Modifier.padding(bottom = 8.dp)
             )
+
+            // Header summary
+            RfHistorySummaryCard(uiState = uiState)
+
+            // ── 1. Optimal BPM ──────────────────────────────────────────
+            RfGraphSection(
+                title = "Optimal Breathing Rate",
+                subtitle = "Your resonance frequency (BPM) over time"
+            ) {
+                RfMetricChart(
+                    label = "Optimal BPM",
+                    points = uiState.chartData.optimalBpm,
+                    lineColor = TextPrimary
+                )
+            }
+
+            // ── 2. Coherence Ratio ──────────────────────────────────────
+            RfGraphSection(
+                title = "Coherence Ratio",
+                subtitle = "Peak coherence achieved per assessment"
+            ) {
+                RfMetricChart(
+                    label = "Coherence Ratio",
+                    points = uiState.chartData.coherenceRatio,
+                    lineColor = Color(0xFFD0D0D0)
+                )
+            }
+
+            // ── 3. LF Power ────────────────────────────────────────────
+            RfGraphSection(
+                title = "LF Power",
+                subtitle = "Absolute low-frequency power at resonance (ms²/Hz)"
+            ) {
+                RfMetricChart(
+                    label = "LF Power (ms²/Hz)",
+                    points = uiState.chartData.lfPower,
+                    lineColor = Color(0xFFB0B0B0)
+                )
+            }
+
+            // ── 4. RMSSD ───────────────────────────────────────────────
+            RfGraphSection(
+                title = "RMSSD",
+                subtitle = "Root mean square of successive differences (ms)"
+            ) {
+                RfMetricChart(
+                    label = "RMSSD (ms)",
+                    points = uiState.chartData.rmssd,
+                    lineColor = Color(0xFF909090)
+                )
+            }
+
+            // ── 5. SDNN ────────────────────────────────────────────────
+            RfGraphSection(
+                title = "SDNN",
+                subtitle = "Standard deviation of NN intervals (ms)"
+            ) {
+                RfMetricChart(
+                    label = "SDNN (ms)",
+                    points = uiState.chartData.sdnn,
+                    lineColor = Color(0xFF808080)
+                )
+            }
+
+            // ── 6. Composite Score ─────────────────────────────────────
+            RfGraphSection(
+                title = "Composite Score",
+                subtitle = "Overall assessment quality score"
+            ) {
+                RfScoreChart(points = uiState.chartData.compositeScore)
+            }
         }
 
-        // ── 2. Coherence Ratio ──────────────────────────────────────────
-        RfGraphSection(
-            title = "Coherence Ratio",
-            subtitle = "Peak coherence achieved per assessment"
-        ) {
-            RfMetricChart(
-                label = "Coherence Ratio",
-                points = uiState.chartData.coherenceRatio,
-                lineColor = Color(0xFFD0D0D0)
-            )
-        }
+        // ── SESSION GRAPHS ──────────────────────────────────────────────
+        if (uiState.allSessions.isNotEmpty()) {
+            HorizontalDivider(color = SurfaceDark, modifier = Modifier.padding(vertical = 8.dp))
 
-        // ── 3. LF Power ────────────────────────────────────────────────
-        RfGraphSection(
-            title = "LF Power",
-            subtitle = "Absolute low-frequency power at resonance (ms²/Hz)"
-        ) {
-            RfMetricChart(
-                label = "LF Power (ms²/Hz)",
-                points = uiState.chartData.lfPower,
-                lineColor = Color(0xFFB0B0B0)
+            Text(
+                "SESSION HISTORY",
+                style = MaterialTheme.typography.titleMedium,
+                color = TextPrimary,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 2.sp,
+                modifier = Modifier.padding(bottom = 8.dp)
             )
-        }
 
-        // ── 4. RMSSD ───────────────────────────────────────────────────
-        RfGraphSection(
-            title = "RMSSD",
-            subtitle = "Root mean square of successive differences (ms)"
-        ) {
-            RfMetricChart(
-                label = "RMSSD (ms)",
-                points = uiState.chartData.rmssd,
-                lineColor = Color(0xFF909090)
-            )
-        }
+            // Session Coherence
+            RfGraphSection(
+                title = "Session Coherence",
+                subtitle = "Mean coherence ratio per session"
+            ) {
+                RfMetricChart(
+                    label = "Coherence Ratio",
+                    points = uiState.sessionChartData.coherenceRatio,
+                    lineColor = Color(0xFFD0D0D0)
+                )
+            }
 
-        // ── 5. SDNN ────────────────────────────────────────────────────
-        RfGraphSection(
-            title = "SDNN",
-            subtitle = "Standard deviation of NN intervals (ms)"
-        ) {
-            RfMetricChart(
-                label = "SDNN (ms)",
-                points = uiState.chartData.sdnn,
-                lineColor = Color(0xFF808080)
-            )
-        }
+            // Session RMSSD
+            RfGraphSection(
+                title = "Session RMSSD",
+                subtitle = "Mean RMSSD per session (ms)"
+            ) {
+                RfMetricChart(
+                    label = "RMSSD (ms)",
+                    points = uiState.sessionChartData.rmssd,
+                    lineColor = Color(0xFF909090)
+                )
+            }
 
-        // ── 6. Composite Score ─────────────────────────────────────────
-        RfGraphSection(
-            title = "Composite Score",
-            subtitle = "Overall assessment quality score"
-        ) {
-            RfScoreChart(points = uiState.chartData.compositeScore)
+            // Session SDNN
+            RfGraphSection(
+                title = "Session SDNN",
+                subtitle = "Mean SDNN per session (ms)"
+            ) {
+                RfMetricChart(
+                    label = "SDNN (ms)",
+                    points = uiState.sessionChartData.sdnn,
+                    lineColor = Color(0xFF808080)
+                )
+            }
+
+            // Session Points
+            RfGraphSection(
+                title = "Session Points",
+                subtitle = "Total points earned per session"
+            ) {
+                RfMetricChart(
+                    label = "Points",
+                    points = uiState.sessionChartData.totalPoints,
+                    lineColor = TextPrimary
+                )
+            }
+
+            // Session Duration
+            RfGraphSection(
+                title = "Session Duration",
+                subtitle = "Duration per session (minutes)"
+            ) {
+                RfMetricChart(
+                    label = "Duration (min)",
+                    points = uiState.sessionChartData.duration,
+                    lineColor = Color(0xFFB0B0B0)
+                )
+            }
         }
 
         Spacer(Modifier.height(16.dp))
@@ -224,6 +313,7 @@ private fun RfGraphsContent(uiState: RfAssessmentHistoryUiState) {
 private fun RfCalendarContent(
     uiState: RfAssessmentHistoryUiState,
     displayedMonth: YearMonth,
+    viewModel: RfAssessmentHistoryViewModel,
     onDayClick: (LocalDate) -> Unit,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
@@ -240,18 +330,27 @@ private fun RfCalendarContent(
         RfCalendar(
             displayedMonth = displayedMonth,
             datesWithAssessments = uiState.datesWithAssessments,
+            datesWithSessions = uiState.datesWithSessions,
             selectedDate = uiState.selectedDate,
             onDayClick = onDayClick,
             onPreviousMonth = onPreviousMonth,
             onNextMonth = onNextMonth
         )
 
-        // Show multi-session list only when >1 assessment on the selected day
+        // Show multi-assessment list when >1 assessment on the selected day
         if (uiState.selectedDayAssessments.size > 1) {
             RfMultiSessionList(
                 assessments = uiState.selectedDayAssessments,
                 onDismiss = onDismissMultiList,
                 onSessionClick = onNavigateToDetail
+            )
+        }
+
+        // Show sessions for the selected day
+        if (uiState.selectedDaySessions.isNotEmpty()) {
+            RfSessionDayList(
+                sessions = uiState.selectedDaySessions,
+                onDismiss = { viewModel.clearSelection() }
             )
         }
     }
@@ -263,6 +362,7 @@ private fun RfCalendarContent(
 private fun RfCalendar(
     displayedMonth: YearMonth,
     datesWithAssessments: Set<LocalDate>,
+    datesWithSessions: Set<LocalDate>,
     selectedDate: LocalDate?,
     onDayClick: (LocalDate) -> Unit,
     onPreviousMonth: () -> Unit,
@@ -323,11 +423,13 @@ private fun RfCalendar(
                         } else {
                             val date = displayedMonth.atDay(dayNumber)
                             val hasAssessment = date in datesWithAssessments
+                            val hasSession = date in datesWithSessions
                             val isSelected = date == selectedDate
                             val isToday = date == LocalDate.now()
                             RfCalendarDay(
                                 dayNumber = dayNumber,
                                 hasAssessment = hasAssessment,
+                                hasSession = hasSession,
                                 isSelected = isSelected,
                                 isToday = isToday,
                                 onClick = { onDayClick(date) },
@@ -345,12 +447,12 @@ private fun RfCalendar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(TextSecondary))
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    "Assessment recorded — tap to view",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextDisabled
-                )
+                Spacer(Modifier.width(4.dp))
+                Text("Assessment", style = MaterialTheme.typography.labelSmall, color = TextDisabled)
+                Spacer(Modifier.width(12.dp))
+                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(EcgCyan.copy(alpha = 0.6f)))
+                Spacer(Modifier.width(4.dp))
+                Text("Session", style = MaterialTheme.typography.labelSmall, color = TextDisabled)
             }
         }
     }
@@ -360,6 +462,7 @@ private fun RfCalendar(
 private fun RfCalendarDay(
     dayNumber: Int,
     hasAssessment: Boolean,
+    hasSession: Boolean,
     isSelected: Boolean,
     isToday: Boolean,
     onClick: () -> Unit,
@@ -371,10 +474,10 @@ private fun RfCalendarDay(
         else       -> Color.Transparent
     }
     val textColor = when {
-        isSelected    -> TextPrimary
-        isToday       -> TextPrimary
-        hasAssessment -> TextPrimary
-        else          -> TextDisabled
+        isSelected                  -> TextPrimary
+        isToday                     -> TextPrimary
+        hasAssessment || hasSession -> TextPrimary
+        else                        -> TextDisabled
     }
 
     Column(
@@ -382,7 +485,7 @@ private fun RfCalendarDay(
             .padding(2.dp)
             .clip(MaterialTheme.shapes.small)
             .background(bgColor)
-            .clickable(enabled = hasAssessment, onClick = onClick)
+            .clickable(enabled = hasAssessment || hasSession, onClick = onClick)
             .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp)
@@ -393,20 +496,34 @@ private fun RfCalendarDay(
             color = textColor,
             fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal
         )
-        if (hasAssessment) {
-            Box(
-                modifier = Modifier
-                    .size(5.dp)
-                    .clip(CircleShape)
-                    .background(if (isSelected) TextPrimary else TextSecondary)
-            )
-        } else {
-            Spacer(Modifier.height(5.dp))
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (hasAssessment) {
+                Box(
+                    modifier = Modifier
+                        .size(5.dp)
+                        .clip(CircleShape)
+                        .background(if (isSelected) TextPrimary else TextSecondary)
+                )
+            }
+            if (hasSession) {
+                Box(
+                    modifier = Modifier
+                        .size(5.dp)
+                        .clip(CircleShape)
+                        .background(if (isSelected) EcgCyan else EcgCyan.copy(alpha = 0.6f))
+                )
+            }
+            if (!hasAssessment && !hasSession) {
+                Spacer(Modifier.height(5.dp))
+            }
         }
     }
 }
 
-// ── Multi-session list (shown when >1 assessment on a day) ──────────────────
+// ── Multi-assessment list (shown when >1 assessment on a day) ───────────────
 
 @Composable
 private fun RfMultiSessionList(
@@ -472,8 +589,6 @@ private fun RfSessionSummaryCard(
     val timeLabel = Instant.ofEpochMilli(assessment.timestamp).atZone(zone)
         .format(DateTimeFormatter.ofPattern("h:mm a"))
 
-    val bpmColor = TextPrimary
-
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -508,6 +623,113 @@ private fun RfSessionSummaryCard(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     String.format("%.1f", assessment.optimalBpm),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = TextPrimary,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Text(
+                    "BPM",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextDisabled
+                )
+            }
+        }
+    }
+}
+
+// ── Session day list (shown when sessions exist on selected day) ────────────
+
+@Composable
+private fun RfSessionDayList(
+    sessions: List<ResonanceSessionEntity>,
+    onDismiss: () -> Unit
+) {
+    val zone = ZoneId.systemDefault()
+    val dateLabel = sessions.firstOrNull()?.let { s ->
+        Instant.ofEpochMilli(s.timestamp).atZone(zone)
+            .format(DateTimeFormatter.ofPattern("EEEE, MMMM d yyyy"))
+    } ?: ""
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = SurfaceVariant)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        dateLabel,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "${sessions.size} session${if (sessions.size > 1) "s" else ""}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextDisabled
+                    )
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("✕", color = TextDisabled)
+                }
+            }
+
+            HorizontalDivider(color = SurfaceDark)
+
+            sessions.forEach { session ->
+                RfSessionCard(session = session)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RfSessionCard(session: ResonanceSessionEntity) {
+    val zone = ZoneId.systemDefault()
+    val timeLabel = Instant.ofEpochMilli(session.timestamp).atZone(zone)
+        .format(DateTimeFormatter.ofPattern("h:mm a"))
+    val durationMin = session.durationSeconds / 60
+    val durationSec = session.durationSeconds % 60
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    timeLabel,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Session  ·  %d:%02d  ·  Coherence %.1f  ·  %.0f pts".format(
+                        durationMin, durationSec,
+                        session.meanCoherenceRatio,
+                        session.totalPoints
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondary
+                )
+            }
+
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    String.format("%.1f", session.breathingRateBpm),
                     style = MaterialTheme.typography.titleLarge,
                     color = TextPrimary,
                     fontWeight = FontWeight.ExtraBold
@@ -817,12 +1039,12 @@ private fun RfEmptyHistoryContent(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            "No assessments yet",
+            "No history yet",
             style = MaterialTheme.typography.headlineSmall,
             color = TextSecondary
         )
         Text(
-            "Complete an RF Assessment to see your history here.",
+            "Complete an RF Assessment or breathing session to see your history here.",
             style = MaterialTheme.typography.bodyMedium,
             color = TextDisabled,
             textAlign = TextAlign.Center

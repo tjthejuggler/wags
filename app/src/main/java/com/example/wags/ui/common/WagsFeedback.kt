@@ -35,11 +35,10 @@ object WagsFeedback {
     private val PATTERN_STAND_UP = longArrayOf(0, 300, 100, 300, 100, 500)
 
     /**
-     * Short single pulse for breath phase transitions (inhale ↔ exhale).
-     * 80 ms at medium amplitude — noticeable but not intrusive.
+     * Rapid double vibration for INHALE transition.
+     * Two quick 60ms pulses separated by 60ms gap.
      */
-    private const val BREATH_TRANSITION_MS = 80L
-    private const val BREATH_TRANSITION_AMPLITUDE = 120 // 0–255
+    private val PATTERN_BREATH_INHALE = longArrayOf(0, 60, 60, 60)
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -62,11 +61,34 @@ object WagsFeedback {
     }
 
     /**
-     * Fire a short haptic pulse to signal a breath phase transition
-     * (inhale → exhale or exhale → inhale). Only vibrates — no sound.
+     * Rapid double vibration for INHALE transition.
+     * Two quick 60ms pulses separated by 60ms gap.
+     */
+    fun breathInhale(context: Context) {
+        vibrate(context, PATTERN_BREATH_INHALE)
+    }
+
+    /**
+     * Rapid single vibration for EXHALE transition.
+     * One quick 60ms pulse.
+     */
+    fun breathExhale(context: Context) {
+        vibrateSingle(context, 60L, 120)
+    }
+
+    /**
+     * Longer vibration to signal "breathe naturally" phase start (assessments).
+     * 300ms at medium amplitude.
+     */
+    fun breathNaturallyStart(context: Context) {
+        vibrateSingle(context, 300L, 150)
+    }
+
+    /**
+     * @deprecated Use [breathInhale] or [breathExhale] instead.
      */
     fun breathTransition(context: Context) {
-        vibrateSingle(context, BREATH_TRANSITION_MS, BREATH_TRANSITION_AMPLITUDE)
+        breathInhale(context)
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
