@@ -124,6 +124,18 @@ class UnifiedDeviceManager @Inject constructor(
      */
     fun connect(identifier: String, name: String = "", isPolar: Boolean) {
         Log.d(TAG, "connect($identifier, name='$name', isPolar=$isPolar)")
+
+        // Disconnect any currently-connected device first to avoid stale GATT
+        // references and BLE stack conflicts when switching devices.
+        val currentState = connectionState.value
+        if (currentState is BleConnectionState.Connected ||
+            currentState is BleConnectionState.Connecting
+        ) {
+            Log.d(TAG, "Disconnecting current device before connecting new one")
+            polarBleManager.disconnect()
+            genericBleManager.disconnect()
+        }
+
         // Save to unified history
         devicePrefs.addDevice(identifier, name, isPolar)
 
@@ -145,35 +157,31 @@ class UnifiedDeviceManager @Inject constructor(
      * Disconnect whichever device is currently connected.
      */
     fun disconnect() {
-        val state = connectionState.value
-        if (state !is BleConnectionState.Connected) return
-
-        if (state.deviceType.isPolar) {
-            polarBleManager.disconnect()
-        } else {
-            genericBleManager.disconnect()
-        }
+        Log.d(TAG, "disconnect() — current state: ${connectionState.value}")
+        // Disconnect both backends — safe even if they're already disconnected.
+        // This handles the case where the device is off / out of range and the
+        // unified state is Error or Connecting rather than Connected.
+        polarBleManager.disconnect()
+        genericBleManager.disconnect()
     }
 
     /**
      * Disconnect a specific device by identifier.
      */
     fun disconnect(identifier: String) {
+        Log.d(TAG, "disconnect($identifier)")
         // Check if it's the Polar device
         val polarState = polarBleManager.connectionState.value
-        if (polarState is BleConnectionState.Connected && polarState.deviceId == identifier) {
+        if (polarState is BleConnectionState.Connected && polarState.deviceId == identifier ||
+            polarState is BleConnectionState.Connecting && polarState.deviceId == identifier ||
+            polarState is BleConnectionState.Error
+        ) {
             polarBleManager.disconnectDevice(identifier)
             return
         }
-        if (polarState is BleConnectionState.Connecting && polarState.deviceId == identifier) {
-            polarBleManager.disconnectDevice(identifier)
-            return
-        }
-        // Otherwise try generic
-        val genericState = genericBleManager.connectionState.value
-        if (genericState is BleConnectionState.Connected && genericState.deviceId == identifier) {
-            genericBleManager.disconnect()
-        }
+        // Otherwise try generic — disconnect regardless of state (Connected,
+        // Connecting, or Error) so the user can always force a clean disconnect.
+        genericBleManager.disconnect()
     }
 
     // ── Capability queries ────────────────────────────────────────────────────

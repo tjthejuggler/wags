@@ -154,10 +154,27 @@ class PolarBleManager @Inject constructor(
      * determined automatically from the device name once connected.
      */
     fun connectDevice(deviceId: String) {
+        // If already connected/connecting to a different device, disconnect first
+        val currentState = _connectionState.value
+        val currentId = when (currentState) {
+            is BleConnectionState.Connected -> currentState.deviceId
+            is BleConnectionState.Connecting -> currentState.deviceId
+            else -> null
+        }
+        if (currentId != null && currentId != deviceId) {
+            Log.d(TAG, "Disconnecting $currentId before connecting $deviceId")
+            try { polarApi.disconnectFromDevice(currentId) } catch (_: Exception) {}
+            stopAllStreams(currentId)
+            _liveHr.value = null
+        }
+
         _connectionState.value = BleConnectionState.Connecting(deviceId)
         try {
             polarApi.connectToDevice(deviceId)
         } catch (e: PolarInvalidArgument) {
+            _connectionState.value = BleConnectionState.Error(e.message ?: "Connection failed")
+        } catch (e: Exception) {
+            Log.e(TAG, "connectDevice($deviceId) threw: ${e.message}")
             _connectionState.value = BleConnectionState.Error(e.message ?: "Connection failed")
         }
     }
@@ -170,7 +187,19 @@ class PolarBleManager @Inject constructor(
     fun disconnectDevice(deviceId: String) {
         try {
             polarApi.disconnectFromDevice(deviceId)
-        } catch (e: PolarInvalidArgument) { /* ignore */ }
+        } catch (e: PolarInvalidArgument) {
+            // Device ID was invalid — force state to Disconnected
+            Log.w(TAG, "disconnectDevice($deviceId) PolarInvalidArgument: ${e.message}")
+            _connectionState.value = BleConnectionState.Disconnected
+            _liveHr.value = null
+        } catch (e: Exception) {
+            // Device already gone (turned off, out of range, BLE stack error)
+            Log.w(TAG, "disconnectDevice($deviceId) threw: ${e.message}")
+            _connectionState.value = BleConnectionState.Disconnected
+            stopAllStreams(deviceId)
+            _liveHr.value = null
+            onDisconnected?.invoke()
+        }
     }
 
     /** Disconnect whichever Polar device is currently connected. */
@@ -179,6 +208,12 @@ class PolarBleManager @Inject constructor(
         when (state) {
             is BleConnectionState.Connected -> disconnectDevice(state.deviceId)
             is BleConnectionState.Connecting -> disconnectDevice(state.deviceId)
+            is BleConnectionState.Error -> {
+                // Stuck in Error state — force to Disconnected so UI can recover
+                Log.d(TAG, "disconnect() from Error state — forcing Disconnected")
+                _connectionState.value = BleConnectionState.Disconnected
+                _liveHr.value = null
+            }
             else -> { /* nothing to disconnect */ }
         }
     }

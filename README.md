@@ -4,6 +4,33 @@
 
 ## Changelog
 
+### 2026-03-27 — Device connection bug fixes + Wellue O2Ring support
+
+**Bug fix: crash when disconnecting from a turned-off device** ([`GenericBleManager.kt`](app/src/main/java/com/example/wags/data/ble/GenericBleManager.kt), [`PolarBleManager.kt`](app/src/main/java/com/example/wags/data/ble/PolarBleManager.kt), [`UnifiedDeviceManager.kt`](app/src/main/java/com/example/wags/data/ble/UnifiedDeviceManager.kt))
+- `GenericBleManager.disconnect()` now wraps the GATT disconnect call in try/catch. When the device is already gone (turned off, out of range), it force-cleans the state to `Disconnected` instead of leaving the UI stuck in `Connected` or `Error`.
+- `PolarBleManager.disconnectDevice()` catches all exceptions (not just `PolarInvalidArgument`) and forces state to `Disconnected` when the Polar SDK throws because the device is unreachable.
+- `PolarBleManager.disconnect()` now handles the `Error` state — previously it only disconnected from `Connected` or `Connecting`, leaving the UI stuck if the device had already errored out.
+- `UnifiedDeviceManager.disconnect()` no longer requires the state to be `Connected` — it now unconditionally tells both backends to disconnect, which is safe even when already disconnected.
+- `GenericBleManager` GATT callback `onConnectionStateChange` now always transitions to `Disconnected` on disconnect (previously set `Error` for non-success status codes, which prevented the user from reconnecting).
+
+**Bug fix: crash when switching devices without restarting** ([`UnifiedDeviceManager.kt`](app/src/main/java/com/example/wags/data/ble/UnifiedDeviceManager.kt), [`PolarBleManager.kt`](app/src/main/java/com/example/wags/data/ble/PolarBleManager.kt), [`GenericBleManager.kt`](app/src/main/java/com/example/wags/data/ble/GenericBleManager.kt))
+- `UnifiedDeviceManager.connect()` now disconnects both backends before connecting to a new device, preventing stale GATT references and BLE stack conflicts.
+- `PolarBleManager.connectDevice()` disconnects the old device first when switching to a different device ID.
+- `GenericBleManager` GATT callback now checks for stale GATT instances on connect (not just disconnect), closing them immediately to prevent race conditions.
+- `gatt.close()` moved inside the `gattLock` synchronized block to eliminate a race where the old GATT's disconnect callback could null out `bluetoothGatt` right after a new connection set it.
+
+**Wellue O2Ring support** ([`GenericBleManager.kt`](app/src/main/java/com/example/wags/data/ble/GenericBleManager.kt), [`DeviceType.kt`](app/src/main/java/com/example/wags/domain/model/DeviceType.kt))
+- Added Wellue O2Ring as a recognized oximeter device. It maps to `DeviceType.OXIMETER` with HR + SpO2 capabilities, so it works everywhere the OxySmart oximeter works (apnea holds, SpO2 safety monitor, live HR display, etc.).
+- `DeviceType.fromName()` now matches "O2Ring" in addition to existing oximeter name patterns.
+- `GenericBleManager` data handler now recognizes two distinct packet protocols:
+  - **OxySmart/PC-60F** — Nordic UART Service packets starting with `AA 55` (existing)
+  - **Wellue O2Ring/Viatom** — Proprietary GATT service (`14839ac4-...`) with packets starting with `AA <cmd>` and a CRC-8 checksum
+- O2Ring live data is obtained by periodically sending command `0x17` to the device's write characteristic. A background polling coroutine starts automatically after connection and stops on disconnect.
+- Full CRC-8 implementation for building valid Viatom protocol packets.
+- O2Ring service UUID (`14839ac4-7d7e-415c-9a42-167340cf2339`), write UUID (`8b00ace7-...`), and notify UUID (`0734594a-...`) are auto-discovered by the existing notify-queue mechanism.
+
+---
+
 ### 2026-03-26 — Apnea History screen: All Records tab, unfiltered calendar, Stats settings popup, "History" button
 
 **All Records tab** ([`ApneaHistoryScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaHistoryScreen.kt))
@@ -176,7 +203,7 @@ Converted the entire app UI to black-and-white greyscale monochrome. All colored
 
 ## Overview
 
-Wags is a professional-grade Android freediving training app built with Kotlin and Jetpack Compose. It combines HRV-based readiness assessment, structured apnea table training, unified BLE-connected biometric monitoring (any BLE device — Polar H10/Verity Sense, Wellue/Viatom oximeters, generic HR sensors — auto-detected by name), and real-time safety monitoring into a single cohesive training ecosystem.
+Wags is a professional-grade Android freediving training app built with Kotlin and Jetpack Compose. It combines HRV-based readiness assessment, structured apnea table training, unified BLE-connected biometric monitoring (any BLE device — Polar H10/Verity Sense, Wellue O2Ring, Wellue/Viatom oximeters, generic HR sensors — auto-detected by name), and real-time safety monitoring into a single cohesive training ecosystem.
 
 The app is designed for competitive freedivers and serious recreational practitioners who want data-driven training, not just a stopwatch.
 
@@ -196,7 +223,7 @@ The app is designed for competitive freedivers and serious recreational practiti
 - **Free Hold Mode** — Stopwatch-style free breath-hold with Polar HR monitoring
 - **Contraction Tracking** — Double-tap or volume-button logging during holds; cruising/struggle phase analytics
 - **Session Analytics** — Per-session contraction delta bar chart and historical hypoxic resistance scatter plot
-- **Unified BLE Integration** — Single scan/connect flow for any BLE device; device type auto-detected from advertised name (Polar H10, Verity Sense, Wellue OxySmart, Viatom PC-60F, generic HR sensors); capabilities (HR, RR, ECG, ACC, PPI, SpO₂) determined per device type
+- **Unified BLE Integration** — Single scan/connect flow for any BLE device; device type auto-detected from advertised name (Polar H10, Verity Sense, Wellue O2Ring, Wellue OxySmart, Viatom PC-60F, generic HR sensors); capabilities (HR, RR, ECG, ACC, PPI, SpO₂) determined per device type
 - **SpO₂ Safety Monitor** — Configurable critical threshold (70–95%) with TTS + haptic abort alert
 - **Personal Best Tracking** — Persistent PB storage; all tables auto-scale to current PB
 - **TTS + Haptic Engine** — Phase announcements, countdown cues, and differentiated vibration patterns

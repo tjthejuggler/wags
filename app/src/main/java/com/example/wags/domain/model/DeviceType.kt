@@ -48,7 +48,7 @@ enum class DeviceType(val capabilities: Set<DeviceCapability>) {
          * Rules:
          *   - Contains "H10" → [POLAR_H10]
          *   - Contains "Sense" → [POLAR_VERITY]
-         *   - Contains "OxySmart", "PC-60", "Viatom", or "Wellue" → [OXIMETER]
+         *   - Contains "OxySmart", "PC-60", "Viatom", "Wellue", or "O2Ring" → [OXIMETER]
          *   - Starts with "Polar " (but not H10/Sense) → [POLAR_H10] (safe default)
          *   - Anything else → [GENERIC_BLE]
          */
@@ -61,6 +61,7 @@ enum class DeviceType(val capabilities: Set<DeviceCapability>) {
                 upper.contains("PC-60") -> OXIMETER
                 upper.contains("VIATOM") -> OXIMETER
                 upper.contains("WELLUE") -> OXIMETER
+                upper.contains("O2RING") -> OXIMETER
                 upper.startsWith("POLAR ") -> POLAR_H10 // unknown Polar → H10 default
                 else -> GENERIC_BLE
             }
