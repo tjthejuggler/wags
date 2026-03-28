@@ -453,6 +453,21 @@ class GenericBleManager @Inject constructor(
             val deviceType = DeviceType.fromName(deviceName)
             connectedDeviceType = deviceType
 
+            // Polar devices should be handled by the Polar SDK, not generic GATT.
+            // If a Polar device ended up here (e.g. its MAC was saved as non-Polar
+            // in the device history), disconnect immediately so the Polar SDK can
+            // handle it on the next auto-connect cycle.
+            if (deviceType.isPolar) {
+                Log.w(TAG, "Polar device '$deviceName' connected via generic GATT — disconnecting to let Polar SDK handle it")
+                synchronized(gattLock) {
+                    try { gatt.disconnect() } catch (_: Exception) {}
+                    try { gatt.close() } catch (_: Exception) {}
+                    bluetoothGatt = null
+                }
+                _connectionState.value = BleConnectionState.Disconnected
+                return
+            }
+
             // Check if this is an O2Ring (Viatom/Wellue proprietary service)
             val isO2Ring = gatt.getService(O2RING_SERVICE_UUID) != null
             Log.d(TAG, "Device type: $deviceType, isO2Ring=$isO2Ring")
@@ -565,6 +580,14 @@ class GenericBleManager @Inject constructor(
 
         val header = bytes[0].toInt() and 0xFF
 
+        // ── Standard BLE Heart Rate Measurement (UUID 0x2A37) ─────────────────
+        // Flags byte (header): bit 0 = HR format (0=uint8, 1=uint16),
+        // bit 4 = RR intervals present. Works with any standard HR strap.
+        if (bytes.size >= 2 && isStandardHrPacket(bytes)) {
+            handleStandardHrPacket(bytes)
+            return
+        }
+
         // ── OxySmart / PC-60F protocol (AA 55 …) ─────────────────────────────
         if (header == 0xAA && bytes.size >= 2 && bytes[1].toInt() and 0xFF == 0x55) {
             handleOxySmartPacket(bytes)
@@ -586,6 +609,66 @@ class GenericBleManager @Inject constructor(
         }
 
         Log.d(TAG, "Skipping unrecognized packet (header=0x${"%02X".format(header)})")
+    }
+
+    /**
+     * Heuristic to detect standard BLE Heart Rate Measurement packets.
+     *
+     * The flags byte encodes the HR format and optional fields. We check that
+     * the HR value extracted from the packet is in a plausible range (20–250 bpm)
+     * and that the packet length is consistent with the flags.
+     */
+    private fun isStandardHrPacket(bytes: ByteArray): Boolean {
+        if (bytes.size < 2) return false
+        val flags = bytes[0].toInt() and 0xFF
+        val hrIs16Bit = (flags and 0x01) != 0
+        val hrOffset = 1
+        val hr = if (hrIs16Bit) {
+            if (bytes.size < 3) return false
+            (bytes[hrOffset].toInt() and 0xFF) or ((bytes[hrOffset + 1].toInt() and 0xFF) shl 8)
+        } else {
+            bytes[hrOffset].toInt() and 0xFF
+        }
+        return hr in 20..250
+    }
+
+    /**
+     * Parse a standard BLE Heart Rate Measurement packet (UUID 0x2A37).
+     *
+     * Format per Bluetooth SIG specification:
+     *   [0] Flags: bit 0 = HR format (0=uint8, 1=uint16)
+     *              bit 1-2 = sensor contact status
+     *              bit 3 = energy expended present
+     *              bit 4 = RR intervals present
+     *   [1] HR value (uint8) or [1-2] HR value (uint16 LE)
+     *   [...] optional energy expended (uint16 LE) if bit 3 set
+     *   [...] optional RR intervals (uint16 LE each, in 1/1024 sec) if bit 4 set
+     */
+    private fun handleStandardHrPacket(bytes: ByteArray) {
+        val flags = bytes[0].toInt() and 0xFF
+        val hrIs16Bit = (flags and 0x01) != 0
+        var offset = 1
+
+        val hr = if (hrIs16Bit) {
+            val v = (bytes[offset].toInt() and 0xFF) or ((bytes[offset + 1].toInt() and 0xFF) shl 8)
+            offset += 2
+            v
+        } else {
+            val v = bytes[offset].toInt() and 0xFF
+            offset += 1
+            v
+        }
+
+        // Skip energy expended if present (bit 3)
+        if ((flags and 0x08) != 0 && offset + 2 <= bytes.size) {
+            offset += 2
+        }
+
+        Log.d(TAG, "Standard BLE HR: $hr bpm (flags=0x${"%02X".format(flags)})")
+
+        if (hr in 20..250) {
+            _liveHr.value = hr
+        }
     }
 
     /**

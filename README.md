@@ -19,10 +19,16 @@
 - HR streaming is now started from the `bleSdkFeatureReady(FEATURE_HR)` callback, which fires only when the SDK is actually ready to stream HR data.
 - Added retry logic: if the HR stream completes or errors while the device is still connected, it retries up to 5 times with a 2-second delay between attempts. The retry counter resets on successful data receipt.
 
+**Bug fix: Polar H10 connecting via generic GATT instead of Polar SDK** ([`GenericBleManager.kt`](app/src/main/java/com/example/wags/data/ble/GenericBleManager.kt))
+- The Polar H10's MAC address could end up in the device history as a non-Polar device (e.g. from a previous generic BLE scan). The auto-connect loop would then connect it via raw GATT instead of the Polar SDK, resulting in standard BLE HR packets (`0x10` header) that were not parsed — HR data was received but silently discarded.
+- `GenericBleManager.onServicesDiscovered()` now detects Polar devices by name and immediately disconnects, letting the Polar SDK handle them on the next auto-connect cycle.
+- Added standard BLE Heart Rate Measurement packet parsing (`handleStandardHrPacket`) as a safety net — any device sending standard HR packets (UUID 0x2A37) now has its HR data correctly extracted and displayed. This also enables support for generic HR straps that aren't Polar or oximeter devices.
+
 #### Files Changed
 - [`PolarBleManager.kt`](app/src/main/java/com/example/wags/data/ble/PolarBleManager.kt) — `bleSdkFeatureReady` callback, `lastRequestedDeviceId` tracking, HR stream retry logic, enhanced `disconnect()`
 - [`AutoConnectManager.kt`](app/src/main/java/com/example/wags/data/ble/AutoConnectManager.kt) — Cancel stale Polar SDK attempts in `connectPolarNow()` and `connectGenericNow()`
 - [`UnifiedDeviceManager.kt`](app/src/main/java/com/example/wags/data/ble/UnifiedDeviceManager.kt) — Unconditional backend disconnect in `connect()`
+- [`GenericBleManager.kt`](app/src/main/java/com/example/wags/data/ble/GenericBleManager.kt) — Reject Polar devices in `onServicesDiscovered`, standard BLE HR packet parsing
 
 ---
 

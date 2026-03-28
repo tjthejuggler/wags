@@ -200,6 +200,16 @@ class AutoConnectManager @Inject constructor(
 
     // ── Connect helpers ───────────────────────────────────────────────────────
 
+    /**
+     * Try to connect to a Polar device. Uses a reactive wait (up to
+     * [POLAR_CONNECT_TIMEOUT_MS]) instead of a fixed delay, so we connect
+     * as soon as the SDK reports success rather than always waiting the full
+     * timeout.
+     *
+     * If the device doesn't connect in time, the SDK attempt is cancelled
+     * to prevent stale background retries from interfering with subsequent
+     * generic device connections.
+     */
     private suspend fun connectPolarNow(deviceId: String): Boolean {
         val polarManager = deviceManager.polarBleManager
         // Already connected?
@@ -210,15 +220,23 @@ class AutoConnectManager @Inject constructor(
 
         polarManager.connectDevice(deviceId)
         connectingSince = System.currentTimeMillis()
-        delay(POLAR_CONNECT_SETTLE_MS)
 
-        val state = polarManager.connectionState.value
-        val connected = state is BleConnectionState.Connected
+        // Wait reactively for the Polar SDK to connect (or fail)
+        val connected = withTimeoutOrNull(POLAR_CONNECT_TIMEOUT_MS) {
+            polarManager.connectionState
+                .filter { state ->
+                    when (state) {
+                        is BleConnectionState.Connected -> state.deviceId == deviceId
+                        is BleConnectionState.Error -> true
+                        is BleConnectionState.Disconnected -> true
+                        // Keep waiting while Connecting
+                        is BleConnectionState.Connecting -> false
+                        is BleConnectionState.Scanning -> false
+                    }
+                }
+                .first() is BleConnectionState.Connected
+        } ?: false
 
-        // If the Polar device didn't connect in time, explicitly disconnect
-        // to cancel the SDK's background connection attempt. Without this,
-        // the Polar SDK keeps trying to connect and may fire callbacks later
-        // that conflict with a generic device connection.
         if (!connected) {
             Log.d(TAG, "Polar $deviceId didn't connect in time — cancelling SDK attempt")
             polarManager.disconnect()
@@ -273,7 +291,7 @@ class AutoConnectManager @Inject constructor(
 
     companion object {
         private const val GENERIC_CONNECT_TIMEOUT_MS = 20_000L
-        private const val POLAR_CONNECT_SETTLE_MS = 2_000L
+        private const val POLAR_CONNECT_TIMEOUT_MS = 10_000L
         private const val CONNECTING_TIMEOUT_MS = 30_000L
         private const val WAKE_CHECK_INTERVAL_MS = 500L
         private const val SESSION_POLL_MS = 1_000L
