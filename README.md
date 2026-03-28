@@ -4,6 +4,28 @@
 
 ## Changelog
 
+### 2026-03-28 — BLE device connectivity bug fixes
+
+**Bug fix: crash when switching between device types** ([`PolarBleManager.kt`](app/src/main/java/com/example/wags/data/ble/PolarBleManager.kt), [`AutoConnectManager.kt`](app/src/main/java/com/example/wags/data/ble/AutoConnectManager.kt), [`UnifiedDeviceManager.kt`](app/src/main/java/com/example/wags/data/ble/UnifiedDeviceManager.kt))
+- The app would crash when connected to a Polar H10, turning it off, and then auto-connecting to a different device type (OxySmart, O2Ring). Root cause: the Polar SDK's `connectToDevice()` is fire-and-forget and keeps retrying in the background even after the auto-connect loop moves on to try generic devices. This caused BLE stack conflicts and stale callbacks.
+- `PolarBleManager` now tracks `lastRequestedDeviceId` so lingering SDK connection attempts can be explicitly cancelled via `disconnectFromDevice()`.
+- `PolarBleManager.disconnect()` now cancels stale SDK connection attempts even when the state is already `Disconnected` (the SDK may still be trying internally).
+- `AutoConnectManager.connectPolarNow()` now explicitly disconnects the Polar SDK when the device doesn't connect within the settle window, preventing background retry interference.
+- `AutoConnectManager.connectGenericNow()` ensures no stale Polar SDK connection attempt is running before attempting a generic BLE connection.
+- `UnifiedDeviceManager.connect()` now unconditionally disconnects both backends before connecting a new device (previously only disconnected if state was Connected/Connecting, missing the case where the SDK was still retrying internally).
+
+**Bug fix: Polar H10 shows connected but no HR data streaming** ([`PolarBleManager.kt`](app/src/main/java/com/example/wags/data/ble/PolarBleManager.kt))
+- HR streaming was started in the `deviceConnected` callback, but the Polar SDK's HR feature may not be ready at that point. The stream would silently fail or complete immediately, leaving `liveHr` stuck at null despite the Connected state.
+- HR streaming is now started from the `bleSdkFeatureReady(FEATURE_HR)` callback, which fires only when the SDK is actually ready to stream HR data.
+- Added retry logic: if the HR stream completes or errors while the device is still connected, it retries up to 5 times with a 2-second delay between attempts. The retry counter resets on successful data receipt.
+
+#### Files Changed
+- [`PolarBleManager.kt`](app/src/main/java/com/example/wags/data/ble/PolarBleManager.kt) — `bleSdkFeatureReady` callback, `lastRequestedDeviceId` tracking, HR stream retry logic, enhanced `disconnect()`
+- [`AutoConnectManager.kt`](app/src/main/java/com/example/wags/data/ble/AutoConnectManager.kt) — Cancel stale Polar SDK attempts in `connectPolarNow()` and `connectGenericNow()`
+- [`UnifiedDeviceManager.kt`](app/src/main/java/com/example/wags/data/ble/UnifiedDeviceManager.kt) — Unconditional backend disconnect in `connect()`
+
+---
+
 ### 2026-03-28 — Resonance Breathing Enhancements
 
 #### New Features

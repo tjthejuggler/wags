@@ -125,16 +125,13 @@ class UnifiedDeviceManager @Inject constructor(
     fun connect(identifier: String, name: String = "", isPolar: Boolean) {
         Log.d(TAG, "connect($identifier, name='$name', isPolar=$isPolar)")
 
-        // Disconnect any currently-connected device first to avoid stale GATT
-        // references and BLE stack conflicts when switching devices.
-        val currentState = connectionState.value
-        if (currentState is BleConnectionState.Connected ||
-            currentState is BleConnectionState.Connecting
-        ) {
-            Log.d(TAG, "Disconnecting current device before connecting new one")
-            polarBleManager.disconnect()
-            genericBleManager.disconnect()
-        }
+        // Always disconnect BOTH backends to avoid stale GATT references,
+        // lingering Polar SDK connection attempts, and BLE stack conflicts
+        // when switching between device types (e.g. Polar → oximeter).
+        // This is safe even if a backend is already disconnected.
+        Log.d(TAG, "Disconnecting both backends before connecting new device")
+        polarBleManager.disconnect()
+        genericBleManager.disconnect()
 
         // Save to unified history
         devicePrefs.addDevice(identifier, name, isPolar)

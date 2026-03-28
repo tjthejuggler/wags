@@ -43,6 +43,8 @@ class PolarBleManager @Inject constructor(
         const val ACC_BUFFER_SIZE = 4096   // 200 Hz × ~20s
         const val PPI_ERROR_THRESHOLD_MS = 10
         private const val RR_CONVERSION_FACTOR = 1000.0 / 1024.0
+        private const val HR_STREAM_RETRY_DELAY_MS = 2_000L
+        private const val HR_STREAM_MAX_RETRIES = 5
     }
 
     val rrBuffer = CircularBuffer<Double>(RR_BUFFER_SIZE)
@@ -68,6 +70,15 @@ class PolarBleManager @Inject constructor(
 
     private val _scanResults = MutableStateFlow<List<PolarDeviceInfo>>(emptyList())
     val scanResults: StateFlow<List<PolarDeviceInfo>> = _scanResults.asStateFlow()
+
+    /**
+     * Tracks the last device ID we asked the Polar SDK to connect to.
+     * The Polar SDK's `connectToDevice` is fire-and-forget — it keeps trying
+     * to connect in the background even after we've moved on. We need this
+     * to properly cancel stale connection attempts when switching devices.
+     */
+    @Volatile
+    private var lastRequestedDeviceId: String? = null
 
     /** Unified scan results for the UnifiedDeviceManager. */
     val unifiedScanResults: StateFlow<List<ScannedDevice>> = _scanResults.map { polarDevices ->
@@ -125,7 +136,8 @@ class PolarBleManager @Inject constructor(
                     deviceName,
                     deviceType
                 )
-                startHrStream(polarDeviceInfo.deviceId)
+                // HR stream is started from bleSdkFeatureReady(FEATURE_HR) instead
+                // of here, because the SDK may not be ready to stream yet.
             }
 
             override fun deviceConnecting(polarDeviceInfo: PolarDeviceInfo) {
@@ -137,6 +149,17 @@ class PolarBleManager @Inject constructor(
                 stopAllStreams(polarDeviceInfo.deviceId)
                 _liveHr.value = null
                 onDisconnected?.invoke()
+            }
+
+            override fun bleSdkFeatureReady(
+                identifier: String,
+                feature: PolarBleApi.PolarBleSdkFeature
+            ) {
+                Log.d(TAG, "bleSdkFeatureReady: $identifier → $feature")
+                if (feature == PolarBleApi.PolarBleSdkFeature.FEATURE_HR) {
+                    // The HR feature is now ready — safe to start streaming.
+                    startHrStream(identifier)
+                }
             }
 
             override fun disInformationReceived(identifier: String, uuid: UUID, value: String) {
@@ -168,6 +191,14 @@ class PolarBleManager @Inject constructor(
             _liveHr.value = null
         }
 
+        // Also cancel any lingering SDK connection attempt for a different device
+        val lastId = lastRequestedDeviceId
+        if (lastId != null && lastId != deviceId && lastId != currentId) {
+            Log.d(TAG, "Cancelling stale SDK connection to $lastId")
+            try { polarApi.disconnectFromDevice(lastId) } catch (_: Exception) {}
+        }
+
+        lastRequestedDeviceId = deviceId
         _connectionState.value = BleConnectionState.Connecting(deviceId)
         try {
             polarApi.connectToDevice(deviceId)
@@ -202,7 +233,10 @@ class PolarBleManager @Inject constructor(
         }
     }
 
-    /** Disconnect whichever Polar device is currently connected. */
+    /**
+     * Disconnect whichever Polar device is currently connected, and cancel
+     * any lingering SDK connection attempt.
+     */
     fun disconnect() {
         val state = _connectionState.value
         when (state) {
@@ -215,6 +249,23 @@ class PolarBleManager @Inject constructor(
                 _liveHr.value = null
             }
             else -> { /* nothing to disconnect */ }
+        }
+
+        // Cancel any lingering SDK connection attempt that may still be running
+        // in the background. The Polar SDK's connectToDevice is fire-and-forget
+        // and keeps retrying even after our state has moved to Disconnected.
+        val lastId = lastRequestedDeviceId
+        if (lastId != null) {
+            val alreadyHandled = when (state) {
+                is BleConnectionState.Connected -> state.deviceId == lastId
+                is BleConnectionState.Connecting -> state.deviceId == lastId
+                else -> false
+            }
+            if (!alreadyHandled) {
+                Log.d(TAG, "disconnect() — also cancelling stale SDK connect to $lastId")
+                try { polarApi.disconnectFromDevice(lastId) } catch (_: Exception) {}
+            }
+            lastRequestedDeviceId = null
         }
     }
 
@@ -247,28 +298,63 @@ class PolarBleManager @Inject constructor(
     }
 
     /**
-     * Auto-started on device connect. Streams live HR bpm into [liveHr] and
-     * also writes RR intervals to [rrBuffer] for HRV processing.
+     * Started when the FEATURE_HR SDK feature is ready. Streams live HR bpm
+     * into [liveHr] and also writes RR intervals to [rrBuffer] for HRV
+     * processing.
+     *
+     * Includes retry logic: if the stream completes or errors while the device
+     * is still connected, it retries up to [HR_STREAM_MAX_RETRIES] times with
+     * a delay between attempts. This handles the case where the Polar SDK
+     * reports the feature as ready but the stream fails to start on the first
+     * attempt.
      */
     private fun startHrStream(deviceId: String) {
         val key = "$deviceId-hr"
         Log.d(TAG, "startHrStream($deviceId) — cancelling existing job? ${streamJobs[key] != null}")
         streamJobs[key]?.cancel()
         streamJobs[key] = scope.launch {
-            Log.d(TAG, "startHrStream($deviceId) — coroutine launched, calling polarApi.startHrStreaming")
-            try {
-                polarApi.startHrStreaming(deviceId).toKotlinFlow().collect { hrData ->
-                    hrData.samples.forEach { sample ->
-                        Log.d(TAG, "HR sample: hr=${sample.hr}, rrsMs=${sample.rrsMs}, rrBuffer.totalWrites=${rrBuffer.totalWrites()}")
-                        _liveHr.value = sample.hr
-                        sample.rrsMs.forEach { rrRaw ->
-                            rrBuffer.write(rrRaw * RR_CONVERSION_FACTOR)
+            var retries = 0
+            while (isActive && retries <= HR_STREAM_MAX_RETRIES) {
+                // Only stream while this device is still connected
+                val state = _connectionState.value
+                if (state !is BleConnectionState.Connected || state.deviceId != deviceId) {
+                    Log.d(TAG, "startHrStream($deviceId) — device no longer connected, stopping")
+                    break
+                }
+
+                Log.d(TAG, "startHrStream($deviceId) — attempt ${retries + 1}/${HR_STREAM_MAX_RETRIES + 1}")
+                try {
+                    polarApi.startHrStreaming(deviceId).toKotlinFlow().collect { hrData ->
+                        retries = 0 // reset on successful data
+                        hrData.samples.forEach { sample ->
+                            Log.d(TAG, "HR sample: hr=${sample.hr}, rrsMs=${sample.rrsMs}, rrBuffer.totalWrites=${rrBuffer.totalWrites()}")
+                            _liveHr.value = sample.hr
+                            sample.rrsMs.forEach { rrRaw ->
+                                rrBuffer.write(rrRaw * RR_CONVERSION_FACTOR)
+                            }
                         }
                     }
+                    Log.d(TAG, "startHrStream($deviceId) — flow completed normally")
+                } catch (e: CancellationException) {
+                    throw e // don't retry on cancellation
+                } catch (e: Exception) {
+                    Log.e(TAG, "startHrStream($deviceId) — exception: ${e.javaClass.simpleName}: ${e.message}", e)
                 }
-                Log.d(TAG, "startHrStream($deviceId) — flow completed normally")
-            } catch (e: Exception) {
-                Log.e(TAG, "startHrStream($deviceId) — exception: ${e.javaClass.simpleName}: ${e.message}", e)
+
+                // Stream ended — check if device is still connected before retrying
+                val postState = _connectionState.value
+                if (postState !is BleConnectionState.Connected || postState.deviceId != deviceId) {
+                    Log.d(TAG, "startHrStream($deviceId) — device disconnected after stream end, not retrying")
+                    break
+                }
+
+                retries++
+                if (retries <= HR_STREAM_MAX_RETRIES) {
+                    Log.d(TAG, "startHrStream($deviceId) — retrying in ${HR_STREAM_RETRY_DELAY_MS}ms (attempt $retries)")
+                    delay(HR_STREAM_RETRY_DELAY_MS)
+                } else {
+                    Log.e(TAG, "startHrStream($deviceId) — max retries reached, giving up")
+                }
             }
         }
     }

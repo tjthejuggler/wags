@@ -213,7 +213,18 @@ class AutoConnectManager @Inject constructor(
         delay(POLAR_CONNECT_SETTLE_MS)
 
         val state = polarManager.connectionState.value
-        return state is BleConnectionState.Connected
+        val connected = state is BleConnectionState.Connected
+
+        // If the Polar device didn't connect in time, explicitly disconnect
+        // to cancel the SDK's background connection attempt. Without this,
+        // the Polar SDK keeps trying to connect and may fire callbacks later
+        // that conflict with a generic device connection.
+        if (!connected) {
+            Log.d(TAG, "Polar $deviceId didn't connect in time — cancelling SDK attempt")
+            polarManager.disconnect()
+        }
+
+        return connected
     }
 
     private suspend fun connectGenericNow(address: String): Boolean {
@@ -226,6 +237,14 @@ class AutoConnectManager @Inject constructor(
         }
 
         genericManager.stopBackgroundScan()
+
+        // Ensure no stale Polar SDK connection attempt is running before
+        // we try to connect a generic device. The Polar SDK's connectToDevice
+        // is fire-and-forget and can interfere with the BLE stack.
+        val polarState = deviceManager.polarBleManager.connectionState.value
+        if (polarState !is BleConnectionState.Connected) {
+            deviceManager.polarBleManager.disconnect()
+        }
 
         return withTimeoutOrNull(GENERIC_CONNECT_TIMEOUT_MS) {
             val resultDeferred = scope.async {
