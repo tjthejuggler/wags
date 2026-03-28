@@ -18,6 +18,9 @@ import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
 
+/** null = show all postures */
+typealias PostureFilter = MeditationPosture?
+
 // ── Chart point ────────────────────────────────────────────────────────────────
 
 data class MeditationChartPoint(val index: Float, val value: Float, val sessionId: Long)
@@ -40,7 +43,9 @@ data class MeditationHistoryUiState(
     val chartData: MeditationChartData = MeditationChartData(),
     val datesWithSessions: Set<LocalDate> = emptySet(),
     val selectedDate: LocalDate? = null,
-    val selectedDaySessions: List<MeditationSessionEntity> = emptyList()
+    val selectedDaySessions: List<MeditationSessionEntity> = emptyList(),
+    /** null = all postures; non-null = only sessions with that posture */
+    val postureFilter: PostureFilter = null
 )
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
@@ -59,6 +64,11 @@ class MeditationHistoryViewModel @Inject constructor(
     ) { sessions, audios, extra ->
         val audioMap = audios.associateBy { it.audioId }
         val zone = ZoneId.systemDefault()
+
+        // Apply posture filter for chart data
+        val filteredSessions = if (extra.postureFilter == null) sessions
+            else sessions.filter { it.posture == extra.postureFilter.name }
+
         val datesWithSessions = sessions.map { s ->
             Instant.ofEpochMilli(s.timestamp).atZone(zone).toLocalDate()
         }.toSet()
@@ -72,10 +82,11 @@ class MeditationHistoryViewModel @Inject constructor(
         MeditationHistoryUiState(
             allSessions         = sessions,
             audioMap            = audioMap,
-            chartData           = buildChartData(sessions),
+            chartData           = buildChartData(filteredSessions),
             datesWithSessions   = datesWithSessions,
             selectedDate        = extra.selectedDate,
-            selectedDaySessions = selectedDaySessions
+            selectedDaySessions = selectedDaySessions,
+            postureFilter       = extra.postureFilter
         )
     }.stateIn(
         scope = viewModelScope,
@@ -89,6 +100,10 @@ class MeditationHistoryViewModel @Inject constructor(
 
     fun clearSelection() {
         _extra.update { it.copy(selectedDate = null) }
+    }
+
+    fun setPostureFilter(posture: PostureFilter) {
+        _extra.update { it.copy(postureFilter = posture) }
     }
 
     // ── Private helpers ────────────────────────────────────────────────────────
@@ -119,5 +134,8 @@ class MeditationHistoryViewModel @Inject constructor(
         )
     }
 
-    private data class ExtraState(val selectedDate: LocalDate? = null)
+    private data class ExtraState(
+        val selectedDate: LocalDate? = null,
+        val postureFilter: PostureFilter = null
+    )
 }

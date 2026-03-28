@@ -38,6 +38,12 @@ import javax.inject.Inject
 
 enum class MeditationSessionState { IDLE, ACTIVE, PROCESSING, COMPLETE }
 
+enum class MeditationPosture(val label: String) {
+    LAYING("Laying"),
+    SITTING("Sitting"),
+    WALKING("Walking")
+}
+
 // ── UI state ──────────────────────────────────────────────────────────────────
 
 data class MeditationUiState(
@@ -49,6 +55,8 @@ data class MeditationUiState(
     // Channel filter
     val availableChannels: List<String> = emptyList(),
     val selectedChannelFilter: String? = null,   // null = "All"
+    // Posture selection (persists across sessions until changed)
+    val selectedPosture: MeditationPosture = MeditationPosture.LAYING,
     // Session
     val sessionState: MeditationSessionState = MeditationSessionState.IDLE,
     val elapsedSeconds: Long = 0L,
@@ -247,6 +255,12 @@ class MeditationViewModel @Inject constructor(
 
     fun setSonificationEnabled(enabled: Boolean) {
         _uiState.update { it.copy(sonificationEnabled = enabled) }
+    }
+
+    fun setPosture(posture: MeditationPosture) {
+        if (_uiState.value.sessionState == MeditationSessionState.IDLE) {
+            _uiState.update { it.copy(selectedPosture = posture) }
+        }
     }
 
     // ── Session lifecycle ──────────────────────────────────────────────────────
@@ -449,7 +463,8 @@ class MeditationViewModel @Inject constructor(
                 hrSlopeBpmPerMin = hrSlope,
                 startRmssdMs     = startRmssd,
                 endRmssdMs       = endRmssd,
-                lnRmssdSlope     = lnSlope
+                lnRmssdSlope     = lnSlope,
+                posture          = _uiState.value.selectedPosture.name
             )
 
             val savedId = withContext(ioDispatcher) {

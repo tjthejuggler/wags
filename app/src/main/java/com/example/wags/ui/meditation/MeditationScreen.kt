@@ -1,5 +1,6 @@
 package com.example.wags.ui.meditation
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -94,6 +95,7 @@ fun MeditationScreen(
                     onRefreshAudios = { viewModel.refreshAudios() },
                     onSonificationToggle = { viewModel.setSonificationEnabled(!state.sonificationEnabled) },
                     onChannelFilterSelected = { viewModel.setChannelFilter(it) },
+                    onPostureSelected = { viewModel.setPosture(it) },
                     onStart = { viewModel.startSession() },
                     modifier = Modifier
                 )
@@ -140,6 +142,7 @@ private fun IdleContent(
     onRefreshAudios: () -> Unit,
     onSonificationToggle: () -> Unit,
     onChannelFilterSelected: (String?) -> Unit,
+    onPostureSelected: (MeditationPosture) -> Unit,
     onStart: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -281,6 +284,14 @@ private fun IdleContent(
                     }
                 }
             }
+        }
+
+        // ── Posture selector ────────────────────────────────────────────────
+        item {
+            PostureSelector(
+                selected = state.selectedPosture,
+                onSelect = onPostureSelected
+            )
         }
 
         // ── Start button ────────────────────────────────────────────────────
@@ -673,6 +684,7 @@ private fun CompleteContent(
                 val durationMin = state.durationMs / 60_000L
                 val durationSec = (state.durationMs % 60_000L) / 1_000L
                 SummaryRow("Duration", "${durationMin}m ${durationSec}s")
+                SummaryRow("Posture", state.selectedPosture.label)
                 SummaryRow("Monitor", state.monitorId ?: "None (no HR data)")
 
                 if (state.avgHrBpm != null) {
@@ -716,6 +728,51 @@ private fun CompleteContent(
         }
     }
 }
+
+// ── Posture selector ──────────────────────────────────────────────────────────
+
+@Composable
+private fun PostureSelector(
+    selected: MeditationPosture,
+    onSelect: (MeditationPosture) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            "Posture",
+            style = MaterialTheme.typography.labelMedium,
+            color = TextSecondary
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            MeditationPosture.entries.forEach { posture ->
+                val isSelected = posture == selected
+                OutlinedButton(
+                    onClick = { onSelect(posture) },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = if (isSelected) TextSecondary.copy(alpha = 0.15f)
+                                         else Color.Transparent,
+                        contentColor   = if (isSelected) TextPrimary else TextSecondary
+                    ),
+                    border = BorderStroke(
+                        width = if (isSelected) 1.5.dp else 1.dp,
+                        color = if (isSelected) TextSecondary else SurfaceVariant
+                    ),
+                    contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp)
+                ) {
+                    Text(
+                        posture.label,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ── Summary row ────────────────────────────────────────────────────────────────
 
 @Composable
 private fun SummaryRow(label: String, value: String) {

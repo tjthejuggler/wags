@@ -1,5 +1,6 @@
 package com.example.wags.data.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -17,6 +18,7 @@ import androidx.room.PrimaryKey
  * [startRmssdMs]     – RMSSD computed from the first 60 s of RR data, null if unavailable.
  * [endRmssdMs]       – RMSSD computed from the last 60 s of RR data, null if unavailable.
  * [lnRmssdSlope]     – slope of ln(RMSSD) over the session, null if unavailable.
+ * [posture]          – one of "LAYING", "SITTING", "WALKING"; defaults to "LAYING".
  */
 @Entity(
     tableName = "meditation_sessions",
@@ -40,5 +42,8 @@ data class MeditationSessionEntity(
     val hrSlopeBpmPerMin: Float? = null,
     val startRmssdMs: Float? = null,
     val endRmssdMs: Float? = null,
-    val lnRmssdSlope: Float? = null
+    val lnRmssdSlope: Float? = null,
+    /** One of MeditationPosture enum names: LAYING, SITTING, WALKING */
+    @ColumnInfo(defaultValue = "LAYING")
+    val posture: String = "LAYING"
 )

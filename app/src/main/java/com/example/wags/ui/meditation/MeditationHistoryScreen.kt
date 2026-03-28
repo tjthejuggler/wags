@@ -149,7 +149,10 @@ fun MeditationHistoryScreen(
                 EmptyHistoryContent()
             } else {
                 when (selectedTab) {
-                    MeditationHistoryTab.GRAPHS -> GraphsContent(uiState = uiState)
+                    MeditationHistoryTab.GRAPHS -> GraphsContent(
+                        uiState = uiState,
+                        onPostureFilterSelected = { viewModel.setPostureFilter(it) }
+                    )
                     MeditationHistoryTab.CALENDAR -> CalendarContent(
                         uiState = uiState,
                         displayedMonth = displayedMonth,
@@ -176,7 +179,10 @@ fun MeditationHistoryScreen(
 // ── Graphs tab ─────────────────────────────────────────────────────────────────
 
 @Composable
-private fun GraphsContent(uiState: MeditationHistoryUiState) {
+private fun GraphsContent(
+    uiState: MeditationHistoryUiState,
+    onPostureFilterSelected: (PostureFilter) -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -185,6 +191,12 @@ private fun GraphsContent(uiState: MeditationHistoryUiState) {
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         SummaryCard(uiState = uiState)
+
+        // ── Posture filter ──────────────────────────────────────────────────
+        PostureFilterRow(
+            selected = uiState.postureFilter,
+            onSelected = onPostureFilterSelected
+        )
 
         // Duration
         GraphSection(title = "Session Duration", subtitle = "Minutes per session") {
@@ -813,6 +825,76 @@ private fun EmptyHistoryContent() {
             color = TextDisabled,
             textAlign = TextAlign.Center
         )
+    }
+}
+
+// ── Posture filter chip row ────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PostureFilterRow(
+    selected: PostureFilter,
+    onSelected: (PostureFilter) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = SurfaceVariant)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                "Filter by posture",
+                style = MaterialTheme.typography.labelMedium,
+                color = TextSecondary
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // "All" chip
+                FilterChip(
+                    selected = selected == null,
+                    onClick = { onSelected(null) },
+                    label = { Text("All") },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = TextSecondary.copy(alpha = 0.2f),
+                        selectedLabelColor = TextPrimary
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = selected == null,
+                        selectedBorderColor = TextSecondary,
+                        borderColor = SurfaceVariant
+                    ),
+                    modifier = Modifier.weight(1f)
+                )
+                MeditationPosture.entries.forEach { posture ->
+                    FilterChip(
+                        selected = selected == posture,
+                        onClick = { onSelected(if (selected == posture) null else posture) },
+                        label = {
+                            Text(
+                                posture.label,
+                                maxLines = 1
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = TextSecondary.copy(alpha = 0.2f),
+                            selectedLabelColor = TextPrimary
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = selected == posture,
+                            selectedBorderColor = TextSecondary,
+                            borderColor = SurfaceVariant
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
     }
 }
 

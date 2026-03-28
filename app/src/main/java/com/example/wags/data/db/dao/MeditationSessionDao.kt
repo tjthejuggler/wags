@@ -25,6 +25,9 @@ interface MeditationSessionDao {
     @Query("SELECT * FROM meditation_sessions WHERE audioId = :audioId ORDER BY timestamp DESC")
     fun observeByAudio(audioId: Long): Flow<List<MeditationSessionEntity>>
 
+    @Query("SELECT * FROM meditation_sessions WHERE posture = :posture ORDER BY timestamp DESC")
+    fun observeByPosture(posture: String): Flow<List<MeditationSessionEntity>>
+
     @Query("DELETE FROM meditation_sessions WHERE sessionId = :id")
     suspend fun deleteById(id: Long)
 }

@@ -201,6 +201,8 @@ fun MeditationSessionDetailScreen(
                     DetailSection(title = "Overview") {
                         DetailRow("Audio", audioName)
                         DetailRow("Duration", "${durationMin}m ${durationSec}s")
+                        DetailRow("Posture", session.posture.lowercase()
+                            .replaceFirstChar { it.uppercase() })
                         DetailRow("Monitor", session.monitorId ?: "None")
                         audio?.sourceUrl?.takeIf { it.isNotBlank() }?.let { url ->
                             DetailRow("Source URL", url)

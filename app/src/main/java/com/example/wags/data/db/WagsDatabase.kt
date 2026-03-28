@@ -27,7 +27,7 @@ import com.example.wags.data.db.entity.*
         ApneaSongLogEntity::class,
         ResonanceSessionEntity::class
     ],
-    version = 22,
+    version = 23,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -671,6 +671,17 @@ abstract class WagsDatabase : RoomDatabase() {
                             `hrDeviceId` TEXT DEFAULT NULL
                         )
                     """.trimIndent())
+                }
+            }
+    
+            /**
+             * v22 → v23: Add posture column to meditation_sessions.
+             * Stores the user's body position during the session: LAYING, SITTING, or WALKING.
+             * All existing sessions default to LAYING.
+             */
+            val MIGRATION_22_23 = object : Migration(22, 23) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE meditation_sessions ADD COLUMN posture TEXT NOT NULL DEFAULT 'LAYING'")
                 }
             }
         }
