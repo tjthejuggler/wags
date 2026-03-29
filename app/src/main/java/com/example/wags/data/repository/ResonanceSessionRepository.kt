@@ -18,5 +18,9 @@ class ResonanceSessionRepository @Inject constructor(
 
     suspend fun getByTimestamp(timestamp: Long): ResonanceSessionEntity? = dao.getByTimestamp(timestamp)
 
+    suspend fun getById(sessionId: Long): ResonanceSessionEntity? = dao.getById(sessionId)
+
     suspend fun deleteByTimestamp(timestamp: Long) = dao.deleteByTimestamp(timestamp)
+
+    suspend fun deleteById(sessionId: Long) = dao.deleteById(sessionId)
 }

@@ -7,6 +7,10 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import com.example.wags.R
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * Lightweight haptic + audio feedback helpers used across the app.
@@ -34,12 +38,6 @@ object WagsFeedback {
      */
     private val PATTERN_STAND_UP = longArrayOf(0, 300, 100, 300, 100, 500)
 
-    /**
-     * Rapid double vibration for INHALE transition.
-     * Two quick 60ms pulses separated by 60ms gap.
-     */
-    private val PATTERN_BREATH_INHALE = longArrayOf(0, 60, 60, 60)
-
     // ── Public API ────────────────────────────────────────────────────────────
 
     /**
@@ -61,19 +59,27 @@ object WagsFeedback {
     }
 
     /**
-     * Rapid double vibration for INHALE transition.
-     * Two quick 60ms pulses separated by 60ms gap.
+     * Single vibration for start-of-inhale (= end of exhale).
+     * Called when isInhaling transitions to true.
+     * User wants: **double vibration** at end of exhale.
+     * Two 80ms pulses with a brief pause between them.
      */
     fun breathInhale(context: Context) {
-        vibrate(context, PATTERN_BREATH_INHALE)
+        vibrateSingle(context, 80L, 200)
+        CoroutineScope(Dispatchers.Main).launch {
+            delay(160L)
+            vibrateSingle(context, 80L, 200)
+        }
     }
 
     /**
-     * Rapid single vibration for EXHALE transition.
-     * One quick 60ms pulse.
+     * Vibration for start-of-exhale (= end of inhale).
+     * Called when isInhaling transitions to false.
+     * User wants: **single vibration** at end of inhale.
+     * One 80ms pulse.
      */
     fun breathExhale(context: Context) {
-        vibrateSingle(context, 60L, 120)
+        vibrateSingle(context, 80L, 200)
     }
 
     /**

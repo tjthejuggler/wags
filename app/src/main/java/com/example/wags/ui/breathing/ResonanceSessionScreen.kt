@@ -89,8 +89,11 @@ fun ResonanceSessionScreen(
     val isActive = state.sessionPhase == BreathingSessionPhase.PREPARING ||
             state.sessionPhase == BreathingSessionPhase.BREATHING
 
+    // Keep screen on during COMPLETE too, so it doesn't black out before navigation
+    val keepScreenOn = isActive || state.sessionPhase == BreathingSessionPhase.COMPLETE
+
     SessionBackHandler(enabled = isActive, onConfirm = { viewModel.stopSession() })
-    KeepScreenOn(enabled = isActive)
+    KeepScreenOn(enabled = keepScreenOn)
 
     // True once the phase has moved past IDLE (i.e. PREPARING or beyond).
     // We use this to distinguish "initial IDLE before session starts" from
@@ -172,9 +175,6 @@ fun ResonanceSessionScreen(
                         size = 200.dp,
                         onPhaseTransition = vibrationCallback
                     )
-
-                    // ── Coherence zone traffic light ──────────────────────────
-                    RsCoherenceZoneIndicator(coherenceRatio = state.liveCoherenceRatio)
 
                     // ── Stats row (points / time / coherence) ─────────────────
                     RsSessionStatsRow(
@@ -321,55 +321,6 @@ private fun RsPreparationContent(
             border = BorderStroke(1.dp, RsCharcoal)
         ) {
             Text("Cancel", style = MaterialTheme.typography.bodySmall, letterSpacing = 2.sp)
-        }
-    }
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  COHERENCE ZONE INDICATOR
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-@Composable
-private fun RsCoherenceZoneIndicator(coherenceRatio: Float) {
-    val zoneColor by animateColorAsState(
-        targetValue = rsCoherenceZoneColor(coherenceRatio),
-        animationSpec = tween(durationMillis = 1000),
-        label = "rs_zone_color"
-    )
-    val label = rsCoherenceZoneLabel(coherenceRatio)
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = zoneColor.copy(alpha = 0.15f)),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 10.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(16.dp)
-                    .clip(CircleShape)
-                    .background(zoneColor)
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = zoneColor,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 2.sp
-                )
-                Text(
-                    text = "Ratio: %.1f".format(coherenceRatio),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
-                )
-            }
         }
     }
 }

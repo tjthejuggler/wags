@@ -24,6 +24,7 @@ import com.example.wags.ui.breathing.AssessmentPickerScreen
 import com.example.wags.ui.breathing.AssessmentResultScreen
 import com.example.wags.ui.breathing.AssessmentRunScreen
 import com.example.wags.ui.breathing.BreathingScreen
+import com.example.wags.ui.breathing.ResonanceSessionDetailScreen
 import com.example.wags.ui.breathing.ResonanceSessionScreen
 import com.example.wags.ui.breathing.RfAssessmentHistoryScreen
 import com.example.wags.ui.dashboard.DashboardScreen
@@ -61,6 +62,7 @@ object WagsRoutes {
     const val RF_ASSESSMENT_RESULT = "rf_assessment_result/{sessionTimestamp}"
     const val RF_ASSESSMENT_HISTORY = "rf_assessment_history"
     const val RESONANCE_SESSION = "resonance_session?vibration={vibration}&duration={duration}&infinity={infinity}"
+    const val RESONANCE_SESSION_DETAIL = "resonance_session_detail/{sessionId}"
     const val APNEA_HISTORY = "apnea_history/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{audio}"
     const val APNEA_RECORD_DETAIL = "apnea_record_detail/{recordId}"
     const val APNEA_ALL_RECORDS = "apnea_all_records/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{eventTypes}"
@@ -102,6 +104,7 @@ object WagsRoutes {
     fun meditationSessionDetail(sessionId: Long) = "meditation_session_detail/$sessionId"
     fun resonanceSession(vibration: Boolean = false, duration: Int = 5, infinity: Boolean = false) =
         "resonance_session?vibration=$vibration&duration=$duration&infinity=$infinity"
+    fun resonanceSessionDetail(sessionId: Long) = "resonance_session_detail/$sessionId"
 
     /**
      * Navigate to All Records pre-filtered to the given settings.
@@ -176,8 +179,17 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToDetail = { sessionTimestamp ->
                     navController.navigate(WagsRoutes.rfAssessmentResult(sessionTimestamp))
+                },
+                onNavigateToSessionDetail = { sessionId ->
+                    navController.navigate(WagsRoutes.resonanceSessionDetail(sessionId))
                 }
             )
+        }
+        composable(
+            route = WagsRoutes.RESONANCE_SESSION_DETAIL,
+            arguments = listOf(navArgument("sessionId") { type = NavType.LongType })
+        ) {
+            ResonanceSessionDetailScreen(onNavigateBack = { navController.popBackStack() })
         }
         composable(WagsRoutes.APNEA_FREE) {
             ApneaScreen(navController = navController)

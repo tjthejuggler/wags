@@ -4,6 +4,33 @@
 
 ## Changelog
 
+
+### 2026-03-29 — Resonance Breathing Fixes & Calendar Navigation
+
+**Bug fix: no vibration at end of exhale** ([`WagsFeedback.kt`](app/src/main/java/com/example/wags/ui/common/WagsFeedback.kt))
+- The double vibration at the end of exhale (start of inhale) was not being felt because `createWaveform` was used without explicit amplitudes, defaulting to device-minimum amplitude. Both breath transition patterns now use `createWaveform` with explicit amplitude arrays (180/255) for reliable haptic feedback.
+- Inhale transition (end of exhale): single 80ms pulse. Exhale transition (end of inhale): double 80ms pulses with 80ms gap.
+- Fix applies to both normal resonance sessions and RF assessments.
+
+**Bug fix: screen blacks out after 10-minute session** ([`ResonanceSessionScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/ResonanceSessionScreen.kt))
+- The `KeepScreenOn` flag was only active during PREPARING/BREATHING phases. When the timer expired and the phase changed to COMPLETE, the flag was removed before navigation could complete, causing the screen to turn off immediately. Now `KeepScreenOn` stays active during the COMPLETE phase as well.
+
+**Removed redundant coherence zone card** ([`ResonanceSessionScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/ResonanceSessionScreen.kt), [`AssessmentRunScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/AssessmentRunScreen.kt))
+- Removed the full-width "coherence zone indicator" card from both normal sessions and assessments. The coherence ratio is already displayed in the stats row directly below, making the card redundant.
+
+**Calendar: clickable event cards for sessions and assessments** ([`RfAssessmentHistoryScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/RfAssessmentHistoryScreen.kt), [`WagsNavGraph.kt`](app/src/main/java/com/example/wags/ui/navigation/WagsNavGraph.kt))
+- When a calendar day has exactly 1 event (assessment or session), tapping it auto-navigates to the detail screen.
+- When a day has multiple events, a combined list of clickable cards is shown — each card displays the event type (Assessment/Session), time, key metrics, and navigates to the appropriate detail screen on tap.
+- Cards are visually distinguished: assessments have a grey dot indicator, sessions have a cyan dot indicator.
+
+**New: Resonance Session Detail Screen** ([`ResonanceSessionDetailScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/ResonanceSessionDetailScreen.kt), [`ResonanceSessionDetailViewModel.kt`](app/src/main/java/com/example/wags/ui/breathing/ResonanceSessionDetailViewModel.kt))
+- New detail screen for normal resonance breathing sessions showing: points earned, date/time, breathing rate, duration, coherence zone breakdown (high/medium/low bar chart), session metrics (mean/max coherence, RMSSD, SDNN, beats, artifact %), coherence-over-time chart, and delete option.
+
+#### Files Changed
+- **New**: [`ResonanceSessionDetailScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/ResonanceSessionDetailScreen.kt), [`ResonanceSessionDetailViewModel.kt`](app/src/main/java/com/example/wags/ui/breathing/ResonanceSessionDetailViewModel.kt)
+- **Modified**: [`WagsFeedback.kt`](app/src/main/java/com/example/wags/ui/common/WagsFeedback.kt), [`ResonanceSessionScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/ResonanceSessionScreen.kt), [`AssessmentRunScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/AssessmentRunScreen.kt), [`RfAssessmentHistoryScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/RfAssessmentHistoryScreen.kt), [`WagsNavGraph.kt`](app/src/main/java/com/example/wags/ui/navigation/WagsNavGraph.kt), [`ResonanceSessionDao.kt`](app/src/main/java/com/example/wags/data/db/dao/ResonanceSessionDao.kt), [`ResonanceSessionRepository.kt`](app/src/main/java/com/example/wags/data/repository/ResonanceSessionRepository.kt)
+
+---
 ### 2026-03-28 — BLE device connectivity bug fixes
 
 **Bug fix: crash when switching between device types** ([`PolarBleManager.kt`](app/src/main/java/com/example/wags/data/ble/PolarBleManager.kt), [`AutoConnectManager.kt`](app/src/main/java/com/example/wags/data/ble/AutoConnectManager.kt), [`UnifiedDeviceManager.kt`](app/src/main/java/com/example/wags/data/ble/UnifiedDeviceManager.kt))

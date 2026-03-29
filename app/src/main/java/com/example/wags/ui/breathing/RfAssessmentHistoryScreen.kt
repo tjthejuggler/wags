@@ -46,17 +46,25 @@ private enum class RfHistoryTab(val label: String) {
 fun RfAssessmentHistoryScreen(
     onNavigateBack: () -> Unit,
     onNavigateToDetail: (sessionTimestamp: Long) -> Unit,
+    onNavigateToSessionDetail: (sessionId: Long) -> Unit = {},
     viewModel: RfAssessmentHistoryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableStateOf(RfHistoryTab.GRAPHS) }
     var displayedMonth by remember { mutableStateOf(YearMonth.now()) }
 
-    // Single-assessment auto-navigate: when exactly 1 assessment and no sessions selected
+    // Auto-navigate when exactly 1 event on the selected day
     val selectedDayAssessments = uiState.selectedDayAssessments
-    LaunchedEffect(selectedDayAssessments) {
-        if (selectedDayAssessments.size == 1 && uiState.selectedDaySessions.isEmpty()) {
-            onNavigateToDetail(selectedDayAssessments.first().timestamp)
+    val selectedDaySessions = uiState.selectedDaySessions
+    val totalEvents = selectedDayAssessments.size + selectedDaySessions.size
+
+    LaunchedEffect(selectedDayAssessments, selectedDaySessions) {
+        if (totalEvents == 1) {
+            if (selectedDayAssessments.size == 1) {
+                onNavigateToDetail(selectedDayAssessments.first().timestamp)
+            } else if (selectedDaySessions.size == 1) {
+                onNavigateToSessionDetail(selectedDaySessions.first().sessionId)
+            }
             viewModel.clearSelection()
         }
     }
@@ -127,6 +135,10 @@ fun RfAssessmentHistoryScreen(
                         onNavigateToDetail = { timestamp ->
                             viewModel.clearSelection()
                             onNavigateToDetail(timestamp)
+                        },
+                        onNavigateToSessionDetail = { sessionId ->
+                            viewModel.clearSelection()
+                            onNavigateToSessionDetail(sessionId)
                         }
                     )
                 }
@@ -318,7 +330,8 @@ private fun RfCalendarContent(
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
     onDismissMultiList: () -> Unit,
-    onNavigateToDetail: (Long) -> Unit
+    onNavigateToDetail: (Long) -> Unit,
+    onNavigateToSessionDetail: (Long) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -337,20 +350,15 @@ private fun RfCalendarContent(
             onNextMonth = onNextMonth
         )
 
-        // Show multi-assessment list when >1 assessment on the selected day
-        if (uiState.selectedDayAssessments.size > 1) {
-            RfMultiSessionList(
+        // Show combined event list when >1 total events on the selected day
+        val totalEvents = uiState.selectedDayAssessments.size + uiState.selectedDaySessions.size
+        if (totalEvents > 1) {
+            RfDayEventList(
                 assessments = uiState.selectedDayAssessments,
-                onDismiss = onDismissMultiList,
-                onSessionClick = onNavigateToDetail
-            )
-        }
-
-        // Show sessions for the selected day
-        if (uiState.selectedDaySessions.isNotEmpty()) {
-            RfSessionDayList(
                 sessions = uiState.selectedDaySessions,
-                onDismiss = { viewModel.clearSelection() }
+                onDismiss = onDismissMultiList,
+                onAssessmentClick = onNavigateToDetail,
+                onSessionClick = onNavigateToSessionDetail
             )
         }
     }
@@ -523,19 +531,24 @@ private fun RfCalendarDay(
     }
 }
 
-// ── Multi-assessment list (shown when >1 assessment on a day) ───────────────
+// ── Combined day event list (assessments + sessions) ────────────────────────────
 
 @Composable
-private fun RfMultiSessionList(
+private fun RfDayEventList(
     assessments: List<RfAssessmentEntity>,
+    sessions: List<ResonanceSessionEntity>,
     onDismiss: () -> Unit,
+    onAssessmentClick: (Long) -> Unit,
     onSessionClick: (Long) -> Unit
 ) {
     val zone = ZoneId.systemDefault()
-    val dateLabel = assessments.firstOrNull()?.let { a ->
+    val dateLabel = (assessments.firstOrNull()?.let { a ->
         Instant.ofEpochMilli(a.timestamp).atZone(zone)
-            .format(DateTimeFormatter.ofPattern("EEEE, MMMM d yyyy"))
-    } ?: ""
+    } ?: sessions.firstOrNull()?.let { s ->
+        Instant.ofEpochMilli(s.timestamp).atZone(zone)
+    })?.format(DateTimeFormatter.ofPattern("EEEE, MMMM d yyyy")) ?: ""
+
+    val totalEvents = assessments.size + sessions.size
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -558,7 +571,7 @@ private fun RfMultiSessionList(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        "${assessments.size} assessments — tap one to view details",
+                        "$totalEvents events — tap one to view details",
                         style = MaterialTheme.typography.labelSmall,
                         color = TextDisabled
                     )
@@ -570,10 +583,19 @@ private fun RfMultiSessionList(
 
             HorizontalDivider(color = SurfaceDark)
 
+            // Assessment cards
             assessments.forEach { assessment ->
-                RfSessionSummaryCard(
+                RfAssessmentEventCard(
                     assessment = assessment,
-                    onClick = { onSessionClick(assessment.timestamp) }
+                    onClick = { onAssessmentClick(assessment.timestamp) }
+                )
+            }
+
+            // Session cards
+            sessions.forEach { session ->
+                RfSessionEventCard(
+                    session = session,
+                    onClick = { onSessionClick(session.sessionId) }
                 )
             }
         }
@@ -581,7 +603,7 @@ private fun RfMultiSessionList(
 }
 
 @Composable
-private fun RfSessionSummaryCard(
+private fun RfAssessmentEventCard(
     assessment: RfAssessmentEntity,
     onClick: () -> Unit
 ) {
@@ -602,14 +624,24 @@ private fun RfSessionSummaryCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Time + basic metrics
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    timeLabel,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = TextPrimary,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(TextSecondary)
+                    )
+                    Text(
+                        "$timeLabel  •  Assessment",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
                 Text(
                     "${assessment.protocolType}  ·  " +
                     "Coherence ${String.format("%.1f", assessment.maxCoherenceRatio)}  ·  " +
@@ -619,7 +651,6 @@ private fun RfSessionSummaryCard(
                 )
             }
 
-            // BPM badge
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     String.format("%.1f", assessment.optimalBpm),
@@ -637,61 +668,11 @@ private fun RfSessionSummaryCard(
     }
 }
 
-// ── Session day list (shown when sessions exist on selected day) ────────────
-
 @Composable
-private fun RfSessionDayList(
-    sessions: List<ResonanceSessionEntity>,
-    onDismiss: () -> Unit
+private fun RfSessionEventCard(
+    session: ResonanceSessionEntity,
+    onClick: () -> Unit
 ) {
-    val zone = ZoneId.systemDefault()
-    val dateLabel = sessions.firstOrNull()?.let { s ->
-        Instant.ofEpochMilli(s.timestamp).atZone(zone)
-            .format(DateTimeFormatter.ofPattern("EEEE, MMMM d yyyy"))
-    } ?: ""
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = SurfaceVariant)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        dateLabel,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        "${sessions.size} session${if (sessions.size > 1) "s" else ""}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextDisabled
-                    )
-                }
-                TextButton(onClick = onDismiss) {
-                    Text("✕", color = TextDisabled)
-                }
-            }
-
-            HorizontalDivider(color = SurfaceDark)
-
-            sessions.forEach { session ->
-                RfSessionCard(session = session)
-            }
-        }
-    }
-}
-
-@Composable
-private fun RfSessionCard(session: ResonanceSessionEntity) {
     val zone = ZoneId.systemDefault()
     val timeLabel = Instant.ofEpochMilli(session.timestamp).atZone(zone)
         .format(DateTimeFormatter.ofPattern("h:mm a"))
@@ -699,7 +680,9 @@ private fun RfSessionCard(session: ResonanceSessionEntity) {
     val durationSec = session.durationSeconds % 60
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = SurfaceDark)
     ) {
         Row(
@@ -710,14 +693,25 @@ private fun RfSessionCard(session: ResonanceSessionEntity) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(EcgCyan.copy(alpha = 0.6f))
+                    )
+                    Text(
+                        "$timeLabel  •  Session",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
                 Text(
-                    timeLabel,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = TextPrimary,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    "Session  ·  %d:%02d  ·  Coherence %.1f  ·  %.0f pts".format(
+                    "%d:%02d  ·  Coherence %.1f  ·  %.0f pts".format(
                         durationMin, durationSec,
                         session.meanCoherenceRatio,
                         session.totalPoints

@@ -18,6 +18,12 @@ interface ResonanceSessionDao {
     @Query("SELECT * FROM resonance_sessions WHERE timestamp = :timestamp LIMIT 1")
     suspend fun getByTimestamp(timestamp: Long): ResonanceSessionEntity?
 
+    @Query("SELECT * FROM resonance_sessions WHERE sessionId = :sessionId LIMIT 1")
+    suspend fun getById(sessionId: Long): ResonanceSessionEntity?
+
     @Query("DELETE FROM resonance_sessions WHERE timestamp = :timestamp")
     suspend fun deleteByTimestamp(timestamp: Long)
+
+    @Query("DELETE FROM resonance_sessions WHERE sessionId = :sessionId")
+    suspend fun deleteById(sessionId: Long)
 }

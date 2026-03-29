@@ -5,7 +5,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -56,26 +55,6 @@ private fun RfProtocol.displayName(): String = when (this) {
 private fun RfProtocol.isStepped(): Boolean = this != RfProtocol.SLIDING_WINDOW
 
 // ---------------------------------------------------------------------------
-// Coherence zone colors — greyscale
-// ---------------------------------------------------------------------------
-
-private val CoherenceZoneRed   = Color(0xFF606060)   // dim grey  = low coherence
-private val CoherenceZoneBlue  = Color(0xFF909090)   // mid grey  = medium coherence
-private val CoherenceZoneGreen = Color(0xFFD0D0D0)   // light grey = high coherence
-
-private fun coherenceZoneColor(ratio: Float): Color = when {
-    ratio >= 3f -> CoherenceZoneGreen
-    ratio >= 1f -> CoherenceZoneBlue
-    else -> CoherenceZoneRed
-}
-
-private fun coherenceZoneLabel(ratio: Float): String = when {
-    ratio >= 3f -> "HIGH COHERENCE"
-    ratio >= 1f -> "MEDIUM COHERENCE"
-    else -> "LOW COHERENCE"
-}
-
-// ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
 
@@ -111,13 +90,6 @@ fun AssessmentRunScreen(
             WagsFeedback.breathNaturallyStart(context)
         }
     }
-
-    // Animate background tint based on coherence zone
-    val zoneColor by animateColorAsState(
-        targetValue = coherenceZoneColor(uiState.liveCoherenceRatio),
-        animationSpec = tween(durationMillis = 1000),
-        label = "zone_color"
-    )
 
     Scaffold(
         containerColor = BackgroundDark,
@@ -185,12 +157,6 @@ fun AssessmentRunScreen(
                 remainingSeconds = uiState.remainingSeconds
             )
 
-            // Coherence Zone Traffic Light
-            CoherenceZoneIndicator(
-                coherenceRatio = uiState.liveCoherenceRatio,
-                zoneColor = zoneColor
-            )
-
             // Live stats row
             LiveStatsRow(
                 hr = uiState.liveHr,
@@ -243,54 +209,6 @@ fun AssessmentRunScreen(
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
             ) {
                 Text("Cancel Assessment")
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Coherence Zone Indicator (Traffic Light)
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun CoherenceZoneIndicator(
-    coherenceRatio: Float,
-    zoneColor: Color
-) {
-    val label = coherenceZoneLabel(coherenceRatio)
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = zoneColor.copy(alpha = 0.15f)),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 10.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Glowing dot
-            Box(
-                modifier = Modifier
-                    .size(16.dp)
-                    .clip(CircleShape)
-                    .background(zoneColor)
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = zoneColor,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 2.sp
-                )
-                Text(
-                    text = "Ratio: %.1f".format(coherenceRatio),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
-                )
             }
         }
     }
