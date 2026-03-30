@@ -31,8 +31,11 @@ fun SessionScreen(
     val isActive = state.sessionState == SessionState.ACTIVE ||
             state.sessionState == SessionState.PROCESSING
 
+    // Keep screen on during COMPLETE too so the user can review results
+    val keepScreenOn = isActive || state.sessionState == SessionState.COMPLETE
+
     SessionBackHandler(enabled = isActive) { navController.popBackStack() }
-    KeepScreenOn(enabled = isActive)
+    KeepScreenOn(enabled = keepScreenOn)
 
     LaunchedEffect(parsedType) {
         viewModel.setSessionType(parsedType)

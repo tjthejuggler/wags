@@ -177,7 +177,7 @@ private fun SessionDetailContent(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "%.0f".format(session.totalPoints),
+                    text = "%.2f".format(session.meanCoherenceRatio),
                     style = MaterialTheme.typography.displayLarge.copy(
                         fontSize = 56.sp,
                         fontWeight = FontWeight.Bold
@@ -185,7 +185,7 @@ private fun SessionDetailContent(
                     color = TextPrimary
                 )
                 Text(
-                    text = "points earned",
+                    text = "mean coherence",
                     style = MaterialTheme.typography.titleMedium,
                     color = DetailSilver
                 )

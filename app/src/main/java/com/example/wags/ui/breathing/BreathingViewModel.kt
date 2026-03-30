@@ -158,6 +158,13 @@ class BreathingViewModel @Inject constructor(
     private var lastCoherenceScore = 0f
     private var lastCoherenceUpdateMs = 0L
 
+    /**
+     * True once [setBreathingRate] has been called explicitly (e.g. from a nav-arg
+     * or slider).  Prevents the async [loadBestBreathingRate] from overwriting a
+     * user-chosen rate after the fact.
+     */
+    private var rateManuallySet = false
+
     private var pacerJob: Job? = null
     private var coherenceJob: Job? = null
     private var rfCollectorJob: Job? = null
@@ -192,7 +199,9 @@ class BreathingViewModel @Inject constructor(
             if (bestRate != null) {
                 _uiState.update {
                     it.copy(
-                        breathingRateBpm = bestRate,
+                        // Only overwrite the breathing rate if the user hasn't
+                        // already set one explicitly (e.g. via the slider or nav-arg).
+                        breathingRateBpm = if (rateManuallySet) it.breathingRateBpm else bestRate,
                         bestRateBpm = bestRate
                     )
                 }
@@ -207,6 +216,7 @@ class BreathingViewModel @Inject constructor(
     private var sessionPoints = 0f
 
     fun setBreathingRate(rateBpm: Float) {
+        rateManuallySet = true
         _uiState.update { it.copy(breathingRateBpm = rateBpm.coerceIn(4.0f, 7.0f)) }
     }
 
@@ -274,6 +284,10 @@ class BreathingViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Ends the session and saves it. Called from the "Stop & Save" / "End Session"
+     * button, or when the timer expires.
+     */
     fun stopSession() {
         prepJob?.cancel()
         pacerJob?.cancel()
@@ -299,6 +313,9 @@ class BreathingViewModel @Inject constructor(
                     sessionSummary = summary
                 )
             }
+
+            // Signal the Habit app that a Resonance Breathing session was completed
+            habitRepo.sendHabitIncrement(Slot.RESONANCE_BREATHING)
         } else {
             _uiState.update {
                 it.copy(
@@ -307,9 +324,26 @@ class BreathingViewModel @Inject constructor(
                 )
             }
         }
+    }
 
-        // Signal the Habit app that a Resonance Breathing session was completed
-        habitRepo.sendHabitIncrement(Slot.RESONANCE_BREATHING)
+    /**
+     * Cancels the session without saving. Called when the user backs out
+     * (via back gesture/button or the back arrow) and confirms the discard dialog.
+     */
+    fun cancelSession() {
+        prepJob?.cancel()
+        pacerJob?.cancel()
+        coherenceJob?.cancel()
+        rrPollingJob?.cancel()
+        timerJob?.cancel()
+
+        _uiState.update {
+            it.copy(
+                isSessionActive = false,
+                sessionPhase = BreathingSessionPhase.IDLE,
+                sessionSummary = null
+            )
+        }
     }
 
     private suspend fun saveSessionToDb(summary: SessionSummary, state: BreathingUiState) {

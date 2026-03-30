@@ -36,11 +36,14 @@ fun AdvancedApneaScreen(
 
     val isActive = state.phase != AdvancedApneaPhase.IDLE && state.phase != AdvancedApneaPhase.COMPLETE
 
+    // Keep screen on during COMPLETE too so the user can review results
+    val keepScreenOn = isActive || state.phase == AdvancedApneaPhase.COMPLETE
+
     SessionBackHandler(enabled = isActive) {
         viewModel.stopSession()
         navController.popBackStack()
     }
-    KeepScreenOn(enabled = isActive)
+    KeepScreenOn(enabled = keepScreenOn)
 
     LaunchedEffect(modality, length) {
         if (state.phase == AdvancedApneaPhase.IDLE) {

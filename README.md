@@ -5,6 +5,55 @@
 ## Changelog
 
 
+### 2026-03-30 — Fix: manual breathing rate ignored during session
+
+**Bug fix: manually-set breathing rate overwritten by async recommendation** ([`BreathingViewModel.kt`](app/src/main/java/com/example/wags/ui/breathing/BreathingViewModel.kt))
+- When navigating from the Breathing hub to the Resonance Session screen, the `ResonanceSessionScreen` gets its own `BreathingViewModel` instance (different nav destination = different Hilt scope). The new ViewModel's `init` block launches `loadBestBreathingRate()` asynchronously, which queries the database for the recommended rate. Meanwhile, `LaunchedEffect(Unit)` calls `setBreathingRate(userRate)` then `startSession()`. The async DB query would complete *after* the manual rate was set, overwriting it back to the recommended value.
+- **Fix**: Added a `rateManuallySet` flag. `setBreathingRate()` sets it to `true`, and `loadBestBreathingRate()` now skips overwriting `breathingRateBpm` when the flag is set. The `bestRateBpm` (displayed as "Suggested") is still always updated.
+- This also fixes the detail screen showing the wrong rate, since the saved session reads `breathingRateBpm` from the ViewModel state.
+
+---
+
+### 2026-03-30 — Resonance Breathing Session Fixes
+
+**Bug fix: sessions saved on back-out** ([`BreathingViewModel.kt`](app/src/main/java/com/example/wags/ui/breathing/BreathingViewModel.kt), [`ResonanceSessionScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/ResonanceSessionScreen.kt))
+- Previously, pressing the back arrow or confirming the "Discard session?" dialog still called `stopSession()`, which saved the session to the database. Now the back arrow and discard dialog call a new `cancelSession()` method that stops all jobs without saving. Sessions are only saved when the user taps the "End Session" button or when the timer expires naturally.
+- The habit integration increment is now only sent when a session is actually saved (not on cancel).
+
+**Bug fix: wrong breathing rate recorded in session details** ([`BreathingViewModel.kt`](app/src/main/java/com/example/wags/ui/breathing/BreathingViewModel.kt), [`ResonanceSessionScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/ResonanceSessionScreen.kt), [`BreathingScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/BreathingScreen.kt), [`WagsNavGraph.kt`](app/src/main/java/com/example/wags/ui/navigation/WagsNavGraph.kt))
+- If a user had a recommended resonance rate but manually adjusted the slider, the session would record the recommended rate instead of the manually set one. Root cause: the `ResonanceSessionScreen` gets its own `BreathingViewModel` instance via `hiltViewModel()`, which re-runs `loadBestBreathingRate()` in `init`, overwriting the user's manual rate. Fix: the breathing rate is now passed as a navigation argument (`rate`) from the hub screen to the session screen, and `setBreathingRate()` is called before `startSession()`.
+
+**Bug fix: screen blacks out after session ends** ([`ResonanceSessionScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/ResonanceSessionScreen.kt), [`SessionGuards.kt`](app/src/main/java/com/example/wags/ui/common/SessionGuards.kt), and all session screens)
+- Previously, when a timed resonance session completed, the screen auto-navigated back after only 1.5 seconds, giving no time to review results or decide what to do next. Now the `COMPLETE` phase shows a **"Session Complete" summary screen** with duration, breathing rate, and coherence stats, plus a manual "Done" button — the screen stays on indefinitely until the user taps Done.
+- Extended `KeepScreenOn` to remain active during the `COMPLETE` phase across **all** session screens (Session, Meditation, Readiness, Morning Readiness, Apnea Table, Advanced Apnea, Assessment, Free Hold). Previously only the active/recording phase kept the screen on; now the post-session review phase does too.
+
+**UI: replaced "points earned" with "mean coherence"** ([`ResonanceSessionDetailScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/ResonanceSessionDetailScreen.kt), [`BreathingScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/BreathingScreen.kt), [`ResonanceSessionScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/ResonanceSessionScreen.kt), [`RfAssessmentHistoryScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/RfAssessmentHistoryScreen.kt))
+- The "points earned" gamification metric was not meaningful to users. Replaced the hero display on the session detail screen and session-complete screen with "mean coherence". The live session stats row now shows "BPM" (breathing rate) instead of "POINTS". Removed the "Session Points" chart from the history screen. Session event cards in the history now show RMSSD instead of points.
+
+**UI: "End Session" button** ([`ResonanceSessionScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/ResonanceSessionScreen.kt))
+- Renamed "Stop & Save Session" to "End Session" for clarity.
+
+**Verified: delete button placement** ([`ResonanceSessionDetailScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/ResonanceSessionDetailScreen.kt))
+- The delete icon is already correctly placed in the top-right corner of the session detail screen's top app bar. No bottom delete button exists.
+
+#### Files Changed
+- **Modified**: [`BreathingViewModel.kt`](app/src/main/java/com/example/wags/ui/breathing/BreathingViewModel.kt) — Added `cancelSession()`, moved habit increment inside save-only path
+- **Modified**: [`ResonanceSessionScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/ResonanceSessionScreen.kt) — Back/cancel uses `cancelSession()`, added `breathingRate` param, replaced auto-navigate with "Session Complete" summary screen + manual Done button, replaced POINTS with BPM in stats row, renamed button
+- **Modified**: [`BreathingScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/BreathingScreen.kt) — Pass rate in `onNavigateToSession`, replaced "points earned" with "mean coherence" in session-complete hero
+- **Modified**: [`WagsNavGraph.kt`](app/src/main/java/com/example/wags/ui/navigation/WagsNavGraph.kt) — Added `rate` nav argument to resonance session route
+- **Modified**: [`ResonanceSessionDetailScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/ResonanceSessionDetailScreen.kt) — Replaced "points earned" hero with "mean coherence"
+- **Modified**: [`RfAssessmentHistoryScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/RfAssessmentHistoryScreen.kt) — Removed "Session Points" chart, event cards show RMSSD instead of points
+- **Modified**: [`SessionScreen.kt`](app/src/main/java/com/example/wags/ui/session/SessionScreen.kt) — `KeepScreenOn` now covers COMPLETE phase
+- **Modified**: [`MeditationScreen.kt`](app/src/main/java/com/example/wags/ui/meditation/MeditationScreen.kt) — `KeepScreenOn` now covers COMPLETE phase
+- **Modified**: [`ReadinessScreen.kt`](app/src/main/java/com/example/wags/ui/readiness/ReadinessScreen.kt) — `KeepScreenOn` now covers COMPLETE phase
+- **Modified**: [`MorningReadinessScreen.kt`](app/src/main/java/com/example/wags/ui/morning/MorningReadinessScreen.kt) — `KeepScreenOn` now covers COMPLETE phase
+- **Modified**: [`ApneaTableScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaTableScreen.kt) — `KeepScreenOn` now covers COMPLETE phase
+- **Modified**: [`AdvancedApneaScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/AdvancedApneaScreen.kt) — `KeepScreenOn` now covers COMPLETE phase
+- **Modified**: [`AssessmentRunScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/AssessmentRunScreen.kt) — `KeepScreenOn` now covers COMPLETE phase
+- **Modified**: [`FreeHoldActiveScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/FreeHoldActiveScreen.kt) — `KeepScreenOn` now covers PB check and PB dialog phases
+
+---
+
 ### 2026-03-30 — Smart Resonance Breathing Rate Recommendation
 
 **Improved: intelligent breathing rate recommendation** ([`ResonanceRateRecommender.kt`](app/src/main/java/com/example/wags/domain/usecase/breathing/ResonanceRateRecommender.kt))

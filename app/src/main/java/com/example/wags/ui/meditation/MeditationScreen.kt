@@ -49,8 +49,11 @@ fun MeditationScreen(
     val isActive = state.sessionState == MeditationSessionState.ACTIVE ||
             state.sessionState == MeditationSessionState.PROCESSING
 
+    // Keep screen on during COMPLETE too so the user can review results
+    val keepScreenOn = isActive || state.sessionState == MeditationSessionState.COMPLETE
+
     SessionBackHandler(enabled = isActive) { navController.popBackStack() }
-    KeepScreenOn(enabled = isActive)
+    KeepScreenOn(enabled = keepScreenOn)
 
     Scaffold(
         containerColor = BackgroundDark,

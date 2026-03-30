@@ -64,8 +64,11 @@ fun ReadinessScreen(
     val isActive = state.sessionState == ReadinessSessionState.RECORDING ||
             state.sessionState == ReadinessSessionState.PROCESSING
 
+    // Keep screen on during COMPLETE too so the user can review results
+    val keepScreenOn = isActive || state.sessionState == ReadinessSessionState.COMPLETE
+
     SessionBackHandler(enabled = isActive) { navController.popBackStack() }
-    KeepScreenOn(enabled = isActive)
+    KeepScreenOn(enabled = keepScreenOn)
 
     // Session-complete feedback: chime + vibration when recording finishes.
     LaunchedEffect(state.sessionState) {

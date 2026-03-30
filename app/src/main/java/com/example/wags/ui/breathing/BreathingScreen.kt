@@ -77,7 +77,7 @@ fun BreathingScreen(
     navController: NavController,
     onNavigateToRfAssessment: () -> Unit = {},
     onNavigateToHistory: () -> Unit = {},
-    onNavigateToSession: (vibration: Boolean, duration: Int, infinity: Boolean) -> Unit = { _, _, _ -> },
+    onNavigateToSession: (vibration: Boolean, duration: Int, infinity: Boolean, rate: Float) -> Unit = { _, _, _, _ -> },
     onNavigateToRateRecommendation: () -> Unit = {},
     viewModel: BreathingViewModel = hiltViewModel()
 ) {
@@ -201,7 +201,7 @@ fun BreathingScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Button(
-                    onClick = { onNavigateToSession(vibrationEnabled, state.sessionDurationMinutes, state.infinityMode) },
+                    onClick = { onNavigateToSession(vibrationEnabled, state.sessionDurationMinutes, state.infinityMode, state.breathingRateBpm) },
                     modifier = Modifier.weight(1f),
                     enabled = state.isHrDeviceConnected
                 ) { Text("Start Session") }
@@ -268,7 +268,7 @@ private fun SessionCompleteContent(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "%.0f".format(summary.totalPoints),
+                text = "%.2f".format(summary.meanCoherenceRatio),
                 style = MaterialTheme.typography.displayLarge.copy(
                     fontSize = 56.sp,
                     fontWeight = FontWeight.Bold
@@ -276,7 +276,7 @@ private fun SessionCompleteContent(
                 color = TextPrimary
             )
             Text(
-                text = "points earned",
+                text = "mean coherence",
                 style = MaterialTheme.typography.titleMedium,
                 color = Silver
             )

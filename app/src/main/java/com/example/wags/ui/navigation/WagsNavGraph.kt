@@ -62,7 +62,7 @@ object WagsRoutes {
     const val RF_ASSESSMENT_RUN = "rf_assessment_run/{protocol}?vibration={vibration}"
     const val RF_ASSESSMENT_RESULT = "rf_assessment_result/{sessionTimestamp}"
     const val RF_ASSESSMENT_HISTORY = "rf_assessment_history"
-    const val RESONANCE_SESSION = "resonance_session?vibration={vibration}&duration={duration}&infinity={infinity}"
+    const val RESONANCE_SESSION = "resonance_session?vibration={vibration}&duration={duration}&infinity={infinity}&rate={rate}"
     const val RESONANCE_SESSION_DETAIL = "resonance_session_detail/{sessionId}"
     const val RATE_RECOMMENDATION = "rate_recommendation"
     const val APNEA_HISTORY = "apnea_history/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{audio}"
@@ -104,8 +104,8 @@ object WagsRoutes {
         audio: String = "SILENCE"
     ) = "free_hold_active/$lungVolume/$prepType/$timeOfDay/$posture/$showTimer/$audio"
     fun meditationSessionDetail(sessionId: Long) = "meditation_session_detail/$sessionId"
-    fun resonanceSession(vibration: Boolean = false, duration: Int = 5, infinity: Boolean = false) =
-        "resonance_session?vibration=$vibration&duration=$duration&infinity=$infinity"
+    fun resonanceSession(vibration: Boolean = false, duration: Int = 5, infinity: Boolean = false, rate: Float = 5.5f) =
+        "resonance_session?vibration=$vibration&duration=$duration&infinity=$infinity&rate=$rate"
     fun resonanceSessionDetail(sessionId: Long) = "resonance_session_detail/$sessionId"
 
     /**
@@ -153,8 +153,8 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
                 navController = navController,
                 onNavigateToRfAssessment = { navController.navigate(WagsRoutes.RF_ASSESSMENT_PICKER) },
                 onNavigateToHistory = { navController.navigate(WagsRoutes.RF_ASSESSMENT_HISTORY) },
-                onNavigateToSession = { vibration, duration, infinity ->
-                    navController.navigate(WagsRoutes.resonanceSession(vibration, duration, infinity))
+                onNavigateToSession = { vibration, duration, infinity, rate ->
+                    navController.navigate(WagsRoutes.resonanceSession(vibration, duration, infinity, rate))
                 },
                 onNavigateToRateRecommendation = { navController.navigate(WagsRoutes.RATE_RECOMMENDATION) }
             )
@@ -167,17 +167,20 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             arguments = listOf(
                 navArgument("vibration") { type = NavType.BoolType; defaultValue = false },
                 navArgument("duration") { type = NavType.IntType; defaultValue = 5 },
-                navArgument("infinity") { type = NavType.BoolType; defaultValue = false }
+                navArgument("infinity") { type = NavType.BoolType; defaultValue = false },
+                navArgument("rate") { type = NavType.FloatType; defaultValue = 5.5f }
             )
         ) { backStackEntry ->
             val vibration = backStackEntry.arguments?.getBoolean("vibration") ?: false
             val duration = backStackEntry.arguments?.getInt("duration") ?: 5
             val infinity = backStackEntry.arguments?.getBoolean("infinity") ?: false
+            val rate = backStackEntry.arguments?.getFloat("rate") ?: 5.5f
             ResonanceSessionScreen(
                 onNavigateBack = { navController.popBackStack() },
                 vibrationEnabled = vibration,
                 durationMinutes = duration,
-                infinityMode = infinity
+                infinityMode = infinity,
+                breathingRate = rate
             )
         }
         composable(WagsRoutes.RF_ASSESSMENT_HISTORY) {

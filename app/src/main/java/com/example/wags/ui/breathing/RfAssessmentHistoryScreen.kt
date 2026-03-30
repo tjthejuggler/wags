@@ -291,18 +291,6 @@ private fun RfGraphsContent(uiState: RfAssessmentHistoryUiState) {
                 )
             }
 
-            // Session Points
-            RfGraphSection(
-                title = "Session Points",
-                subtitle = "Total points earned per session"
-            ) {
-                RfMetricChart(
-                    label = "Points",
-                    points = uiState.sessionChartData.totalPoints,
-                    lineColor = TextPrimary
-                )
-            }
-
             // Session Duration
             RfGraphSection(
                 title = "Session Duration",
@@ -712,10 +700,10 @@ private fun RfSessionEventCard(
                     )
                 }
                 Text(
-                    "%d:%02d  ·  Coherence %.1f  ·  %.0f pts".format(
+                    "%d:%02d  ·  Coherence %.1f  ·  RMSSD %.0f ms".format(
                         durationMin, durationSec,
                         session.meanCoherenceRatio,
-                        session.totalPoints
+                        session.meanRmssdMs
                     ),
                     style = MaterialTheme.typography.labelSmall,
                     color = TextSecondary

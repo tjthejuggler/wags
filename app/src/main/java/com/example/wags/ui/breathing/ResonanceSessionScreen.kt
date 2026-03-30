@@ -80,6 +80,7 @@ fun ResonanceSessionScreen(
     vibrationEnabled: Boolean = false,
     durationMinutes: Int = 5,
     infinityMode: Boolean = false,
+    breathingRate: Float = 5.5f,
     viewModel: BreathingViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -92,7 +93,8 @@ fun ResonanceSessionScreen(
     // Keep screen on during COMPLETE too, so it doesn't black out before navigation
     val keepScreenOn = isActive || state.sessionPhase == BreathingSessionPhase.COMPLETE
 
-    SessionBackHandler(enabled = isActive, onConfirm = { viewModel.stopSession() })
+    // Back gesture/button → cancel without saving (after user confirms discard dialog)
+    SessionBackHandler(enabled = isActive, onConfirm = { viewModel.cancelSession() })
     KeepScreenOn(enabled = keepScreenOn)
 
     // True once the phase has moved past IDLE (i.e. PREPARING or beyond).
@@ -100,15 +102,20 @@ fun ResonanceSessionScreen(
     // "IDLE after session was stopped/completed".
     var sessionEverActive by remember { mutableStateOf(false) }
 
+    // Play the end-chime once when the session completes
+    var chimePlayed by remember { mutableStateOf(false) }
+
     LaunchedEffect(state.sessionPhase) {
         when (state.sessionPhase) {
             BreathingSessionPhase.PREPARING,
             BreathingSessionPhase.BREATHING -> sessionEverActive = true
             BreathingSessionPhase.COMPLETE  -> {
                 sessionEverActive = true
-                // Notify the user the session is done before navigating away.
-                WagsFeedback.sessionEnd(context)
-                onNavigateBack()
+                if (!chimePlayed) {
+                    WagsFeedback.sessionEnd(context)
+                    chimePlayed = true
+                }
+                // Do NOT auto-navigate — let the user review and leave manually
             }
             BreathingSessionPhase.IDLE -> {
                 if (sessionEverActive) onNavigateBack()
@@ -116,8 +123,9 @@ fun ResonanceSessionScreen(
         }
     }
 
-    // Kick off the session on first composition
+    // Kick off the session on first composition — apply the rate from the hub screen
     LaunchedEffect(Unit) {
+        viewModel.setBreathingRate(breathingRate)
         viewModel.setSessionDuration(durationMinutes)
         viewModel.setInfinityMode(infinityMode)
         viewModel.startSession(deviceId)
@@ -129,10 +137,11 @@ fun ResonanceSessionScreen(
             TopAppBar(
                 title = { Text("Resonance Breathing", style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
-                    IconButton(onClick = { viewModel.stopSession() }) {
+                    // Back arrow → cancel without saving (shows discard dialog via SessionBackHandler)
+                    IconButton(onClick = { viewModel.cancelSession() }) {
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Stop & back",
+                            contentDescription = "Cancel & back",
                             tint = EcgCyan
                         )
                     }
@@ -155,7 +164,7 @@ fun ResonanceSessionScreen(
                     RsPreparationContent(
                         countdownSeconds = state.prepCountdownSeconds,
                         breathingRateBpm = state.breathingRateBpm,
-                        onCancel = { viewModel.stopSession() }
+                        onCancel = { viewModel.cancelSession() }
                     )
                 }
 
@@ -176,9 +185,9 @@ fun ResonanceSessionScreen(
                         onPhaseTransition = vibrationCallback
                     )
 
-                    // ── Stats row (points / time / coherence) ─────────────────
+                    // ── Stats row (rate / time / coherence) ─────────────────
                     RsSessionStatsRow(
-                        points = state.sessionPoints,
+                        breathingRateBpm = state.breathingRateBpm,
                         elapsedSeconds = state.sessionElapsedSeconds,
                         coherenceRatio = state.liveCoherenceRatio
                     )
@@ -223,16 +232,26 @@ fun ResonanceSessionScreen(
                             .height(100.dp)
                     )
 
-                    // ── Stop button ───────────────────────────────────────────
+                    // ── End Session button (saves the session) ───────────────
                     OutlinedButton(
                         onClick = { viewModel.stopSession() },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
-                    ) { Text("Stop & Save Session") }
+                    ) { Text("End Session") }
                 }
 
-                // IDLE / COMPLETE handled by LaunchedEffect → pop back
-                else -> {
+                BreathingSessionPhase.COMPLETE -> {
+                    // Session finished — show summary and let the user leave manually
+                    RsSessionCompleteContent(
+                        elapsedSeconds = state.sessionElapsedSeconds,
+                        coherenceRatio = state.liveCoherenceRatio,
+                        breathingRateBpm = state.breathingRateBpm,
+                        onDone = onNavigateBack
+                    )
+                }
+
+                // IDLE before session starts or after cancel → pop back via LaunchedEffect
+                BreathingSessionPhase.IDLE -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
@@ -241,6 +260,66 @@ fun ResonanceSessionScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  SESSION COMPLETE
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@Composable
+private fun RsSessionCompleteContent(
+    elapsedSeconds: Int,
+    coherenceRatio: Float,
+    breathingRateBpm: Float,
+    onDone: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Spacer(Modifier.height(32.dp))
+
+        Text(
+            "SESSION COMPLETE",
+            style = MaterialTheme.typography.titleMedium,
+            color = RsBone,
+            letterSpacing = 6.sp
+        )
+
+        // Summary card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = RsGraphite),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                RsStatCell(value = rsFmtDuration(elapsedSeconds), label = "DURATION", color = RsBone)
+                RsStatCell(value = "%.1f".format(breathingRateBpm), label = "BREATHING RATE", color = RsGold)
+                RsStatCell(value = "%.1f".format(coherenceRatio), label = "COHERENCE", color = EcgCyan)
+            }
+        }
+
+        Text(
+            "Session saved. Take your time.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = RsAsh,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        Button(
+            onClick = onDone,
+            modifier = Modifier.fillMaxWidth(0.6f),
+            colors = ButtonDefaults.buttonColors(containerColor = RsGraphite, contentColor = RsBone)
+        ) {
+            Text("Done", letterSpacing = 2.sp)
         }
     }
 }
@@ -330,7 +409,7 @@ private fun RsPreparationContent(
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 @Composable
-private fun RsSessionStatsRow(points: Float, elapsedSeconds: Int, coherenceRatio: Float) {
+private fun RsSessionStatsRow(breathingRateBpm: Float, elapsedSeconds: Int, coherenceRatio: Float) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -340,9 +419,9 @@ private fun RsSessionStatsRow(points: Float, elapsedSeconds: Int, coherenceRatio
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        RsStatCell(value = "%.0f".format(points),          label = "POINTS",    color = RsGold)
-        RsStatCell(value = rsFmtDuration(elapsedSeconds),  label = "TIME",      color = RsBone)
-        RsStatCell(value = "%.1f".format(coherenceRatio),  label = "COHERENCE", color = EcgCyan)
+        RsStatCell(value = "%.1f".format(breathingRateBpm), label = "BPM",       color = RsGold)
+        RsStatCell(value = rsFmtDuration(elapsedSeconds),   label = "TIME",      color = RsBone)
+        RsStatCell(value = "%.1f".format(coherenceRatio),   label = "COHERENCE", color = EcgCyan)
     }
 }
 

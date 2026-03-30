@@ -72,8 +72,11 @@ fun AssessmentRunScreen(
 
     val isActive = uiState.phase != "IDLE" && uiState.phase != "COMPLETE"
 
+    // Keep screen on during COMPLETE too so the user can review results
+    val keepScreenOn = isActive || uiState.phase == "COMPLETE"
+
     SessionBackHandler(enabled = isActive, onConfirm = onNavigateBack)
-    KeepScreenOn(enabled = isActive)
+    KeepScreenOn(enabled = keepScreenOn)
 
     // Navigate once when complete — play end-of-session sound
     LaunchedEffect(uiState.isComplete) {

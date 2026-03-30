@@ -68,8 +68,11 @@ fun MorningReadinessScreen(
             uiState.fsmState != MorningReadinessState.COMPLETE &&
             uiState.fsmState != MorningReadinessState.ERROR
 
+    // Keep screen on during COMPLETE too so the user can review results
+    val keepScreenOn = isActive || uiState.fsmState == MorningReadinessState.COMPLETE
+
     SessionBackHandler(enabled = isActive, onConfirm = onNavigateBack)
-    KeepScreenOn(enabled = isActive)
+    KeepScreenOn(enabled = keepScreenOn)
 
     // No HRM dialog
     if (uiState.noHrmDialogVisible) {

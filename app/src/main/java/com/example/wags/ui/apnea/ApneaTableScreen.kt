@@ -33,8 +33,11 @@ fun ApneaTableScreen(
 
     val isActive = state.apneaState != ApneaState.IDLE && state.apneaState != ApneaState.COMPLETE
 
+    // Keep screen on during COMPLETE too so the user can review results
+    val keepScreenOn = isActive || state.apneaState == ApneaState.COMPLETE
+
     SessionBackHandler(enabled = isActive) { navController.popBackStack() }
-    KeepScreenOn(enabled = isActive)
+    KeepScreenOn(enabled = keepScreenOn)
 
     // Load table when screen enters with a valid personal best
     LaunchedEffect(parsedType, state.personalBestMs) {
