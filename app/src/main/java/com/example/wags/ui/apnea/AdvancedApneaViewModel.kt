@@ -14,6 +14,7 @@ import com.example.wags.data.spotify.SpotifyManager
 import com.example.wags.data.spotify.SpotifyTrackDetail
 import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.SpotifySong
+import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.model.TableLength
 import com.example.wags.domain.model.TrainingModality
 import com.example.wags.domain.model.WonkaConfig
@@ -40,7 +41,13 @@ data class AdvancedApneaScreenUiState(
     val previousSongs: List<SpotifyTrackDetail> = emptyList(),
     val loadingSongs: Boolean = false,
     val selectedSong: SpotifyTrackDetail? = null,
-    val loadingSelectedSong: Boolean = false
+    val loadingSelectedSong: Boolean = false,
+    // Current apnea settings (read from SharedPreferences at init)
+    val lungVolume: String = "FULL",
+    val prepType: String = "NO_PREP",
+    val timeOfDay: String = "DAY",
+    val posture: String = "LAYING",
+    val audio: String = "SILENCE"
 )
 
 @HiltViewModel
@@ -85,7 +92,22 @@ class AdvancedApneaViewModel @Inject constructor(
         audioSetting = runCatching {
             AudioSetting.valueOf(prefs.getString("setting_audio", AudioSetting.SILENCE.name) ?: AudioSetting.SILENCE.name)
         }.getOrDefault(AudioSetting.SILENCE)
-        _uiState.update { it.copy(isMusicMode = audioSetting == AudioSetting.MUSIC) }
+
+        // Read all persisted apnea settings for the summary banner
+        val savedLungVolume = prefs.getString("setting_lung_volume", "FULL") ?: "FULL"
+        val savedPrepType   = prefs.getString("setting_prep_type", "NO_PREP") ?: "NO_PREP"
+        val savedPosture    = prefs.getString("setting_posture", "LAYING") ?: "LAYING"
+
+        _uiState.update {
+            it.copy(
+                isMusicMode = audioSetting == AudioSetting.MUSIC,
+                lungVolume  = savedLungVolume,
+                prepType    = savedPrepType,
+                timeOfDay   = TimeOfDay.fromCurrentTime().name,
+                posture     = savedPosture,
+                audio       = audioSetting.name
+            )
+        }
 
         viewModelScope.launch {
             stateMachine.state.collect { advancedState ->

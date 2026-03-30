@@ -5,6 +5,22 @@
 ## Changelog
 
 
+### 2026-03-30 — Apnea settings summary banner on active session screens
+
+**New: settings summary banner on all apnea active screens** ([`ApneaSettingsSummaryBanner.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaSettingsSummaryBanner.kt))
+- Added a small, centered text line just below the top app bar on every apnea active session screen showing the current settings: Lung Volume · Prep Type · Time of Day · Posture · Audio.
+- Displayed on the **Free Hold** active screen, **O₂/CO₂ Table** screen, and **Advanced Apnea** screen (Progressive O₂, Min Breath, Wonka).
+- Uses `labelSmall` typography in `TextSecondary` color so it's visible but unobtrusive.
+
+#### Files Changed
+- **New**: [`ApneaSettingsSummaryBanner.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaSettingsSummaryBanner.kt) — Reusable composable that formats raw setting keys into a human-readable one-liner
+- **Modified**: [`FreeHoldActiveScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/FreeHoldActiveScreen.kt) — Added banner below top bar (settings from nav args)
+- **Modified**: [`ApneaTableScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaTableScreen.kt) — Added banner as first LazyColumn item (settings from shared ViewModel)
+- **Modified**: [`AdvancedApneaScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/AdvancedApneaScreen.kt) — Added banner below top bar (settings from ViewModel)
+- **Modified**: [`AdvancedApneaViewModel.kt`](app/src/main/java/com/example/wags/ui/apnea/AdvancedApneaViewModel.kt) — Exposed persisted apnea settings in `AdvancedApneaScreenUiState` for the banner
+
+---
+
 ### 2026-03-30 — Overhaul rate recommendation scoring
 
 **Changed: use composite score for assessments, weight assessments 3× over sessions** ([`ResonanceRateRecommender.kt`](app/src/main/java/com/example/wags/domain/usecase/breathing/ResonanceRateRecommender.kt))

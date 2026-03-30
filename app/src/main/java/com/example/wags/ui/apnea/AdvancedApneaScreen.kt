@@ -93,6 +93,15 @@ fun AdvancedApneaScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Settings summary — always visible so the user knows which settings are active
+            ApneaSettingsSummaryBanner(
+                lungVolume = uiState.lungVolume,
+                prepType   = uiState.prepType,
+                timeOfDay  = uiState.timeOfDay,
+                posture    = uiState.posture,
+                audio      = uiState.audio
+            )
+
             // Song picker — shown when MUSIC mode + Spotify connected + session not yet started
             if (uiState.isMusicMode && uiState.spotifyConnected && state.phase == AdvancedApneaPhase.IDLE) {
                 if (uiState.selectedSong != null) {

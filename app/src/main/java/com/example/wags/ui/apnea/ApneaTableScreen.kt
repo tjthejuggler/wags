@@ -90,6 +90,16 @@ fun ApneaTableScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    // Settings summary — always visible so the user knows which settings are active
+                    item {
+                        ApneaSettingsSummaryBanner(
+                            lungVolume = state.selectedLungVolume,
+                            prepType   = state.prepType.name,
+                            timeOfDay  = state.timeOfDay.name,
+                            posture    = state.posture.name,
+                            audio      = state.audio.name
+                        )
+                    }
                     item {
                         SessionStatusCard(
                             apneaState = state.apneaState,

@@ -672,6 +672,15 @@ fun FreeHoldActiveScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // Settings summary — always visible so the user knows which settings are active
+            ApneaSettingsSummaryBanner(
+                lungVolume = viewModel.lungVolume,
+                prepType   = viewModel.prepType,
+                timeOfDay  = viewModel.timeOfDay,
+                posture    = viewModel.posture,
+                audio      = viewModel.audio
+            )
+
             // Now-playing banner — shown when MUSIC is selected and a song is detected
             if (state.freeHoldActive && state.nowPlayingSong != null) {
                 NowPlayingBanner(track = state.nowPlayingSong!!)
