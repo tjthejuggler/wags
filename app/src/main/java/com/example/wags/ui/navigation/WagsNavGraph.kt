@@ -24,6 +24,7 @@ import com.example.wags.ui.breathing.AssessmentPickerScreen
 import com.example.wags.ui.breathing.AssessmentResultScreen
 import com.example.wags.ui.breathing.AssessmentRunScreen
 import com.example.wags.ui.breathing.BreathingScreen
+import com.example.wags.ui.breathing.RateRecommendationScreen
 import com.example.wags.ui.breathing.ResonanceSessionDetailScreen
 import com.example.wags.ui.breathing.ResonanceSessionScreen
 import com.example.wags.ui.breathing.RfAssessmentHistoryScreen
@@ -63,6 +64,7 @@ object WagsRoutes {
     const val RF_ASSESSMENT_HISTORY = "rf_assessment_history"
     const val RESONANCE_SESSION = "resonance_session?vibration={vibration}&duration={duration}&infinity={infinity}"
     const val RESONANCE_SESSION_DETAIL = "resonance_session_detail/{sessionId}"
+    const val RATE_RECOMMENDATION = "rate_recommendation"
     const val APNEA_HISTORY = "apnea_history/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{audio}"
     const val APNEA_RECORD_DETAIL = "apnea_record_detail/{recordId}"
     const val APNEA_ALL_RECORDS = "apnea_all_records/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{eventTypes}"
@@ -153,8 +155,12 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
                 onNavigateToHistory = { navController.navigate(WagsRoutes.RF_ASSESSMENT_HISTORY) },
                 onNavigateToSession = { vibration, duration, infinity ->
                     navController.navigate(WagsRoutes.resonanceSession(vibration, duration, infinity))
-                }
+                },
+                onNavigateToRateRecommendation = { navController.navigate(WagsRoutes.RATE_RECOMMENDATION) }
             )
+        }
+        composable(WagsRoutes.RATE_RECOMMENDATION) {
+            RateRecommendationScreen(onNavigateBack = { navController.popBackStack() })
         }
         composable(
             route = WagsRoutes.RESONANCE_SESSION,

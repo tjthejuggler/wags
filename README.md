@@ -5,6 +5,26 @@
 ## Changelog
 
 
+### 2026-03-30 — Smart Resonance Breathing Rate Recommendation
+
+**Improved: intelligent breathing rate recommendation** ([`ResonanceRateRecommender.kt`](app/src/main/java/com/example/wags/domain/usecase/breathing/ResonanceRateRecommender.kt))
+- Replaced the simple "highest average coherence" rate picker with a smarter algorithm that uses **recency-weighted scoring** (exponential decay, 14-day half-life) and a **confidence multiplier** (requires ≥3 data points per rate bucket for full confidence).
+- The algorithm collects all valid RF assessments and resonance sessions from the last 60 days, groups them into 0.1 BPM buckets (rounded to nearest), and scores each bucket as `weightedAvgCoherence × confidenceMultiplier`.
+- The old logic had a rounding bug (`(rateBpm * 10).toInt() / 10f` rounds down instead of to nearest) and no weighting by recency or data count.
+
+**New: Rate Recommendation Explanation screen** ([`RateRecommendationScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/RateRecommendationScreen.kt), [`RateRecommendationViewModel.kt`](app/src/main/java/com/example/wags/ui/breathing/RateRecommendationViewModel.kt))
+- A dedicated screen showing full transparency into the recommendation: the recommended rate, data summary (lookback window, assessment/session counts), algorithm explanation, and a ranked table of all rate buckets with their raw average, weighted average, confidence multiplier, final score, and individual data points (with source, coherence, recency weight, and date).
+- Accessible via a "Why?" button on the Breathing hub screen next to the suggested rate display.
+
+**UI: suggested rate card on Breathing hub** ([`BreathingScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/BreathingScreen.kt))
+- When a recommendation is available, a card below the breathing controls shows "Suggested: X.XX BPM — Based on 60-day history" with a "Why?" link to the explanation screen.
+
+#### Files Changed
+- **New**: [`ResonanceRateRecommender.kt`](app/src/main/java/com/example/wags/domain/usecase/breathing/ResonanceRateRecommender.kt), [`RateRecommendationScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/RateRecommendationScreen.kt), [`RateRecommendationViewModel.kt`](app/src/main/java/com/example/wags/ui/breathing/RateRecommendationViewModel.kt)
+- **Modified**: [`BreathingViewModel.kt`](app/src/main/java/com/example/wags/ui/breathing/BreathingViewModel.kt), [`BreathingScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/BreathingScreen.kt), [`WagsNavGraph.kt`](app/src/main/java/com/example/wags/ui/navigation/WagsNavGraph.kt)
+
+---
+
 ### 2026-03-29 — Strip Chart Initial Batch Fix
 
 **Bug fix: first ~7-8 RR points bunched at time zero on scrolling chart** ([`RrStripChart.kt`](app/src/main/java/com/example/wags/ui/common/RrStripChart.kt))

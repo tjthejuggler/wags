@@ -38,6 +38,7 @@ import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.common.RrIntervalChart
 import com.example.wags.ui.common.SessionBackHandler
+import com.example.wags.domain.usecase.breathing.ResonanceRateRecommender
 import com.example.wags.ui.theme.*
 import kotlin.math.roundToInt
 
@@ -77,6 +78,7 @@ fun BreathingScreen(
     onNavigateToRfAssessment: () -> Unit = {},
     onNavigateToHistory: () -> Unit = {},
     onNavigateToSession: (vibration: Boolean, duration: Int, infinity: Boolean) -> Unit = { _, _, _ -> },
+    onNavigateToRateRecommendation: () -> Unit = {},
     viewModel: BreathingViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -143,6 +145,39 @@ fun BreathingScreen(
                 onRateChange = { viewModel.setBreathingRate(it) },
                 onIeRatioChange = { viewModel.setIeRatio(it) }
             )
+
+            // ── Recommended rate info + link to explanation ──────────────────
+            if (state.bestRateBpm != null) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                            .fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                "Suggested: %.2f BPM".format(state.bestRateBpm),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TextPrimary
+                            )
+                            Text(
+                                "Based on ${ResonanceRateRecommender.LOOKBACK_DAYS}-day history",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary
+                            )
+                        }
+                        TextButton(onClick = onNavigateToRateRecommendation) {
+                            Text("Why?", color = EcgCyan)
+                        }
+                    }
+                }
+            }
 
             // ── Duration controls ──────────────────────────────────────────
             DurationControls(

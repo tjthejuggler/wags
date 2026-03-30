@@ -13,6 +13,8 @@ import com.example.wags.data.repository.RfAssessmentRepository
 import com.example.wags.di.MathDispatcher
 import com.example.wags.domain.usecase.breathing.CoherenceScoreCalculator
 import com.example.wags.domain.usecase.breathing.ContinuousPacerEngine
+import com.example.wags.domain.usecase.breathing.RateRecommendation
+import com.example.wags.domain.usecase.breathing.ResonanceRateRecommender
 import com.example.wags.domain.usecase.breathing.RfAssessmentOrchestrator
 import com.example.wags.domain.usecase.breathing.RfEpochResult
 import com.example.wags.domain.usecase.breathing.RfOrchestratorState
@@ -135,6 +137,7 @@ class BreathingViewModel @Inject constructor(
     private val timeDomainCalc: TimeDomainHrvCalculator,
     private val rfAssessmentRepo: RfAssessmentRepository,
     private val resonanceSessionRepo: ResonanceSessionRepository,
+    private val rateRecommender: ResonanceRateRecommender,
     @MathDispatcher private val mathDispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
@@ -169,44 +172,23 @@ class BreathingViewModel @Inject constructor(
     private val allSessionRrIntervals = mutableListOf<Double>()
     private var sessionStartTimeMs = 0L
 
+    /** The last computed recommendation — exposed so the explanation screen can read it. */
+    private val _recommendation = MutableStateFlow<RateRecommendation?>(null)
+    val recommendation: StateFlow<RateRecommendation?> = _recommendation
+
     init {
         loadBestBreathingRate()
     }
 
     /**
-     * Loads the best breathing rate from the last 2 months of assessment + session data.
-     * Groups by rate (rounded to 0.1 BPM) and picks the rate with the highest average coherence.
+     * Loads the best breathing rate from the last 2 months of assessment + session data
+     * using the [ResonanceRateRecommender] algorithm (recency-weighted, confidence-scaled).
      */
     private fun loadBestBreathingRate() {
         viewModelScope.launch {
-            val twoMonthsAgoMs = System.currentTimeMillis() - (60L * 24 * 60 * 60 * 1000) // 60 days
-
-            val assessments = rfAssessmentRepo.getSince(twoMonthsAgoMs)
-            val sessions = resonanceSessionRepo.getSince(twoMonthsAgoMs)
-
-            data class RateScore(val rateBpm: Float, val coherenceScore: Float)
-
-            val rateScores = mutableListOf<RateScore>()
-
-            assessments.forEach { a ->
-                if (a.isValid && a.optimalBpm in 4f..7f) {
-                    rateScores.add(RateScore(a.optimalBpm, a.maxCoherenceRatio))
-                }
-            }
-
-            sessions.forEach { s ->
-                if (s.breathingRateBpm in 4f..7f && s.durationSeconds >= 60) {
-                    rateScores.add(RateScore(s.breathingRateBpm, s.meanCoherenceRatio))
-                }
-            }
-
-            if (rateScores.isEmpty()) return@launch
-
-            val grouped = rateScores.groupBy { (it.rateBpm * 10).toInt() / 10f }
-            val bestRate = grouped.maxByOrNull { (_, scores) ->
-                scores.map { it.coherenceScore.toDouble() }.average()
-            }?.key
-
+            val result = rateRecommender.recommend()
+            _recommendation.value = result
+            val bestRate = result.recommendedBpm
             if (bestRate != null) {
                 _uiState.update {
                     it.copy(
