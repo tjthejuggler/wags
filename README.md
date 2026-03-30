@@ -5,18 +5,25 @@
 ## Changelog
 
 
-### 2026-03-30 — Remove recency weighting from rate recommendation
+### 2026-03-30 — Overhaul rate recommendation scoring
 
-**Changed: equal-weight scoring for all data points in lookback window** ([`ResonanceRateRecommender.kt`](app/src/main/java/com/example/wags/domain/usecase/breathing/ResonanceRateRecommender.kt))
-- Removed the exponential decay recency weighting (14-day half-life) from the rate recommendation algorithm. All data points within the 60-day lookback window are now weighted equally.
-- The previous recency bias caused rates with more recent (but lower coherence) data to be recommended over rates with genuinely higher coherence scores from slightly older sessions.
-- Scoring is now simply: `finalScore = avgCoherence × confidenceMultiplier` (where confidence = min(dataPointCount / 3, 1.0)).
-- Removed `recencyWeight` field from `RateDataPoint`, `weightedAvgCoherence` field from `RateBucket`, and the `HALF_LIFE_DAYS` constant.
-- Updated the Rate Recommendation screen to remove the "Weighted" column and `w:` display from data points.
+**Changed: use composite score for assessments, weight assessments 3× over sessions** ([`ResonanceRateRecommender.kt`](app/src/main/java/com/example/wags/domain/usecase/breathing/ResonanceRateRecommender.kt))
+- Removed the exponential decay recency weighting (14-day half-life). All data points within the 60-day lookback window are now treated equally in terms of time.
+- **Assessments now use `compositeScore`** (the multi-factor epoch quality metric, 0–260) instead of `maxCoherenceRatio`. The composite score better reflects overall resonance quality since it factors in phase synchrony, PT amplitude, LF power, and RMSSD.
+- **Sessions continue to use `meanCoherenceRatio`** (0–5 range), which is the only comparable metric available for sessions.
+- Both are **normalized to 0–1** for fair comparison: assessments divide by 260, sessions divide by 5.
+- **Assessments count 3× more** than sessions in the weighted average, since assessments are more controlled and rigorous measurements.
+- Confidence multiplier now uses effective points (assessment=3 pts, session=1 pt) with a threshold of 5 effective points for full confidence.
+- Formula: `finalScore = weightedAvgNormalizedScore × confidenceMultiplier`.
+
+**Updated: Rate Recommendation screen** ([`RateRecommendationScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/RateRecommendationScreen.kt))
+- Bucket metrics now show "Avg Score" (normalized weighted average) instead of "Avg Coh".
+- Data points show the raw value appropriate to their source: "score: X.X" for assessments, "coh: X.XX" for sessions.
+- Assessment data points display "(3×)" to indicate their higher weight.
 
 #### Files Changed
-- **Modified**: [`ResonanceRateRecommender.kt`](app/src/main/java/com/example/wags/domain/usecase/breathing/ResonanceRateRecommender.kt) — Removed recency weighting logic, simplified scoring
-- **Modified**: [`RateRecommendationScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/RateRecommendationScreen.kt) — Removed "Weighted" metric column and `w:` from data point display
+- **Modified**: [`ResonanceRateRecommender.kt`](app/src/main/java/com/example/wags/domain/usecase/breathing/ResonanceRateRecommender.kt) — New scoring algorithm with composite score, normalization, and source weighting
+- **Modified**: [`RateRecommendationScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/RateRecommendationScreen.kt) — Updated display for new data model fields
 
 ---
 

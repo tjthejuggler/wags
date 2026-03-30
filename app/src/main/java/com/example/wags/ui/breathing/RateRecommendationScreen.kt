@@ -265,7 +265,7 @@ private fun BucketCard(bucket: RateBucket) {
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 BucketMetric("Points", "${bucket.dataPointCount}")
-                BucketMetric("Avg Coh", "%.2f".format(bucket.rawAvgCoherence))
+                BucketMetric("Avg Score", "%.2f".format(bucket.weightedAvgScore))
                 BucketMetric("Confidence", "%.0f%%".format(bucket.confidenceMultiplier * 100))
             }
 
@@ -299,8 +299,13 @@ private fun BucketCard(bucket: RateBucket) {
                             modifier = Modifier.weight(1f)
                         )
                         Column(horizontalAlignment = Alignment.End) {
+                            val valueLabel = when (dp.source) {
+                                DataPointSource.ASSESSMENT -> "score: %.1f".format(dp.rawDisplayValue)
+                                DataPointSource.SESSION -> "coh: %.2f".format(dp.rawDisplayValue)
+                            }
+                            val weightLabel = if (dp.sourceWeight > 1) " (${dp.sourceWeight}×)" else ""
                             Text(
-                                    text = "coh: %.2f".format(dp.coherenceScore),
+                                    text = "$valueLabel$weightLabel",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = RecAsh
                                 )
