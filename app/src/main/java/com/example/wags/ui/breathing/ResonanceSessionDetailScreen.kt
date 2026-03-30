@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -45,10 +47,43 @@ fun ResonanceSessionDetailScreen(
     viewModel: ResonanceSessionDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     // Pop back when deleted
     LaunchedEffect(Unit) {
         viewModel.deleted.collect { onNavigateBack() }
+    }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            containerColor   = SurfaceVariant,
+            title = {
+                Text(
+                    "Delete this session?",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextPrimary
+                )
+            },
+            text = {
+                Text(
+                    "This will permanently remove the resonance session record. This cannot be undone.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteDialog = false
+                    viewModel.deleteSession()
+                }) { Text("Delete", color = TextDisabled, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -59,6 +94,15 @@ fun ResonanceSessionDetailScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showDeleteDialog = true }) {
+                        Icon(
+                            Icons.Filled.Delete,
+                            contentDescription = "Delete session",
+                            tint = TextSecondary
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
@@ -85,7 +129,6 @@ fun ResonanceSessionDetailScreen(
             else -> {
                 SessionDetailContent(
                     session = uiState.session!!,
-                    onDelete = { viewModel.deleteSession() },
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(padding)
@@ -102,7 +145,6 @@ fun ResonanceSessionDetailScreen(
 @Composable
 private fun SessionDetailContent(
     session: ResonanceSessionEntity,
-    onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val zone = ZoneId.systemDefault()
@@ -254,33 +296,6 @@ private fun SessionDetailContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(120.dp)
-            )
-        }
-
-        // ── Delete button ──────────────────────────────────────────────────
-        var showDeleteDialog by remember { mutableStateOf(false) }
-        OutlinedButton(
-            onClick = { showDeleteDialog = true },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
-        ) {
-            Text("Delete Session")
-        }
-
-        if (showDeleteDialog) {
-            AlertDialog(
-                onDismissRequest = { showDeleteDialog = false },
-                title = { Text("Delete session?") },
-                text = { Text("This action cannot be undone.") },
-                confirmButton = {
-                    TextButton(onClick = {
-                        showDeleteDialog = false
-                        onDelete()
-                    }) { Text("Delete") }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") }
-                }
             )
         }
 
