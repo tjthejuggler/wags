@@ -100,6 +100,7 @@ class RrStripChartState(private val windowMs: Double = DEFAULT_CHART_WINDOW_MS) 
 
     fun ingest(source: List<Double>, nowNanos: Long) {
         if (source.isEmpty()) return
+        val isFirstBatch = !started
         if (!started) {
             started = true
             firstBeatNanos = nowNanos
@@ -119,20 +120,41 @@ class RrStripChartState(private val windowMs: Double = DEFAULT_CHART_WINDOW_MS) 
             lastSourceTail = source.last()
             return
         }
+        val startIdx = source.size - newBeatsCount
+
+        // ── First batch: back-date firstBeatWallMs so beats are spaced by
+        //    their actual RR durations instead of all landing at time ≈ 0.
+        if (isFirstBatch && newBeatsCount > 1) {
+            val batchDurationMs = source.subList(startIdx, source.size).sum()
+            firstBeatWallMs -= batchDurationMs.toLong()
+        }
+
         val wallNow = System.currentTimeMillis()
         val wallTimeMs = (wallNow - firstBeatWallMs).toDouble()
-        val startIdx = source.size - newBeatsCount
         // Determine the floor: no beat may appear before the last existing one.
         val lastBeatTime = if (beats.isNotEmpty()) beats.last().timeMs else 0.0
-        for (i in startIdx until source.size) {
-            val rrMs = source[i]
-            if (beats.isNotEmpty()) cumulativeTimeMs += rrMs
-            // Spread batch beats evenly between the last existing beat and
-            // wallTimeMs so they are monotonically increasing in time.
-            val fraction = (i - startIdx + 1).toDouble() / newBeatsCount
-            val beatTime = (lastBeatTime + fraction * (wallTimeMs - lastBeatTime))
-                .coerceAtLeast(if (beats.isNotEmpty()) beats.last().timeMs + 1.0 else 0.0)
-            beats.add(TimedBeat(timeMs = beatTime, valueMs = rrMs))
+
+        if (isFirstBatch && newBeatsCount > 1) {
+            // Place initial beats using cumulative RR intervals so they are
+            // properly spaced along the time axis.
+            var cumMs = 0.0
+            for (i in startIdx until source.size) {
+                val rrMs = source[i]
+                if (beats.isNotEmpty()) cumulativeTimeMs += rrMs
+                beats.add(TimedBeat(timeMs = cumMs, valueMs = rrMs))
+                cumMs += rrMs
+            }
+        } else {
+            for (i in startIdx until source.size) {
+                val rrMs = source[i]
+                if (beats.isNotEmpty()) cumulativeTimeMs += rrMs
+                // Spread batch beats evenly between the last existing beat and
+                // wallTimeMs so they are monotonically increasing in time.
+                val fraction = (i - startIdx + 1).toDouble() / newBeatsCount
+                val beatTime = (lastBeatTime + fraction * (wallTimeMs - lastBeatTime))
+                    .coerceAtLeast(if (beats.isNotEmpty()) beats.last().timeMs + 1.0 else 0.0)
+                beats.add(TimedBeat(timeMs = beatTime, valueMs = rrMs))
+            }
         }
         lastSourceTail = source.last()
         val cutoff = wallTimeMs - windowMs * 2
@@ -161,6 +183,7 @@ class RmssdStripChartState(private val windowMs: Double = DEFAULT_CHART_WINDOW_M
 
     fun ingest(source: List<Double>, nowNanos: Long) {
         if (source.isEmpty()) return
+        val isFirstBatch = !started
         if (!started) {
             started = true
             firstBeatNanos = nowNanos
@@ -180,31 +203,56 @@ class RmssdStripChartState(private val windowMs: Double = DEFAULT_CHART_WINDOW_M
             lastSourceTail = source.last()
             return
         }
+        val startIdx = source.size - newBeatsCount
+
+        // ── First batch: back-date firstBeatWallMs so RMSSD beats are spaced
+        //    by their actual RR durations instead of all landing at time ≈ 0.
+        if (isFirstBatch && newBeatsCount > 1) {
+            val batchDurationMs = source.subList(startIdx, source.size).sum()
+            firstBeatWallMs -= batchDurationMs.toLong()
+        }
+
         val wallNow = System.currentTimeMillis()
         val wallTimeMs = (wallNow - firstBeatWallMs).toDouble()
-        val startIdx = source.size - newBeatsCount
         val lastBeatTime = if (beats.isNotEmpty()) beats.last().timeMs else 0.0
-        // Count how many of the new beats will actually produce RMSSD values
-        var rmssdCount = 0
-        for (i in startIdx until source.size) {
-            if (!prevRrMs.isNaN() || (i > startIdx)) rmssdCount++
-        }
-        var rmssdIdx = 0
-        for (i in startIdx until source.size) {
-            val rrMs = source[i]
-            if (beats.isNotEmpty() || !prevRrMs.isNaN()) cumulativeTimeMs += rrMs
-            if (!prevRrMs.isNaN()) {
-                val diff = kotlin.math.abs(rrMs - prevRrMs)
-                // Spread batch beats evenly, monotonically increasing
-                val fraction = if (rmssdCount > 0) {
-                    (rmssdIdx + 1).toDouble() / rmssdCount
-                } else 1.0
-                val beatTime = (lastBeatTime + fraction * (wallTimeMs - lastBeatTime))
-                    .coerceAtLeast(if (beats.isNotEmpty()) beats.last().timeMs + 1.0 else 0.0)
-                beats.add(TimedBeat(timeMs = beatTime, valueMs = diff))
-                rmssdIdx++
+
+        if (isFirstBatch && newBeatsCount > 1) {
+            // Place initial RMSSD beats using cumulative RR intervals so they
+            // are properly spaced along the time axis.
+            var cumMs = 0.0
+            for (i in startIdx until source.size) {
+                val rrMs = source[i]
+                if (beats.isNotEmpty() || !prevRrMs.isNaN()) cumulativeTimeMs += rrMs
+                if (!prevRrMs.isNaN()) {
+                    val diff = kotlin.math.abs(rrMs - prevRrMs)
+                    beats.add(TimedBeat(timeMs = cumMs, valueMs = diff))
+                }
+                cumMs += rrMs
+                prevRrMs = rrMs
             }
-            prevRrMs = rrMs
+        } else {
+            // Count how many of the new beats will actually produce RMSSD values
+            var rmssdCount = 0
+            for (i in startIdx until source.size) {
+                if (!prevRrMs.isNaN() || (i > startIdx)) rmssdCount++
+            }
+            var rmssdIdx = 0
+            for (i in startIdx until source.size) {
+                val rrMs = source[i]
+                if (beats.isNotEmpty() || !prevRrMs.isNaN()) cumulativeTimeMs += rrMs
+                if (!prevRrMs.isNaN()) {
+                    val diff = kotlin.math.abs(rrMs - prevRrMs)
+                    // Spread batch beats evenly, monotonically increasing
+                    val fraction = if (rmssdCount > 0) {
+                        (rmssdIdx + 1).toDouble() / rmssdCount
+                    } else 1.0
+                    val beatTime = (lastBeatTime + fraction * (wallTimeMs - lastBeatTime))
+                        .coerceAtLeast(if (beats.isNotEmpty()) beats.last().timeMs + 1.0 else 0.0)
+                    beats.add(TimedBeat(timeMs = beatTime, valueMs = diff))
+                    rmssdIdx++
+                }
+                prevRrMs = rrMs
+            }
         }
         lastSourceTail = source.last()
         val cutoff = wallTimeMs - windowMs * 2

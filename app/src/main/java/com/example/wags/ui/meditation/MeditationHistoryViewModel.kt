@@ -1,5 +1,6 @@
 package com.example.wags.ui.meditation
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.db.entity.MeditationAudioEntity
@@ -35,6 +36,10 @@ data class MeditationChartData(
     val durationMin: List<MeditationChartPoint> = emptyList()
 )
 
+// ── Tab selection ──────────────────────────────────────────────────────────────
+
+enum class MeditationHistoryTabSelection { GRAPHS, CALENDAR }
+
 // ── UI state ──────────────────────────────────────────────────────────────────
 
 data class MeditationHistoryUiState(
@@ -45,17 +50,32 @@ data class MeditationHistoryUiState(
     val selectedDate: LocalDate? = null,
     val selectedDaySessions: List<MeditationSessionEntity> = emptyList(),
     /** null = all postures; non-null = only sessions with that posture */
-    val postureFilter: PostureFilter = null
+    val postureFilter: PostureFilter = null,
+    val selectedTab: MeditationHistoryTabSelection = MeditationHistoryTabSelection.GRAPHS
 )
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
 
+private const val KEY_SELECTED_TAB = "selected_tab"
+
 @HiltViewModel
 class MeditationHistoryViewModel @Inject constructor(
-    private val repository: MeditationRepository
+    private val repository: MeditationRepository,
+    private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    private val _extra = MutableStateFlow(ExtraState())
+    private val _extra = MutableStateFlow(
+        ExtraState(
+            selectedTab = savedStateHandle.get<String>(KEY_SELECTED_TAB)
+                ?.let { runCatching { MeditationHistoryTabSelection.valueOf(it) }.getOrNull() }
+                ?: MeditationHistoryTabSelection.GRAPHS
+        )
+    )
+
+    fun selectTab(tab: MeditationHistoryTabSelection) {
+        savedStateHandle[KEY_SELECTED_TAB] = tab.name
+        _extra.update { it.copy(selectedTab = tab) }
+    }
 
     val uiState: StateFlow<MeditationHistoryUiState> = combine(
         repository.observeSessions(),
@@ -86,7 +106,8 @@ class MeditationHistoryViewModel @Inject constructor(
             datesWithSessions   = datesWithSessions,
             selectedDate        = extra.selectedDate,
             selectedDaySessions = selectedDaySessions,
-            postureFilter       = extra.postureFilter
+            postureFilter       = extra.postureFilter,
+            selectedTab         = extra.selectedTab
         )
     }.stateIn(
         scope = viewModelScope,
@@ -136,6 +157,7 @@ class MeditationHistoryViewModel @Inject constructor(
 
     private data class ExtraState(
         val selectedDate: LocalDate? = null,
-        val postureFilter: PostureFilter = null
+        val postureFilter: PostureFilter = null,
+        val selectedTab: MeditationHistoryTabSelection = MeditationHistoryTabSelection.GRAPHS
     )
 }

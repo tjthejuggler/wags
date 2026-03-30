@@ -5,6 +5,18 @@
 ## Changelog
 
 
+### 2026-03-29 — Strip Chart Initial Batch Fix
+
+**Bug fix: first ~7-8 RR points bunched at time zero on scrolling chart** ([`RrStripChart.kt`](app/src/main/java/com/example/wags/ui/common/RrStripChart.kt))
+- When the Polar sensor delivers its first batch of buffered RR intervals, `RrStripChartState.ingest()` and `RmssdStripChartState.ingest()` set `firstBeatWallMs` to `System.currentTimeMillis()` and then immediately compute `wallTimeMs = wallNow − firstBeatWallMs ≈ 0`. The spreading formula `lastBeatTime + fraction * (wallTimeMs − lastBeatTime)` collapses to 0 for every beat, producing a vertical line at the left edge.
+- Fix: on the first batch, back-date `firstBeatWallMs` by the total duration of the batch's RR intervals, then place each beat at its cumulative RR offset from time 0. Subsequent batches continue using the existing wall-clock spreading logic.
+- Affects all screens using the shared strip chart: Morning Readiness, Resonance Breathing sessions, RF Assessments, and general Breathing sessions.
+
+#### Files Changed
+- **Modified**: [`RrStripChart.kt`](app/src/main/java/com/example/wags/ui/common/RrStripChart.kt)
+
+---
+
 ### 2026-03-29 — Resonance Breathing Fixes & Calendar Navigation
 
 **Bug fix: no vibration at end of exhale** ([`WagsFeedback.kt`](app/src/main/java/com/example/wags/ui/common/WagsFeedback.kt))

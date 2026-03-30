@@ -7,6 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,6 +29,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.db.entity.MeditationTelemetryEntity
+import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 import java.time.Instant
 import java.time.ZoneId
@@ -43,7 +45,7 @@ fun MeditationSessionDetailScreen(
 
     // Pop back automatically once the session has been deleted
     LaunchedEffect(state.deleted) {
-        if (state.deleted) navController.popBackStack()
+        if (state.deleted) navController.popBackStack(WagsRoutes.MEDITATION_HISTORY, inclusive = false)
     }
 
     // Delete confirmation dialog
@@ -85,7 +87,9 @@ fun MeditationSessionDetailScreen(
             TopAppBar(
                 title = { Text("Session Detail") },
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
+                    IconButton(onClick = {
+                        navController.popBackStack()
+                    }) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
@@ -96,10 +100,10 @@ fun MeditationSessionDetailScreen(
                 actions = {
                     if (state.session != null) {
                         IconButton(onClick = { viewModel.requestDelete() }) {
-                            Text(
-                                "🗑",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = TextDisabled
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "Delete session",
+                                tint = TextDisabled
                             )
                         }
                     }

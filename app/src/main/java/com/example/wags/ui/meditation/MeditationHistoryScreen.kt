@@ -71,10 +71,11 @@ internal fun MeditationDetailLineChart(
 
 // ── Tab definitions ────────────────────────────────────────────────────────────
 
-private enum class MeditationHistoryTab(val label: String) {
-    GRAPHS("Graphs"),
-    CALENDAR("Calendar")
-}
+private val MeditationHistoryTabSelection.label: String
+    get() = when (this) {
+        MeditationHistoryTabSelection.GRAPHS   -> "Graphs"
+        MeditationHistoryTabSelection.CALENDAR -> "Calendar"
+    }
 
 // ── Screen ─────────────────────────────────────────────────────────────────────
 
@@ -85,15 +86,31 @@ fun MeditationHistoryScreen(
     viewModel: MeditationHistoryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var selectedTab by remember { mutableStateOf(MeditationHistoryTab.GRAPHS) }
+    val selectedTab = uiState.selectedTab
     var displayedMonth by remember { mutableStateOf(YearMonth.now()) }
+
+    // Track the session ID we last auto-navigated to, so we don't re-trigger
+    // the navigation when the user presses back and the screen is resumed with
+    // the same single-session selection still in state.
+    var lastAutoNavigatedId by remember { mutableStateOf<Long?>(null) }
 
     // Single-session auto-navigate
     val selectedDaySessions = uiState.selectedDaySessions
     LaunchedEffect(selectedDaySessions) {
         if (selectedDaySessions.size == 1) {
-            navController.navigate(WagsRoutes.meditationSessionDetail(selectedDaySessions.first().sessionId))
-            viewModel.clearSelection()
+            val sessionId = selectedDaySessions.first().sessionId
+            if (sessionId != lastAutoNavigatedId) {
+                lastAutoNavigatedId = sessionId
+                // Persist Calendar tab so system back returns to it
+                viewModel.selectTab(MeditationHistoryTabSelection.CALENDAR)
+                navController.navigate(WagsRoutes.meditationSessionDetail(sessionId))
+                // Selection is intentionally NOT cleared here so that pressing
+                // back returns to the calendar with the selected date's list open.
+            }
+        } else {
+            // Reset guard when selection changes (e.g. user taps a different date
+            // or clears the selection).
+            lastAutoNavigatedId = null
         }
     }
 
@@ -125,11 +142,11 @@ fun MeditationHistoryScreen(
                 containerColor = SurfaceDark,
                 contentColor = TextSecondary
             ) {
-                MeditationHistoryTab.entries.forEach { tab ->
+                MeditationHistoryTabSelection.entries.forEach { tab ->
                     val isSelected = selectedTab == tab
                     Tab(
                         selected = isSelected,
-                        onClick = { selectedTab = tab },
+                        onClick = { viewModel.selectTab(tab) },
                         modifier = Modifier.background(
                             if (isSelected) SurfaceVariant
                             else Color.Transparent
@@ -149,11 +166,11 @@ fun MeditationHistoryScreen(
                 EmptyHistoryContent()
             } else {
                 when (selectedTab) {
-                    MeditationHistoryTab.GRAPHS -> GraphsContent(
+                    MeditationHistoryTabSelection.GRAPHS -> GraphsContent(
                         uiState = uiState,
                         onPostureFilterSelected = { viewModel.setPostureFilter(it) }
                     )
-                    MeditationHistoryTab.CALENDAR -> CalendarContent(
+                    MeditationHistoryTabSelection.CALENDAR -> CalendarContent(
                         uiState = uiState,
                         displayedMonth = displayedMonth,
                         onDayClick = { date ->
@@ -166,7 +183,10 @@ fun MeditationHistoryScreen(
                         onNextMonth = { displayedMonth = displayedMonth.plusMonths(1) },
                         onDismissMultiList = { viewModel.clearSelection() },
                         onNavigateToDetail = { id ->
-                            viewModel.clearSelection()
+                            // Do NOT clear selection here — preserve it so back navigation
+                            // returns to the calendar with the selected date's list still open.
+                            // Persist Calendar tab so system back returns to it.
+                            viewModel.selectTab(MeditationHistoryTabSelection.CALENDAR)
                             navController.navigate(WagsRoutes.meditationSessionDetail(id))
                         }
                     )

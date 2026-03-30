@@ -344,7 +344,7 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             AssessmentResultScreen(
                 sessionTimestamp = sessionTimestamp,
                 onNavigateBack = {
-                    navController.popBackStack(WagsRoutes.BREATHING, inclusive = false)
+                    navController.popBackStack()
                 },
                 onRunAgain = {
                     navController.navigate(WagsRoutes.RF_ASSESSMENT_PICKER) {
