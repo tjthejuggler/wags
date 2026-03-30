@@ -5,6 +5,21 @@
 ## Changelog
 
 
+### 2026-03-30 — Remove recency weighting from rate recommendation
+
+**Changed: equal-weight scoring for all data points in lookback window** ([`ResonanceRateRecommender.kt`](app/src/main/java/com/example/wags/domain/usecase/breathing/ResonanceRateRecommender.kt))
+- Removed the exponential decay recency weighting (14-day half-life) from the rate recommendation algorithm. All data points within the 60-day lookback window are now weighted equally.
+- The previous recency bias caused rates with more recent (but lower coherence) data to be recommended over rates with genuinely higher coherence scores from slightly older sessions.
+- Scoring is now simply: `finalScore = avgCoherence × confidenceMultiplier` (where confidence = min(dataPointCount / 3, 1.0)).
+- Removed `recencyWeight` field from `RateDataPoint`, `weightedAvgCoherence` field from `RateBucket`, and the `HALF_LIFE_DAYS` constant.
+- Updated the Rate Recommendation screen to remove the "Weighted" column and `w:` display from data points.
+
+#### Files Changed
+- **Modified**: [`ResonanceRateRecommender.kt`](app/src/main/java/com/example/wags/domain/usecase/breathing/ResonanceRateRecommender.kt) — Removed recency weighting logic, simplified scoring
+- **Modified**: [`RateRecommendationScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/RateRecommendationScreen.kt) — Removed "Weighted" metric column and `w:` from data point display
+
+---
+
 ### 2026-03-30 — Fix: manual breathing rate ignored during session
 
 **Bug fix: manually-set breathing rate overwritten by async recommendation** ([`BreathingViewModel.kt`](app/src/main/java/com/example/wags/ui/breathing/BreathingViewModel.kt))

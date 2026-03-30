@@ -1,7 +1,5 @@
 package com.example.wags.domain.usecase.breathing
 
-import com.example.wags.data.db.entity.ResonanceSessionEntity
-import com.example.wags.data.db.entity.RfAssessmentEntity
 import com.example.wags.data.repository.ResonanceSessionRepository
 import com.example.wags.data.repository.RfAssessmentRepository
 import javax.inject.Inject
@@ -37,13 +35,11 @@ data class RateBucket(
     val rateBpm: Float,
     /** Number of data points in this bucket. */
     val dataPointCount: Int,
-    /** Simple average coherence across all data points. */
+    /** Average coherence across all data points. */
     val rawAvgCoherence: Float,
-    /** Recency-weighted average coherence. */
-    val weightedAvgCoherence: Float,
     /** Confidence multiplier (0..1) based on data count. */
     val confidenceMultiplier: Float,
-    /** Final score = weightedAvgCoherence × confidenceMultiplier. */
+    /** Final score = avgCoherence × confidenceMultiplier. */
     val finalScore: Float,
     /** Whether this bucket was chosen as the recommendation. */
     val isRecommended: Boolean,
@@ -59,8 +55,6 @@ data class RateDataPoint(
     val rateBpm: Float,
     val coherenceScore: Float,
     val timestamp: Long,
-    /** Recency weight applied to this point (0..1, higher = more recent). */
-    val recencyWeight: Float,
     /** Label for display, e.g. "Assessment" or "Session (5:23)". */
     val label: String
 )
@@ -76,15 +70,12 @@ enum class DataPointSource { ASSESSMENT, SESSION }
  * **Algorithm:**
  * 1. Collect all valid assessments (isValid, optimalBpm 4–7) and sessions
  *    (duration ≥ 60 s, rate 4–7 BPM) from the last 60 days.
- * 2. For each data point compute a **recency weight** using exponential decay
- *    (half-life = 14 days). Recent data matters more.
- * 3. Group into 0.1 BPM buckets (round to nearest 0.1).
- * 4. For each bucket compute:
- *    - Raw average coherence
- *    - Recency-weighted average coherence
+ * 2. Group into 0.1 BPM buckets (round to nearest 0.1).
+ * 3. For each bucket compute:
+ *    - Average coherence (equal weight for all points in the lookback window)
  *    - Confidence multiplier: min(dataPointCount / MIN_POINTS_FULL_CONFIDENCE, 1.0)
- *    - Final score = weightedAvgCoherence × confidenceMultiplier
- * 5. Pick the bucket with the highest final score.
+ *    - Final score = avgCoherence × confidenceMultiplier
+ * 4. Pick the bucket with the highest final score.
  */
 @Singleton
 class ResonanceRateRecommender @Inject constructor(
@@ -93,8 +84,6 @@ class ResonanceRateRecommender @Inject constructor(
 ) {
     companion object {
         const val LOOKBACK_DAYS = 60
-        /** Exponential decay half-life in days. */
-        const val HALF_LIFE_DAYS = 14.0
         /** Number of data points needed for full confidence (1.0 multiplier). */
         const val MIN_POINTS_FULL_CONFIDENCE = 3
     }
@@ -117,15 +106,12 @@ class ResonanceRateRecommender @Inject constructor(
         assessments.forEach { a ->
             if (a.isValid && a.optimalBpm in 4f..7f) {
                 validAssessmentCount++
-                val ageDays = (nowMs - a.timestamp).toDouble() / (24 * 60 * 60 * 1000)
-                val recencyWeight = recencyWeight(ageDays)
                 dataPoints.add(
                     RateDataPoint(
                         source = DataPointSource.ASSESSMENT,
                         rateBpm = a.optimalBpm,
                         coherenceScore = a.maxCoherenceRatio,
                         timestamp = a.timestamp,
-                        recencyWeight = recencyWeight,
                         label = "Assessment (score %.1f)".format(a.compositeScore)
                     )
                 )
@@ -137,8 +123,6 @@ class ResonanceRateRecommender @Inject constructor(
         sessions.forEach { s ->
             if (s.breathingRateBpm in 4f..7f && s.durationSeconds >= 60) {
                 validSessionCount++
-                val ageDays = (nowMs - s.timestamp).toDouble() / (24 * 60 * 60 * 1000)
-                val recencyWeight = recencyWeight(ageDays)
                 val durationLabel = "%d:%02d".format(s.durationSeconds / 60, s.durationSeconds % 60)
                 dataPoints.add(
                     RateDataPoint(
@@ -146,7 +130,6 @@ class ResonanceRateRecommender @Inject constructor(
                         rateBpm = s.breathingRateBpm,
                         coherenceScore = s.meanCoherenceRatio,
                         timestamp = s.timestamp,
-                        recencyWeight = recencyWeight,
                         label = "Session ($durationLabel)"
                     )
                 )
@@ -169,21 +152,14 @@ class ResonanceRateRecommender @Inject constructor(
         val grouped = dataPoints.groupBy { roundToTenth(it.rateBpm) }
 
         val buckets = grouped.map { (rate, points) ->
-            val rawAvg = points.map { it.coherenceScore }.average().toFloat()
-            val totalWeight = points.sumOf { it.recencyWeight.toDouble() }
-            val weightedAvg = if (totalWeight > 0) {
-                points.sumOf { it.coherenceScore.toDouble() * it.recencyWeight } / totalWeight
-            } else {
-                rawAvg.toDouble()
-            }.toFloat()
+            val avgCoherence = points.map { it.coherenceScore }.average().toFloat()
             val confidence = (points.size.toFloat() / MIN_POINTS_FULL_CONFIDENCE).coerceAtMost(1f)
-            val finalScore = weightedAvg * confidence
+            val finalScore = avgCoherence * confidence
 
             RateBucket(
                 rateBpm = rate,
                 dataPointCount = points.size,
-                rawAvgCoherence = rawAvg,
-                weightedAvgCoherence = weightedAvg,
+                rawAvgCoherence = avgCoherence,
                 confidenceMultiplier = confidence,
                 finalScore = finalScore,
                 isRecommended = false, // set below
@@ -201,8 +177,8 @@ class ResonanceRateRecommender @Inject constructor(
             append("($validAssessmentCount assessments, $validSessionCount sessions) ")
             append("from the last $LOOKBACK_DAYS days.\n\n")
             append("Rates are grouped into 0.1 BPM buckets. Each bucket is scored using ")
-            append("recency-weighted coherence (half-life ${HALF_LIFE_DAYS.toInt()} days) ")
-            append("multiplied by a confidence factor (requires ≥$MIN_POINTS_FULL_CONFIDENCE data points for full confidence).\n\n")
+            append("average coherence multiplied by a confidence factor ")
+            append("(requires ≥$MIN_POINTS_FULL_CONFIDENCE data points for full confidence).\n\n")
             append("Recommended rate: %.2f BPM ".format(bestBucket.rateBpm))
             append("(score: %.2f, %d data points)".format(bestBucket.finalScore, bestBucket.dataPointCount))
         }
@@ -215,11 +191,6 @@ class ResonanceRateRecommender @Inject constructor(
             summaryText = summaryText,
             lookbackDays = LOOKBACK_DAYS
         )
-    }
-
-    /** Exponential decay: weight = 2^(-ageDays / halfLife). */
-    private fun recencyWeight(ageDays: Double): Float {
-        return Math.pow(2.0, -ageDays / HALF_LIFE_DAYS).toFloat()
     }
 
     /** Round to nearest 0.1 BPM. */

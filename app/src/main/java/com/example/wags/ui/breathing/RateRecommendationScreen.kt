@@ -265,8 +265,7 @@ private fun BucketCard(bucket: RateBucket) {
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 BucketMetric("Points", "${bucket.dataPointCount}")
-                BucketMetric("Raw Avg", "%.2f".format(bucket.rawAvgCoherence))
-                BucketMetric("Weighted", "%.2f".format(bucket.weightedAvgCoherence))
+                BucketMetric("Avg Coh", "%.2f".format(bucket.rawAvgCoherence))
                 BucketMetric("Confidence", "%.0f%%".format(bucket.confidenceMultiplier * 100))
             }
 
@@ -301,10 +300,10 @@ private fun BucketCard(bucket: RateBucket) {
                         )
                         Column(horizontalAlignment = Alignment.End) {
                             Text(
-                                text = "coh: %.2f  w: %.2f".format(dp.coherenceScore, dp.recencyWeight),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = RecAsh
-                            )
+                                    text = "coh: %.2f".format(dp.coherenceScore),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = RecAsh
+                                )
                             Text(
                                 text = dateStr,
                                 style = MaterialTheme.typography.labelSmall,
