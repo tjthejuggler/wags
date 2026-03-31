@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.wags.data.ble.AutoConnectManager
 import com.example.wags.data.ble.DevicePreferencesRepository
 import com.example.wags.data.ble.UnifiedDeviceManager
 import com.example.wags.data.garmin.GarminConnectionState
@@ -74,6 +75,7 @@ data class SettingsUiState(
 class SettingsViewModel @Inject constructor(
     private val devicePrefs: DevicePreferencesRepository,
     private val deviceManager: UnifiedDeviceManager,
+    private val autoConnectManager: AutoConnectManager,
     private val habitRepo: HabitIntegrationRepository,
     private val meditationRepository: com.example.wags.data.repository.MeditationRepository,
     private val garminManager: GarminManager,
@@ -159,13 +161,17 @@ class SettingsViewModel @Inject constructor(
      */
     fun connectDevice(device: ScannedDevice) {
         stopScan()
+        autoConnectManager.notifyUserConnect()
         deviceManager.connect(device)
     }
 
     /**
      * Disconnect whichever device is currently connected.
+     * Notifies [AutoConnectManager] to suppress auto-reconnect for 60 s
+     * so the user has time to connect a different device.
      */
     fun disconnectDevice() {
+        autoConnectManager.notifyUserDisconnect()
         deviceManager.disconnect()
     }
 

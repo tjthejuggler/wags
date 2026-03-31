@@ -47,6 +47,25 @@ class AutoConnectManager @Inject constructor(
 
     @Volatile private var reconnectNow = false
 
+    /**
+     * Timestamp (epoch ms) until which auto-reconnect is suppressed.
+     * Set by [notifyUserDisconnect] when the user explicitly disconnects,
+     * so the auto-connect loop doesn't immediately reconnect to the same device.
+     */
+    @Volatile private var cooldownUntil = 0L
+
+    /**
+     * Timestamp (epoch ms) until which the auto-connect loop is completely
+     * suppressed because the **user** explicitly initiated a connection.
+     * While active, the loop will not attempt connections, run stale-connecting
+     * checks, or start background scans — giving the user's connection attempt
+     * full control of the BLE stack.
+     *
+     * Automatically expires after [USER_CONNECT_GRACE_MS] so the loop resumes
+     * if the user's connection silently fails.
+     */
+    @Volatile private var userConnectingUntil = 0L
+
     private val connectMutex = Mutex()
     private var loopJob: Job? = null
     private var connectingSince: Long = 0L
@@ -61,15 +80,21 @@ class AutoConnectManager @Inject constructor(
         // Wire background scan callback for generic devices
         deviceManager.genericBleManager.onKnownDeviceFound = { address ->
             Log.d(TAG, "Background scan found device $address — triggering connect")
-            scope.launch {
-                if (connectMutex.tryLock()) {
-                    try {
-                        connectGenericNow(address)
-                    } finally {
-                        connectMutex.unlock()
+            if (isUserConnecting()) {
+                Log.d(TAG, "User connect in progress — ignoring background scan trigger")
+            } else if (isCooldownActive()) {
+                Log.d(TAG, "User-disconnect cooldown active — ignoring background scan trigger")
+            } else {
+                scope.launch {
+                    if (connectMutex.tryLock()) {
+                        try {
+                            connectGenericNow(address)
+                        } finally {
+                            connectMutex.unlock()
+                        }
+                    } else {
+                        Log.d(TAG, "Connect already in progress — skipping background trigger")
                     }
-                } else {
-                    Log.d(TAG, "Connect already in progress — skipping background trigger")
                 }
             }
         }
@@ -88,6 +113,14 @@ class AutoConnectManager @Inject constructor(
     }
 
     fun onDeviceDisconnected() {
+        if (isUserConnecting()) {
+            Log.d(TAG, "Device disconnected — user connect in progress, NOT waking reconnect loop")
+            return
+        }
+        if (isCooldownActive()) {
+            Log.d(TAG, "Device disconnected — cooldown active, NOT waking reconnect loop")
+            return
+        }
         if (!sessionActive.get()) {
             Log.d(TAG, "Device disconnected — waking reconnect loop")
             reconnectNow = true
@@ -97,6 +130,45 @@ class AutoConnectManager @Inject constructor(
     fun cancel() {
         loopJob?.cancel()
         deviceManager.genericBleManager.stopBackgroundScan()
+    }
+
+    /**
+     * Called when the user explicitly disconnects from the UI.
+     * Suppresses auto-reconnect for [USER_DISCONNECT_COOLDOWN_MS] (60 s).
+     */
+    fun notifyUserDisconnect() {
+        cooldownUntil = System.currentTimeMillis() + USER_DISCONNECT_COOLDOWN_MS
+        Log.d(TAG, "User-initiated disconnect — cooldown for ${USER_DISCONNECT_COOLDOWN_MS / 1000}s")
+    }
+
+    /**
+     * Called when the user explicitly connects to a new device from the UI.
+     * Clears any active cooldown and sets a grace period during which the
+     * auto-connect loop is completely suppressed, giving the user's connection
+     * attempt full control of the BLE stack.
+     */
+    fun notifyUserConnect() {
+        cooldownUntil = 0L
+        userConnectingUntil = System.currentTimeMillis() + USER_CONNECT_GRACE_MS
+        Log.d(TAG, "User-initiated connect — suppressing auto-connect for ${USER_CONNECT_GRACE_MS / 1000}s")
+    }
+
+    /**
+     * Clears the "user connecting" grace period. Called automatically when
+     * the connection succeeds (the loop detects Connected state) or can be
+     * called externally if needed.
+     */
+    fun clearUserConnecting() {
+        userConnectingUntil = 0L
+    }
+
+    private fun isCooldownActive(): Boolean {
+        val remaining = cooldownUntil - System.currentTimeMillis()
+        return remaining > 0
+    }
+
+    private fun isUserConnecting(): Boolean {
+        return userConnectingUntil - System.currentTimeMillis() > 0
     }
 
     // ── Main loop ─────────────────────────────────────────────────────────────
@@ -128,10 +200,23 @@ class AutoConnectManager @Inject constructor(
             // ── 3. Check if already connected ─────────────────────────────────
             val alreadyConnected = deviceManager.connectionState.value is BleConnectionState.Connected
 
+            // If user's connection just succeeded, clear the grace period
+            if (alreadyConnected && isUserConnecting()) {
+                Log.d(TAG, "User's connection succeeded — clearing user-connect grace")
+                clearUserConnecting()
+            }
+
+            // ── 3b. If user is actively connecting, skip everything ───────────
+            if (isUserConnecting()) {
+                Log.d(TAG, "User connect in progress — auto-connect loop sleeping")
+                delay(RECHECK_DISCONNECTED_MS)
+                continue
+            }
+
             // ── 4. Attempt connections if not connected ───────────────────────
             var connected = alreadyConnected
 
-            if (!connected && !sessionActive.get()) {
+            if (!connected && !sessionActive.get() && !isCooldownActive()) {
                 val isConnecting = deviceManager.connectionState.value is BleConnectionState.Connecting
                 val now = System.currentTimeMillis()
 
@@ -178,7 +263,7 @@ class AutoConnectManager @Inject constructor(
 
             // ── 5. Start background scan if not connected ─────────────────────
             val genericAddresses = history.filter { !it.isPolar }.map { it.identifier }
-            if (!connected && genericAddresses.isNotEmpty() && !sessionActive.get()) {
+            if (!connected && genericAddresses.isNotEmpty() && !sessionActive.get() && !isCooldownActive()) {
                 Log.d(TAG, "Not connected — starting background scan for generic devices")
                 deviceManager.genericBleManager.startBackgroundScan(genericAddresses)
             } else {
@@ -298,5 +383,7 @@ class AutoConnectManager @Inject constructor(
         private const val NO_DEVICE_WAIT_MS = 30_000L
         private const val RECHECK_DISCONNECTED_MS = 5_000L
         private const val RECHECK_CONNECTED_MS = 30_000L
+        private const val USER_DISCONNECT_COOLDOWN_MS = 60_000L
+        private const val USER_CONNECT_GRACE_MS = 60_000L
     }
 }
