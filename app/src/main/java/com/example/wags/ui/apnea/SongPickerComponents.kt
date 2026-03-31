@@ -11,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -130,6 +131,7 @@ fun SongPickerDialog(
     isLoading: Boolean,
     selectedSong: SpotifyTrackDetail?,
     loadingSelectedSong: Boolean,
+    songCompletionStatus: Map<String, SongCompletionStatus> = emptyMap(),
     onSongSelected: (SpotifyTrackDetail) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -219,11 +221,15 @@ fun SongPickerDialog(
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             items(sortedSongs, key = { it.cardKey() }) { track ->
+                                val key = "${track.title.lowercase().trim()}|${track.artist.lowercase().trim()}"
+                                val completion = songCompletionStatus[key]
                                 SongCard(
                                     track = track,
                                     isSelected = selectedSong?.cardKey() == track.cardKey(),
                                     isLoading = loadingSelectedSong &&
                                         selectedSong?.cardKey() == track.cardKey(),
+                                    completedEver = completion?.completedEver == true,
+                                    completedWithCurrentSettings = completion?.completedWithCurrentSettings == true,
                                     onClick = { onSongSelected(track) }
                                 )
                             }
@@ -288,13 +294,20 @@ private fun SortChipRow(
 
 /**
  * A compact card representing a single song in the picker.
- * Shows album art, title, artist, and duration. Highlights when selected.
+ * Shows album art, title, artist, duration, and completion checkmarks.
+ *
+ * Checkmarks:
+ * - [completedEver] → bright checkmark (✓) — song was completed during any past free hold.
+ * - [completedWithCurrentSettings] → lighter grey checkmark (✓) — completed with current settings.
+ * A card can show 0, 1, or 2 checkmarks.
  */
 @Composable
 private fun SongCard(
     track: SpotifyTrackDetail,
     isSelected: Boolean,
     isLoading: Boolean,
+    completedEver: Boolean = false,
+    completedWithCurrentSettings: Boolean = false,
     onClick: () -> Unit
 ) {
     val borderColor = if (isSelected) TextSecondary else SurfaceVariant
@@ -372,6 +385,22 @@ private fun SongCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = TextSecondary
                 )
+            }
+
+            // Completion checkmarks — shown to the left of the selected indicator
+            // Bright checkmark = completed during any past free hold
+            // Lighter grey checkmark = completed with current settings
+            if (completedEver || completedWithCurrentSettings) {
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    if (completedEver) {
+                        Text("✓", color = TextPrimary, fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.labelSmall)
+                    }
+                    if (completedWithCurrentSettings) {
+                        Text("✓", color = Color(0xFF888888), fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.labelSmall)
+                    }
+                }
             }
 
             // Selected indicator

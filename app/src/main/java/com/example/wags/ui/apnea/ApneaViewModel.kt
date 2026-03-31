@@ -97,6 +97,8 @@ data class ApneaUiState(
     val lastFreeHoldForSettingsMs: Long = 0L,
     /** recordId of the best free-hold record for the current settings combination (null if none). */
     val bestTimeForSettingsRecordId: Long? = null,
+    /** recordId of the most recent free-hold record for the current settings combination (null if none). */
+    val lastFreeHoldForSettingsRecordId: Long? = null,
     /**
      * The broadest PB category that the current best record holds.
      * Determines how many trophy emojis to show (1–6). Null when no best record exists.
@@ -324,6 +326,17 @@ class ApneaViewModel @Inject constructor(
                     val pos = arr[3] as Posture; val aud = arr[4] as AudioSetting
                     apneaRepository.getLastFreeHold(lv, pt.name, tod.name, pos.name, aud.name).collect { last ->
                         _uiState.update { it.copy(lastFreeHoldForSettingsMs = last ?: 0L) }
+                    }
+                }
+        }
+        // Whenever any setting changes, re-subscribe to last free-hold record-id query
+        viewModelScope.launch {
+            combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud -> arrayOf(lv, pt, tod, pos, aud) }
+                .collectLatest { arr ->
+                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as TimeOfDay
+                    val pos = arr[3] as Posture; val aud = arr[4] as AudioSetting
+                    apneaRepository.getLastFreeHoldRecordId(lv, pt.name, tod.name, pos.name, aud.name).collect { id ->
+                        _uiState.update { it.copy(lastFreeHoldForSettingsRecordId = id) }
                     }
                 }
         }

@@ -5,6 +5,32 @@
 ## Changelog
 
 
+### 2026-03-31 — Free Hold UX improvements: clickable "last" time & song completion checkmarks
+
+**New: "last" time is clickable in the Free Hold collapsible section** ([`ApneaScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaScreen.kt))
+- The "last: X:XX" text shown beneath the personal best in the Free Hold card on the main Apnea screen is now clickable. Tapping it navigates to the record detail screen for that hold.
+- Added `getLastFreeHoldRecordId` DAO query and repository method to fetch the record ID of the most recent free hold for the current 5-setting combination.
+- Added `lastFreeHoldForSettingsRecordId` to the ViewModel state with a reactive subscription that updates whenever settings change.
+
+**New: song completion checkmarks in the Free Hold song picker** ([`SongPickerComponents.kt`](app/src/main/java/com/example/wags/ui/apnea/SongPickerComponents.kt))
+- Each song card in the Free Hold song picker now shows completion checkmarks:
+  - **Bright checkmark (✓)**: The user has completed a free hold whose duration ≥ the song's duration while that song was playing (any settings).
+  - **Lighter grey checkmark (✓)**: The same, but specifically with the current 5-setting combination.
+  - A card can show 0, 1, or 2 checkmarks depending on completion history.
+- Added `wasSongCompletedEver` and `wasSongCompletedWithSettings` DAO queries that join `apnea_song_log` with `apnea_records` and check the song's actual play time (`endedAtMs - startedAtMs >= songDurationMs`). Songs still playing when the hold ended (`endedAtMs IS NULL`) are not considered completed.
+- Completion status is computed when songs are loaded and stored in a `songCompletionStatus` map in the UI state.
+
+#### Files Changed
+- **Modified**: [`ApneaRecordDao.kt`](app/src/main/java/com/example/wags/data/db/dao/ApneaRecordDao.kt) — Added `getLastFreeHoldRecordId` Flow query
+- **Modified**: [`ApneaSongLogDao.kt`](app/src/main/java/com/example/wags/data/db/dao/ApneaSongLogDao.kt) — Added `wasSongCompletedEver` and `wasSongCompletedWithSettings` queries
+- **Modified**: [`ApneaRepository.kt`](app/src/main/java/com/example/wags/data/repository/ApneaRepository.kt) — Added `getLastFreeHoldRecordId`, `wasSongCompletedEver`, `wasSongCompletedWithSettings` methods
+- **Modified**: [`ApneaViewModel.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaViewModel.kt) — Added `lastFreeHoldForSettingsRecordId` state + reactive subscription
+- **Modified**: [`ApneaScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaScreen.kt) — `FreeHoldContent` now accepts `lastTimeRecordId` + `onLastTimeClick`; "last" text is clickable
+- **Modified**: [`FreeHoldActiveScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/FreeHoldActiveScreen.kt) — Added `SongCompletionStatus` data class, `songCompletionStatus` in UI state, completion computation in `loadPreviousSongs()`
+- **Modified**: [`SongPickerComponents.kt`](app/src/main/java/com/example/wags/ui/apnea/SongPickerComponents.kt) — `SongPickerDialog` accepts `songCompletionStatus`; `SongCard` shows completion checkmarks
+
+---
+
 ### 2026-03-30 — Apnea settings summary banner on active session screens
 
 **New: settings summary banner on all apnea active screens** ([`ApneaSettingsSummaryBanner.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaSettingsSummaryBanner.kt))

@@ -88,6 +88,20 @@ internal object PhysiologicalBounds {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Song completion status
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Tracks whether a song was completed (hold duration >= song duration) during free holds.
+ * @property completedEver true if the song was completed during any past free hold.
+ * @property completedWithCurrentSettings true if completed with the current 5-setting combination.
+ */
+data class SongCompletionStatus(
+    val completedEver: Boolean = false,
+    val completedWithCurrentSettings: Boolean = false
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ViewModel
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -112,6 +126,11 @@ data class FreeHoldActiveUiState(
     val previousSongs: List<SpotifyTrackDetail> = emptyList(),
     /** True while previous songs are being loaded. */
     val loadingSongs: Boolean = false,
+    /**
+     * Song completion status keyed by title+artist (lowercase, trimmed).
+     * Value: [SongCompletionStatus] indicating whether the song was completed ever / with current settings.
+     */
+    val songCompletionStatus: Map<String, SongCompletionStatus> = emptyMap(),
     /** The song the user selected from the picker (will be loaded into Spotify on Start). */
     val selectedSong: SpotifyTrackDetail? = null,
     /** True while a selected song is being loaded into Spotify playback. */
@@ -351,7 +370,33 @@ class FreeHoldActiveViewModel @Inject constructor(
             }
             // Final dedup by title+artist after API enrichment (same track may
             // have been stored with different URIs or one with/without URI)
-            _uiState.update { it.copy(previousSongs = deduplicateTracks(details), loadingSongs = false) }
+            val dedupedSongs = deduplicateTracks(details)
+
+            // Compute completion status for each song
+            val completionMap = mutableMapOf<String, SongCompletionStatus>()
+            for (track in dedupedSongs) {
+                if (track.durationMs <= 0L) continue // can't check without duration
+                val key = "${track.title.lowercase().trim()}|${track.artist.lowercase().trim()}"
+                val ever = apneaRepository.wasSongCompletedEver(
+                    track.title, track.artist, track.durationMs
+                )
+                val withSettings = apneaRepository.wasSongCompletedWithSettings(
+                    track.title, track.artist, track.durationMs,
+                    lungVolume, prepType, timeOfDay, posture, audio
+                )
+                completionMap[key] = SongCompletionStatus(
+                    completedEver = ever,
+                    completedWithCurrentSettings = withSettings
+                )
+            }
+
+            _uiState.update {
+                it.copy(
+                    previousSongs = dedupedSongs,
+                    songCompletionStatus = completionMap,
+                    loadingSongs = false
+                )
+            }
         }
     }
 
@@ -660,6 +705,7 @@ fun FreeHoldActiveScreen(
                 isLoading = state.loadingSongs,
                 selectedSong = state.selectedSong,
                 loadingSelectedSong = state.loadingSelectedSong,
+                songCompletionStatus = state.songCompletionStatus,
                 onSongSelected = { track ->
                     viewModel.selectSong(track)
                 },

@@ -203,6 +203,25 @@ interface ApneaRecordDao {
         audio: String
     ): Flow<Long?>
 
+    /** recordId of the most recent free-hold for a given 5-setting combination. */
+    @Query("""
+        SELECT recordId FROM apnea_records
+        WHERE lungVolume = :lungVolume
+          AND prepType   = :prepType
+          AND timeOfDay  = :timeOfDay
+          AND posture    = :posture
+          AND audio      = :audio
+          AND tableType IS NULL
+        ORDER BY timestamp DESC LIMIT 1
+    """)
+    fun getLastFreeHoldRecordId(
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        posture: String,
+        audio: String
+    ): Flow<Long?>
+
     /** One-shot (suspend) best free-hold duration for a given 5-setting combination. */
     @Query("""
         SELECT MAX(durationMs) FROM apnea_records

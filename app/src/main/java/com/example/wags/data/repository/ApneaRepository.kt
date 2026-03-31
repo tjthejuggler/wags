@@ -104,6 +104,16 @@ class ApneaRepository @Inject constructor(
     ): Flow<Long?> =
         dao.getBestFreeHoldRecordId(lungVolume, prepType, timeOfDay, posture, audio)
 
+    /** recordId of the most recent free-hold for the current 5-setting combination. */
+    fun getLastFreeHoldRecordId(
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        posture: String,
+        audio: String
+    ): Flow<Long?> =
+        dao.getLastFreeHoldRecordId(lungVolume, prepType, timeOfDay, posture, audio)
+
     // ── Broader personal-best queries (one-shot, for PB celebration) ──────────
 
     /** Best free-hold across ALL settings (global PB). */
@@ -741,6 +751,35 @@ class ApneaRepository @Inject constructor(
 
     /** Deletes all song log entries (clears the song picker history). */
     suspend fun clearSongHistory() = songLogDao.deleteAll()
+
+    /**
+     * Returns true if the user has ever completed a free hold whose duration >= [songDurationMs]
+     * while the given song (by title+artist) was playing.
+     */
+    suspend fun wasSongCompletedEver(title: String, artist: String, songDurationMs: Long): Boolean =
+        withContext(ioDispatcher) {
+            songLogDao.wasSongCompletedEver(title, artist, songDurationMs) == 1
+        }
+
+    /**
+     * Returns true if the user has completed a free hold whose duration >= [songDurationMs]
+     * while the given song was playing, using the specified 5-setting combination.
+     */
+    suspend fun wasSongCompletedWithSettings(
+        title: String,
+        artist: String,
+        songDurationMs: Long,
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        posture: String,
+        audio: String
+    ): Boolean = withContext(ioDispatcher) {
+        songLogDao.wasSongCompletedWithSettings(
+            title, artist, songDurationMs,
+            lungVolume, prepType, timeOfDay, posture, audio
+        ) == 1
+    }
 
     // ── Stats (filtered by 5 settings) ───────────────────────────────────────
 

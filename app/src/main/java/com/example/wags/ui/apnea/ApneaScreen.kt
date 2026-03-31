@@ -169,6 +169,7 @@ fun ApneaScreen(
                         bestTimeMs         = state.bestTimeForSettingsMs,
                         lastTimeMs         = state.lastFreeHoldForSettingsMs,
                         bestTimeRecordId   = state.bestTimeForSettingsRecordId,
+                        lastTimeRecordId   = state.lastFreeHoldForSettingsRecordId,
                         bestTimeTrophyCategory = state.bestTimeTrophyCategory,
                         showTimer = state.showTimer,
                         onShowTimerChange = { viewModel.setShowTimer(it) },
@@ -185,6 +186,9 @@ fun ApneaScreen(
                             )
                         },
                         onBestTimeClick = { recordId ->
+                            navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
+                        },
+                        onLastTimeClick = { recordId ->
                             navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
                         },
                         onTrophyClick = {
@@ -689,11 +693,13 @@ private fun FreeHoldContent(
     bestTimeMs: Long,
     lastTimeMs: Long,
     bestTimeRecordId: Long?,
+    lastTimeRecordId: Long?,
     bestTimeTrophyCategory: PersonalBestCategory?,
     showTimer: Boolean,
     onShowTimerChange: (Boolean) -> Unit,
     onStartHold: () -> Unit,
     onBestTimeClick: (Long) -> Unit = {},
+    onLastTimeClick: (Long) -> Unit = {},
     onTrophyClick: () -> Unit = {}
 ) {
     Column(
@@ -741,24 +747,32 @@ private fun FreeHoldContent(
                             Modifier
                     )
                 }
-                // Last hold for these settings — smaller, beneath the best time
+                // Last hold for these settings — smaller, beneath the best time; clickable → detail
                 val displayLast = if (freeHoldDurationMs > 0L) freeHoldDurationMs else lastTimeMs
                 if (displayLast > 0L) {
                     Text(
                         "last: ${formatMs(displayLast)}",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = TextSecondary
+                        color = TextSecondary,
+                        modifier = if (lastTimeRecordId != null)
+                            Modifier.clickable { onLastTimeClick(lastTimeRecordId) }
+                        else
+                            Modifier
                     )
                 }
             }
         } else {
-            // No best time yet — still show last hold if available
+            // No best time yet — still show last hold if available; clickable → detail
             val displayLast = if (freeHoldDurationMs > 0L) freeHoldDurationMs else lastTimeMs
             if (displayLast > 0L) {
                 Text(
                     "last: ${formatMs(displayLast)}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary
+                    color = TextSecondary,
+                    modifier = if (lastTimeRecordId != null)
+                        Modifier.clickable { onLastTimeClick(lastTimeRecordId) }
+                    else
+                        Modifier
                 )
             }
         }
