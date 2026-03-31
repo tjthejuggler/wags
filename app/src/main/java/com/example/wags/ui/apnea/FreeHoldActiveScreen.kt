@@ -40,6 +40,8 @@ import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.SpotifySong
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
+import com.example.wags.ui.common.AdviceBanner
+import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.common.SessionBackHandler
@@ -726,6 +728,11 @@ fun FreeHoldActiveScreen(
                 posture    = viewModel.posture,
                 audio      = viewModel.audio
             )
+
+            // Hyperventilating advice — shown only when prep type is HYPER
+            if (viewModel.prepType == PrepType.HYPER.name) {
+                AdviceBanner(section = AdviceSection.APNEA_HYPER)
+            }
 
             // Now-playing banner — shown when MUSIC is selected and a song is detected
             if (state.freeHoldActive && state.nowPlayingSong != null) {

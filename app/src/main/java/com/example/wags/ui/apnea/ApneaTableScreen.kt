@@ -15,7 +15,10 @@ import androidx.navigation.NavController
 import com.example.wags.domain.model.ApneaTableStep
 import com.example.wags.domain.model.ApneaTableType
 import com.example.wags.domain.model.AudioSetting
+import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.usecase.apnea.ApneaState
+import com.example.wags.ui.common.AdviceBanner
+import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.InfoHelpBubble
 import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.SessionBackHandler
@@ -99,6 +102,12 @@ fun ApneaTableScreen(
                             posture    = state.posture.name,
                             audio      = state.audio.name
                         )
+                    }
+                    // Hyperventilating advice — shown only when prep type is HYPER
+                    if (state.prepType == PrepType.HYPER) {
+                        item {
+                            AdviceBanner(section = AdviceSection.APNEA_HYPER)
+                        }
                     }
                     item {
                         SessionStatusCard(

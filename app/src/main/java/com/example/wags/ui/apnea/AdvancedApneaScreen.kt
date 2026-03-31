@@ -14,11 +14,14 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TrainingModality
 import com.example.wags.domain.model.TableLength
 import com.example.wags.domain.model.WonkaConfig
 import com.example.wags.domain.usecase.apnea.AdvancedApneaPhase
 import com.example.wags.domain.usecase.apnea.AdvancedApneaState
+import com.example.wags.ui.common.AdviceBanner
+import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.theme.*
@@ -101,6 +104,11 @@ fun AdvancedApneaScreen(
                 posture    = uiState.posture,
                 audio      = uiState.audio
             )
+
+            // Hyperventilating advice — shown only when prep type is HYPER
+            if (uiState.prepType == PrepType.HYPER.name) {
+                AdviceBanner(section = AdviceSection.APNEA_HYPER)
+            }
 
             // Song picker — shown when MUSIC mode + Spotify connected + session not yet started
             if (uiState.isMusicMode && uiState.spotifyConnected && state.phase == AdvancedApneaPhase.IDLE) {

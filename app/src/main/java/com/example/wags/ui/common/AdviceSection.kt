@@ -1,12 +1,13 @@
 package com.example.wags.ui.common
 
 /**
- * String constants for the five advice sections.
+ * String constants for the advice sections.
  * These match the `section` column stored in the `advice` table.
  */
 object AdviceSection {
     const val HOME = "home"
     const val APNEA = "apnea"
+    const val APNEA_HYPER = "apnea_hyper"
     const val BREATHING = "breathing"
     const val READINESS = "readiness"
     const val MORNING = "morning"
@@ -16,6 +17,7 @@ object AdviceSection {
     fun label(section: String): String = when (section) {
         HOME -> "Home"
         APNEA -> "Apnea Training"
+        APNEA_HYPER -> "Apnea – Hyperventilating"
         BREATHING -> "Resonance Breathing"
         READINESS -> "HRV Readiness"
         MORNING -> "Morning Readiness"
@@ -24,5 +26,5 @@ object AdviceSection {
     }
 
     /** All sections in display order. */
-    val all = listOf(HOME, APNEA, BREATHING, READINESS, MORNING, MEDITATION)
+    val all = listOf(HOME, APNEA, APNEA_HYPER, BREATHING, READINESS, MORNING, MEDITATION)
 }

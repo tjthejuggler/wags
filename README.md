@@ -5,6 +5,22 @@
 ## Changelog
 
 
+### 2026-03-31 — Apnea hyperventilating advice subcategory
+
+**New: "Apnea – Hyperventilating" advice section** ([`AdviceSection.kt`](app/src/main/java/com/example/wags/ui/common/AdviceSection.kt))
+- Added a new `APNEA_HYPER` advice section specifically for hyperventilating reminders/tips.
+- This advice is shown as an `AdviceBanner` on the **Free Hold** active screen, **O₂/CO₂ Table** screen, and **Advanced Apnea** screen — but **only when the prep type setting is set to "Hyper"**.
+- The banner appears just below the settings summary banner, identical in behavior to how advice banners work on all other screens (swipe left/right to cycle, randomized on entry).
+- The new section automatically appears in the **Settings → Advice** card for managing advice items, since the settings screen iterates `AdviceSection.all`.
+
+#### Files Changed
+- **Modified**: [`AdviceSection.kt`](app/src/main/java/com/example/wags/ui/common/AdviceSection.kt) — Added `APNEA_HYPER` constant, label, and included it in `all` list
+- **Modified**: [`FreeHoldActiveScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/FreeHoldActiveScreen.kt) — Added conditional `AdviceBanner` for `APNEA_HYPER` when prepType is HYPER
+- **Modified**: [`ApneaTableScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaTableScreen.kt) — Added conditional `AdviceBanner` for `APNEA_HYPER` when prepType is HYPER
+- **Modified**: [`AdvancedApneaScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/AdvancedApneaScreen.kt) — Added conditional `AdviceBanner` for `APNEA_HYPER` when prepType is HYPER
+
+---
+
 ### 2026-03-31 — Free Hold UX improvements: clickable "last" time & song completion checkmarks
 
 **New: "last" time is clickable in the Free Hold collapsible section** ([`ApneaScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaScreen.kt))
