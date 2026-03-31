@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.math.roundToInt
 
 // ---------------------------------------------------------------------------
 // Enums
@@ -404,35 +405,75 @@ class RfAssessmentOrchestrator @Inject constructor(
     // -----------------------------------------------------------------------
 
     /**
+     * Picks a random period offset for this session: one of
+     * {-0.9, -0.8, … -0.1, 0.0, 0.1, … 0.8, 0.9} seconds.
+     *
+     * Applied to every rate's breath-cycle period so that repeated
+     * assessments don't always test the exact same BPM values.
+     */
+    private fun randomPeriodOffsetSec(): Float {
+        // 19 possible values: -9..+9 tenths → -0.9..+0.9 seconds
+        val tenths = (-9..9).random()
+        return tenths / 10f
+    }
+
+    /**
+     * Converts a BPM rate to its breath-cycle period in seconds,
+     * adds [offsetSec], then converts back to BPM.
+     * Clamps the result to a safe range (3.0–8.0 BPM).
+     */
+    private fun offsetBpm(baseBpm: Float, offsetSec: Float): Float {
+        val periodSec = 60f / baseBpm + offsetSec
+        if (periodSec <= 0f) return baseBpm          // safety guard
+        val newBpm = 60f / periodSec
+        // Round to nearest 0.01 to avoid floating-point noise
+        return ((newBpm * 100f).roundToInt() / 100f).coerceIn(3.0f, 8.0f)
+    }
+
+    /**
      * Returns (grid, testDurationMs, washoutDurationMs).
      * Grid is a list of (rateBpm, ieRatio) pairs.
      *
      * All stepped protocols shuffle their rate order so that repeated
      * assessments don't always test the same rate first. EXPRESS draws
      * 5 rates from a larger pool for better long-term coverage.
+     *
+     * A random period offset (±0.9 s) is applied to every rate so that
+     * successive sessions sample slightly different breathing frequencies.
      */
     private fun protocolParams(
         protocol: RfProtocol,
         optimalBpm: Float
-    ): Triple<List<Pair<Float, Float>>, Long, Long> = when (protocol) {
-        RfProtocol.EXPRESS    -> Triple(
-            EXPRESS_POOL_BPM.shuffled().take(5).map { it to 1.0f },
-            60_000L, 30_000L
-        )
-        RfProtocol.STANDARD   -> Triple(
-            STANDARD_RATES_BPM.shuffled().map { it to 1.0f },
-            120_000L, 60_000L
-        )
-        RfProtocol.DEEP       -> Triple(DEEP_GRID.shuffled(), 180_000L, 60_000L)
-        RfProtocol.TARGETED   -> Triple(
-            listOf(optimalBpm to 1.0f, optimalBpm + 0.1f to 1.0f, optimalBpm - 0.1f to 1.0f).shuffled(),
-            180_000L, 60_000L
-        )
-        RfProtocol.CONTINUOUS -> Triple(
-            STANDARD_RATES_BPM.shuffled().map { it to 1.0f },
-            120_000L, 0L
-        )
-        RfProtocol.SLIDING_WINDOW -> Triple(emptyList(), 0L, 0L) // handled separately
+    ): Triple<List<Pair<Float, Float>>, Long, Long> {
+        val offset = randomPeriodOffsetSec()
+
+        return when (protocol) {
+            RfProtocol.EXPRESS -> Triple(
+                EXPRESS_POOL_BPM.shuffled().take(5).map { offsetBpm(it, offset) to 1.0f },
+                60_000L, 30_000L
+            )
+            RfProtocol.STANDARD -> Triple(
+                STANDARD_RATES_BPM.shuffled().map { offsetBpm(it, offset) to 1.0f },
+                120_000L, 60_000L
+            )
+            RfProtocol.DEEP -> Triple(
+                DEEP_GRID.shuffled().map { (bpm, ie) -> offsetBpm(bpm, offset) to ie },
+                180_000L, 60_000L
+            )
+            RfProtocol.TARGETED -> Triple(
+                listOf(
+                    offsetBpm(optimalBpm, offset) to 1.0f,
+                    offsetBpm(optimalBpm + 0.1f, offset) to 1.0f,
+                    offsetBpm(optimalBpm - 0.1f, offset) to 1.0f
+                ).shuffled(),
+                180_000L, 60_000L
+            )
+            RfProtocol.CONTINUOUS -> Triple(
+                STANDARD_RATES_BPM.shuffled().map { offsetBpm(it, offset) to 1.0f },
+                120_000L, 0L
+            )
+            RfProtocol.SLIDING_WINDOW -> Triple(emptyList(), 0L, 0L) // handled separately
+        }
     }
 
     // -----------------------------------------------------------------------

@@ -11,6 +11,7 @@ import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.data.repository.RfAssessmentRepository
 import com.example.wags.domain.usecase.breathing.CoherenceScoreCalculator
 import com.example.wags.domain.usecase.breathing.ContinuousPacerEngine
+import com.example.wags.domain.usecase.breathing.ResonanceRateRecommender
 import com.example.wags.domain.usecase.breathing.RfAssessmentOrchestrator
 import com.example.wags.domain.usecase.breathing.RfEpochResult
 import com.example.wags.domain.usecase.breathing.RfOrchestratorState
@@ -40,6 +41,7 @@ class AssessmentRunViewModel @Inject constructor(
     private val coherenceCalc: CoherenceScoreCalculator,
     private val artifactCorrection: ArtifactCorrectionUseCase,
     private val timeDomainCalc: TimeDomainHrvCalculator,
+    private val rateRecommender: ResonanceRateRecommender,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -97,7 +99,21 @@ class AssessmentRunViewModel @Inject constructor(
 
     init {
         pacerEngine.reset()
-        orchestrator.start(protocol = protocol, scope = viewModelScope)
+        // For TARGETED protocol, fetch the current recommendation first so the
+        // orchestrator centers its fine-tune sweep on the recommended rate.
+        if (protocol == RfProtocol.TARGETED) {
+            viewModelScope.launch {
+                val recommendation = rateRecommender.recommend()
+                val optimalBpm = recommendation.recommendedBpm ?: 5.5f
+                orchestrator.start(
+                    protocol = protocol,
+                    scope = viewModelScope,
+                    optimalBpm = optimalBpm
+                )
+            }
+        } else {
+            orchestrator.start(protocol = protocol, scope = viewModelScope)
+        }
         collectOrchestratorState()
         startRrPolling()
         startPacerLoop()

@@ -5,6 +5,24 @@
 ## Changelog
 
 
+### 2026-03-31 — RF Assessment: random period offset & recommendation-based Targeted sweep
+
+**Improved: random period offset for assessment rate diversity** ([`RfAssessmentOrchestrator.kt`](app/src/main/java/com/example/wags/domain/usecase/breathing/RfAssessmentOrchestrator.kt))
+- Assessment rates are normally on full/half-second breath periods (e.g. 5.0, 5.5, 6.0 BPM). To avoid always testing the exact same frequencies, each session now picks a random offset from {-0.9, -0.8, … -0.1, 0.0, +0.1, … +0.8, +0.9} seconds and applies it to every rate's breath-cycle period before converting back to BPM.
+- The offset is chosen once per session and applied uniformly to all rates, preserving the relative spacing between test points while shifting the entire grid slightly.
+- Applies to all stepped protocols: EXPRESS, STANDARD, DEEP, TARGETED, and CONTINUOUS. The SLIDING_WINDOW protocol is unaffected (it uses a continuous chirp sweep).
+- New helper methods: `randomPeriodOffsetSec()` picks the offset, `offsetBpm()` converts BPM→period, adds offset, converts back, and clamps to 3.0–8.0 BPM.
+
+**Improved: Targeted assessment uses current recommendation** ([`AssessmentRunViewModel.kt`](app/src/main/java/com/example/wags/ui/breathing/AssessmentRunViewModel.kt))
+- The TARGETED protocol's fine-tune sweep (optimal ±0.1 BPM) now centers on the current recommended rate from `ResonanceRateRecommender` instead of the hardcoded 5.5 BPM default.
+- On TARGETED protocol start, the ViewModel fetches the recommendation asynchronously and passes `optimalBpm` to the orchestrator. Falls back to 5.5 BPM if no recommendation is available.
+
+#### Files Changed
+- **Modified**: [`RfAssessmentOrchestrator.kt`](app/src/main/java/com/example/wags/domain/usecase/breathing/RfAssessmentOrchestrator.kt) — Added `randomPeriodOffsetSec()`, `offsetBpm()`, applied offset in `protocolParams()` for all stepped protocols
+- **Modified**: [`AssessmentRunViewModel.kt`](app/src/main/java/com/example/wags/ui/breathing/AssessmentRunViewModel.kt) — Injected `ResonanceRateRecommender`, fetch recommendation for TARGETED protocol before starting orchestrator
+
+---
+
 ### 2026-03-31 — Guided Hyperventilation for Free Hold
 
 **New: Guided Hyperventilation countdown before free holds** ([`FreeHoldActiveScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/FreeHoldActiveScreen.kt), [`GuidedHyperCountdownDialog.kt`](app/src/main/java/com/example/wags/ui/apnea/GuidedHyperCountdownDialog.kt))
