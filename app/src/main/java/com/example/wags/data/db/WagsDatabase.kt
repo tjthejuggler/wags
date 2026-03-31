@@ -27,7 +27,7 @@ import com.example.wags.data.db.entity.*
         ApneaSongLogEntity::class,
         ResonanceSessionEntity::class
     ],
-    version = 23,
+    version = 24,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -682,6 +682,21 @@ abstract class WagsDatabase : RoomDatabase() {
             val MIGRATION_22_23 = object : Migration(22, 23) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE meditation_sessions ADD COLUMN posture TEXT NOT NULL DEFAULT 'LAYING'")
+                }
+            }
+
+            /**
+             * v23 → v24: Add guided hyperventilation columns to apnea_records.
+             * Stores whether the user used guided hyperventilation and the durations
+             * for each phase (relaxed exhale, purge exhale, transition).
+             * Existing records default to not-guided (0) with NULL durations.
+             */
+            val MIGRATION_23_24 = object : Migration(23, 24) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE apnea_records ADD COLUMN guidedHyper INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE apnea_records ADD COLUMN guidedRelaxedExhaleSec INTEGER DEFAULT NULL")
+                    db.execSQL("ALTER TABLE apnea_records ADD COLUMN guidedPurgeExhaleSec INTEGER DEFAULT NULL")
+                    db.execSQL("ALTER TABLE apnea_records ADD COLUMN guidedTransitionSec INTEGER DEFAULT NULL")
                 }
             }
         }

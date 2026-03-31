@@ -5,6 +5,27 @@
 ## Changelog
 
 
+### 2026-03-31 — Guided Hyperventilation for Free Hold
+
+**New: Guided Hyperventilation countdown before free holds** ([`FreeHoldActiveScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/FreeHoldActiveScreen.kt), [`GuidedHyperCountdownDialog.kt`](app/src/main/java/com/example/wags/ui/apnea/GuidedHyperCountdownDialog.kt))
+
+When the prep type is set to **HYPER**, a new "Guided Hyperventilation" section appears above the start button on the free hold screen:
+- **Checkbox**: "Guided Hyperventilation" — when checked, three numeric inputs appear for configuring phase durations (in seconds): Relaxed Exhale, Purge Exhale, and Transition.
+- **Persistent settings**: All three durations and the checkbox state are saved to `SharedPreferences` (`apnea_prefs`) so they persist across sessions.
+- **Start button**: When guided hyper is enabled, the large START button shows "START" with "HYPER" underneath. Tapping it launches a full-screen countdown dialog instead of immediately starting the hold.
+- **Countdown dialog**: Shows a circular countdown timer for each non-zero phase sequentially. The circle rim shrinks as the countdown progresses, with the remaining seconds displayed in the centre. Phases with 0 seconds are skipped.
+- **After countdown**: The dialog closes and the start button reverts to plain "START" — the user taps it to begin the actual breath hold when ready.
+- **Data recording**: When a hold is saved, the record includes whether guided hyperventilation was used and the three phase durations.
+- **Database**: Added 4 new columns to `apnea_records` (`guidedHyper`, `guidedRelaxedExhaleSec`, `guidedPurgeExhaleSec`, `guidedTransitionSec`) with migration v23→v24.
+
+#### Files Changed
+- **Created**: [`GuidedHyperCountdownDialog.kt`](app/src/main/java/com/example/wags/ui/apnea/GuidedHyperCountdownDialog.kt) — Circular countdown dialog with sequential phase timers
+- **Modified**: [`FreeHoldActiveScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/FreeHoldActiveScreen.kt) — Added guided hyper UI state, checkbox/inputs section, countdown flow, start button text, save logic
+- **Modified**: [`ApneaRecordEntity.kt`](app/src/main/java/com/example/wags/data/db/entity/ApneaRecordEntity.kt) — Added `guidedHyper`, `guidedRelaxedExhaleSec`, `guidedPurgeExhaleSec`, `guidedTransitionSec` columns
+- **Modified**: [`WagsDatabase.kt`](app/src/main/java/com/example/wags/data/db/WagsDatabase.kt) — Bumped version to 24, added `MIGRATION_23_24`
+- **Modified**: [`DatabaseModule.kt`](app/src/main/java/com/example/wags/di/DatabaseModule.kt) — Registered `MIGRATION_23_24`
+
+
 ### 2026-03-31 — Apnea hyperventilating advice subcategory
 
 **New: "Apnea – Hyperventilating" advice section** ([`AdviceSection.kt`](app/src/main/java/com/example/wags/ui/common/AdviceSection.kt))

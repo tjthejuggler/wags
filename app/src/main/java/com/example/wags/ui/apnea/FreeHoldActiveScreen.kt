@@ -1,19 +1,26 @@
 package com.example.wags.ui.apnea
 
 import android.util.Log
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import android.content.SharedPreferences
 import androidx.lifecycle.SavedStateHandle
@@ -136,7 +143,22 @@ data class FreeHoldActiveUiState(
     /** The song the user selected from the picker (will be loaded into Spotify on Start). */
     val selectedSong: SpotifyTrackDetail? = null,
     /** True while a selected song is being loaded into Spotify playback. */
-    val loadingSelectedSong: Boolean = false
+    val loadingSelectedSong: Boolean = false,
+    // ── Guided hyperventilation ──────────────────────────────────────────────
+    /** True when the prep type is HYPER — controls whether the guided hyper section is shown. */
+    val isHyperPrep: Boolean = false,
+    /** True when the user has checked the "Guided Hyperventilation" checkbox. */
+    val guidedHyperEnabled: Boolean = false,
+    /** Relaxed exhale phase duration in seconds. */
+    val guidedRelaxedExhaleSec: Int = 0,
+    /** Purge exhale phase duration in seconds. */
+    val guidedPurgeExhaleSec: Int = 0,
+    /** Transition phase duration in seconds. */
+    val guidedTransitionSec: Int = 0,
+    /** True while the guided hyper countdown dialog is showing. */
+    val showGuidedCountdown: Boolean = false,
+    /** True after the guided countdown has completed — button reverts to plain START. */
+    val guidedCountdownComplete: Boolean = false
 )
 
 @HiltViewModel
@@ -161,11 +183,17 @@ class FreeHoldActiveViewModel @Inject constructor(
     val audio: String      = savedStateHandle.get<String>("audio")      ?: AudioSetting.SILENCE.name
 
     private val isMusicMode = audio == AudioSetting.MUSIC.name
+    private val isHyperPrep = prepType == PrepType.HYPER.name
 
     private val _uiState = MutableStateFlow(
         FreeHoldActiveUiState(
             showTimer = savedStateHandle.get<Boolean>("showTimer") ?: true,
-            isMusicMode = isMusicMode
+            isMusicMode = isMusicMode,
+            isHyperPrep = isHyperPrep,
+            guidedHyperEnabled = if (isHyperPrep) prefs.getBoolean("guided_hyper_enabled", false) else false,
+            guidedRelaxedExhaleSec = prefs.getInt("guided_relaxed_exhale_sec", 0),
+            guidedPurgeExhaleSec = prefs.getInt("guided_purge_exhale_sec", 0),
+            guidedTransitionSec = prefs.getInt("guided_transition_sec", 0)
         )
     )
 
@@ -193,9 +221,40 @@ class FreeHoldActiveViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = FreeHoldActiveUiState(
             showTimer = savedStateHandle.get<Boolean>("showTimer") ?: true,
-            isMusicMode = isMusicMode
+            isMusicMode = isMusicMode,
+            isHyperPrep = isHyperPrep
         )
     )
+
+    // ── Guided hyperventilation ──────────────────────────────────────────────
+
+    fun setGuidedHyperEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(guidedHyperEnabled = enabled, guidedCountdownComplete = false) }
+        prefs.edit().putBoolean("guided_hyper_enabled", enabled).apply()
+    }
+
+    fun setGuidedRelaxedExhaleSec(sec: Int) {
+        _uiState.update { it.copy(guidedRelaxedExhaleSec = sec) }
+        prefs.edit().putInt("guided_relaxed_exhale_sec", sec).apply()
+    }
+
+    fun setGuidedPurgeExhaleSec(sec: Int) {
+        _uiState.update { it.copy(guidedPurgeExhaleSec = sec) }
+        prefs.edit().putInt("guided_purge_exhale_sec", sec).apply()
+    }
+
+    fun setGuidedTransitionSec(sec: Int) {
+        _uiState.update { it.copy(guidedTransitionSec = sec) }
+        prefs.edit().putInt("guided_transition_sec", sec).apply()
+    }
+
+    fun showGuidedCountdown() {
+        _uiState.update { it.copy(showGuidedCountdown = true) }
+    }
+
+    fun onGuidedCountdownComplete() {
+        _uiState.update { it.copy(showGuidedCountdown = false, guidedCountdownComplete = true) }
+    }
 
     private var freeHoldStartTime = 0L
     private val oximeterSamples = mutableListOf<Pair<Long, OximeterReading>>()
@@ -536,22 +595,30 @@ class FreeHoldActiveViewModel @Inject constructor(
 
             val now = System.currentTimeMillis()
 
+            // Capture guided hyper state at save time
+            val guidedState = _uiState.value
+            val wasGuided = guidedState.guidedHyperEnabled && isHyperPrep
+
             // Use the settings that were baked in at navigation time — guaranteed correct
             val recordId = apneaRepository.saveRecord(
                 ApneaRecordEntity(
-                    timestamp          = now,
-                    durationMs         = durationMs,
-                    lungVolume         = lungVolume,
-                    prepType           = prepType,
-                    timeOfDay          = timeOfDay,
-                    posture            = posture,
-                    audio              = audio,
-                    minHrBpm           = minHr,
-                    maxHrBpm           = maxHr,
-                    lowestSpO2         = lowestSpO2,
-                    tableType          = null,
-                    firstContractionMs = firstContractionMs,
-                    hrDeviceId         = deviceLabel
+                    timestamp              = now,
+                    durationMs             = durationMs,
+                    lungVolume             = lungVolume,
+                    prepType               = prepType,
+                    timeOfDay              = timeOfDay,
+                    posture                = posture,
+                    audio                  = audio,
+                    minHrBpm               = minHr,
+                    maxHrBpm               = maxHr,
+                    lowestSpO2             = lowestSpO2,
+                    tableType              = null,
+                    firstContractionMs     = firstContractionMs,
+                    hrDeviceId             = deviceLabel,
+                    guidedHyper            = wasGuided,
+                    guidedRelaxedExhaleSec = if (wasGuided) guidedState.guidedRelaxedExhaleSec else null,
+                    guidedPurgeExhaleSec   = if (wasGuided) guidedState.guidedPurgeExhaleSec else null,
+                    guidedTransitionSec    = if (wasGuided) guidedState.guidedTransitionSec else null
                 )
             )
 
@@ -715,6 +782,18 @@ fun FreeHoldActiveScreen(
             )
         }
 
+        // Guided hyperventilation countdown dialog
+        if (state.showGuidedCountdown) {
+            GuidedHyperCountdownDialog(
+                phases = GuidedHyperPhases(
+                    relaxedExhaleSec = state.guidedRelaxedExhaleSec,
+                    purgeExhaleSec = state.guidedPurgeExhaleSec,
+                    transitionSec = state.guidedTransitionSec
+                ),
+                onComplete = { viewModel.onGuidedCountdownComplete() }
+            )
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -756,12 +835,39 @@ fun FreeHoldActiveScreen(
                 )
             }
 
+            // Guided hyperventilation section — shown when prep is HYPER and hold not active
+            if (state.isHyperPrep && !state.freeHoldActive) {
+                GuidedHyperSection(
+                    enabled = state.guidedHyperEnabled,
+                    relaxedExhaleSec = state.guidedRelaxedExhaleSec,
+                    purgeExhaleSec = state.guidedPurgeExhaleSec,
+                    transitionSec = state.guidedTransitionSec,
+                    onEnabledChange = { viewModel.setGuidedHyperEnabled(it) },
+                    onRelaxedExhaleChange = { viewModel.setGuidedRelaxedExhaleSec(it) },
+                    onPurgeExhaleChange = { viewModel.setGuidedPurgeExhaleSec(it) },
+                    onTransitionChange = { viewModel.setGuidedTransitionSec(it) }
+                )
+            }
+
+            // Determine whether the start button should trigger guided countdown
+            val useGuidedStart = state.isHyperPrep
+                && state.guidedHyperEnabled
+                && !state.guidedCountdownComplete
+
             FreeHoldActiveContent(
                 freeHoldActive = state.freeHoldActive,
                 showTimer = state.showTimer,
                 firstContractionMs = state.freeHoldFirstContractionMs,
+                guidedHyperActive = state.isHyperPrep && state.guidedHyperEnabled,
+                guidedCountdownComplete = state.guidedCountdownComplete,
                 modifier = Modifier.fillMaxSize(),
-                onStart = { viewModel.startFreeHold() },
+                onStart = {
+                    if (useGuidedStart) {
+                        viewModel.showGuidedCountdown()
+                    } else {
+                        viewModel.startFreeHold()
+                    }
+                },
                 onFirstContraction = { viewModel.recordFreeHoldFirstContraction() },
                 onStop = {
                     stopRequested = true
@@ -781,6 +887,8 @@ private fun FreeHoldActiveContent(
     freeHoldActive: Boolean,
     showTimer: Boolean,
     firstContractionMs: Long?,
+    guidedHyperActive: Boolean = false,
+    guidedCountdownComplete: Boolean = false,
     modifier: Modifier = Modifier,
     onStart: () -> Unit,
     onFirstContraction: () -> Unit,
@@ -858,6 +966,9 @@ private fun FreeHoldActiveContent(
         ) {
             when {
                 !freeHoldActive -> {
+                    // Determine button label based on guided hyper state
+                    val showHyperStart = guidedHyperActive && !guidedCountdownComplete
+
                     Button(
                         onClick = onStart,
                         modifier = Modifier
@@ -869,12 +980,23 @@ private fun FreeHoldActiveContent(
                             contentColor = TextPrimary
                         )
                     ) {
-                        Text(
-                            text = "START",
-                            style = MaterialTheme.typography.displayMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            textAlign = TextAlign.Center
-                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "START",
+                                style = MaterialTheme.typography.displayMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                textAlign = TextAlign.Center
+                            )
+                            if (showHyperStart) {
+                                Text(
+                                    text = "HYPER",
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center,
+                                    color = TextSecondary
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -965,4 +1087,126 @@ private fun formatElapsedMs(ms: Long): String {
         "${minutes}m ${seconds}s"
     else
         "${seconds}.${centis.toString().padStart(2, '0')}s"
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Guided Hyperventilation Section
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Checkbox + three compact numeric inputs for guided hyperventilation.
+ * Shown above the start button when prep type is HYPER.
+ * When enabled, shows: label input | label input | label input — all on one line.
+ */
+@Composable
+private fun GuidedHyperSection(
+    enabled: Boolean,
+    relaxedExhaleSec: Int,
+    purgeExhaleSec: Int,
+    transitionSec: Int,
+    onEnabledChange: (Boolean) -> Unit,
+    onRelaxedExhaleChange: (Int) -> Unit,
+    onPurgeExhaleChange: (Int) -> Unit,
+    onTransitionChange: (Int) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.clickable { onEnabledChange(!enabled) }
+        ) {
+            Checkbox(
+                checked = enabled,
+                onCheckedChange = onEnabledChange,
+                modifier = Modifier.size(32.dp),
+                colors = CheckboxDefaults.colors(
+                    checkedColor = TextPrimary,
+                    uncheckedColor = TextSecondary,
+                    checkmarkColor = BackgroundDark
+                )
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = "Guided Hyperventilation",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextPrimary
+            )
+        }
+
+        if (enabled) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 36.dp, top = 2.dp, bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                CompactLabeledInput(
+                    label = "Relaxed\nExhale",
+                    value = relaxedExhaleSec,
+                    onValueChange = onRelaxedExhaleChange
+                )
+                CompactLabeledInput(
+                    label = "Purge\nExhale",
+                    value = purgeExhaleSec,
+                    onValueChange = onPurgeExhaleChange
+                )
+                CompactLabeledInput(
+                    label = "Transition",
+                    value = transitionSec,
+                    onValueChange = onTransitionChange
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Tiny label + input pair: label text then a small bordered box for 3 digits.
+ */
+@Composable
+private fun CompactLabeledInput(
+    label: String,
+    value: Int,
+    onValueChange: (Int) -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = TextSecondary,
+            lineHeight = 12.sp,
+            fontSize = 10.sp
+        )
+        Box(
+            modifier = Modifier
+                .width(36.dp)
+                .height(28.dp)
+                .border(1.dp, SurfaceVariant, RoundedCornerShape(4.dp))
+                .padding(horizontal = 4.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            BasicTextField(
+                value = if (value == 0) "" else value.toString(),
+                onValueChange = { text ->
+                    val parsed = text.filter { it.isDigit() }.take(3).toIntOrNull() ?: 0
+                    onValueChange(parsed)
+                },
+                textStyle = MaterialTheme.typography.bodySmall.copy(
+                    textAlign = TextAlign.Center,
+                    color = TextPrimary,
+                    fontSize = 13.sp
+                ),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                cursorBrush = SolidColor(TextPrimary)
+            )
+        }
+    }
 }

@@ -39,5 +39,17 @@ data class ApneaRecordEntity(
     val posture: String = "LAYING",
     /** One of AudioSetting enum names: SILENCE, MUSIC */
     @ColumnInfo(defaultValue = "SILENCE")
-    val audio: String = "SILENCE"
+    val audio: String = "SILENCE",
+    /** True when the user used guided hyperventilation before this hold. */
+    @ColumnInfo(defaultValue = "0")
+    val guidedHyper: Boolean = false,
+    /** Relaxed exhale phase duration in seconds (guided hyperventilation). Null when not used. */
+    @ColumnInfo(defaultValue = "NULL")
+    val guidedRelaxedExhaleSec: Int? = null,
+    /** Purge exhale phase duration in seconds (guided hyperventilation). Null when not used. */
+    @ColumnInfo(defaultValue = "NULL")
+    val guidedPurgeExhaleSec: Int? = null,
+    /** Transition phase duration in seconds (guided hyperventilation). Null when not used. */
+    @ColumnInfo(defaultValue = "NULL")
+    val guidedTransitionSec: Int? = null
 )
