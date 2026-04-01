@@ -82,6 +82,7 @@ fun ApneaScreen(
                     }
                 },
                 actions = {
+                    LiveSensorActions(liveHr = state.liveHr, liveSpO2 = state.liveSpO2)
                     TextButton(onClick = {
                         navController.navigate(
                             WagsRoutes.apneaHistory(
@@ -99,7 +100,6 @@ fun ApneaScreen(
                             color = TextSecondary
                         )
                     }
-                    LiveSensorActions(liveHr = state.liveHr, liveSpO2 = state.liveSpO2)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )
