@@ -5,6 +5,17 @@
 ## Changelog
 
 
+### 2026-04-01 — Display guided hyperventilation details in hold history
+
+**Fixed: Guided hyperventilation phase durations now shown in record detail summary** ([`ApneaRecordDetailScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaRecordDetailScreen.kt))
+- The guided hyperventilation data (whether it was used and the three phase durations) was already being saved correctly to the database when a free hold was completed, but was not displayed in the record detail screen's Summary section.
+- When `guidedHyper` is true on a record, the Summary section now shows a single row: **Guided Hyper** with the phase durations as plain numbers separated by dots (e.g. "30 · 15 · 10"). Falls back to "Yes" if no phase durations were recorded.
+
+#### Files Changed
+- **Modified**: [`ApneaRecordDetailScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaRecordDetailScreen.kt) — Added guided hyperventilation row to the Summary card in `RecordDetailContent`
+
+---
+
 ### 2026-03-31 — RF Assessment: random period offset & recommendation-based Targeted sweep
 
 **Improved: random period offset for assessment rate diversity** ([`RfAssessmentOrchestrator.kt`](app/src/main/java/com/example/wags/domain/usecase/breathing/RfAssessmentOrchestrator.kt))

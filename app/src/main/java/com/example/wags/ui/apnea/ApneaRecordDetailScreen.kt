@@ -492,6 +492,17 @@ private fun RecordDetailContent(
                     value = record.prepType.lowercase().replace('_', ' ')
                         .replaceFirstChar { it.uppercase() }
                 )
+                if (record.guidedHyper) {
+                    val phases = listOfNotNull(
+                        record.guidedRelaxedExhaleSec,
+                        record.guidedPurgeExhaleSec,
+                        record.guidedTransitionSec
+                    ).joinToString(" · ")
+                    DetailRow(
+                        label = "Guided Hyper",
+                        value = phases.ifEmpty { "Yes" }
+                    )
+                }
                 DetailRow(label = "Time of Day",
                     value = record.timeOfDay.lowercase().replaceFirstChar { it.uppercase() }
                 )
