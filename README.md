@@ -5,6 +5,26 @@
 ## Changelog
 
 
+### 2026-04-01 — Persistent crash logging to file
+
+**New: Crash logs written to internal storage for offline review** ([`CrashLogWriter.kt`](app/src/main/java/com/example/wags/data/crash/CrashLogWriter.kt), [`CrashLogScreen.kt`](app/src/main/java/com/example/wags/ui/settings/CrashLogScreen.kt))
+
+The app sometimes crashes when switching BLE devices (e.g. removing H10 and connecting O2Ring), but the crash is hard to reproduce when connected to ADB. To capture these crashes for later analysis:
+
+- **File-based crash logging**: The existing `UncaughtExceptionHandler` in [`WagsApplication`](app/src/main/java/com/example/wags/WagsApplication.kt) now writes crash stack traces to files in `{filesDir}/crash_logs/` in addition to Logcat. Each crash creates a timestamped `.txt` file containing the full stack trace, thread name, device info, and SDK version.
+- **Crash log viewer**: A new **Settings → 🪲 Crash Logs** screen lets you browse, view, and delete saved crash logs directly in the app — no ADB or debug mode needed.
+- **Auto-pruning**: Only the 20 most recent crash logs are kept; older ones are automatically deleted.
+- **Safe implementation**: The crash logger is wrapped in try/catch to never mask the original crash. The original default handler is always invoked after logging.
+
+#### Files Changed
+- **Created**: [`CrashLogWriter.kt`](app/src/main/java/com/example/wags/data/crash/CrashLogWriter.kt) — Utility to write/read/prune crash log files in app-private storage
+- **Created**: [`CrashLogScreen.kt`](app/src/main/java/com/example/wags/ui/settings/CrashLogScreen.kt) — Composable screen to list, view, and delete crash logs
+- **Modified**: [`WagsApplication.kt`](app/src/main/java/com/example/wags/WagsApplication.kt) — `installCrashLogger()` now also writes to file via `CrashLogWriter`
+- **Modified**: [`SettingsScreen.kt`](app/src/main/java/com/example/wags/ui/settings/SettingsScreen.kt) — Added `CrashLogsCard` with "View" button navigating to crash logs
+- **Modified**: [`WagsNavGraph.kt`](app/src/main/java/com/example/wags/ui/navigation/WagsNavGraph.kt) — Added `CRASH_LOGS` route and composable
+
+---
+
 ### 2026-04-01 — Display guided hyperventilation details in hold history
 
 **Fixed: Guided hyperventilation phase durations now shown in record detail summary** ([`ApneaRecordDetailScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaRecordDetailScreen.kt))

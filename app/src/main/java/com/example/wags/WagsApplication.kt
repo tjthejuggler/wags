@@ -3,6 +3,7 @@ package com.example.wags
 import android.app.Application
 import android.util.Log
 import android.widget.Toast
+import com.example.wags.data.crash.CrashLogWriter
 import com.example.wags.data.garmin.GarminApneaRepository
 import com.example.wags.data.garmin.GarminManager
 import dagger.hilt.android.HiltAndroidApp
@@ -49,13 +50,16 @@ class WagsApplication : Application() {
 
     /**
      * Installs a last-resort uncaught exception logger that writes the crash
-     * stack trace to Logcat before the default handler kills the process.
+     * stack trace to both Logcat AND a file in internal storage.
      *
      * This does NOT suppress the crash — the original default handler is still
-     * invoked — but it guarantees the full stack trace is captured in Logcat
-     * even when the device is not connected to Android Studio at the time.
+     * invoked — but it guarantees the full stack trace is captured even when
+     * the device is not connected to Android Studio / ADB at the time.
      *
-     * To retrieve the crash log after the fact:
+     * Crash logs are stored in: {filesDir}/crash_logs/crash_*.txt
+     * They can be viewed in-app via Settings → Crash Logs.
+     *
+     * To retrieve via ADB:
      *   adb logcat -d -s WAGS_CRASH:E
      */
     private fun installCrashLogger() {
@@ -69,6 +73,12 @@ class WagsApplication : Application() {
                 )
             } catch (_: Exception) {
                 // If logging itself fails, don't mask the original crash.
+            }
+            // Write crash to file so it can be reviewed later without ADB
+            try {
+                CrashLogWriter.writeCrash(this@WagsApplication, thread.name, throwable)
+            } catch (_: Exception) {
+                // Never let file-writing failure mask the original crash.
             }
             // Delegate to the original handler (which shows the crash dialog / kills the process)
             defaultHandler?.uncaughtException(thread, throwable)

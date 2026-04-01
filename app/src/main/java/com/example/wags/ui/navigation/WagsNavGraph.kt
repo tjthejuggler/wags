@@ -40,6 +40,7 @@ import com.example.wags.ui.morning.MorningReadinessDetailScreen
 import com.example.wags.ui.morning.MorningReadinessHistoryScreen
 import com.example.wags.ui.morning.MorningReadinessScreen
 import com.example.wags.ui.garmin.GarminScreen
+import com.example.wags.ui.settings.CrashLogScreen
 import com.example.wags.ui.settings.SettingsScreen
 
 object WagsRoutes {
@@ -73,6 +74,7 @@ object WagsRoutes {
     // ── Meditation / NSDR ──────────────────────────────────────────────────────
     // ── Garmin Watch ─────────────────────────────────────────────────────────
     const val GARMIN = "garmin"
+    const val CRASH_LOGS = "crash_logs"
 
     const val MEDITATION = "meditation"
     const val MEDITATION_HISTORY = "meditation_history"
@@ -378,6 +380,9 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
         // ── Garmin Watch ────────────────────────────────────────────────────
         composable(WagsRoutes.GARMIN) {
             GarminScreen(navController = navController)
+        }
+        composable(WagsRoutes.CRASH_LOGS) {
+            CrashLogScreen(onNavigateBack = { navController.popBackStack() })
         }
     }
 }

@@ -24,6 +24,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
+import com.example.wags.data.crash.CrashLogWriter
 import com.example.wags.data.garmin.GarminConnectionState
 import com.example.wags.domain.model.BleConnectionState
 import com.example.wags.domain.model.HabitEntry
@@ -324,6 +325,13 @@ fun SettingsScreen(
                         importLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
                     },
                     onDismissMessage = { viewModel.clearExportImportMessage() }
+                )
+            }
+
+            // ── Crash Logs ───────────────────────────────────────────────
+            item {
+                CrashLogsCard(
+                    onViewLogs = { navController.navigate(WagsRoutes.CRASH_LOGS) }
                 )
             }
 
@@ -821,6 +829,40 @@ private fun HabitPickerRow(
             )
             if (isSelected) {
                 Text("✓", style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
+            }
+        }
+    }
+}
+
+// ── Crash Logs card ────────────────────────────────────────────────────────────
+
+@Composable
+private fun CrashLogsCard(onViewLogs: () -> Unit) {
+    val context = LocalContext.current
+    val logCount = remember { CrashLogWriter.listLogs(context).size }
+
+    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("🪲 Crash Logs", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                Text(
+                    if (logCount == 0) "No crashes recorded"
+                    else "$logCount crash log${if (logCount != 1) "s" else ""} saved",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (logCount > 0) ReadinessRed else TextSecondary
+                )
+            }
+            OutlinedButton(
+                onClick = onViewLogs,
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
+            ) {
+                Text("View")
             }
         }
     }
