@@ -61,7 +61,8 @@ fun ReadinessScreen(
     val context = LocalContext.current
     val deviceId = "PLACEHOLDER_H10_ID"
 
-    val isActive = state.sessionState == ReadinessSessionState.RECORDING ||
+    val isActive = state.sessionState == ReadinessSessionState.PREPARING ||
+            state.sessionState == ReadinessSessionState.RECORDING ||
             state.sessionState == ReadinessSessionState.PROCESSING
 
     // Keep screen on during COMPLETE too so the user can review results
@@ -115,7 +116,13 @@ fun ReadinessScreen(
             ) {
             when (state.sessionState) {
                 ReadinessSessionState.IDLE -> IdleContent(
-                    onStart = { viewModel.startSession(deviceId, 120L) }
+                    selectedDuration = state.selectedDuration,
+                    onSelectDuration = { viewModel.selectDuration(it) },
+                    onStart = { viewModel.startSession(deviceId) }
+                )
+                ReadinessSessionState.PREPARING -> PreparingContent(
+                    secondsRemaining = state.preparingSecondsRemaining,
+                    onCancel = { viewModel.cancelSession() }
                 )
                 ReadinessSessionState.RECORDING -> RecordingContent(
                     state = state,
@@ -123,8 +130,7 @@ fun ReadinessScreen(
                 )
                 ReadinessSessionState.PROCESSING -> ProcessingContent()
                 ReadinessSessionState.COMPLETE -> CompleteContent(
-                    state = state,
-                    onReset = { viewModel.reset() }
+                    state = state
                 )
                 ReadinessSessionState.ERROR -> ErrorContent(
                     message = state.errorMessage ?: "Unknown error",
@@ -141,7 +147,11 @@ fun ReadinessScreen(
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 @Composable
-private fun IdleContent(onStart: () -> Unit) {
+private fun IdleContent(
+    selectedDuration: HrvDuration,
+    onSelectDuration: (HrvDuration) -> Unit,
+    onStart: () -> Unit
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -158,10 +168,38 @@ private fun IdleContent(onStart: () -> Unit) {
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("2-minute resting HRV measurement", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                Text("Resting HRV measurement", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
                 Text("1. Ensure Polar H10 is connected and worn correctly", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 Text("2. Sit or lie down comfortably", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 Text("3. Breathe normally and stay still", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+            }
+        }
+        // ── Duration selector + Start button in one row ──────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            HrvDuration.entries.forEach { duration ->
+                val isSelected = duration == selectedDuration
+                OutlinedButton(
+                    onClick = { onSelectDuration(duration) },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = if (isSelected) Graphite else Color.Transparent,
+                        contentColor = if (isSelected) Bone else Ash
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = if (isSelected) 1.5.dp else 1.dp,
+                        color = if (isSelected) Silver else Charcoal
+                    )
+                ) {
+                    Text(
+                        duration.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        letterSpacing = 1.sp
+                    )
+                }
             }
         }
         Button(
@@ -169,7 +207,53 @@ private fun IdleContent(onStart: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(containerColor = ButtonPrimary)
         ) {
-            Text("Start 2-Minute Session")
+            Text("Start ${selectedDuration.label} Session")
+        }
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  PREPARING — 20-second countdown before recording begins
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@Composable
+private fun PreparingContent(secondsRemaining: Int, onCancel: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            "PREPARE",
+            style = MaterialTheme.typography.titleMedium,
+            color = Silver,
+            letterSpacing = 6.sp
+        )
+        MinimalistArcCountdown(
+            remainingSeconds = secondsRemaining,
+            totalSeconds = 20
+        )
+        Text(
+            "sit or lie down · relax · breathe normally",
+            style = MaterialTheme.typography.bodySmall,
+            color = Ash,
+            letterSpacing = 2.sp,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            "recording starts automatically",
+            style = MaterialTheme.typography.bodySmall,
+            color = Ash.copy(alpha = 0.6f),
+            letterSpacing = 1.sp
+        )
+        Spacer(Modifier.height(4.dp))
+        OutlinedButton(
+            onClick = onCancel,
+            modifier = Modifier.fillMaxWidth(0.5f),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Ash),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Charcoal)
+        ) {
+            Text("Cancel", style = MaterialTheme.typography.bodySmall, letterSpacing = 2.sp)
         }
     }
 }
@@ -266,7 +350,7 @@ private fun ProcessingContent() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 @Composable
-private fun CompleteContent(state: ReadinessUiState, onReset: () -> Unit) {
+private fun CompleteContent(state: ReadinessUiState) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -277,14 +361,6 @@ private fun CompleteContent(state: ReadinessUiState, onReset: () -> Unit) {
         }
         state.hrvMetrics?.let { metrics ->
             HrvMetricsCard(metrics = metrics)
-        }
-        Spacer(Modifier.height(4.dp))
-        Button(
-            onClick = onReset,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = ButtonPrimary)
-        ) {
-            Text("New Session")
         }
     }
 }

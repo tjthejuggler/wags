@@ -33,12 +33,21 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
-enum class ReadinessSessionState { IDLE, RECORDING, PROCESSING, COMPLETE, ERROR }
+enum class ReadinessSessionState { IDLE, PREPARING, RECORDING, PROCESSING, COMPLETE, ERROR }
+
+/** The three available measurement durations. */
+enum class HrvDuration(val seconds: Long, val label: String) {
+    SHORT(120L, "2 min"),
+    MEDIUM(180L, "3 min"),
+    LONG(300L, "5 min")
+}
 
 data class ReadinessUiState(
     val sessionState: ReadinessSessionState = ReadinessSessionState.IDLE,
     val remainingSeconds: Long = 0L,
     val sessionDurationSeconds: Long = 120L,
+    val preparingSecondsRemaining: Int = 20,
+    val selectedDuration: HrvDuration = HrvDuration.SHORT,
     val rrCount: Int = 0,
     val liveRmssd: Float? = null,
     val liveSdnn: Float? = null,
@@ -85,20 +94,25 @@ class ReadinessViewModel @Inject constructor(
     // Total writes at the moment the session started — used to ignore pre-session RR intervals
     private var rrWritesAtStart: Long = 0L
 
-    fun startSession(deviceId: String, durationSeconds: Long = 120L) {
-        if (_uiState.value.sessionState == ReadinessSessionState.RECORDING) return
+    fun selectDuration(duration: HrvDuration) {
+        if (_uiState.value.sessionState == ReadinessSessionState.IDLE) {
+            _uiState.update { it.copy(selectedDuration = duration) }
+        }
+    }
+
+    fun startSession(deviceId: String) {
+        val state = _uiState.value
+        if (state.sessionState != ReadinessSessionState.IDLE) return
+        val durationSeconds = state.selectedDuration.seconds
+
         collectedRr.clear()
         sessionHrDeviceLabel = hrDataSource.activeHrDeviceLabel()
-        Log.d("ReadinessVM", "startSession(deviceId=$deviceId) — calling startRrStream")
-        deviceManager.startRrStream(deviceId)
-        // Snapshot the current total writes so we only count intervals from this point forward
-        rrWritesAtStart = deviceManager.rrBuffer.totalWrites()
-        Log.d("ReadinessVM", "rrWritesAtStart=$rrWritesAtStart, rrBuffer.capacity=${deviceManager.rrBuffer.capacity}")
+        Log.d("ReadinessVM", "startSession(deviceId=$deviceId) — 20s prep then ${durationSeconds}s recording")
+
         _uiState.update {
             it.copy(
-                sessionState = ReadinessSessionState.RECORDING,
-                remainingSeconds = durationSeconds,
-                sessionDurationSeconds = durationSeconds,
+                sessionState = ReadinessSessionState.PREPARING,
+                preparingSecondsRemaining = 20,
                 rrCount = 0,
                 liveRmssd = null,
                 errorMessage = null
@@ -106,21 +120,40 @@ class ReadinessViewModel @Inject constructor(
         }
 
         sessionJob = viewModelScope.launch {
+            // ── 20-second preparation countdown ──────────────────────────────
+            var prep = 20
+            while (prep > 0 && isActive) {
+                delay(1_000L)
+                prep--
+                _uiState.update { it.copy(preparingSecondsRemaining = prep) }
+            }
+            if (!isActive) return@launch
+
+            // ── Start actual recording ────────────────────────────────────────
+            deviceManager.startRrStream(deviceId)
+            rrWritesAtStart = deviceManager.rrBuffer.totalWrites()
+            Log.d("ReadinessVM", "recording started: rrWritesAtStart=$rrWritesAtStart")
+            _uiState.update {
+                it.copy(
+                    sessionState = ReadinessSessionState.RECORDING,
+                    remainingSeconds = durationSeconds,
+                    sessionDurationSeconds = durationSeconds
+                )
+            }
+
             var remaining = durationSeconds
             while (remaining > 0 && isActive) {
                 delay(500L) // Poll at 2 Hz for smoother chart updates
                 remaining = (remaining - 1L).coerceAtLeast(0L)
-                // Only take intervals added since the session started
                 val totalWrites = deviceManager.rrBuffer.totalWrites()
                 val newCount = (totalWrites - rrWritesAtStart).toInt()
                     .coerceAtMost(deviceManager.rrBuffer.capacity)
                 val snapshot = if (newCount > 0) deviceManager.rrBuffer.readLast(newCount) else emptyList()
-                Log.d("ReadinessVM", "poll: remaining=$remaining totalWrites=$totalWrites rrWritesAtStart=$rrWritesAtStart newCount=$newCount snapshot.size=${snapshot.size} liveHr=${deviceManager.liveHr.value}")
+                Log.d("ReadinessVM", "poll: remaining=$remaining newCount=$newCount snapshot.size=${snapshot.size}")
                 collectedRr.clear()
                 collectedRr.addAll(snapshot)
                 val liveRmssd = computeLiveRmssd(snapshot)
                 val liveSdnn = computeLiveSdnn(snapshot)
-                // Last ~45 RR intervals for the chart (~30 s at typical resting HR)
                 val chartRr = if (newCount > 0) deviceManager.rrBuffer.readLast(45.coerceAtMost(newCount)) else emptyList()
                 _uiState.update {
                     it.copy(
@@ -204,7 +237,7 @@ class ReadinessViewModel @Inject constructor(
 
     fun cancelSession() {
         sessionJob?.cancel()
-        _uiState.update { it.copy(sessionState = ReadinessSessionState.IDLE) }
+        _uiState.update { it.copy(sessionState = ReadinessSessionState.IDLE, preparingSecondsRemaining = 20) }
     }
 
     fun reset() {

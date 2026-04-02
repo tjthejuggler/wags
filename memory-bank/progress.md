@@ -1,10 +1,13 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-02 16:26 UTC*
+*Last updated: 2026-04-02 20:25 UTC*
 
 ## Recent Changes (2026-04-02)
 - ✅ Removed "New Session" button from `MorningReadinessResultScreen` (result screen after completing test)
 - ✅ Added standing-completeness guard to `MorningReadinessDetailScreen`: if standing beats < 50% of total telemetry beats, all standing-related sections (Standing HRV, Orthostatic Response, OrthostasisStatsCard, stand marker on charts) are hidden as if standing never occurred
+- ✅ HRV Readiness: added `PREPARING` state with 20-second countdown before recording begins
+- ✅ HRV Readiness: added `HrvDuration` enum (SHORT=2min, MEDIUM=3min, LONG=5min) with toggle buttons on idle screen
+- ✅ HRV Readiness: removed "New Session" button from result screen (CompleteContent)
 
 ## What Works
 
