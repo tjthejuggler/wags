@@ -37,7 +37,7 @@ data class ApneaRecordEntity(
     /** One of Posture enum names: SITTING, LAYING */
     @ColumnInfo(defaultValue = "LAYING")
     val posture: String = "LAYING",
-    /** One of AudioSetting enum names: SILENCE, MUSIC */
+    /** One of AudioSetting enum names: SILENCE, MUSIC, MOVIE */
     @ColumnInfo(defaultValue = "SILENCE")
     val audio: String = "SILENCE",
     /** True when the user used guided hyperventilation before this hold. */

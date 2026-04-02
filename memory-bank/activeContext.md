@@ -62,3 +62,21 @@ Based on open tabs and visible files:
   1. `ApneaViewModel.kt`: Auto-set PB from best free hold time when it arrives from DB and no PB has been manually set yet.
   2. `ApneaScreen.kt` `TableTrainingConfigContent`: Auto-call `onSetPersonalBest` when `bestTimeForSettingsMs` auto-fills and `personalBestMs` is still 0. Also added a `LaunchedEffect` to keep the text field in sync when PB is set from elsewhere.
 - The table flow: ApneaScreen → "Start O2/CO2 Table" navigates to ApneaTableScreen → "Start Session" button loads table and starts state machine countdown.
+
+---
+
+### 2026-04-01 20:25 (UTC-6)
+
+**Added: "Movie" audio type for Apnea**
+
+- Added `MOVIE` to the `AudioSetting` enum alongside `SILENCE` and `MUSIC`.
+- `MOVIE` behaves identically to `SILENCE` (no Spotify integration) — it's just a distinct category for tracking personal bests and filtering history.
+- No DB migration needed: the `audio` column in `apnea_records` is `TEXT` and stores enum names as strings. Adding a new enum value doesn't change the schema.
+- Files modified:
+  1. `domain/model/AudioSetting.kt` — Added `MOVIE` enum value with `displayName() = "Movie"`
+  2. `ui/apnea/ApneaSettingsSummaryBanner.kt` — Added `"MOVIE" -> "Movie"` to `displayAudio()`
+  3. `data/db/entity/ApneaRecordEntity.kt` — Updated comment to include `MOVIE`
+- Automatically picked up everywhere else because:
+  - All filter chips use `AudioSetting.entries.forEach` (ApneaScreen, ApneaHistoryScreen, AllApneaRecordsScreen, ApneaRecordDetailScreen)
+  - Personal bests use `AudioSetting.entries.map { it.name }` (ApneaRepository)
+  - Spotify logic only triggers on `== AudioSetting.MUSIC`, so `MOVIE` is safely ignored

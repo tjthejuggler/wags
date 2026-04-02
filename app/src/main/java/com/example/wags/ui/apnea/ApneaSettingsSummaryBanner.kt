@@ -78,5 +78,6 @@ private fun String.displayPosture(): String = when (uppercase()) {
 private fun String.displayAudio(): String = when (uppercase()) {
     "SILENCE" -> "Silence"
     "MUSIC"   -> "Music"
+    "MOVIE"   -> "Movie"
     else      -> lowercase().replaceFirstChar { it.uppercase() }
 }

@@ -74,6 +74,9 @@
 ### 2026-04-01 19:39 (UTC-6)
 - ✅ Fixed: Apnea table "Start O2/CO2 Table" buttons were disabled because PB auto-filled text field but didn't call `setPersonalBest()`. Now auto-sets PB from best free hold time in both ViewModel and UI.
 
+### 2026-04-01 20:25 (UTC-6)
+- ✅ Added: "Movie" audio type for Apnea — new `MOVIE` value in `AudioSetting` enum. Appears in all filter chips, settings summaries, personal bests, and history screens. Behaves like Silence (no Spotify). No DB migration needed.
+
 ## Architecture Decisions Log
 
 | Date | Decision | Rationale |
