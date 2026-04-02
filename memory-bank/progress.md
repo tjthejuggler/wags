@@ -99,6 +99,10 @@
 ### 2026-04-01 22:17 (UTC-6)
 - ✅ Fixed: HR/SpO₂ data not saved for table sessions — `startTableSession()` now starts oximeter collection, `saveCompletedSession()` snapshots RR + oximeter data, computes aggregates, saves telemetry rows. `stopTableSession()` cleans up oximeter collection.
 
+### 2026-04-02 07:43 (UTC-6)
+- ✅ Meditation/NSDR: Added Tail habit integration (`Slot.MEDITATION`) — wired through `HabitIntegrationRepository`, `SettingsViewModel`, `SettingsScreen` (TailIntegrationCard), and `MeditationViewModel` (`stopSession()` fires increment).
+- ✅ Meditation/NSDR: Added optional countdown timer — checkbox + hh:mm:ss fields in IdleContent; ticks down during active session; plays `chime_end.mp3` when zero; shows countdown card (or 🔔) in ActiveContent. Session is NOT stopped by the timer.
+
 ## Architecture Decisions Log
 
 | Date | Decision | Rationale |

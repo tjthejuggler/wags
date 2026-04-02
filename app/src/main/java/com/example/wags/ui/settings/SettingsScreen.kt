@@ -305,6 +305,7 @@ fun SettingsScreen(
                     morningReadinessHabit   = state.morningReadinessHabit,
                     hrvReadinessHabit       = state.hrvReadinessHabit,
                     resonanceBreathingHabit = state.resonanceBreathingHabit,
+                    meditationHabit         = state.meditationHabit,
                     onSelectHabit           = { slot, entry -> viewModel.selectHabit(slot, entry) },
                     onClearHabit            = { slot -> viewModel.clearHabit(slot) },
                     onRefresh               = { viewModel.loadHabits() }
@@ -634,6 +635,7 @@ private fun TailAppIntegrationCard(
     morningReadinessHabit: HabitSlotSelection,
     hrvReadinessHabit: HabitSlotSelection,
     resonanceBreathingHabit: HabitSlotSelection,
+    meditationHabit: HabitSlotSelection,
     onSelectHabit: (Slot, HabitEntry) -> Unit,
     onClearHabit: (Slot) -> Unit,
     onRefresh: () -> Unit
@@ -696,7 +698,8 @@ private fun TailAppIntegrationCard(
                 Slot.TABLE_TRAINING      to tableTrainingHabit,
                 Slot.MORNING_READINESS   to morningReadinessHabit,
                 Slot.HRV_READINESS       to hrvReadinessHabit,
-                Slot.RESONANCE_BREATHING to resonanceBreathingHabit
+                Slot.RESONANCE_BREATHING to resonanceBreathingHabit,
+                Slot.MEDITATION          to meditationHabit
             )
 
             slots.forEachIndexed { index, (slot, selection) ->

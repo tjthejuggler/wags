@@ -6,11 +6,14 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.wags.R
 import com.example.wags.data.ble.HrDataSource
 import com.example.wags.data.ble.UnifiedDeviceManager
 import com.example.wags.data.db.entity.MeditationAudioEntity
 import com.example.wags.data.db.entity.MeditationSessionEntity
 import com.example.wags.data.db.entity.MeditationTelemetryEntity
+import com.example.wags.data.ipc.HabitIntegrationRepository
+import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.data.repository.MeditationRepository
 import com.example.wags.data.repository.YouTubeMetadataFetcher
 import com.example.wags.di.IoDispatcher
@@ -63,6 +66,14 @@ data class MeditationUiState(
     val currentHrBpm: Float? = null,
     val currentRmssd: Float? = null,
     val sonificationEnabled: Boolean = false,
+    // Countdown timer (optional, indication only — does not stop session)
+    val timerEnabled: Boolean = false,
+    val timerHours: Int = 0,
+    val timerMinutes: Int = 20,
+    val timerSeconds: Int = 0,
+    /** Remaining seconds when timer is active; null when timer is off or not started. */
+    val timerRemainingSeconds: Long? = null,
+    val timerChimeFired: Boolean = false,
     // Post-session analytics
     val avgHrBpm: Float? = null,
     val hrSlopeBpmPerMin: Float? = null,
@@ -91,6 +102,10 @@ data class MeditationUiState(
                 audio.isNone || audio.youtubeChannel == selectedChannelFilter
             }
         }
+
+    /** Total timer duration in seconds (0 if timer disabled or all fields zero). */
+    val timerTotalSeconds: Long
+        get() = timerHours * 3600L + timerMinutes * 60L + timerSeconds.toLong()
 }
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
@@ -104,6 +119,7 @@ class MeditationViewModel @Inject constructor(
     private val analyticsCalculator: NsdrAnalyticsCalculator,
     private val artifactCorrection: ArtifactCorrectionUseCase,
     private val sonificationEngine: HrSonificationEngine,
+    private val habitRepo: HabitIntegrationRepository,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     @MathDispatcher private val mathDispatcher: CoroutineDispatcher
 ) : ViewModel() {
@@ -129,6 +145,7 @@ class MeditationViewModel @Inject constructor(
 
     // ── Audio playback ─────────────────────────────────────────────────────────
     private var mediaPlayer: MediaPlayer? = null
+    private var chimePlayer: MediaPlayer? = null
 
     init {
         // Observe HR device connection
@@ -263,6 +280,24 @@ class MeditationViewModel @Inject constructor(
         }
     }
 
+    // ── Timer settings ─────────────────────────────────────────────────────────
+
+    fun setTimerEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(timerEnabled = enabled) }
+    }
+
+    fun setTimerHours(hours: Int) {
+        _uiState.update { it.copy(timerHours = hours.coerceIn(0, 23)) }
+    }
+
+    fun setTimerMinutes(minutes: Int) {
+        _uiState.update { it.copy(timerMinutes = minutes.coerceIn(0, 59)) }
+    }
+
+    fun setTimerSeconds(seconds: Int) {
+        _uiState.update { it.copy(timerSeconds = seconds.coerceIn(0, 59)) }
+    }
+
     // ── Session lifecycle ──────────────────────────────────────────────────────
 
     fun startSession() {
@@ -283,19 +318,23 @@ class MeditationViewModel @Inject constructor(
             startAudioPlayback(audio)
         }
 
+        val timerTotal = if (_uiState.value.timerEnabled) _uiState.value.timerTotalSeconds else 0L
+
         _uiState.update {
             it.copy(
-                sessionState      = MeditationSessionState.ACTIVE,
-                elapsedSeconds    = 0L,
-                currentHrBpm      = null,
-                currentRmssd      = null,
-                avgHrBpm          = null,
-                hrSlopeBpmPerMin  = null,
-                startRmssdMs      = null,
-                endRmssdMs        = null,
-                lnRmssdSlope      = null,
-                monitorId         = activeMonitorId,
-                savedSessionId    = null
+                sessionState         = MeditationSessionState.ACTIVE,
+                elapsedSeconds       = 0L,
+                currentHrBpm         = null,
+                currentRmssd         = null,
+                avgHrBpm             = null,
+                hrSlopeBpmPerMin     = null,
+                startRmssdMs         = null,
+                endRmssdMs           = null,
+                lnRmssdSlope         = null,
+                monitorId            = activeMonitorId,
+                savedSessionId       = null,
+                timerRemainingSeconds = if (timerTotal > 0L) timerTotal else null,
+                timerChimeFired      = false
             )
         }
 
@@ -307,6 +346,21 @@ class MeditationViewModel @Inject constructor(
             while (isActive) {
                 delay(1_000L)
                 val elapsed = (System.currentTimeMillis() - sessionStartMs) / 1_000L
+
+                // ── Countdown timer tick ───────────────────────────────────────
+                val currentRemaining = _uiState.value.timerRemainingSeconds
+                if (currentRemaining != null && !_uiState.value.timerChimeFired) {
+                    val newRemaining = (currentRemaining - 1L).coerceAtLeast(0L)
+                    if (newRemaining == 0L) {
+                        // Fire chime and mark as done
+                        playChime()
+                        _uiState.update {
+                            it.copy(timerRemainingSeconds = 0L, timerChimeFired = true)
+                        }
+                    } else {
+                        _uiState.update { it.copy(timerRemainingSeconds = newRemaining) }
+                    }
+                }
 
                 if (activeMonitorId != null) {
                     val rrSnapshot = deviceManager.rrBuffer.readLast(64)
@@ -351,24 +405,30 @@ class MeditationViewModel @Inject constructor(
         sonificationEngine.stop()
         stopAudioPlayback()
         val durationMs = System.currentTimeMillis() - sessionStartMs
+        // Signal Tail habit integration
+        try {
+            habitRepo.sendHabitIncrement(Slot.MEDITATION)
+        } catch (_: Exception) { /* never crash */ }
         processSession(durationMs)
     }
 
     fun reset() {
         _uiState.update {
             it.copy(
-                sessionState     = MeditationSessionState.IDLE,
-                elapsedSeconds   = 0L,
-                currentHrBpm     = null,
-                currentRmssd     = null,
-                avgHrBpm         = null,
-                hrSlopeBpmPerMin = null,
-                startRmssdMs     = null,
-                endRmssdMs       = null,
-                lnRmssdSlope     = null,
-                monitorId        = null,
-                durationMs       = 0L,
-                savedSessionId   = null
+                sessionState          = MeditationSessionState.IDLE,
+                elapsedSeconds        = 0L,
+                currentHrBpm          = null,
+                currentRmssd          = null,
+                avgHrBpm              = null,
+                hrSlopeBpmPerMin      = null,
+                startRmssdMs          = null,
+                endRmssdMs            = null,
+                lnRmssdSlope          = null,
+                monitorId             = null,
+                durationMs            = 0L,
+                savedSessionId        = null,
+                timerRemainingSeconds = null,
+                timerChimeFired       = false
             )
         }
     }
@@ -376,6 +436,7 @@ class MeditationViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         stopAudioPlayback()
+        stopChime()
     }
 
     // ── Private helpers ────────────────────────────────────────────────────────
@@ -413,6 +474,25 @@ class MeditationViewModel @Inject constructor(
             release()
         }
         mediaPlayer = null
+    }
+
+    /** Plays the ending chime sound once. Uses chime_end.mp3 from raw resources. */
+    private fun playChime() {
+        stopChime()
+        try {
+            chimePlayer = MediaPlayer.create(appContext, R.raw.chime_end)?.apply {
+                setOnCompletionListener { it.release(); chimePlayer = null }
+                start()
+            }
+        } catch (_: Exception) { /* chime failure is non-fatal */ }
+    }
+
+    private fun stopChime() {
+        chimePlayer?.runCatching {
+            if (isPlaying) stop()
+            release()
+        }
+        chimePlayer = null
     }
 
     private fun computeLiveRmssd(rr: List<Double>): Float? {

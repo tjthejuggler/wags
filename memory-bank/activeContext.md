@@ -1,6 +1,6 @@
 # WAGS — Active Context
 
-*Last updated: 2026-03-28*
+*Last updated: 2026-04-02*
 
 ## Current State
 
@@ -152,3 +152,22 @@ Fix applied in `ui/apnea/ApneaViewModel.kt`:
 - `saveCompletedSession()` now snapshots RR buffer + oximeter data, computes HR/SpO₂ aggregates, saves `FreeHoldTelemetryEntity` rows linked to the record (same pattern as `saveFreeHoldRecord()`)
 - `stopTableSession()` now cleans up oximeter collection job and samples
 - `ApneaSessionEntity` also gets real `maxHrBpm` and `lowestSpO2` values
+
+---
+
+### 2026-04-02 07:43 (UTC-6)
+
+**Meditation/NSDR: Tail Integration + Countdown Timer**
+
+Two changes to the Meditation/NSDR section:
+
+1. **Tail habit integration** — Added `Slot.MEDITATION` to `HabitIntegrationRepository.Slot` enum. Wired through `SettingsViewModel` (`meditationHabit` field in `HabitPartialState`, `SettingsUiState`, `buildInitialHabitState`, `uiState` combine), `SettingsScreen` (`TailAppIntegrationCard` signature + call site + slots list), and `MeditationViewModel` (injects `HabitIntegrationRepository`, calls `sendHabitIncrement(Slot.MEDITATION)` in `stopSession()`). Now appears in Settings → Tail App Integration as "Meditation / NSDR".
+
+2. **Countdown timer** — Optional indication-only timer that plays a chime when time is up but does NOT stop the session. Added to `MeditationUiState`: `timerEnabled`, `timerHours`, `timerMinutes`, `timerSeconds`, `timerRemainingSeconds`, `timerChimeFired`. `MeditationViewModel` ticks the countdown each second in the session loop, fires `chime_end.mp3` via `MediaPlayer` when it reaches zero, marks `timerChimeFired = true`. UI: `TimerOptionRow` composable with a `Checkbox` + description text; when checked, shows three `OutlinedTextField` fields (hh / mm / ss) with numeric keyboard. During active session, a card shows the countdown (or 🔔 when chime has fired). Default: 0h 20m 0s.
+
+Files modified:
+- `data/ipc/HabitIntegrationRepository.kt` — Added `MEDITATION` slot
+- `ui/settings/SettingsViewModel.kt` — Added `meditationHabit` throughout
+- `ui/settings/SettingsScreen.kt` — Added `meditationHabit` param + slot to list
+- `ui/meditation/MeditationViewModel.kt` — Injected `HabitIntegrationRepository`, added timer state + logic + chime playback
+- `ui/meditation/MeditationScreen.kt` — Added `TimerOptionRow`, `TimerField` composables; updated `IdleContent` and `ActiveContent`

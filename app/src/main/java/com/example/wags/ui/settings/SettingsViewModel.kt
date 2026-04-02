@@ -59,6 +59,7 @@ data class SettingsUiState(
     val morningReadinessHabit: HabitSlotSelection = HabitSlotSelection(),
     val hrvReadinessHabit: HabitSlotSelection = HabitSlotSelection(),
     val resonanceBreathingHabit: HabitSlotSelection = HabitSlotSelection(),
+    val meditationHabit: HabitSlotSelection = HabitSlotSelection(),
     // ── Spotify account ───────────────────────────────────────────────────────
     val spotifyConnected: Boolean = false,
     // ── Data Export / Import ────────────────────────────────────────────────────
@@ -118,7 +119,8 @@ class SettingsViewModel @Inject constructor(
             tableTrainingHabit      = habit.tableTrainingHabit,
             morningReadinessHabit   = habit.morningReadinessHabit,
             hrvReadinessHabit       = habit.hrvReadinessHabit,
-            resonanceBreathingHabit = habit.resonanceBreathingHabit
+            resonanceBreathingHabit = habit.resonanceBreathingHabit,
+            meditationHabit         = habit.meditationHabit
         )
     }.combine(_exportImportState) { state, exportImport ->
         state.copy(
@@ -139,7 +141,8 @@ class SettingsViewModel @Inject constructor(
             tableTrainingHabit      = slotSelection(Slot.TABLE_TRAINING),
             morningReadinessHabit   = slotSelection(Slot.MORNING_READINESS),
             hrvReadinessHabit       = slotSelection(Slot.HRV_READINESS),
-            resonanceBreathingHabit = slotSelection(Slot.RESONANCE_BREATHING)
+            resonanceBreathingHabit = slotSelection(Slot.RESONANCE_BREATHING),
+            meditationHabit         = slotSelection(Slot.MEDITATION)
         )
     )
 
@@ -278,7 +281,8 @@ class SettingsViewModel @Inject constructor(
         tableTrainingHabit      = slotSelection(Slot.TABLE_TRAINING),
         morningReadinessHabit   = slotSelection(Slot.MORNING_READINESS),
         hrvReadinessHabit       = slotSelection(Slot.HRV_READINESS),
-        resonanceBreathingHabit = slotSelection(Slot.RESONANCE_BREATHING)
+        resonanceBreathingHabit = slotSelection(Slot.RESONANCE_BREATHING),
+        meditationHabit         = slotSelection(Slot.MEDITATION)
     )
 }
 
@@ -293,7 +297,8 @@ private data class HabitPartialState(
     val tableTrainingHabit: HabitSlotSelection = HabitSlotSelection(),
     val morningReadinessHabit: HabitSlotSelection = HabitSlotSelection(),
     val hrvReadinessHabit: HabitSlotSelection = HabitSlotSelection(),
-    val resonanceBreathingHabit: HabitSlotSelection = HabitSlotSelection()
+    val resonanceBreathingHabit: HabitSlotSelection = HabitSlotSelection(),
+    val meditationHabit: HabitSlotSelection = HabitSlotSelection()
 ) {
     fun copySlot(slot: HabitIntegrationRepository.Slot, value: HabitSlotSelection) = when (slot) {
         HabitIntegrationRepository.Slot.FREE_HOLD           -> copy(freeHoldHabit = value)
@@ -302,6 +307,7 @@ private data class HabitPartialState(
         HabitIntegrationRepository.Slot.MORNING_READINESS   -> copy(morningReadinessHabit = value)
         HabitIntegrationRepository.Slot.HRV_READINESS       -> copy(hrvReadinessHabit = value)
         HabitIntegrationRepository.Slot.RESONANCE_BREATHING -> copy(resonanceBreathingHabit = value)
+        HabitIntegrationRepository.Slot.MEDITATION          -> copy(meditationHabit = value)
     }
 }
 

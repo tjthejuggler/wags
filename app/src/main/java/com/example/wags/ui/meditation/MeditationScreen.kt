@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -22,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -99,6 +101,10 @@ fun MeditationScreen(
                     onSonificationToggle = { viewModel.setSonificationEnabled(!state.sonificationEnabled) },
                     onChannelFilterSelected = { viewModel.setChannelFilter(it) },
                     onPostureSelected = { viewModel.setPosture(it) },
+                    onTimerEnabledChange = { viewModel.setTimerEnabled(it) },
+                    onTimerHoursChange = { viewModel.setTimerHours(it) },
+                    onTimerMinutesChange = { viewModel.setTimerMinutes(it) },
+                    onTimerSecondsChange = { viewModel.setTimerSeconds(it) },
                     onStart = { viewModel.startSession() },
                     modifier = Modifier
                 )
@@ -146,6 +152,10 @@ private fun IdleContent(
     onSonificationToggle: () -> Unit,
     onChannelFilterSelected: (String?) -> Unit,
     onPostureSelected: (MeditationPosture) -> Unit,
+    onTimerEnabledChange: (Boolean) -> Unit,
+    onTimerHoursChange: (Int) -> Unit,
+    onTimerMinutesChange: (Int) -> Unit,
+    onTimerSecondsChange: (Int) -> Unit,
     onStart: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -297,6 +307,20 @@ private fun IdleContent(
             )
         }
 
+        // ── Timer option ────────────────────────────────────────────────────
+        item {
+            TimerOptionRow(
+                enabled = state.timerEnabled,
+                hours = state.timerHours,
+                minutes = state.timerMinutes,
+                seconds = state.timerSeconds,
+                onEnabledChange = onTimerEnabledChange,
+                onHoursChange = onTimerHoursChange,
+                onMinutesChange = onTimerMinutesChange,
+                onSecondsChange = onTimerSecondsChange
+            )
+        }
+
         // ── Start button ────────────────────────────────────────────────────
         item {
             Button(
@@ -310,6 +334,122 @@ private fun IdleContent(
             }
         }
     }
+}
+
+// ── Timer option row ──────────────────────────────────────────────────────────
+
+@Composable
+private fun TimerOptionRow(
+    enabled: Boolean,
+    hours: Int,
+    minutes: Int,
+    seconds: Int,
+    onEnabledChange: (Boolean) -> Unit,
+    onHoursChange: (Int) -> Unit,
+    onMinutesChange: (Int) -> Unit,
+    onSecondsChange: (Int) -> Unit
+) {
+    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Checkbox row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Checkbox(
+                    checked = enabled,
+                    onCheckedChange = onEnabledChange,
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = TextSecondary,
+                        uncheckedColor = TextSecondary
+                    )
+                )
+                Column {
+                    Text(
+                        "Countdown Timer",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = TextPrimary
+                    )
+                    Text(
+                        "Plays a chime when time is up (session continues)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                }
+            }
+
+            // hh:mm:ss fields — only visible when enabled
+            if (enabled) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TimerField(
+                        value = hours,
+                        label = "hh",
+                        max = 23,
+                        onChange = onHoursChange,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(":", style = MaterialTheme.typography.headlineSmall, color = TextSecondary)
+                    TimerField(
+                        value = minutes,
+                        label = "mm",
+                        max = 59,
+                        onChange = onMinutesChange,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(":", style = MaterialTheme.typography.headlineSmall, color = TextSecondary)
+                    TimerField(
+                        value = seconds,
+                        label = "ss",
+                        max = 59,
+                        onChange = onSecondsChange,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TimerField(
+    value: Int,
+    label: String,
+    max: Int,
+    onChange: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OutlinedTextField(
+        value = String.format("%02d", value),
+        onValueChange = { raw ->
+            val digits = raw.filter { it.isDigit() }.takeLast(2)
+            val parsed = digits.toIntOrNull() ?: 0
+            onChange(parsed.coerceIn(0, max))
+        },
+        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        textStyle = MaterialTheme.typography.headlineSmall.copy(
+            textAlign = TextAlign.Center,
+            color = TextPrimary
+        ),
+        modifier = modifier,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = TextSecondary,
+            unfocusedBorderColor = SurfaceVariant,
+            focusedLabelColor = TextSecondary,
+            cursorColor = TextPrimary
+        )
+    )
 }
 
 // ── Channel filter chip row ────────────────────────────────────────────────────
@@ -558,14 +698,50 @@ private fun ActiveContent(
             }
         }
 
-        // Timer
-        val minutes = state.elapsedSeconds / 60L
-        val seconds = state.elapsedSeconds % 60L
+        // Elapsed timer
+        val elapsedMin = state.elapsedSeconds / 60L
+        val elapsedSec = state.elapsedSeconds % 60L
         Text(
-            "${minutes}:${String.format("%02d", seconds)}",
+            "${elapsedMin}:${String.format("%02d", elapsedSec)}",
             style = MaterialTheme.typography.displayLarge,
             color = TextPrimary
         )
+
+        // Countdown timer display (only when enabled)
+        val remaining = state.timerRemainingSeconds
+        if (remaining != null) {
+            val chimeFired = state.timerChimeFired
+            val remH = remaining / 3600L
+            val remM = (remaining % 3600L) / 60L
+            val remS = remaining % 60L
+            val countdownText = if (remH > 0)
+                "${remH}:${String.format("%02d", remM)}:${String.format("%02d", remS)}"
+            else
+                "${remM}:${String.format("%02d", remS)}"
+
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = if (chimeFired) SurfaceVariant else SurfaceDark
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        if (chimeFired) "Timer complete" else "Timer",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextSecondary
+                    )
+                    Text(
+                        if (chimeFired) "🔔" else countdownText,
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = if (chimeFired) TextPrimary else TextSecondary
+                    )
+                }
+            }
+        }
 
         if (state.hasHrMonitor) {
             Row(

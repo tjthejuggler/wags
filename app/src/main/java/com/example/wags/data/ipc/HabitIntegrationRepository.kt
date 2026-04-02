@@ -24,6 +24,7 @@ import javax.inject.Singleton
  *  • [Slot.MORNING_READINESS]   – Morning Readiness assessment completion
  *  • [Slot.HRV_READINESS]       – HRV Readiness session completion
  *  • [Slot.RESONANCE_BREATHING] – Resonance Breathing session stop
+ *  • [Slot.MEDITATION]          – Meditation / NSDR session completion
  *
  * The broadcast is:
  *  - **Explicit** (package + action set) — required for reliable delivery on API 26+
@@ -71,6 +72,11 @@ class HabitIntegrationRepository @Inject constructor(
             idKey   = "habit_id_resonance_breathing",
             nameKey = "habit_name_resonance_breathing",
             label   = "Resonance Breathing"
+        ),
+        MEDITATION(
+            idKey   = "habit_id_meditation",
+            nameKey = "habit_name_meditation",
+            label   = "Meditation / NSDR"
         )
     }
 
