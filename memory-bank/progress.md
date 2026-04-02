@@ -77,6 +77,28 @@
 ### 2026-04-01 20:25 (UTC-6)
 - ✅ Added: "Movie" audio type for Apnea — new `MOVIE` value in `AudioSetting` enum. Appears in all filter chips, settings summaries, personal bests, and history screens. Behaves like Silence (no Spotify). No DB migration needed.
 
+### 2026-04-01 21:11 (UTC-6)
+- ✅ Major Apnea Tables overhaul:
+  - Removed warm-up and recovery phases — tables now go Hold → Breath → Hold directly
+  - Simplified labels to "Hold" and "Breath" (removed "Rest" and "Recovery")
+  - Fixed O2 table breath time from 120s to 60s for all difficulties
+  - Made all table step times (hold + breath) editable before session starts
+  - Added large "First Contraction" button during every hold phase (disappears when tapped, reappears next hold)
+  - Table completions save single unified ApneaRecordEntity + ApneaSessionEntity
+  - First contraction data saved per round in session entity for detail screen
+
+### 2026-04-01 21:28 (UTC-6)
+- ✅ Apnea Tables: Unified record + detail screen + greyscale fixes:
+  - Changed from per-round records to single unified record per table session (longest hold as duration)
+  - Added table session detail card in record detail screen (size, difficulty, rounds, total duration, PB, per-round contractions)
+  - All Records row shows table type as primary text with "Longest hold" subtitle for table records
+  - First Contraction button changed from orange to greyscale (whole app is greyscale)
+  - Detail screen Type label shows human-readable names (O₂ Table, CO₂ Table, etc.)
+  - ApneaRecordDetailViewModel now loads matching ApneaSessionEntity via timestamp+type lookup
+
+### 2026-04-01 22:17 (UTC-6)
+- ✅ Fixed: HR/SpO₂ data not saved for table sessions — `startTableSession()` now starts oximeter collection, `saveCompletedSession()` snapshots RR + oximeter data, computes aggregates, saves telemetry rows. `stopTableSession()` cleans up oximeter collection.
+
 ## Architecture Decisions Log
 
 | Date | Decision | Rationale |

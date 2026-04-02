@@ -82,11 +82,11 @@ fun ContractionOverlay(
 }
 
 /**
- * Summary card shown during RECOVERY phase with cruising time, struggle time, and contraction count.
+ * Summary card shown during VENTILATION (breath) phase with cruising time, struggle time, and contraction count.
  */
 @Composable
 fun ContractionSummaryCard(uiState: ApneaUiState) {
-    if (uiState.apneaState != ApneaState.RECOVERY) return
+    if (uiState.apneaState != ApneaState.VENTILATION && uiState.apneaState != ApneaState.RECOVERY) return
 
     val firstMs = uiState.firstContractionElapsedMs
     val holdMs = uiState.lastHoldDurationMs

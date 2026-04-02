@@ -9,7 +9,10 @@ enum class ApneaState { IDLE, VENTILATION, APNEA, RECOVERY, COMPLETE }
 
 /**
  * Manages apnea session state transitions.
- * States: IDLE → VENTILATION → APNEA → RECOVERY → COMPLETE
+ * States: IDLE → APNEA → VENTILATION → APNEA → … → COMPLETE
+ *
+ * The first phase is always APNEA (hold), followed by VENTILATION (breath).
+ * No warm-up or recovery phases.
  */
 class ApneaStateTransitionHandler @Inject constructor() {
 
@@ -29,31 +32,30 @@ class ApneaStateTransitionHandler @Inject constructor() {
 
     fun startSession() {
         _currentRound.value = 1
-        _state.value = ApneaState.VENTILATION
-    }
-
-    fun onVentilationComplete() {
-        if (_state.value == ApneaState.VENTILATION) {
-            _state.value = ApneaState.APNEA
-        }
+        _state.value = ApneaState.APNEA
     }
 
     fun onApneaComplete() {
         if (_state.value == ApneaState.APNEA) {
-            _state.value = ApneaState.RECOVERY
-        }
-    }
-
-    fun onRecoveryComplete() {
-        if (_state.value == ApneaState.RECOVERY) {
             val nextRound = _currentRound.value + 1
             if (nextRound > totalRounds) {
                 _state.value = ApneaState.COMPLETE
             } else {
-                _currentRound.value = nextRound
                 _state.value = ApneaState.VENTILATION
             }
         }
+    }
+
+    fun onVentilationComplete() {
+        if (_state.value == ApneaState.VENTILATION) {
+            _currentRound.value = _currentRound.value + 1
+            _state.value = ApneaState.APNEA
+        }
+    }
+
+    /** Legacy — kept for compatibility but no longer used in table flow. */
+    fun onRecoveryComplete() {
+        // No-op: recovery phase removed from table flow
     }
 
     fun reset() {

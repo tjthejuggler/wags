@@ -80,7 +80,7 @@ class ApneaTableGenerator @Inject constructor() {
                 co2RestMinSec = 30,
                 o2MaxHoldPercent = 0.70f,
                 o2FirstHoldPercent = 0.40f,
-                o2RestSec = 120
+                o2RestSec = 60
             )
             TableDifficulty.MEDIUM -> TableConfig(
                 length = length,
@@ -90,7 +90,7 @@ class ApneaTableGenerator @Inject constructor() {
                 co2RestMinSec = 15,
                 o2MaxHoldPercent = 0.80f,
                 o2FirstHoldPercent = 0.40f,
-                o2RestSec = 120
+                o2RestSec = 60
             )
             TableDifficulty.HARD -> TableConfig(
                 length = length,
@@ -100,7 +100,7 @@ class ApneaTableGenerator @Inject constructor() {
                 co2RestMinSec = 10,
                 o2MaxHoldPercent = 0.85f,
                 o2FirstHoldPercent = 0.40f,
-                o2RestSec = 150
+                o2RestSec = 60
             )
         }
     }

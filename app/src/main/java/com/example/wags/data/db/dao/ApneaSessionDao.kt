@@ -22,4 +22,11 @@ interface ApneaSessionDao {
 
     @Query("SELECT MAX(pbAtSessionMs) FROM apnea_sessions")
     suspend fun getMaxPb(): Long?
+
+    @Query("SELECT * FROM apnea_sessions WHERE sessionId = :sessionId")
+    suspend fun getById(sessionId: Long): ApneaSessionEntity?
+
+    /** Find a session by its timestamp — used to link ApneaRecordEntity to its session. */
+    @Query("SELECT * FROM apnea_sessions WHERE timestamp = :timestamp AND tableType = :tableType LIMIT 1")
+    suspend fun getByTimestampAndType(timestamp: Long, tableType: String): ApneaSessionEntity?
 }

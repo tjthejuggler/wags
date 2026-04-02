@@ -5,10 +5,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 
-private const val RECOVERY_DURATION_MS = 30_000L
-
 /**
- * Orchestrates the full apnea session: table steps → countdown → state transitions.
+ * Orchestrates the full apnea table session: APNEA → VENTILATION → APNEA → … → COMPLETE.
+ *
+ * No warm-up or recovery phases — just Hold and Breath, alternating.
  * Delegates timing to [ApneaCountdownTimer] and state to [ApneaStateTransitionHandler].
  */
 class ApneaStateMachine @Inject constructor(
@@ -36,30 +36,12 @@ class ApneaStateMachine @Inject constructor(
         stateChangeCallback = onStateChange
     }
 
+    /** Start the session — begins immediately with the first APNEA (hold) phase. */
     fun start(scope: CoroutineScope) {
         val t = table ?: return
         stateHandler.startSession()
-        stateChangeCallback?.invoke(ApneaState.VENTILATION)
-        startVentilation(scope, t, 0)
-    }
-
-    private fun startVentilation(scope: CoroutineScope, table: ApneaTable, stepIndex: Int) {
-        if (stepIndex >= table.steps.size) {
-            stateHandler.onRecoveryComplete()
-            stateChangeCallback?.invoke(ApneaState.COMPLETE)
-            return
-        }
-        val step = table.steps[stepIndex]
-        timer.start(
-            durationMs = step.ventilationDurationMs,
-            scope = scope,
-            onWarning = { warningCallback?.invoke(it) },
-            onComplete = {
-                stateHandler.onVentilationComplete()
-                stateChangeCallback?.invoke(ApneaState.APNEA)
-                startApnea(scope, table, stepIndex)
-            }
-        )
+        stateChangeCallback?.invoke(ApneaState.APNEA)
+        startApnea(scope, t, 0)
     }
 
     private fun startApnea(scope: CoroutineScope, table: ApneaTable, stepIndex: Int) {
@@ -70,26 +52,26 @@ class ApneaStateMachine @Inject constructor(
             onWarning = { warningCallback?.invoke(it) },
             onComplete = {
                 stateHandler.onApneaComplete()
-                stateChangeCallback?.invoke(ApneaState.RECOVERY)
-                startRecovery(scope, table, stepIndex)
+                val nextState = stateHandler.state.value
+                stateChangeCallback?.invoke(nextState)
+                if (nextState == ApneaState.VENTILATION) {
+                    startVentilation(scope, table, stepIndex)
+                }
+                // If COMPLETE, the callback above already fired
             }
         )
     }
 
-    private fun startRecovery(scope: CoroutineScope, table: ApneaTable, stepIndex: Int) {
+    private fun startVentilation(scope: CoroutineScope, table: ApneaTable, stepIndex: Int) {
+        val step = table.steps[stepIndex]
         timer.start(
-            durationMs = RECOVERY_DURATION_MS,
+            durationMs = step.ventilationDurationMs,
             scope = scope,
             onWarning = { warningCallback?.invoke(it) },
             onComplete = {
-                stateHandler.onRecoveryComplete()
-                val nextStep = stepIndex + 1
-                if (nextStep < table.steps.size) {
-                    stateChangeCallback?.invoke(ApneaState.VENTILATION)
-                    startVentilation(scope, table, nextStep)
-                } else {
-                    stateChangeCallback?.invoke(ApneaState.COMPLETE)
-                }
+                stateHandler.onVentilationComplete()
+                stateChangeCallback?.invoke(ApneaState.APNEA)
+                startApnea(scope, table, stepIndex + 1)
             }
         )
     }

@@ -14,5 +14,5 @@ data class TableConfig(
     // O2 parameters (set by difficulty)
     val o2MaxHoldPercent: Float,
     val o2FirstHoldPercent: Float,  // always 0.40f
-    val o2RestSec: Int              // 120–180s
+    val o2RestSec: Int              // 60s breath time
 )

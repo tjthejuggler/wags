@@ -5,8 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.DevicePreferencesRepository
 import com.example.wags.data.db.entity.ApneaRecordEntity
+import com.example.wags.data.db.entity.ApneaSessionEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
 import com.example.wags.data.repository.ApneaRepository
+import com.example.wags.data.repository.ApneaSessionRepository
 import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
@@ -42,13 +44,16 @@ data class ApneaRecordDetailUiState(
     /** Editable device label — null means "None recorded". */
     val editHrDeviceId: String? = null,
     /** All device labels ever used, for the edit dropdown. */
-    val deviceLabelOptions: List<String> = emptyList()
+    val deviceLabelOptions: List<String> = emptyList(),
+    /** Matching session entity for table records (null for free holds). */
+    val tableSession: ApneaSessionEntity? = null
 )
 
 @HiltViewModel
 class ApneaRecordDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val apneaRepository: ApneaRepository,
+    private val sessionRepository: ApneaSessionRepository,
     private val devicePrefs: DevicePreferencesRepository
 ) : ViewModel() {
 
@@ -70,12 +75,17 @@ class ApneaRecordDetailViewModel @Inject constructor(
                 val telemetry = apneaRepository.getTelemetryForRecord(recordId)
                 val badges = apneaRepository.getRecordPbBadges(recordId)
                 val songLog = apneaRepository.getSongLogForRecord(recordId)
+                // For table records, find the matching session entity
+                val tableSession = if (record.tableType != null) {
+                    sessionRepository.getSessionByTimestampAndType(record.timestamp, record.tableType)
+                } else null
                 _uiState.update {
                     it.copy(
                         record = record,
                         telemetry = telemetry,
                         pbBadges = badges,
                         songLog = songLog,
+                        tableSession = tableSession,
                         isLoading = false
                     )
                 }

@@ -112,6 +112,10 @@ data class ApneaUiState(
     val firstContractionElapsedMs: Long? = null,
     val currentRoundStartMs: Long = 0L,
     val lastHoldDurationMs: Long = 0L,
+    /** Whether the "First Contraction" button has been tapped this round. */
+    val firstContractionTappedThisRound: Boolean = false,
+    /** Per-round first contraction data: Map<roundNumber, elapsedMs>. */
+    val roundFirstContractions: Map<Int, Long> = emptyMap(),
     // Live oximeter readings (null when oximeter not connected / no data yet)
     val liveOxHr: Int? = null,
     val liveOxSpO2: Int? = null,
@@ -205,6 +209,7 @@ class ApneaViewModel @Inject constructor(
     )
 
     private var freeHoldStartTime = 0L
+    private var tableSessionStartTime = 0L
 
     /**
      * Timestamped oximeter readings collected while a free hold is active.
@@ -404,14 +409,16 @@ class ApneaViewModel @Inject constructor(
                 audioHapticEngine.announceHoldBegin()
                 onApneaPhaseStarted()
             }
-            ApneaState.RECOVERY -> {
+            ApneaState.VENTILATION -> {
                 audioHapticEngine.announceBreath()
+                // Capture hold duration for the contraction summary card
                 val table = _uiState.value.currentTable
-                val round = _uiState.value.currentRound
-                val holdMs = table?.steps?.getOrNull(round - 1)?.apneaDurationMs ?: 0L
+                // After apnea completes, currentRound has already advanced for the next round,
+                // so the just-finished round is currentRound - 1 (or currentRound if not yet incremented)
+                val justFinishedRound = _uiState.value.currentRound - 1
+                val holdMs = table?.steps?.getOrNull(justFinishedRound.coerceAtLeast(0))?.apneaDurationMs ?: 0L
                 _uiState.update { it.copy(lastHoldDurationMs = holdMs) }
             }
-            ApneaState.VENTILATION -> audioHapticEngine.announceBreath()
             ApneaState.COMPLETE -> {
                 audioHapticEngine.announceSessionComplete()
                 saveCompletedSession()
@@ -423,28 +430,120 @@ class ApneaViewModel @Inject constructor(
     }
 
     private fun saveCompletedSession() {
+        // Stop collecting oximeter readings before saving so the snapshot is stable
+        oximeterCollectionJob?.cancel()
+        oximeterCollectionJob = null
+
+        val oxSnapshot = if (oximeterIsPrimary) oximeterSamples.toList() else emptyList()
+        oximeterSamples.clear()
+        val deviceLabel = hrDataSource.activeHrDeviceLabel()
+
         viewModelScope.launch {
             val state = _uiState.value
             val tableType = state.currentTable?.type?.name ?: "UNKNOWN"
             val variantStr = "${state.selectedLength.name}_${state.selectedDifficulty.name}"
-            val contractionJson = state.contractionTimestamps
-                .joinToString(",", "[", "]") { it.toString() }
-            val entity = ApneaSessionEntity(
-                timestamp = System.currentTimeMillis(),
+            val now = System.currentTimeMillis()
+            val table = state.currentTable ?: return@launch
+
+            // ── HR / SpO₂ aggregates (same logic as free hold) ──────────────
+            val rrSnapshot = if (!oximeterIsPrimary) deviceManager.rrBuffer.readLast(512) else emptyList()
+            val rrHrValues = rrSnapshot.map { 60_000.0 / it }
+            val minHrFromRr = rrHrValues.minOrNull()?.toFloat() ?: 0f
+            val maxHrFromRr = rrHrValues.maxOrNull()?.toFloat() ?: 0f
+
+            val oxHrValues = oxSnapshot.map { it.second.heartRateBpm.toFloat() }
+            val oxSpO2Values = oxSnapshot.map { it.second.spO2.toFloat() }
+            val maxHrFromOx = oxHrValues.maxOrNull() ?: 0f
+            val lowestSpO2 = oxSpO2Values.minOrNull()?.toInt()
+
+            val minHr = if (minHrFromRr > 0f) minHrFromRr else oxHrValues.minOrNull() ?: 0f
+            val maxHr = if (maxHrFromRr > 0f) maxHrFromRr else maxHrFromOx
+
+            // Build per-round first contraction JSON: {"1":12345,"3":23456}
+            val roundFcJson = if (state.roundFirstContractions.isNotEmpty()) {
+                state.roundFirstContractions.entries
+                    .joinToString(",", "{", "}") { "\"${it.key}\":${it.value}" }
+            } else "{}"
+
+            val totalSessionMs = table.steps.sumOf { it.apneaDurationMs + it.ventilationDurationMs }
+
+            // 1. Save the session entity with per-round contraction data
+            val sessionEntity = ApneaSessionEntity(
+                timestamp = now,
                 tableType = tableType,
                 tableVariant = variantStr,
-                tableParamsJson = "{}",
+                tableParamsJson = roundFcJson,
                 pbAtSessionMs = state.personalBestMs,
-                totalSessionDurationMs = state.currentTable?.steps
-                    ?.sumOf { it.apneaDurationMs + it.ventilationDurationMs } ?: 0L,
-                contractionTimestampsJson = contractionJson,
-                maxHrBpm = null,
-                lowestSpO2 = null,
+                totalSessionDurationMs = totalSessionMs,
+                contractionTimestampsJson = "[]",
+                maxHrBpm = maxHr.toInt().takeIf { it > 0 },
+                lowestSpO2 = lowestSpO2,
                 roundsCompleted = state.currentRound,
                 totalRounds = state.totalRounds,
-                hrDeviceId = hrDataSource.activeHrDeviceLabel()
+                hrDeviceId = deviceLabel
             )
-            sessionRepository.saveSession(entity)
+            sessionRepository.saveSession(sessionEntity)
+
+            // 2. Save a SINGLE ApneaRecordEntity for the whole table session
+            //    so it appears in All Records, Stats, and Calendar.
+            //    Duration = longest hold; tableType identifies it as a table.
+            val longestHoldMs = table.steps.maxOfOrNull { it.apneaDurationMs } ?: 0L
+            val recordId = apneaRepository.saveRecord(
+                ApneaRecordEntity(
+                    timestamp = now,
+                    durationMs = longestHoldMs,
+                    lungVolume = state.selectedLungVolume,
+                    prepType = state.prepType.name,
+                    minHrBpm = minHr,
+                    maxHrBpm = maxHr,
+                    tableType = tableType,
+                    lowestSpO2 = lowestSpO2,
+                    timeOfDay = state.timeOfDay.name,
+                    firstContractionMs = null,
+                    hrDeviceId = deviceLabel,
+                    posture = state.posture.name,
+                    audio = state.audio.name
+                )
+            )
+
+            // 3. Save telemetry rows so the detail screen can show HR/SpO₂ charts
+            if (recordId > 0) {
+                val samples = mutableListOf<FreeHoldTelemetryEntity>()
+
+                // Polar RR → per-beat HR telemetry
+                if (rrSnapshot.isNotEmpty()) {
+                    var cumulativeMs = 0L
+                    for (rrMs in rrSnapshot) {
+                        cumulativeMs += rrMs.toLong()
+                        val bpm = (60_000.0 / rrMs).toInt()
+                        samples.add(
+                            FreeHoldTelemetryEntity(
+                                recordId = recordId,
+                                timestampMs = tableSessionStartTime + cumulativeMs,
+                                heartRateBpm = bpm,
+                                spO2 = null
+                            )
+                        )
+                    }
+                }
+
+                // Oximeter → HR + SpO₂ telemetry
+                for ((timestampMs, reading) in oxSnapshot) {
+                    if (timestampMs < tableSessionStartTime) continue
+                    samples.add(
+                        FreeHoldTelemetryEntity(
+                            recordId = recordId,
+                            timestampMs = timestampMs,
+                            heartRateBpm = reading.heartRateBpm,
+                            spO2 = reading.spO2
+                        )
+                    )
+                }
+
+                if (samples.isNotEmpty()) {
+                    apneaRepository.saveTelemetry(samples)
+                }
+            }
         }
     }
 
@@ -477,6 +576,7 @@ class ApneaViewModel @Inject constructor(
                 contractionTimestamps = emptyList(),
                 contractionCount = 0,
                 firstContractionElapsedMs = null,
+                firstContractionTappedThisRound = false,
                 currentRoundStartMs = System.currentTimeMillis()
             )
         }
@@ -494,6 +594,37 @@ class ApneaViewModel @Inject constructor(
             )
         }
         audioHapticEngine.vibrateContractionLogged()
+    }
+
+    /** Called when the user taps the "First Contraction" button during a hold. */
+    fun logFirstContraction() {
+        val now = System.currentTimeMillis()
+        val elapsed = now - _uiState.value.currentRoundStartMs
+        val round = _uiState.value.currentRound
+        _uiState.update { state ->
+            state.copy(
+                firstContractionTappedThisRound = true,
+                firstContractionElapsedMs = state.firstContractionElapsedMs ?: elapsed,
+                roundFirstContractions = state.roundFirstContractions + (round to elapsed)
+            )
+        }
+        audioHapticEngine.vibrateContractionLogged()
+    }
+
+    /** Update a specific step's hold or breath time in the current table. */
+    fun updateTableStep(roundNumber: Int, newHoldMs: Long? = null, newBreathMs: Long? = null) {
+        val table = _uiState.value.currentTable ?: return
+        val updatedSteps = table.steps.map { step ->
+            if (step.roundNumber == roundNumber) {
+                step.copy(
+                    apneaDurationMs = newHoldMs ?: step.apneaDurationMs,
+                    ventilationDurationMs = newBreathMs ?: step.ventilationDurationMs
+                )
+            } else step
+        }
+        val updatedTable = table.copy(steps = updatedSteps)
+        stateMachine.load(updatedTable)
+        _uiState.update { it.copy(currentTable = updatedTable) }
     }
 
     fun setPersonalBest(pbMs: Long) {
@@ -533,6 +664,17 @@ class ApneaViewModel @Inject constructor(
         if (polarDeviceId != null) {
             deviceManager.startRrStream(polarDeviceId)
         }
+        tableSessionStartTime = System.currentTimeMillis()
+        oximeterIsPrimary = hrDataSource.isOximeterPrimaryDevice()
+        oximeterSamples.clear()
+        oximeterCollectionJob?.cancel()
+        if (oximeterIsPrimary) {
+            oximeterCollectionJob = viewModelScope.launch {
+                deviceManager.oximeterReadings.collect { reading ->
+                    oximeterSamples.add(System.currentTimeMillis() to reading)
+                }
+            }
+        }
         stateMachine.setCallbacks(
             onWarning = { secs -> onWarning(secs) },
             onStateChange = { /* state collected via flow in init */ }
@@ -547,6 +689,9 @@ class ApneaViewModel @Inject constructor(
     }
 
     fun stopTableSession() {
+        oximeterCollectionJob?.cancel()
+        oximeterCollectionJob = null
+        oximeterSamples.clear()
         val tracksPlayed = if (_audio.value == AudioSetting.MUSIC) {
             val tracks = spotifyManager.stopTracking()
             spotifyManager.sendPauseAndRewindCommand()

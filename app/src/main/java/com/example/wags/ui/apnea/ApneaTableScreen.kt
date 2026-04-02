@@ -3,11 +3,13 @@ package com.example.wags.ui.apnea
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -80,12 +82,7 @@ fun ApneaTableScreen(
         if (state.personalBestMs <= 0L) {
             NoPbContent(modifier = Modifier.padding(padding))
         } else {
-            // Box allows the overlay to sit behind the scrollable content
             Box(modifier = Modifier.fillMaxSize()) {
-                ContractionOverlay(
-                    uiState = state,
-                    onLogContraction = { viewModel.logContraction() }
-                )
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
@@ -93,7 +90,7 @@ fun ApneaTableScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Settings summary — always visible so the user knows which settings are active
+                    // Settings summary
                     item {
                         ApneaSettingsSummaryBanner(
                             lungVolume = state.selectedLungVolume,
@@ -103,7 +100,7 @@ fun ApneaTableScreen(
                             audio      = state.audio.name
                         )
                     }
-                    // Hyperventilating advice — shown only when prep type is HYPER
+                    // Hyperventilating advice
                     if (state.prepType == PrepType.HYPER) {
                         item {
                             AdviceBanner(section = AdviceSection.APNEA_HYPER)
@@ -117,8 +114,24 @@ fun ApneaTableScreen(
                             remainingSeconds = state.remainingSeconds
                         )
                     }
+                    // First Contraction button — shown during APNEA phase, hidden once tapped
+                    if (state.apneaState == ApneaState.APNEA && !state.firstContractionTappedThisRound) {
+                        item {
+                            FirstContractionButton(
+                                onTap = { viewModel.logFirstContraction() }
+                            )
+                        }
+                    }
+                    // Show first contraction time after it's been tapped
+                    if (state.apneaState == ApneaState.APNEA && state.firstContractionTappedThisRound) {
+                        item {
+                            FirstContractionConfirmation(
+                                elapsedMs = state.firstContractionElapsedMs ?: 0L
+                            )
+                        }
+                    }
                     item {
-                        ContractionSummaryCard(uiState = state)
+                        TableContractionSummaryCard(uiState = state)
                     }
                     // Song picker — shown when MUSIC is selected, Spotify connected, session not active
                     if (state.audio == AudioSetting.MUSIC && state.spotifyConnected &&
@@ -157,7 +170,14 @@ fun ApneaTableScreen(
                                 step = step,
                                 isActive = state.apneaState != ApneaState.IDLE &&
                                         state.currentRound == step.roundNumber,
-                                isComplete = state.currentRound > step.roundNumber
+                                isComplete = state.currentRound > step.roundNumber,
+                                isEditable = state.apneaState == ApneaState.IDLE,
+                                onHoldChanged = { newSec ->
+                                    viewModel.updateTableStep(step.roundNumber, newHoldMs = newSec * 1000L)
+                                },
+                                onBreathChanged = { newSec ->
+                                    viewModel.updateTableStep(step.roundNumber, newBreathMs = newSec * 1000L)
+                                }
                             )
                         }
                     }
@@ -199,8 +219,13 @@ private fun SessionStatusCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            val displayName = when (apneaState) {
+                ApneaState.APNEA -> "HOLD"
+                ApneaState.VENTILATION -> "BREATH"
+                else -> apneaState.name
+            }
             Text(
-                text = apneaState.name,
+                text = displayName,
                 style = MaterialTheme.typography.headlineMedium,
                 color = apneaStateColor(apneaState)
             )
@@ -225,6 +250,83 @@ private fun SessionStatusCard(
             if (apneaState == ApneaState.COMPLETE) {
                 Text("Session Complete!", style = MaterialTheme.typography.titleLarge,
                     color = TextPrimary)
+            }
+        }
+    }
+}
+
+/** Large "First Contraction" button shown during each hold phase. */
+@Composable
+private fun FirstContractionButton(onTap: () -> Unit) {
+    Button(
+        onClick = onTap,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(80.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color(0xFF555555)
+        )
+    ) {
+        Text(
+            "First Contraction",
+            style = MaterialTheme.typography.headlineSmall,
+            color = Color.White
+        )
+    }
+}
+
+/** Confirmation shown after the first contraction button is tapped. */
+@Composable
+private fun FirstContractionConfirmation(elapsedMs: Long) {
+    val secs = elapsedMs / 1000L
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF2D2D2D))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "First contraction at ${secs}s ✓",
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color(0xFFCCCCCC)
+            )
+        }
+    }
+}
+
+/** Contraction summary shown during VENTILATION phase (between holds). */
+@Composable
+private fun TableContractionSummaryCard(uiState: ApneaUiState) {
+    if (uiState.apneaState != ApneaState.VENTILATION) return
+
+    val firstMs = uiState.firstContractionElapsedMs
+    val holdMs = uiState.lastHoldDurationMs
+
+    val cruising = if (firstMs != null) formatTableMmSs(firstMs) else "—"
+    val struggle = if (firstMs != null && holdMs > 0L) formatTableMmSs(holdMs - firstMs) else "—"
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = SurfaceVariant)
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Cruising", style = MaterialTheme.typography.labelSmall, color = Color(0xFFAAAAAA))
+                Text(cruising, style = MaterialTheme.typography.bodyMedium)
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Struggle", style = MaterialTheme.typography.labelSmall, color = Color(0xFFAAAAAA))
+                Text(struggle, style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
@@ -258,13 +360,26 @@ private fun SessionControlRow(
 private fun TableStepRow(
     step: ApneaTableStep,
     isActive: Boolean,
-    isComplete: Boolean
+    isComplete: Boolean,
+    isEditable: Boolean,
+    onHoldChanged: (Long) -> Unit,
+    onBreathChanged: (Long) -> Unit
 ) {
     val containerColor = when {
         isActive -> SurfaceVariant
         isComplete -> SurfaceDark.copy(alpha = 0.5f)
         else -> SurfaceDark
     }
+
+    var editingHold by remember { mutableStateOf(false) }
+    var editingBreath by remember { mutableStateOf(false) }
+    var holdInput by remember(step.apneaDurationMs) {
+        mutableStateOf((step.apneaDurationMs / 1000L).toString())
+    }
+    var breathInput by remember(step.ventilationDurationMs) {
+        mutableStateOf((step.ventilationDurationMs / 1000L).toString())
+    }
+
     Card(colors = CardDefaults.cardColors(containerColor = containerColor)) {
         Row(
             modifier = Modifier.padding(12.dp).fillMaxWidth(),
@@ -277,6 +392,7 @@ private fun TableStepRow(
                 color = if (isComplete) TextDisabled else TextPrimary
             )
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                // Hold column
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Hold", style = MaterialTheme.typography.labelMedium)
@@ -285,25 +401,89 @@ private fun TableStepRow(
                             content = HOLD_HELP_CONTENT
                         )
                     }
-                    Text(
-                        "${step.apneaDurationMs / 1000L}s",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = if (isActive) ApneaHold else TextPrimary
-                    )
+                    if (isEditable && editingHold) {
+                        OutlinedTextField(
+                            value = holdInput,
+                            onValueChange = { holdInput = it },
+                            modifier = Modifier.width(64.dp),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            textStyle = MaterialTheme.typography.bodyMedium
+                        )
+                        Row {
+                            TextButton(onClick = {
+                                holdInput.toLongOrNull()?.let { onHoldChanged(it) }
+                                editingHold = false
+                            }) { Text("✓", color = TextPrimary) }
+                            TextButton(onClick = {
+                                holdInput = (step.apneaDurationMs / 1000L).toString()
+                                editingHold = false
+                            }) { Text("✗", color = TextSecondary) }
+                        }
+                    } else {
+                        Text(
+                            "${step.apneaDurationMs / 1000L}s",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (isActive) ApneaHold else TextPrimary,
+                            modifier = if (isEditable) Modifier.let { mod ->
+                                mod.then(
+                                    Modifier.padding(4.dp)
+                                )
+                            } else Modifier
+                        )
+                        if (isEditable) {
+                            TextButton(
+                                onClick = { editingHold = true },
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text("edit", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                            }
+                        }
+                    }
                 }
+                // Breath column
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Rest", style = MaterialTheme.typography.labelMedium)
+                        Text("Breath", style = MaterialTheme.typography.labelMedium)
                         InfoHelpBubble(
-                            title = REST_HELP_TITLE,
-                            content = REST_HELP_CONTENT
+                            title = BREATH_HELP_TITLE,
+                            content = BREATH_HELP_CONTENT
                         )
                     }
-                    Text(
-                        "${step.ventilationDurationMs / 1000L}s",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = if (isActive) ApneaVentilation else TextSecondary
-                    )
+                    if (isEditable && editingBreath) {
+                        OutlinedTextField(
+                            value = breathInput,
+                            onValueChange = { breathInput = it },
+                            modifier = Modifier.width(64.dp),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            textStyle = MaterialTheme.typography.bodyMedium
+                        )
+                        Row {
+                            TextButton(onClick = {
+                                breathInput.toLongOrNull()?.let { onBreathChanged(it) }
+                                editingBreath = false
+                            }) { Text("✓", color = TextPrimary) }
+                            TextButton(onClick = {
+                                breathInput = (step.ventilationDurationMs / 1000L).toString()
+                                editingBreath = false
+                            }) { Text("✗", color = TextSecondary) }
+                        }
+                    } else {
+                        Text(
+                            "${step.ventilationDurationMs / 1000L}s",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (isActive) ApneaVentilation else TextSecondary
+                        )
+                        if (isEditable) {
+                            TextButton(
+                                onClick = { editingBreath = true },
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text("edit", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                            }
+                        }
+                    }
                 }
             }
             if (isActive) {
@@ -319,24 +499,31 @@ private fun apneaStateColor(state: ApneaState) = when (state) {
     ApneaState.IDLE -> TextSecondary
     ApneaState.VENTILATION -> ApneaVentilation
     ApneaState.APNEA -> ApneaHold
-    ApneaState.RECOVERY -> ApneaRecovery
+    ApneaState.RECOVERY -> ApneaVentilation  // fallback — recovery no longer used in tables
     ApneaState.COMPLETE -> TextPrimary
 }
 
-private const val REST_HELP_TITLE = "Rest Phase (Ventilation)"
-private const val REST_HELP_CONTENT = """
-Purpose: Recovery between breath-holds. Allows CO₂ to clear and O₂ to replenish.
+private fun formatTableMmSs(ms: Long): String {
+    val totalSecs = (ms / 1000L).coerceAtLeast(0L)
+    val mins = totalSecs / 60
+    val secs = totalSecs % 60
+    return if (mins > 0) "${mins}m ${secs}s" else "${secs}s"
+}
 
-In CO₂ Tables: Rest decreases each round to build CO₂ tolerance.
-Formula: R_n = R₁ - ((n-1) × ΔR)
-• R₁ = Initial rest (equals hold time)
-• ΔR = (R₁ - R_min) / (N-1)
+private const val BREATH_HELP_TITLE = "Breath Phase"
+private const val BREATH_HELP_CONTENT = """
+Purpose: Recovery breathing between holds. Allows CO₂ to clear and O₂ to replenish.
+
+In CO₂ Tables: Breath time decreases each round to build CO₂ tolerance.
+Formula: B_n = B₁ - ((n-1) × ΔB)
+• B₁ = Initial breath time (equals hold time)
+• ΔB = (B₁ - B_min) / (N-1)
 • n = Current round number
 
-In O₂ Tables: Rest is fixed (120–180s) to allow full O₂ recovery.
+In O₂ Tables: Breath time is fixed (60s) to allow O₂ recovery.
 """
 
-private const val HOLD_HELP_TITLE = "Breath-Hold Phase (Apnea)"
+private const val HOLD_HELP_TITLE = "Hold Phase (Apnea)"
 private const val HOLD_HELP_CONTENT = """
 Purpose: The actual breath-hold. Your body consumes O₂ and produces CO₂.
 
@@ -349,20 +536,4 @@ Formula: H_n = H₁ + ((n-1) × ΔH)
 • T_PB = Your Personal Best
 
 Physiological note: The urge to breathe is triggered by rising CO₂, not falling O₂.
-"""
-
-private const val CONTRACTION_HELP_TITLE = "Diaphragmatic Contractions"
-private const val CONTRACTION_HELP_CONTENT = """
-Purpose: Involuntary diaphragm contractions signal rising CO₂ levels.
-
-Phases:
-• Cruising Phase: Time from hold start to first contraction (aerobic zone)
-• Struggle Phase: Time from first contraction to hold end (anaerobic zone)
-
-Training insight: A longer Cruising Phase indicates better CO₂ tolerance.
-The ratio Cruising/Total Hold is your "efficiency score".
-
-Formula: Efficiency = T_cruise / T_total × 100%
-• T_cruise = Time to first contraction
-• T_total = Total hold duration
 """

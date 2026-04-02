@@ -617,12 +617,28 @@ private fun AllRecordsRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    formatAllRecordsMs(record.durationMs),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = EcgCyan,
-                    fontWeight = FontWeight.SemiBold
-                )
+                if (record.tableType != null) {
+                    // Table record: show table type as primary, duration as secondary
+                    Text(
+                        eventLabel,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = EcgCyan,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "Longest hold: ${formatAllRecordsMs(record.durationMs)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextSecondary
+                    )
+                } else {
+                    // Free hold: show duration as primary
+                    Text(
+                        formatAllRecordsMs(record.durationMs),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = EcgCyan,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
                 Text(
                     dateStr,
                     style = MaterialTheme.typography.labelSmall,
@@ -634,11 +650,13 @@ private fun AllRecordsRow(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        eventLabel,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = TextSecondary
-                    )
+                    if (record.tableType == null) {
+                        Text(
+                            eventLabel,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = TextSecondary
+                        )
+                    }
                     Text(
                         "${if (record.lungVolume == "PARTIAL") "Half" else record.lungVolume.lowercase().replaceFirstChar { it.uppercase() }}  ·  ${record.prepType.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }}  ·  ${record.posture.lowercase().replaceFirstChar { it.uppercase() }}",
                         style = MaterialTheme.typography.labelSmall,

@@ -23,7 +23,7 @@ internal const val O2_HELP_TITLE = "O₂ Deprivation Training (Hypoxia)"
 internal const val O2_HELP_TEXT = """Purpose: Trains your body to function at lower oxygen levels — extends your aerobic capacity.
 
 Formula:
-• Rest Time: T_rest = fixed (120–150s, set by Difficulty)
+• Breath Time: T_breath = fixed (60s)
 • First Hold: H₁ = T_PB × 40%
 • Max Hold: H_max = T_PB × max% (set by Difficulty)
 • Hold Increment: ΔH = (H_max - H₁) / (N - 1)
@@ -34,7 +34,7 @@ Variables:
 • N = Total rounds (set by Session Length)
 • H_n = Hold duration for round n
 
-Effect: Fixed rest with progressively longer holds pushes your oxygen limits safely."""
+Effect: Fixed breath time with progressively longer holds pushes your oxygen limits safely."""
 
 internal const val PB_HELP_TITLE = "Personal Best (PB)"
 internal const val PB_HELP_CONTENT = """

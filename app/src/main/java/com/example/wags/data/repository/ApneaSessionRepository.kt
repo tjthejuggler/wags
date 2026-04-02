@@ -39,6 +39,16 @@ class ApneaSessionRepository @Inject constructor(
         apneaSessionDao.getByType(type)
     }
 
+    suspend fun getSessionById(sessionId: Long): ApneaSessionEntity? = withContext(ioDispatcher) {
+        apneaSessionDao.getById(sessionId)
+    }
+
+    /** Find a session entity matching a record's timestamp and table type. */
+    suspend fun getSessionByTimestampAndType(timestamp: Long, tableType: String): ApneaSessionEntity? =
+        withContext(ioDispatcher) {
+            apneaSessionDao.getByTimestampAndType(timestamp, tableType)
+        }
+
     suspend fun getContractionsForSession(sessionId: Long): List<ContractionEntity> = withContext(ioDispatcher) {
         contractionDao.getForSession(sessionId)
     }

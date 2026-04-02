@@ -28,6 +28,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.db.entity.ApneaRecordEntity
+import com.example.wags.data.db.entity.ApneaSessionEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
 import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.PersonalBestCategory
@@ -132,6 +133,7 @@ fun ApneaRecordDetailScreen(
                     telemetry = state.telemetry,
                     pbBadges = state.pbBadges,
                     songLog = state.songLog,
+                    tableSession = state.tableSession,
                     modifier = Modifier.padding(padding)
                 )
             }
@@ -432,6 +434,7 @@ private fun RecordDetailContent(
     telemetry: List<FreeHoldTelemetryEntity>,
     pbBadges: List<RecordPbBadge>,
     songLog: List<SpotifySong> = emptyList(),
+    tableSession: ApneaSessionEntity? = null,
     modifier: Modifier = Modifier
 ) {
     val dateStr = remember(record.timestamp) {
@@ -521,7 +524,16 @@ private fun RecordDetailContent(
                     }
                     DetailRow(label = "Song", value = songText)
                 }
-                DetailRow(label = "Type", value = record.tableType ?: "Free Hold")
+                DetailRow(label = "Type", value = when (record.tableType) {
+                    null                       -> "Free Hold"
+                    "O2"                       -> "O₂ Table"
+                    "CO2"                      -> "CO₂ Table"
+                    "PROGRESSIVE_O2"           -> "Progressive O₂"
+                    "MIN_BREATH"               -> "Min Breath"
+                    "WONKA_FIRST_CONTRACTION"  -> "Wonka: Contraction"
+                    "WONKA_ENDURANCE"          -> "Wonka: Endurance"
+                    else                       -> record.tableType ?: "Free Hold"
+                })
                 DetailRow(
                     label = "HR/SpO₂ Device",
                     value = record.hrDeviceId ?: "None recorded"
@@ -565,6 +577,76 @@ private fun RecordDetailContent(
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = statusColor
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Table Session Details ───────────────────────────────────────
+        if (tableSession != null) {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceVariant)) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text("Table Session", style = MaterialTheme.typography.titleLarge)
+
+                    // Parse variant: "SHORT_EASY" → "Short" + "Easy"
+                    val parts = tableSession.tableVariant.split("_")
+                    val lengthLabel = parts.getOrNull(0)?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "—"
+                    val difficultyLabel = parts.getOrNull(1)?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "—"
+
+                    DetailRow(label = "Size", value = lengthLabel)
+                    DetailRow(label = "Difficulty", value = difficultyLabel)
+                    DetailRow(
+                        label = "Rounds",
+                        value = "${tableSession.roundsCompleted} / ${tableSession.totalRounds}"
+                    )
+                    DetailRow(
+                        label = "Total Duration",
+                        value = formatMsDetail(tableSession.totalSessionDurationMs)
+                    )
+                    DetailRow(
+                        label = "PB at Session",
+                        value = formatMsDetail(tableSession.pbAtSessionMs)
+                    )
+                    DetailRow(
+                        label = "Longest Hold",
+                        value = formatMsDetail(record.durationMs),
+                        valueColor = TextPrimary,
+                        valueBold = true
+                    )
+
+                    // Per-round first contraction data from tableParamsJson
+                    // Format: {"1":12345,"3":23456} where key=round, value=elapsed ms
+                    val fcJson = tableSession.tableParamsJson
+                    if (fcJson.length > 2 && fcJson != "{}") {
+                        HorizontalDivider(
+                            color = TextDisabled.copy(alpha = 0.3f),
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+                        Text(
+                            "First Contractions",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = TextPrimary
+                        )
+                        // Simple parse: remove braces, split by comma
+                        val entries = fcJson.trim('{', '}').split(",")
+                            .mapNotNull { entry ->
+                                val kv = entry.split(":")
+                                if (kv.size == 2) {
+                                    val round = kv[0].trim().trim('"').toIntOrNull()
+                                    val ms = kv[1].trim().toLongOrNull()
+                                    if (round != null && ms != null) round to ms else null
+                                } else null
+                            }
+                            .sortedBy { it.first }
+                        entries.forEach { (round, ms) ->
+                            DetailRow(
+                                label = "Round $round",
+                                value = formatMsDetail(ms)
                             )
                         }
                     }
