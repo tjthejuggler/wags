@@ -171,8 +171,6 @@ fun ApneaScreen(
                         bestTimeRecordId   = state.bestTimeForSettingsRecordId,
                         lastTimeRecordId   = state.lastFreeHoldForSettingsRecordId,
                         bestTimeTrophyCategory = state.bestTimeTrophyCategory,
-                        showTimer = state.showTimer,
-                        onShowTimerChange = { viewModel.setShowTimer(it) },
                         onStartHold = {
                             navController.navigate(
                                 WagsRoutes.freeHoldActive(
@@ -695,8 +693,6 @@ private fun FreeHoldContent(
     bestTimeRecordId: Long?,
     lastTimeRecordId: Long?,
     bestTimeTrophyCategory: PersonalBestCategory?,
-    showTimer: Boolean,
-    onShowTimerChange: (Boolean) -> Unit,
     onStartHold: () -> Unit,
     onBestTimeClick: (Long) -> Unit = {},
     onLastTimeClick: (Long) -> Unit = {},
@@ -707,16 +703,6 @@ private fun FreeHoldContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Show-timer toggle (persisted preference, used on the active-hold screen)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Show timer", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-            Checkbox(checked = showTimer, onCheckedChange = onShowTimerChange)
-        }
-
         // Personal best for current settings — big trophies + big time
         if (bestTimeMs > 0L) {
             val trophies = bestTimeTrophyCategory?.trophyEmojis() ?: "🏆"

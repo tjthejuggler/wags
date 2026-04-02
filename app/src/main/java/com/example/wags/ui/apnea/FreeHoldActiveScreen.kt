@@ -228,6 +228,11 @@ class FreeHoldActiveViewModel @Inject constructor(
 
     // ── Guided hyperventilation ──────────────────────────────────────────────
 
+    fun setShowTimer(show: Boolean) {
+        _uiState.update { it.copy(showTimer = show) }
+        prefs.edit().putBoolean("setting_show_timer", show).apply()
+    }
+
     fun setGuidedHyperEnabled(enabled: Boolean) {
         _uiState.update { it.copy(guidedHyperEnabled = enabled, guidedCountdownComplete = false) }
         prefs.edit().putBoolean("guided_hyper_enabled", enabled).apply()
@@ -861,6 +866,7 @@ fun FreeHoldActiveScreen(
                 guidedHyperActive = state.isHyperPrep && state.guidedHyperEnabled,
                 guidedCountdownComplete = state.guidedCountdownComplete,
                 modifier = Modifier.fillMaxSize(),
+                onShowTimerChange = { viewModel.setShowTimer(it) },
                 onStart = {
                     if (useGuidedStart) {
                         viewModel.showGuidedCountdown()
@@ -890,6 +896,7 @@ private fun FreeHoldActiveContent(
     guidedHyperActive: Boolean = false,
     guidedCountdownComplete: Boolean = false,
     modifier: Modifier = Modifier,
+    onShowTimerChange: (Boolean) -> Unit = {},
     onStart: () -> Unit,
     onFirstContraction: () -> Unit,
     onStop: () -> Unit
@@ -969,33 +976,50 @@ private fun FreeHoldActiveContent(
                     // Determine button label based on guided hyper state
                     val showHyperStart = guidedHyperActive && !guidedCountdownComplete
 
-                    Button(
-                        onClick = onStart,
-                        modifier = Modifier
-                            .fillMaxWidth(0.92f)
-                            .fillMaxHeight(0.85f),
-                        shape = MaterialTheme.shapes.large,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = ButtonSuccess,
-                            contentColor = TextPrimary
-                        )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "START",
-                                style = MaterialTheme.typography.displayMedium,
-                                fontWeight = FontWeight.ExtraBold,
-                                textAlign = TextAlign.Center
+                        Button(
+                            onClick = onStart,
+                            modifier = Modifier
+                                .fillMaxWidth(0.92f)
+                                .fillMaxHeight(0.75f),
+                            shape = MaterialTheme.shapes.large,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = ButtonSuccess,
+                                contentColor = TextPrimary
                             )
-                            if (showHyperStart) {
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    text = "HYPER",
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center,
-                                    color = TextSecondary
+                                    text = "START",
+                                    style = MaterialTheme.typography.displayMedium,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    textAlign = TextAlign.Center
                                 )
+                                if (showHyperStart) {
+                                    Text(
+                                        text = "HYPER",
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = TextAlign.Center,
+                                        color = TextSecondary
+                                    )
+                                }
                             }
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                "Show timer",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                            Checkbox(checked = showTimer, onCheckedChange = onShowTimerChange)
                         }
                     }
                 }
