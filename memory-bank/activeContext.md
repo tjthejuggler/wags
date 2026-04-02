@@ -1,6 +1,6 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-02 20:25 UTC*
+*Last updated: 2026-04-02 22:25 UTC*
 
 ## Current State
 
@@ -185,3 +185,53 @@ Files modified:
   1. Re-throw `CancellationException` (required for structured concurrency)
   2. Catch all other exceptions (including `PolarDeviceDisconnected`) and log them as warnings
 - **File modified**: `data/ble/PolarBleManager.kt` — `startEcgStream()`, `startAccStream()`, `startPpiStream()`
+
+---
+
+### 2026-04-02 16:25 (UTC-6)
+
+**Added: Rapid HR Change — 6th dashboard section**
+
+New feature allowing users to time how quickly they can shift their heart rate between two thresholds (High→Low or Low→High).
+
+**Architecture:**
+- State machine: `IDLE` → `WAITING_FIRST` → `TRANSITIONING` → `COMPLETE`
+- DB migration 24→25 adds two new tables: `rapid_hr_sessions` and `rapid_hr_telemetry`
+- Per-second HR telemetry recorded during sessions for detail chart
+
+**New files (12):**
+- `data/db/entity/RapidHrSessionEntity.kt` — session record entity
+- `data/db/entity/RapidHrTelemetryEntity.kt` — per-second HR telemetry entity
+- `data/db/dao/RapidHrSessionDao.kt` — DAO with preset aggregation query
+- `data/db/dao/RapidHrTelemetryDao.kt` — telemetry CRUD DAO
+- `data/repository/RapidHrRepository.kt` — repository wrapping both DAOs
+- `ui/rapidhr/RapidHrViewModel.kt` — state machine, HR polling, chime playback, PB detection
+- `ui/rapidhr/RapidHrScreen.kt` — idle (direction toggle, threshold inputs, preset cards) + active (live HR, progress bar, timers) + complete (stats, PB banner)
+- `ui/rapidhr/RapidHrHistoryViewModel.kt` — history data loading + chart computation
+- `ui/rapidhr/RapidHrHistoryScreen.kt` — graphs tab (line chart, filter chips, session list) + calendar tab
+- `ui/rapidhr/RapidHrDetailViewModel.kt` — loads session + telemetry
+- `ui/rapidhr/RapidHrDetailScreen.kt` — full detail with HR chart + threshold lines
+
+**Modified files (4):**
+- `data/db/WagsDatabase.kt` — added entities, abstract DAOs, migration 24→25
+- `di/DatabaseModule.kt` — added DAO providers + migration to list
+- `ui/navigation/WagsNavGraph.kt` — added RAPID_HR, RAPID_HR_HISTORY, RAPID_HR_DETAIL routes
+- `ui/dashboard/DashboardScreen.kt` — added 6th NavigationCard "Rapid HR Change"
+
+**Key UX features:**
+- Preset cards show previously-used settings with best time + attempt count (one-tap to reuse)
+- HR progress bar shows real-time progress toward target threshold
+- Chime plays at each threshold crossing
+- Personal best detection per direction + settings combo
+- History with graphs (transition time trend) + calendar view
+- Detail screen shows HR chart with dashed threshold lines + phase background tint
+
+---
+
+### 2026-04-02 16:43 (UTC-6)
+
+**Fixed: Rapid HR Change "Start" button not working**
+
+- Root cause: `startSession()` in `RapidHrViewModel.kt` checked `_state.value.canStart`, but `canStart` depends on `hasHrMonitor` which is only set in the public `uiState` (via `combine` with `hrDataSource.isAnyHrDeviceConnected`). The internal `_state` never has `hasHrMonitor = true`, so `canStart` was always `false` and `startSession()` silently returned.
+- Fix: Changed `startSession()` to check `hrDataSource.isAnyHrDeviceConnected.value` directly instead of relying on `_state.value.canStart`. Threshold validation is done inline.
+- File modified: `ui/rapidhr/RapidHrViewModel.kt` (lines 193-199)

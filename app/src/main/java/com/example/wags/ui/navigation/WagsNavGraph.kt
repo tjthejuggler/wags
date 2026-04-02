@@ -32,6 +32,9 @@ import com.example.wags.ui.dashboard.DashboardScreen
 import com.example.wags.ui.meditation.MeditationHistoryScreen
 import com.example.wags.ui.meditation.MeditationScreen
 import com.example.wags.ui.meditation.MeditationSessionDetailScreen
+import com.example.wags.ui.rapidhr.RapidHrDetailScreen
+import com.example.wags.ui.rapidhr.RapidHrHistoryScreen
+import com.example.wags.ui.rapidhr.RapidHrScreen
 import com.example.wags.ui.readiness.HrvReadinessDetailScreen
 import com.example.wags.ui.readiness.HrvReadinessHistoryScreen
 import com.example.wags.ui.readiness.ReadinessScreen
@@ -81,6 +84,13 @@ object WagsRoutes {
     const val MEDITATION = "meditation"
     const val MEDITATION_HISTORY = "meditation_history"
     const val MEDITATION_SESSION_DETAIL = "meditation_session_detail/{sessionId}"
+
+    // ── Rapid HR Change ───────────────────────────────────────────────────────
+    const val RAPID_HR = "rapid_hr"
+    const val RAPID_HR_HISTORY = "rapid_hr_history"
+    const val RAPID_HR_DETAIL = "rapid_hr_detail/{sessionId}"
+
+    fun rapidHrDetail(sessionId: Long) = "rapid_hr_detail/$sessionId"
 
     fun apneaTable(type: String) = "apnea_table/$type"
     fun advancedApnea(modality: String, length: String) = "advanced_apnea/$modality/$length"
@@ -378,6 +388,19 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             arguments = listOf(navArgument("sessionId") { type = NavType.LongType })
         ) {
             MeditationSessionDetailScreen(navController = navController)
+        }
+        // ── Rapid HR Change ─────────────────────────────────────────────────
+        composable(WagsRoutes.RAPID_HR) {
+            RapidHrScreen(navController = navController)
+        }
+        composable(WagsRoutes.RAPID_HR_HISTORY) {
+            RapidHrHistoryScreen(navController = navController)
+        }
+        composable(
+            route = WagsRoutes.RAPID_HR_DETAIL,
+            arguments = listOf(navArgument("sessionId") { type = NavType.LongType })
+        ) {
+            RapidHrDetailScreen(navController = navController)
         }
         // ── Garmin Watch ────────────────────────────────────────────────────
         composable(WagsRoutes.GARMIN) {

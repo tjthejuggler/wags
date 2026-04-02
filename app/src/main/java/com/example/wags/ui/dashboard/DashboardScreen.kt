@@ -162,6 +162,11 @@ fun DashboardScreen(
                     navController.navigate(WagsRoutes.MEDITATION)
                 }
             }
+            item {
+                NavigationCard("Rapid HR Change", "Time how fast you can shift your heart rate") {
+                    navController.navigate(WagsRoutes.RAPID_HR)
+                }
+            }
         }
     }
 }

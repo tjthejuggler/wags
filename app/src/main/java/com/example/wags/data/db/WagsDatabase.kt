@@ -25,9 +25,11 @@ import com.example.wags.data.db.entity.*
         MorningReadinessTelemetryEntity::class,
         AdviceEntity::class,
         ApneaSongLogEntity::class,
-        ResonanceSessionEntity::class
+        ResonanceSessionEntity::class,
+        RapidHrSessionEntity::class,
+        RapidHrTelemetryEntity::class
     ],
-    version = 24,
+    version = 25,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -48,6 +50,8 @@ abstract class WagsDatabase : RoomDatabase() {
     abstract fun adviceDao(): AdviceDao
     abstract fun apneaSongLogDao(): ApneaSongLogDao
     abstract fun resonanceSessionDao(): ResonanceSessionDao
+    abstract fun rapidHrSessionDao(): RapidHrSessionDao
+    abstract fun rapidHrTelemetryDao(): RapidHrTelemetryDao
 
     companion object {
         /**
@@ -697,6 +701,46 @@ abstract class WagsDatabase : RoomDatabase() {
                     db.execSQL("ALTER TABLE apnea_records ADD COLUMN guidedRelaxedExhaleSec INTEGER DEFAULT NULL")
                     db.execSQL("ALTER TABLE apnea_records ADD COLUMN guidedPurgeExhaleSec INTEGER DEFAULT NULL")
                     db.execSQL("ALTER TABLE apnea_records ADD COLUMN guidedTransitionSec INTEGER DEFAULT NULL")
+                }
+            }
+
+            /**
+             * v24 → v25: Add Rapid HR Change tables.
+             *  1. rapid_hr_sessions — one row per completed session
+             *  2. rapid_hr_telemetry — per-second HR samples linked to a session
+             */
+            val MIGRATION_24_25 = object : Migration(24, 25) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("""
+                        CREATE TABLE IF NOT EXISTS `rapid_hr_sessions` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `timestamp` INTEGER NOT NULL,
+                            `direction` TEXT NOT NULL,
+                            `highThreshold` INTEGER NOT NULL,
+                            `lowThreshold` INTEGER NOT NULL,
+                            `phase1DurationMs` INTEGER NOT NULL,
+                            `transitionDurationMs` INTEGER NOT NULL,
+                            `totalDurationMs` INTEGER NOT NULL,
+                            `peakHrBpm` INTEGER NOT NULL,
+                            `troughHrBpm` INTEGER NOT NULL,
+                            `hrAtFirstCrossing` INTEGER NOT NULL,
+                            `hrAtSecondCrossing` INTEGER NOT NULL,
+                            `avgHrBpm` REAL,
+                            `monitorId` TEXT,
+                            `isPersonalBest` INTEGER NOT NULL DEFAULT 0
+                        )
+                    """.trimIndent())
+                    db.execSQL("""
+                        CREATE TABLE IF NOT EXISTS `rapid_hr_telemetry` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `sessionId` INTEGER NOT NULL,
+                            `offsetMs` INTEGER NOT NULL,
+                            `hrBpm` INTEGER NOT NULL,
+                            `phase` TEXT NOT NULL,
+                            FOREIGN KEY(`sessionId`) REFERENCES `rapid_hr_sessions`(`id`) ON DELETE CASCADE
+                        )
+                    """.trimIndent())
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_rapid_hr_telemetry_sessionId` ON `rapid_hr_telemetry` (`sessionId`)")
                 }
             }
         }

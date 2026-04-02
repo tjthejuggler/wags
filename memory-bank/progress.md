@@ -1,6 +1,6 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-02 20:25 UTC*
+*Last updated: 2026-04-02 22:26 UTC*
 
 ## Recent Changes (2026-04-02)
 - ✅ Removed "New Session" button from `MorningReadinessResultScreen` (result screen after completing test)
@@ -113,6 +113,18 @@
 ### 2026-04-02 07:50 (UTC-6)
 - ✅ Fixed: `PolarDeviceDisconnected` crash — `startEcgStream()`, `startAccStream()`, `startPpiStream()` in `PolarBleManager.kt` had no try/catch around `.collect {}`, so device disconnection errors propagated as uncaught coroutine exceptions. Added try/catch with `CancellationException` re-throw + warning log for all other exceptions. `startHrStream()` already had proper error handling.
 
+### 2026-04-02 16:26 (UTC-6)
+- ✅ Added: **Rapid HR Change** — 6th dashboard section. Full feature implementation:
+  - DB migration 24→25: two new tables (`rapid_hr_sessions`, `rapid_hr_telemetry`)
+  - 2 entities, 2 DAOs, 1 repository
+  - `RapidHrViewModel` — state machine (IDLE→WAITING_FIRST→TRANSITIONING→COMPLETE), 500ms HR polling, chime on threshold crossings, PB detection, per-second telemetry recording
+  - `RapidHrScreen` — idle (direction toggle, threshold inputs, preset cards with best times), active (live HR circle, progress bar, timers), complete (stats, PB banner, action buttons)
+  - `RapidHrHistoryScreen` + `RapidHrHistoryViewModel` — graphs tab (transition time line chart, filter chips, session list) + calendar tab
+  - `RapidHrDetailScreen` + `RapidHrDetailViewModel` — full session detail with HR chart + dashed threshold lines
+  - Navigation: 3 new routes (RAPID_HR, RAPID_HR_HISTORY, RAPID_HR_DETAIL)
+  - Dashboard: 6th NavigationCard added
+  - Build: ✅ Installed on SM-S918U1 (Android 16)
+
 ## Architecture Decisions Log
 
 | Date | Decision | Rationale |
@@ -123,3 +135,6 @@
 | 2026-03-09 | CircularBuffer with AtomicInteger | Prevent GC pressure during 130Hz ECG ingestion |
 | 2026-03-09 | Vico for historical charts | Native Compose API, no View interop |
 | 2026-03-28 | Memory bank initialized | Persistent context across sessions |
+
+### 2026-04-02 16:43 (UTC-6)
+- ✅ Fixed: Rapid HR Change "Start" button not working — `startSession()` checked `_state.value.canStart` but `hasHrMonitor` was only set in the combined `uiState`, never in `_state`. Fixed by checking `hrDataSource.isAnyHrDeviceConnected.value` directly.
