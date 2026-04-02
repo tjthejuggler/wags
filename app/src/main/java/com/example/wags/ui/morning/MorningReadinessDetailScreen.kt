@@ -263,10 +263,20 @@ private fun MorningReadinessDetailContent(
         else    -> ReadinessOrange
     }
 
+    // Standing is considered "complete" only when standing beats make up at least
+    // half of the total telemetry. If the user never actually stood (they just
+    // didn't press "skip standing" fast enough), the standing beat count will be
+    // tiny relative to the supine count, so we treat it as if standing never happened.
+    val standingBeatCount = telemetry.count { it.phase == "STANDING" }
+    val totalBeatCount    = telemetry.size
+    val standingComplete  = totalBeatCount > 0 && standingBeatCount * 2 >= totalBeatCount
+
     // Pre-compute stand marker fraction (0..1 across the full telemetry timeline)
+    // — only relevant when standing was actually completed.
     val sessionStartMs = telemetry.firstOrNull()?.timestampMs
     val sessionEndMs   = telemetry.lastOrNull()?.timestampMs
     val standFraction: Float? = if (
+        standingComplete &&
         reading.standTimestampMs != null &&
         sessionStartMs != null &&
         sessionEndMs != null &&
@@ -332,13 +342,14 @@ private fun MorningReadinessDetailContent(
         // ── HR chart ──────────────────────────────────────────────────────────
         if (telemetry.isNotEmpty()) {
             TelemetryChartCard(
-                title       = "Heart Rate",
-                subtitle    = "bpm · supine → stand",
-                telemetry   = telemetry,
+                title         = "Heart Rate",
+                subtitle      = if (standingComplete) "bpm · supine → stand" else "bpm · supine",
+                telemetry     = telemetry,
                 valueSelector = { it.hrBpm.toFloat() },
-                lineColor   = EcgCyan,
-                unit        = "bpm",
-                standFraction = standFraction
+                lineColor     = EcgCyan,
+                unit          = "bpm",
+                standFraction = standFraction,
+                showStandingLabel = standingComplete
             )
         }
 
@@ -346,18 +357,21 @@ private fun MorningReadinessDetailContent(
         val hasHrv = telemetry.any { it.rollingRmssdMs > 0.0 }
         if (hasHrv) {
             TelemetryChartCard(
-                title       = "Rolling HRV (RMSSD)",
-                subtitle    = "ms · 20-beat sliding window",
-                telemetry   = telemetry.filter { it.rollingRmssdMs > 0.0 },
+                title         = "Rolling HRV (RMSSD)",
+                subtitle      = "ms · 20-beat sliding window",
+                telemetry     = telemetry.filter { it.rollingRmssdMs > 0.0 },
                 valueSelector = { it.rollingRmssdMs.toFloat() },
-                lineColor   = ReadinessGreen,
-                unit        = "ms",
-                standFraction = standFraction
+                lineColor     = ReadinessGreen,
+                unit          = "ms",
+                standFraction = standFraction,
+                showStandingLabel = standingComplete
             )
         }
 
-        // ── Orthostatic response stats ────────────────────────────────────────
-        OrthostasisStatsCard(reading = reading, telemetry = telemetry)
+        // ── Orthostatic response stats — only when standing was truly completed ──
+        if (standingComplete) {
+            OrthostasisStatsCard(reading = reading, telemetry = telemetry)
+        }
 
         // ── Supine HRV ────────────────────────────────────────────────────────
         DetailSection(title = "Supine HRV") {
@@ -371,8 +385,8 @@ private fun MorningReadinessDetailContent(
                 HELP_RHR_TITLE, HELP_RHR_TEXT)
         }
 
-        // ── Standing HRV — only shown when the user completed the standing phase ──
-        if (reading.standingRmssdMs != null) {
+        // ── Standing HRV — only shown when standing was truly completed ────────
+        if (standingComplete && reading.standingRmssdMs != null) {
             DetailSection(title = "Standing HRV") {
                 DetailRowWithHelp("RMSSD", "${String.format("%.1f", reading.standingRmssdMs)} ms",
                     HELP_RMSSD_TITLE, HELP_RMSSD_TEXT)
@@ -391,19 +405,21 @@ private fun MorningReadinessDetailContent(
             }
         }
 
-        // ── Orthostatic Response ──────────────────────────────────────────────
-        DetailSection(title = "Orthostatic Response") {
-            reading.thirtyFifteenRatio?.let {
-                DetailRowWithHelp("30:15 Ratio", String.format("%.3f", it),
-                    HELP_3015_TITLE, HELP_3015_TEXT)
-            } ?: DetailRow("30:15 Ratio", "—")
-            reading.ohrrAt20sPercent?.let {
-                DetailRowWithHelp("OHRR at 20s", "${String.format("%.1f", it)} %",
-                    HELP_OHRR_TITLE, HELP_OHRR_TEXT)
-            }
-            reading.ohrrAt60sPercent?.let {
-                DetailRowWithHelp("OHRR at 60s", "${String.format("%.1f", it)} %",
-                    HELP_OHRR_TITLE, HELP_OHRR_TEXT)
+        // ── Orthostatic Response — only when standing was truly completed ──────
+        if (standingComplete) {
+            DetailSection(title = "Orthostatic Response") {
+                reading.thirtyFifteenRatio?.let {
+                    DetailRowWithHelp("30:15 Ratio", String.format("%.3f", it),
+                        HELP_3015_TITLE, HELP_3015_TEXT)
+                } ?: DetailRow("30:15 Ratio", "—")
+                reading.ohrrAt20sPercent?.let {
+                    DetailRowWithHelp("OHRR at 20s", "${String.format("%.1f", it)} %",
+                        HELP_OHRR_TITLE, HELP_OHRR_TEXT)
+                }
+                reading.ohrrAt60sPercent?.let {
+                    DetailRowWithHelp("OHRR at 60s", "${String.format("%.1f", it)} %",
+                        HELP_OHRR_TITLE, HELP_OHRR_TEXT)
+                }
             }
         }
 
@@ -480,6 +496,7 @@ private fun TelemetryChartCard(
     lineColor: Color,
     unit: String,
     standFraction: Float?,
+    showStandingLabel: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val values = telemetry.map(valueSelector)
@@ -531,12 +548,13 @@ private fun TelemetryChartCard(
 
             // Chart
             TelemetryLineChart(
-                values        = values,
-                yMin          = yMin,
-                yMax          = yMax,
-                lineColor     = lineColor,
-                standFraction = standFraction,
-                modifier      = Modifier
+                values            = values,
+                yMin              = yMin,
+                yMax              = yMax,
+                lineColor         = lineColor,
+                standFraction     = standFraction,
+                showStandingLabel = showStandingLabel,
+                modifier          = Modifier
                     .fillMaxWidth()
                     .height(160.dp)
             )
@@ -719,6 +737,7 @@ private fun TelemetryLineChart(
     yMax: Float,
     lineColor: Color,
     standFraction: Float?,
+    showStandingLabel: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     if (values.size < 2) {
@@ -837,19 +856,21 @@ private fun TelemetryLineChart(
             color       = labelArgb
             textAlign   = Paint.Align.CENTER
         }
-        // "Supine" at 25% and "Standing" at 75% (approximate)
+        val supineLabelX = if (showStandingLabel) plotLeft + plotW * 0.20f else plotLeft + plotW * 0.50f
         drawContext.canvas.nativeCanvas.drawText(
             "Supine",
-            plotLeft + plotW * 0.20f,
+            supineLabelX,
             totalH - with(density) { 2.dp.toPx() },
             xPaint
         )
-        drawContext.canvas.nativeCanvas.drawText(
-            "Standing",
-            plotLeft + plotW * 0.75f,
-            totalH - with(density) { 2.dp.toPx() },
-            xPaint
-        )
+        if (showStandingLabel) {
+            drawContext.canvas.nativeCanvas.drawText(
+                "Standing",
+                plotLeft + plotW * 0.75f,
+                totalH - with(density) { 2.dp.toPx() },
+                xPaint
+            )
+        }
     }
 }
 

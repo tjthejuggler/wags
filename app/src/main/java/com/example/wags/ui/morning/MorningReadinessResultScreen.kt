@@ -75,8 +75,7 @@ private const val HELP_SLOW_BREATH_TEXT =
 
 @Composable
 fun MorningReadinessResultScreen(
-    result: MorningReadinessResult,
-    onReset: () -> Unit
+    result: MorningReadinessResult
 ) {
     // NOTE: Do NOT add verticalScroll() here — this composable is hosted inside
     // MorningReadinessScreen's Column(Modifier.verticalScroll()), and nesting two
@@ -113,14 +112,6 @@ fun MorningReadinessResultScreen(
         }
 
         AlgorithmDetailsCard(result)
-
-        Button(
-            onClick = onReset,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = ButtonPrimary)
-        ) {
-            Text("New Session")
-        }
     }
 }
 

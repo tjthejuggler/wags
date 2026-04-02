@@ -343,6 +343,17 @@ fun SettingsScreen(
                     onOpenSection = { openAdviceSection = it }
                 )
             }
+
+            // ── About ────────────────────────────────────────────────────────
+            item {
+                OutlinedButton(
+                    onClick = { navController.navigate(WagsRoutes.ABOUT) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
+                ) {
+                    Text("About")
+                }
+            }
         }
     }
 

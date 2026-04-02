@@ -171,10 +171,7 @@ fun MorningReadinessScreen(
                 MorningReadinessState.COMPLETE -> {
                     val result = uiState.result
                     if (result != null) {
-                        MorningReadinessResultScreen(
-                            result = result,
-                            onReset = { viewModel.reset() }
-                        )
+                        MorningReadinessResultScreen(result = result)
                     } else {
                         CalculatingContent()
                     }

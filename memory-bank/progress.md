@@ -1,6 +1,10 @@
 # WAGS — Progress
 
-*Last updated: 2026-03-28*
+*Last updated: 2026-04-02 16:26 UTC*
+
+## Recent Changes (2026-04-02)
+- ✅ Removed "New Session" button from `MorningReadinessResultScreen` (result screen after completing test)
+- ✅ Added standing-completeness guard to `MorningReadinessDetailScreen`: if standing beats < 50% of total telemetry beats, all standing-related sections (Standing HRV, Orthostatic Response, OrthostasisStatsCard, stand marker on charts) are hidden as if standing never occurred
 
 ## What Works
 
