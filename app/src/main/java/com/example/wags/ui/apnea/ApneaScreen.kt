@@ -803,9 +803,21 @@ private fun TableTrainingConfigContent(
 ) {
     var pbInput by remember { mutableStateOf("") }
 
+    // Auto-fill the text field from best free hold time
     LaunchedEffect(bestTimeForSettingsMs) {
         if (bestTimeForSettingsMs > 0L) {
             pbInput = (bestTimeForSettingsMs / 1000L).toString()
+            // Also auto-set the PB if it hasn't been set yet
+            if (personalBestMs <= 0L) {
+                onSetPersonalBest(bestTimeForSettingsMs)
+            }
+        }
+    }
+
+    // Keep text field in sync when PB is set from elsewhere (e.g. auto-set from ViewModel)
+    LaunchedEffect(personalBestMs) {
+        if (personalBestMs > 0L && pbInput.isEmpty()) {
+            pbInput = (personalBestMs / 1000L).toString()
         }
     }
 

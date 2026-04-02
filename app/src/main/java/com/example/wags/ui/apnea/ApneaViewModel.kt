@@ -314,7 +314,12 @@ class ApneaViewModel @Inject constructor(
                     val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as TimeOfDay
                     val pos = arr[3] as Posture; val aud = arr[4] as AudioSetting
                     apneaRepository.getBestFreeHold(lv, pt.name, tod.name, pos.name, aud.name).collect { best ->
-                        _uiState.update { it.copy(bestTimeForSettingsMs = best ?: 0L) }
+                        val bestMs = best ?: 0L
+                        _uiState.update { it.copy(bestTimeForSettingsMs = bestMs) }
+                        // Auto-set PB from best free hold when no PB has been set yet
+                        if (bestMs > 0L && _uiState.value.personalBestMs <= 0L) {
+                            setPersonalBest(bestMs)
+                        }
                     }
                 }
         }

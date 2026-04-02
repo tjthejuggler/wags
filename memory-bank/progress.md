@@ -71,6 +71,9 @@
 - No specific known issues documented at this time
 - Memory bank just initialized — will be updated as work continues
 
+### 2026-04-01 19:39 (UTC-6)
+- ✅ Fixed: Apnea table "Start O2/CO2 Table" buttons were disabled because PB auto-filled text field but didn't call `setPersonalBest()`. Now auto-sets PB from best free hold time in both ViewModel and UI.
+
 ## Architecture Decisions Log
 
 | Date | Decision | Rationale |
