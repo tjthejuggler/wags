@@ -376,14 +376,20 @@ class PolarBleManager @Inject constructor(
         val key = "$deviceId-ecg"
         streamJobs[key]?.cancel()
         streamJobs[key] = scope.launch {
-            val settings = PolarSensorSetting(
-                mapOf(
-                    PolarSensorSetting.SettingType.SAMPLE_RATE to 130,
-                    PolarSensorSetting.SettingType.RESOLUTION to 14
+            try {
+                val settings = PolarSensorSetting(
+                    mapOf(
+                        PolarSensorSetting.SettingType.SAMPLE_RATE to 130,
+                        PolarSensorSetting.SettingType.RESOLUTION to 14
+                    )
                 )
-            )
-            polarApi.startEcgStreaming(deviceId, settings).toKotlinFlow().collect { ecgData ->
-                ecgBuffer.writeBatch(ecgData.samples.map { it.voltage })
+                polarApi.startEcgStreaming(deviceId, settings).toKotlinFlow().collect { ecgData ->
+                    ecgBuffer.writeBatch(ecgData.samples.map { it.voltage })
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "ECG stream ended for $deviceId: ${e.javaClass.simpleName}: ${e.message}")
             }
         }
     }
@@ -393,15 +399,21 @@ class PolarBleManager @Inject constructor(
         val key = "$deviceId-acc"
         streamJobs[key]?.cancel()
         streamJobs[key] = scope.launch {
-            val settings = PolarSensorSetting(
-                mapOf(
-                    PolarSensorSetting.SettingType.SAMPLE_RATE to 200,
-                    PolarSensorSetting.SettingType.RESOLUTION to 16,
-                    PolarSensorSetting.SettingType.RANGE to 2
+            try {
+                val settings = PolarSensorSetting(
+                    mapOf(
+                        PolarSensorSetting.SettingType.SAMPLE_RATE to 200,
+                        PolarSensorSetting.SettingType.RESOLUTION to 16,
+                        PolarSensorSetting.SettingType.RANGE to 2
+                    )
                 )
-            )
-            polarApi.startAccStreaming(deviceId, settings).toKotlinFlow().collect { accData ->
-                accBuffer.writeBatch(accData.samples.map { Triple(it.x, it.y, it.z) })
+                polarApi.startAccStreaming(deviceId, settings).toKotlinFlow().collect { accData ->
+                    accBuffer.writeBatch(accData.samples.map { Triple(it.x, it.y, it.z) })
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "ACC stream ended for $deviceId: ${e.javaClass.simpleName}: ${e.message}")
             }
         }
     }
@@ -412,14 +424,20 @@ class PolarBleManager @Inject constructor(
         streamJobs[key]?.cancel()
         streamJobs[key] = scope.launch {
             try {
-                polarApi.enableSDKMode(deviceId).blockingAwait()
-            } catch (e: Exception) { /* SDK mode may already be active */ }
-            polarApi.startPpiStreaming(deviceId).toKotlinFlow().collect { ppiData ->
-                ppiData.samples.forEach { sample ->
-                    if (sample.skinContactSupported && !sample.skinContactStatus) return@forEach
-                    if (sample.errorEstimate > PPI_ERROR_THRESHOLD_MS) return@forEach
-                    ppiBuffer.write(sample.ppi)
+                try {
+                    polarApi.enableSDKMode(deviceId).blockingAwait()
+                } catch (e: Exception) { /* SDK mode may already be active */ }
+                polarApi.startPpiStreaming(deviceId).toKotlinFlow().collect { ppiData ->
+                    ppiData.samples.forEach { sample ->
+                        if (sample.skinContactSupported && !sample.skinContactStatus) return@forEach
+                        if (sample.errorEstimate > PPI_ERROR_THRESHOLD_MS) return@forEach
+                        ppiBuffer.write(sample.ppi)
+                    }
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "PPI stream ended for $deviceId: ${e.javaClass.simpleName}: ${e.message}")
             }
         }
     }

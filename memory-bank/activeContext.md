@@ -171,3 +171,17 @@ Files modified:
 - `ui/settings/SettingsScreen.kt` — Added `meditationHabit` param + slot to list
 - `ui/meditation/MeditationViewModel.kt` — Injected `HabitIntegrationRepository`, added timer state + logic + chime playback
 - `ui/meditation/MeditationScreen.kt` — Added `TimerOptionRow`, `TimerField` composables; updated `IdleContent` and `ActiveContent`
+
+---
+
+### 2026-04-02 07:50 (UTC-6)
+
+**Fixed: PolarDeviceDisconnected crash in BLE streaming**
+
+- **Crash**: `com.polar.sdk.api.errors.PolarDeviceDisconnected` on `DefaultDispatcher-worker-3` — app crashed when Polar device disconnected while ECG/ACC/PPI streams were active.
+- **Root cause**: In `PolarBleManager.kt`, three streaming methods (`startEcgStream`, `startAccStream`, `startPpiStream`) launched coroutines that called `.collect {}` on Polar SDK RxJava→Flow bridges **without any try/catch**. When the device disconnected, the Polar SDK's internal `BlePMDClient.clearStreamObservers()` emitted a `PolarDeviceDisconnected` error through the RxJava chain, which propagated as an uncaught exception in the coroutine, crashing the app.
+- **Why `startHrStream` didn't crash**: It already had proper try/catch + retry logic around its `.collect {}` call.
+- **Fix**: Wrapped all three stream `.collect {}` calls in try/catch blocks that:
+  1. Re-throw `CancellationException` (required for structured concurrency)
+  2. Catch all other exceptions (including `PolarDeviceDisconnected`) and log them as warnings
+- **File modified**: `data/ble/PolarBleManager.kt` — `startEcgStream()`, `startAccStream()`, `startPpiStream()`
