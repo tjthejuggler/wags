@@ -39,7 +39,8 @@ data class GuidedHyperPhases(
 @Composable
 fun GuidedHyperCountdownDialog(
     phases: GuidedHyperPhases,
-    onComplete: () -> Unit
+    onComplete: () -> Unit,
+    onCancel: () -> Unit = {}
 ) {
     // Build the list of non-zero phases
     val phaseList = remember(phases) {
@@ -66,9 +67,9 @@ fun GuidedHyperCountdownDialog(
 
     if (!completed) {
         Dialog(
-            onDismissRequest = { /* non-dismissable */ },
+            onDismissRequest = onCancel,
             properties = DialogProperties(
-                dismissOnBackPress = false,
+                dismissOnBackPress = true,
                 dismissOnClickOutside = false,
                 usePlatformDefaultWidth = false
             )

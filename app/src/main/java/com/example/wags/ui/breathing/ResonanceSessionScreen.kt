@@ -86,6 +86,9 @@ fun ResonanceSessionScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val deviceId = "PLACEHOLDER_H10_ID"
+    val apneaPrefs = remember {
+        context.getSharedPreferences("apnea_prefs", android.content.Context.MODE_PRIVATE)
+    }
 
     val isActive = state.sessionPhase == BreathingSessionPhase.PREPARING ||
             state.sessionPhase == BreathingSessionPhase.BREATHING
@@ -115,6 +118,8 @@ fun ResonanceSessionScreen(
                     WagsFeedback.sessionEnd(context)
                     chimePlayed = true
                 }
+                // Set apnea prep type to RESONANCE so the next free hold is tagged correctly
+                apneaPrefs.edit().putString("setting_prep_type", "RESONANCE").apply()
                 // Do NOT auto-navigate — let the user review and leave manually
             }
             BreathingSessionPhase.IDLE -> {

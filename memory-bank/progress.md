@@ -1,8 +1,12 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-03 15:18 UTC*
+*Last updated: 2026-04-03 15:41 UTC*
 
 ## Recent Changes (2026-04-03)
+- ✅ Apnea section improvements:
+  - Guided hyperventilation countdown can now be cancelled with the system back button — cancelling skips the countdown and goes straight into the hold (guided hyper specifics still recorded)
+  - Added edit pencil icon next to "Guided Hyperventilation" checkbox that opens a `GuidedHyperEditSheet` (ModalBottomSheet) to configure Relaxed Exhale / Purge Exhale / Transition durations
+  - After a resonance breathing session completes, the apnea prep type is automatically set to `RESONANCE` in SharedPreferences so the next free hold is tagged correctly
 - ✅ Fixed: Song chooser not visible on apnea session screens when Spotify disconnected — added `SpotifyConnectPrompt` composable shown in place of song picker when MUSIC is selected but Spotify auth tokens are missing. Tapping navigates to Settings. Applied to `FreeHoldActiveScreen`, `ApneaTableScreen`, and `AdvancedApneaScreen`.
 
 ## Recent Changes (2026-04-02)

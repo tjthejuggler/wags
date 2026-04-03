@@ -1,6 +1,6 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-03 15:17 UTC*
+*Last updated: 2026-04-03 15:41 UTC*
 
 ## Current State
 
@@ -50,6 +50,33 @@ Based on open tabs and visible files:
 ## Current Focus / Open Questions
 
 - No specific open questions
+
+---
+
+### 2026-04-03 09:41 (UTC-6)
+
+**Apnea section minor improvements**
+
+Three changes made:
+
+1. **Guided hyperventilation back-button cancel** (`GuidedHyperCountdownDialog.kt`):
+   - Added `onCancel: () -> Unit = {}` parameter
+   - Changed `dismissOnBackPress = false` → `true`
+   - `onDismissRequest` now calls `onCancel` instead of being a no-op
+
+2. **Cancel guided countdown → go straight to hold** (`FreeHoldActiveScreen.kt`):
+   - Added `onGuidedCountdownCancelled()` to `FreeHoldActiveViewModel`: marks countdown complete + immediately calls `startFreeHold()` so the hold begins right away with guided hyper specifics still recorded
+   - Dialog call site now passes `onCancel = { viewModel.onGuidedCountdownCancelled() }`
+
+3. **Edit guided hyperventilation specifics** (`FreeHoldActiveScreen.kt`):
+   - `GuidedHyperSection` now shows a small edit pencil icon (always visible) next to the checkbox label
+   - Tapping the icon opens a new `GuidedHyperEditSheet` (ModalBottomSheet) with three labeled rows for Relaxed Exhale / Purge Exhale / Transition seconds — same pattern as `EditRecordSheet` in the detail screen
+   - Removed the old inline `CompactLabeledInput` fields from the section (replaced by the sheet)
+   - A summary line (e.g. "Relaxed 30s · Purge 15s") is shown below the checkbox when enabled
+
+4. **Resonance session sets apnea prep type** (`ResonanceSessionScreen.kt`):
+   - When `BreathingSessionPhase.COMPLETE` is reached, writes `"RESONANCE"` to `"setting_prep_type"` in `"apnea_prefs"` SharedPreferences
+   - `ApneaViewModel` reads this key on init, so the next time the Apnea screen is opened the prep type will already be set to Resonance
 
 ---
 

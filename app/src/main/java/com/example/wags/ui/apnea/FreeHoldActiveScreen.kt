@@ -9,6 +9,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -260,6 +262,16 @@ class FreeHoldActiveViewModel @Inject constructor(
 
     fun onGuidedCountdownComplete() {
         _uiState.update { it.copy(showGuidedCountdown = false, guidedCountdownComplete = true) }
+    }
+
+    /**
+     * Called when the user cancels the guided hyperventilation countdown via the back button.
+     * Skips the remaining countdown, marks it complete (so the next tap goes straight to hold),
+     * and immediately starts the hold — the guided hyper specifics are still recorded.
+     */
+    fun onGuidedCountdownCancelled() {
+        _uiState.update { it.copy(showGuidedCountdown = false, guidedCountdownComplete = true) }
+        startFreeHold()
     }
 
     private var freeHoldStartTime = 0L
@@ -796,7 +808,8 @@ fun FreeHoldActiveScreen(
                     purgeExhaleSec = state.guidedPurgeExhaleSec,
                     transitionSec = state.guidedTransitionSec
                 ),
-                onComplete = { viewModel.onGuidedCountdownComplete() }
+                onComplete = { viewModel.onGuidedCountdownComplete() },
+                onCancel = { viewModel.onGuidedCountdownCancelled() }
             )
         }
 
@@ -848,6 +861,7 @@ fun FreeHoldActiveScreen(
             }
 
             // Guided hyperventilation section — shown when prep is HYPER and hold not active
+            var showGuidedHyperEditSheet by remember { mutableStateOf(false) }
             if (state.isHyperPrep && !state.freeHoldActive) {
                 GuidedHyperSection(
                     enabled = state.guidedHyperEnabled,
@@ -855,9 +869,19 @@ fun FreeHoldActiveScreen(
                     purgeExhaleSec = state.guidedPurgeExhaleSec,
                     transitionSec = state.guidedTransitionSec,
                     onEnabledChange = { viewModel.setGuidedHyperEnabled(it) },
+                    onEditClick = { showGuidedHyperEditSheet = true }
+                )
+            }
+
+            if (showGuidedHyperEditSheet) {
+                GuidedHyperEditSheet(
+                    relaxedExhaleSec = state.guidedRelaxedExhaleSec,
+                    purgeExhaleSec = state.guidedPurgeExhaleSec,
+                    transitionSec = state.guidedTransitionSec,
                     onRelaxedExhaleChange = { viewModel.setGuidedRelaxedExhaleSec(it) },
                     onPurgeExhaleChange = { viewModel.setGuidedPurgeExhaleSec(it) },
-                    onTransitionChange = { viewModel.setGuidedTransitionSec(it) }
+                    onTransitionChange = { viewModel.setGuidedTransitionSec(it) },
+                    onDismiss = { showGuidedHyperEditSheet = false }
                 )
             }
 
@@ -1125,9 +1149,9 @@ private fun formatElapsedMs(ms: Long): String {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Checkbox + three compact numeric inputs for guided hyperventilation.
+ * Checkbox + edit icon for guided hyperventilation.
  * Shown above the start button when prep type is HYPER.
- * When enabled, shows: label input | label input | label input — all on one line.
+ * The edit icon opens a bottom sheet to configure the phase durations.
  */
 @Composable
 private fun GuidedHyperSection(
@@ -1136,9 +1160,7 @@ private fun GuidedHyperSection(
     purgeExhaleSec: Int,
     transitionSec: Int,
     onEnabledChange: (Boolean) -> Unit,
-    onRelaxedExhaleChange: (Int) -> Unit,
-    onPurgeExhaleChange: (Int) -> Unit,
-    onTransitionChange: (Int) -> Unit
+    onEditClick: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -1147,48 +1169,55 @@ private fun GuidedHyperSection(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.clickable { onEnabledChange(!enabled) }
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Checkbox(
-                checked = enabled,
-                onCheckedChange = onEnabledChange,
-                modifier = Modifier.size(32.dp),
-                colors = CheckboxDefaults.colors(
-                    checkedColor = TextPrimary,
-                    uncheckedColor = TextSecondary,
-                    checkmarkColor = BackgroundDark
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onEnabledChange(!enabled) }
+            ) {
+                Checkbox(
+                    checked = enabled,
+                    onCheckedChange = onEnabledChange,
+                    modifier = Modifier.size(32.dp),
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = TextPrimary,
+                        uncheckedColor = TextSecondary,
+                        checkmarkColor = BackgroundDark
+                    )
                 )
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = "Guided Hyperventilation",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextPrimary
-            )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "Guided Hyperventilation",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextPrimary
+                )
+            }
+            // Edit icon — always visible so user can configure even when disabled
+            IconButton(onClick = onEditClick) {
+                Icon(
+                    imageVector = Icons.Outlined.Edit,
+                    contentDescription = "Edit guided hyperventilation settings",
+                    tint = TextSecondary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
 
+        // Summary of configured durations when enabled
         if (enabled) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 36.dp, top = 2.dp, bottom = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                CompactLabeledInput(
-                    label = "Relaxed\nExhale",
-                    value = relaxedExhaleSec,
-                    onValueChange = onRelaxedExhaleChange
-                )
-                CompactLabeledInput(
-                    label = "Purge\nExhale",
-                    value = purgeExhaleSec,
-                    onValueChange = onPurgeExhaleChange
-                )
-                CompactLabeledInput(
-                    label = "Transition",
-                    value = transitionSec,
-                    onValueChange = onTransitionChange
+            val parts = buildList {
+                if (relaxedExhaleSec > 0) add("Relaxed ${relaxedExhaleSec}s")
+                if (purgeExhaleSec > 0) add("Purge ${purgeExhaleSec}s")
+                if (transitionSec > 0) add("Transition ${transitionSec}s")
+            }
+            if (parts.isNotEmpty()) {
+                Text(
+                    text = parts.joinToString(" · "),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondary,
+                    modifier = Modifier.padding(start = 36.dp, bottom = 2.dp)
                 )
             }
         }
@@ -1196,43 +1225,108 @@ private fun GuidedHyperSection(
 }
 
 /**
- * Tiny label + input pair: label text then a small bordered box for 3 digits.
+ * Bottom sheet for editing the three guided hyperventilation phase durations.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GuidedHyperEditSheet(
+    relaxedExhaleSec: Int,
+    purgeExhaleSec: Int,
+    transitionSec: Int,
+    onRelaxedExhaleChange: (Int) -> Unit,
+    onPurgeExhaleChange: (Int) -> Unit,
+    onTransitionChange: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceDark,
+        tonalElevation = 4.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            Text(
+                "Guided Hyperventilation",
+                style = MaterialTheme.typography.titleLarge,
+                color = TextPrimary
+            )
+            Text(
+                "Set the duration (in seconds) for each phase. Set to 0 to skip a phase.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
+
+            GuidedHyperPhaseRow(
+                label = "Relaxed Exhale",
+                value = relaxedExhaleSec,
+                onValueChange = onRelaxedExhaleChange
+            )
+            GuidedHyperPhaseRow(
+                label = "Purge Exhale",
+                value = purgeExhaleSec,
+                onValueChange = onPurgeExhaleChange
+            )
+            GuidedHyperPhaseRow(
+                label = "Transition",
+                value = transitionSec,
+                onValueChange = onTransitionChange
+            )
+
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = SurfaceVariant,
+                    contentColor = TextPrimary
+                )
+            ) {
+                Text("Done")
+            }
+        }
+    }
+}
+
+/**
+ * A single row in the edit sheet: label on the left, numeric input on the right.
  */
 @Composable
-private fun CompactLabeledInput(
+private fun GuidedHyperPhaseRow(
     label: String,
     value: Int,
     onValueChange: (Int) -> Unit
 ) {
     Row(
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(3.dp)
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = TextSecondary,
-            lineHeight = 12.sp,
-            fontSize = 10.sp
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextPrimary
         )
         Box(
             modifier = Modifier
-                .width(36.dp)
-                .height(28.dp)
-                .border(1.dp, SurfaceVariant, RoundedCornerShape(4.dp))
-                .padding(horizontal = 4.dp),
+                .width(72.dp)
+                .height(40.dp)
+                .border(1.dp, SurfaceVariant, RoundedCornerShape(6.dp))
+                .padding(horizontal = 8.dp),
             contentAlignment = Alignment.Center
         ) {
             BasicTextField(
                 value = if (value == 0) "" else value.toString(),
                 onValueChange = { text ->
-                    val parsed = text.filter { it.isDigit() }.take(3).toIntOrNull() ?: 0
+                    val parsed = text.filter { it.isDigit() }.take(4).toIntOrNull() ?: 0
                     onValueChange(parsed)
                 },
-                textStyle = MaterialTheme.typography.bodySmall.copy(
+                textStyle = MaterialTheme.typography.bodyMedium.copy(
                     textAlign = TextAlign.Center,
-                    color = TextPrimary,
-                    fontSize = 13.sp
+                    color = TextPrimary
                 ),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
@@ -1241,3 +1335,4 @@ private fun CompactLabeledInput(
         }
     }
 }
+
