@@ -25,6 +25,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.db.dao.RapidHrPreset
+import com.example.wags.ui.common.AdviceBanner
+import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.common.SessionBackHandler
@@ -82,32 +84,41 @@ fun RapidHrScreen(
             )
         }
     ) { padding ->
-        when (state.phase) {
-            RapidHrPhase.IDLE -> IdleContent(
-                state = state,
-                onSetDirection = viewModel::setDirection,
-                onSetHigh = viewModel::setHighThreshold,
-                onSetLow = viewModel::setLowThreshold,
-                onApplyPreset = viewModel::applyPreset,
-                onStart = viewModel::startSession,
-                modifier = Modifier.padding(padding)
-            )
-            RapidHrPhase.WAITING_FIRST,
-            RapidHrPhase.TRANSITIONING -> ActiveContent(
-                state = state,
-                onCancel = viewModel::cancelSession,
-                modifier = Modifier.padding(padding)
-            )
-            RapidHrPhase.COMPLETE -> CompleteContent(
-                state = state,
-                onNewAttempt = viewModel::resetToIdle,
-                onViewDetail = {
-                    state.savedSessionId?.let { id ->
-                        navController.navigate(WagsRoutes.rapidHrDetail(id))
-                    }
-                },
-                modifier = Modifier.padding(padding)
-            )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            // ── Advice Banner ───────────────────────────────────────────────
+            AdviceBanner(section = AdviceSection.RAPID_HR_CHANGE)
+
+            when (state.phase) {
+                RapidHrPhase.IDLE -> IdleContent(
+                    state = state,
+                    onSetDirection = viewModel::setDirection,
+                    onSetHigh = viewModel::setHighThreshold,
+                    onSetLow = viewModel::setLowThreshold,
+                    onApplyPreset = viewModel::applyPreset,
+                    onStart = viewModel::startSession,
+                    modifier = Modifier
+                )
+                RapidHrPhase.WAITING_FIRST,
+                RapidHrPhase.TRANSITIONING -> ActiveContent(
+                    state = state,
+                    onCancel = viewModel::cancelSession,
+                    modifier = Modifier
+                )
+                RapidHrPhase.COMPLETE -> CompleteContent(
+                    state = state,
+                    onNewAttempt = viewModel::resetToIdle,
+                    onViewDetail = {
+                        state.savedSessionId?.let { id ->
+                            navController.navigate(WagsRoutes.rapidHrDetail(id))
+                        }
+                    },
+                    modifier = Modifier
+                )
+            }
         }
     }
 }

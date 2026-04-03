@@ -9,6 +9,8 @@ import com.example.wags.data.ble.HrDataSource
 import com.example.wags.data.db.dao.RapidHrPreset
 import com.example.wags.data.db.entity.RapidHrSessionEntity
 import com.example.wags.data.db.entity.RapidHrTelemetryEntity
+import com.example.wags.data.ipc.HabitIntegrationRepository
+import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.data.repository.RapidHrRepository
 import com.example.wags.di.IoDispatcher
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -127,6 +129,7 @@ class RapidHrViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: RapidHrRepository,
     private val hrDataSource: HrDataSource,
+    private val habitRepo: HabitIntegrationRepository,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
@@ -365,6 +368,11 @@ class RapidHrViewModel @Inject constructor(
             val sessionId = repository.saveSession(entity)
             val telemetryWithId = telemetrySamples.map { it.copy(sessionId = sessionId) }
             repository.saveTelemetry(telemetryWithId)
+
+            // Signal Tail habit integration
+            try {
+                habitRepo.sendHabitIncrement(Slot.RAPID_HR_CHANGE)
+            } catch (_: Exception) { /* never crash */ }
 
             withContext(kotlinx.coroutines.Dispatchers.Main) {
                 _state.update { it.copy(isPersonalBest = isPb, savedSessionId = sessionId) }

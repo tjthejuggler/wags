@@ -77,6 +77,11 @@ class HabitIntegrationRepository @Inject constructor(
             idKey   = "habit_id_meditation",
             nameKey = "habit_name_meditation",
             label   = "Meditation / NSDR"
+        ),
+        RAPID_HR_CHANGE(
+            idKey   = "habit_id_rapid_hr_change",
+            nameKey = "habit_name_rapid_hr_change",
+            label   = "Rapid HR Change"
         )
     }
 

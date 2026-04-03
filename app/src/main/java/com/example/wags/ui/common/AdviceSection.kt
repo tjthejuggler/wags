@@ -12,6 +12,7 @@ object AdviceSection {
     const val READINESS = "readiness"
     const val MORNING = "morning"
     const val MEDITATION = "meditation"
+    const val RAPID_HR_CHANGE = "rapid_hr_change"
 
     /** Human-readable label for each section key. */
     fun label(section: String): String = when (section) {
@@ -22,9 +23,10 @@ object AdviceSection {
         READINESS -> "HRV Readiness"
         MORNING -> "Morning Readiness"
         MEDITATION -> "Meditation / NSDR"
+        RAPID_HR_CHANGE -> "Rapid HR Change"
         else -> section
     }
 
     /** All sections in display order. */
-    val all = listOf(HOME, APNEA, APNEA_HYPER, BREATHING, READINESS, MORNING, MEDITATION)
+    val all = listOf(HOME, APNEA, APNEA_HYPER, BREATHING, READINESS, MORNING, MEDITATION, RAPID_HR_CHANGE)
 }
