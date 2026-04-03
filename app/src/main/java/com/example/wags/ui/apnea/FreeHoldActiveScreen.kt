@@ -52,6 +52,7 @@ import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.common.SessionBackHandler
+import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -830,14 +831,20 @@ fun FreeHoldActiveScreen(
                 }
             }
 
-            // Song picker button — shown when MUSIC mode + Spotify connected + hold not active
-            if (!state.freeHoldActive && state.isMusicMode && state.spotifyConnected) {
-                SongPickerButton(
-                    onClick = {
-                        viewModel.loadPreviousSongs()
-                        showSongPicker = true
-                    }
-                )
+            // Song picker / connect prompt — shown when MUSIC mode + hold not active
+            if (!state.freeHoldActive && state.isMusicMode) {
+                if (state.spotifyConnected) {
+                    SongPickerButton(
+                        onClick = {
+                            viewModel.loadPreviousSongs()
+                            showSongPicker = true
+                        }
+                    )
+                } else {
+                    SpotifyConnectPrompt(
+                        onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) }
+                    )
+                }
             }
 
             // Guided hyperventilation section — shown when prep is HYPER and hold not active

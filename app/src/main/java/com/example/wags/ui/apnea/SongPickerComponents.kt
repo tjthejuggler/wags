@@ -65,6 +65,48 @@ fun SongPickerButton(onClick: () -> Unit) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Spotify Connect Prompt
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Shown in place of the song picker when MUSIC is selected but Spotify is not connected.
+ * Tapping it navigates to Settings where the user can connect their Spotify account.
+ */
+@Composable
+fun SpotifyConnectPrompt(onNavigateToSettings: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onNavigateToSettings),
+        color = SurfaceDark,
+        tonalElevation = 2.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("🎵", style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.grayscale())
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Spotify not connected",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextPrimary
+                )
+                Text(
+                    "Tap to connect in Settings",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Selected Song Banner
 // ─────────────────────────────────────────────────────────────────────────────
 

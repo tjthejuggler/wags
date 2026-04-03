@@ -24,6 +24,7 @@ import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.InfoHelpBubble
 import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.SessionBackHandler
+import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -133,19 +134,24 @@ fun ApneaTableScreen(
                     item {
                         TableContractionSummaryCard(uiState = state)
                     }
-                    // Song picker — shown when MUSIC is selected, Spotify connected, session not active
-                    if (state.audio == AudioSetting.MUSIC && state.spotifyConnected &&
-                        state.apneaState == ApneaState.IDLE) {
+                    // Song picker / connect prompt — shown when MUSIC is selected, session not active
+                    if (state.audio == AudioSetting.MUSIC && state.apneaState == ApneaState.IDLE) {
                         item {
-                            if (state.selectedSong != null) {
-                                SelectedSongBanner(track = state.selectedSong!!) {
-                                    viewModel.clearSelectedSong()
+                            if (state.spotifyConnected) {
+                                if (state.selectedSong != null) {
+                                    SelectedSongBanner(track = state.selectedSong!!) {
+                                        viewModel.clearSelectedSong()
+                                    }
                                 }
+                                SongPickerButton(onClick = {
+                                    viewModel.loadPreviousSongs()
+                                    showSongPicker = true
+                                })
+                            } else {
+                                SpotifyConnectPrompt(
+                                    onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) }
+                                )
                             }
-                            SongPickerButton(onClick = {
-                                viewModel.loadPreviousSongs()
-                                showSongPicker = true
-                            })
                         }
                     }
                     item {

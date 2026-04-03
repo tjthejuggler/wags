@@ -1,6 +1,9 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-02 22:26 UTC*
+*Last updated: 2026-04-03 15:18 UTC*
+
+## Recent Changes (2026-04-03)
+- ✅ Fixed: Song chooser not visible on apnea session screens when Spotify disconnected — added `SpotifyConnectPrompt` composable shown in place of song picker when MUSIC is selected but Spotify auth tokens are missing. Tapping navigates to Settings. Applied to `FreeHoldActiveScreen`, `ApneaTableScreen`, and `AdvancedApneaScreen`.
 
 ## Recent Changes (2026-04-02)
 - ✅ Removed "New Session" button from `MorningReadinessResultScreen` (result screen after completing test)

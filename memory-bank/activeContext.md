@@ -1,6 +1,6 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-03 02:12 UTC*
+*Last updated: 2026-04-03 15:17 UTC*
 
 ## Current State
 
@@ -49,7 +49,21 @@ Based on open tabs and visible files:
 
 ## Current Focus / Open Questions
 
-- Memory bank just initialized — no specific active task beyond this setup
+- No specific open questions
+
+---
+
+### 2026-04-03 09:17 (UTC-6)
+
+**Fixed: Song chooser not visible on apnea session screens when Spotify disconnected**
+
+- Root cause: The song picker button on all three apnea session screens (`FreeHoldActiveScreen`, `ApneaTableScreen`, `AdvancedApneaScreen`) was gated behind `spotifyConnected == true`. When Spotify auth tokens expire/get cleared, the entire song picker area disappears with no indication of why.
+- Fix: Added a new `SpotifyConnectPrompt` composable to `SongPickerComponents.kt`. When MUSIC is selected but Spotify is not connected, this prompt is shown instead of the song picker button. It displays "Spotify not connected / Tap to connect in Settings" and navigates to the Settings screen on tap.
+- Files modified:
+  1. `ui/apnea/SongPickerComponents.kt` — Added `SpotifyConnectPrompt` composable
+  2. `ui/apnea/FreeHoldActiveScreen.kt` — Added `WagsRoutes` import; replaced single `if (spotifyConnected)` with `if/else` showing prompt when disconnected
+  3. `ui/apnea/ApneaTableScreen.kt` — Same pattern; added `WagsRoutes` import
+  4. `ui/apnea/AdvancedApneaScreen.kt` — Same pattern; added `WagsRoutes` import
 
 ---
 

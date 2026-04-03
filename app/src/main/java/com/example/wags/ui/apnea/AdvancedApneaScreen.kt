@@ -24,6 +24,7 @@ import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.SessionBackHandler
+import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -110,17 +111,23 @@ fun AdvancedApneaScreen(
                 AdviceBanner(section = AdviceSection.APNEA_HYPER)
             }
 
-            // Song picker — shown when MUSIC mode + Spotify connected + session not yet started
-            if (uiState.isMusicMode && uiState.spotifyConnected && state.phase == AdvancedApneaPhase.IDLE) {
-                if (uiState.selectedSong != null) {
-                    SelectedSongBanner(track = uiState.selectedSong!!) {
-                        viewModel.clearSelectedSong()
+            // Song picker / connect prompt — shown when MUSIC mode + session not yet started
+            if (uiState.isMusicMode && state.phase == AdvancedApneaPhase.IDLE) {
+                if (uiState.spotifyConnected) {
+                    if (uiState.selectedSong != null) {
+                        SelectedSongBanner(track = uiState.selectedSong!!) {
+                            viewModel.clearSelectedSong()
+                        }
                     }
+                    SongPickerButton(onClick = {
+                        viewModel.loadPreviousSongs()
+                        showSongPicker = true
+                    })
+                } else {
+                    SpotifyConnectPrompt(
+                        onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) }
+                    )
                 }
-                SongPickerButton(onClick = {
-                    viewModel.loadPreviousSongs()
-                    showSongPicker = true
-                })
             }
 
             RoundProgressBar(state = state)
