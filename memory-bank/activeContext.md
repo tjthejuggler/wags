@@ -235,3 +235,24 @@ New feature allowing users to time how quickly they can shift their heart rate b
 - Root cause: `startSession()` in `RapidHrViewModel.kt` checked `_state.value.canStart`, but `canStart` depends on `hasHrMonitor` which is only set in the public `uiState` (via `combine` with `hrDataSource.isAnyHrDeviceConnected`). The internal `_state` never has `hasHrMonitor = true`, so `canStart` was always `false` and `startSession()` silently returned.
 - Fix: Changed `startSession()` to check `hrDataSource.isAnyHrDeviceConnected.value` directly instead of relying on `_state.value.canStart`. Threshold validation is done inline.
 - File modified: `ui/rapidhr/RapidHrViewModel.kt` (lines 193-199)
+
+---
+
+### 2026-04-02 18:17 (UTC-6)
+
+**Added: Advice Notes Feature — tap any advice to write thoughts**
+
+- Users can now tap any advice banner to open a "My Thoughts" popup dialog where they can write and save notes/thoughts about that specific piece of advice.
+- Notes are persisted in the `advice` table via a new `notes` TEXT column (nullable, defaults to NULL).
+- Notes are associated per-advice-item and remembered across sessions.
+- Since advice and notes live in the Room database (`advice` table), they are automatically included in any backup/restore operations via `DataExportImportRepository` (which exports the entire `wags.db` file).
+- DB migration v25 → v26 adds the `notes` column.
+- Files modified:
+  1. `data/db/entity/AdviceEntity.kt` — Added `notes: String?` field
+  2. `data/db/dao/AdviceDao.kt` — Added `updateNotes()`, `getById()`, `getAll()` queries
+  3. `data/db/WagsDatabase.kt` — Bumped version to 26, added `MIGRATION_25_26`
+  4. `di/DatabaseModule.kt` — Registered `MIGRATION_25_26`
+  5. `data/repository/AdviceRepository.kt` — Added `updateNotes()`, `getById()` methods
+  6. `ui/common/AdviceViewModel.kt` — Added `saveNotes()` method
+  7. `ui/common/AdviceBanner.kt` — Made banner clickable (tap opens note dialog, swipe still works)
+  8. `ui/common/AdviceNoteDialog.kt` — **New file** — Popup dialog showing advice text + editable notes field

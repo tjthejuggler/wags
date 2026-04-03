@@ -29,7 +29,7 @@ class AdviceViewModel @Inject constructor(
     val state: StateFlow<AdviceUiState> = _state
 
     init {
-        // Observe all five sections
+        // Observe all sections
         AdviceSection.all.forEach { section ->
             viewModelScope.launch {
                 repo.observeBySection(section).collect { list ->
@@ -118,5 +118,13 @@ class AdviceViewModel @Inject constructor(
 
     fun deleteAdvice(id: Long) {
         viewModelScope.launch { repo.delete(id) }
+    }
+
+    // ── Notes operations ──────────────────────────────────────────────────────
+
+    /** Save notes for a specific advice item. Empty/blank → null. */
+    fun saveNotes(adviceId: Long, notes: String) {
+        val trimmed = notes.trim().ifBlank { null }
+        viewModelScope.launch { repo.updateNotes(adviceId, trimmed) }
     }
 }

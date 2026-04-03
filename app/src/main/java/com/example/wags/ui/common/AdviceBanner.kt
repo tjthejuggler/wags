@@ -7,6 +7,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,6 +22,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -36,11 +38,13 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.wags.data.db.entity.AdviceEntity
 import com.example.wags.ui.theme.SurfaceDark
 
 /**
  * A thin banner that shows a random piece of advice for the given [section].
  * Swipe left → previous advice, swipe right → next random advice.
+ * Tap → opens a note dialog to write thoughts about this advice.
  * Hidden when no advice exists for the section.
  *
  * Shows up to 5 visible lines; longer text is silently scrollable with no
@@ -77,6 +81,9 @@ fun AdviceBanner(
     // Track swipe direction for animation
     var swipeDirection by remember { mutableIntStateOf(0) }
 
+    // Track which advice item to show notes dialog for
+    var noteDialogAdvice by remember { mutableStateOf<AdviceEntity?>(null) }
+
     // 5 lines × 16sp lineHeight ≈ 80dp content + 12dp vertical padding = ~92dp max
     val maxBannerHeight = 92.dp
 
@@ -94,6 +101,7 @@ fun AdviceBanner(
         label = "advice_banner"
     ) { (_, text) ->
         var dragTotal by remember { mutableFloatStateOf(0f) }
+        var dragged by remember { mutableStateOf(false) }
 
         Box(
             modifier = modifier
@@ -107,10 +115,12 @@ fun AdviceBanner(
                                 // Swiped right → previous
                                 swipeDirection = -1
                                 viewModel.previous(section)
+                                dragged = true
                             } else if (dragTotal < -80f) {
                                 // Swiped left → next random
                                 swipeDirection = 1
                                 viewModel.nextRandom(section)
+                                dragged = true
                             }
                             dragTotal = 0f
                         },
@@ -118,6 +128,13 @@ fun AdviceBanner(
                     ) { _, dragAmount ->
                         dragTotal += dragAmount
                     }
+                }
+                .clickable {
+                    // Only open note dialog if we didn't just finish a swipe
+                    if (!dragged) {
+                        noteDialogAdvice = advice
+                    }
+                    dragged = false
                 }
                 .padding(horizontal = 16.dp, vertical = 6.dp)
                 .verticalScroll(rememberScrollState()),
@@ -135,5 +152,17 @@ fun AdviceBanner(
                 modifier = Modifier.fillMaxWidth()
             )
         }
+    }
+
+    // ── Note dialog ─────────────────────────────────────────────────────────
+    noteDialogAdvice?.let { adviceItem ->
+        AdviceNoteDialog(
+            adviceText = adviceItem.text,
+            currentNotes = adviceItem.notes,
+            onSave = { notes ->
+                viewModel.saveNotes(adviceItem.id, notes)
+            },
+            onDismiss = { noteDialogAdvice = null }
+        )
     }
 }

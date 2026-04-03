@@ -19,6 +19,10 @@ interface AdviceDao {
     @Query("SELECT * FROM advice WHERE section = :section ORDER BY createdAt DESC")
     suspend fun getBySection(section: String): List<AdviceEntity>
 
+    /** Get a single advice item by ID. */
+    @Query("SELECT * FROM advice WHERE id = :id")
+    suspend fun getById(id: Long): AdviceEntity?
+
     @Insert
     suspend fun insert(entity: AdviceEntity): Long
 
@@ -30,4 +34,12 @@ interface AdviceDao {
 
     @Query("DELETE FROM advice WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    /** Update only the notes column for a given advice item. */
+    @Query("UPDATE advice SET notes = :notes WHERE id = :id")
+    suspend fun updateNotes(id: Long, notes: String?)
+
+    /** Get all advice items (for export/backup). */
+    @Query("SELECT * FROM advice ORDER BY section, createdAt DESC")
+    suspend fun getAll(): List<AdviceEntity>
 }

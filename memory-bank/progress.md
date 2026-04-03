@@ -138,3 +138,6 @@
 
 ### 2026-04-02 16:43 (UTC-6)
 - ✅ Fixed: Rapid HR Change "Start" button not working — `startSession()` checked `_state.value.canStart` but `hasHrMonitor` was only set in the combined `uiState`, never in `_state`. Fixed by checking `hrDataSource.isAnyHrDeviceConnected.value` directly.
+
+### 2026-04-02 18:17 (UTC-6)
+- ✅ Added: Advice Notes feature — tap any advice banner to open a "My Thoughts" popup dialog. Notes are saved per-advice-item in the `advice` table (`notes` column). DB version bumped to 26 with migration. Notes are included in backup/restore since they're in the Room DB. New file: `ui/common/AdviceNoteDialog.kt`. Modified: AdviceEntity, AdviceDao, WagsDatabase, DatabaseModule, AdviceRepository, AdviceViewModel, AdviceBanner.

@@ -29,7 +29,7 @@ import com.example.wags.data.db.entity.*
         RapidHrSessionEntity::class,
         RapidHrTelemetryEntity::class
     ],
-    version = 25,
+    version = 26,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -741,6 +741,17 @@ abstract class WagsDatabase : RoomDatabase() {
                         )
                     """.trimIndent())
                     db.execSQL("CREATE INDEX IF NOT EXISTS `index_rapid_hr_telemetry_sessionId` ON `rapid_hr_telemetry` (`sessionId`)")
+                }
+            }
+
+            /**
+             * v25 → v26: Add notes column to advice table.
+             * Stores user thoughts/notes about each piece of advice.
+             * Existing advice items default to NULL (no notes).
+             */
+            val MIGRATION_25_26 = object : Migration(25, 26) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE advice ADD COLUMN notes TEXT DEFAULT NULL")
                 }
             }
         }

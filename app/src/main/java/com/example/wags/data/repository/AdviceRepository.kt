@@ -21,6 +21,10 @@ class AdviceRepository @Inject constructor(
     suspend fun getBySection(section: String): List<AdviceEntity> =
         dao.getBySection(section)
 
+    /** Get a single advice item by ID. */
+    suspend fun getById(id: Long): AdviceEntity? =
+        dao.getById(id)
+
     suspend fun add(section: String, text: String): Long =
         dao.insert(AdviceEntity(section = section, text = text))
 
@@ -29,4 +33,8 @@ class AdviceRepository @Inject constructor(
 
     suspend fun delete(id: Long) =
         dao.deleteById(id)
+
+    /** Update only the notes for a given advice item. */
+    suspend fun updateNotes(adviceId: Long, notes: String?) =
+        dao.updateNotes(adviceId, notes)
 }
