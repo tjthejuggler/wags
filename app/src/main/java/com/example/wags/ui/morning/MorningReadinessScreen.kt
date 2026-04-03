@@ -81,7 +81,7 @@ fun MorningReadinessScreen(
             title = { Text("Heart Rate Monitor Required", color = TextPrimary) },
             text = {
                 Text(
-                    "Please connect your Polar H10 heart rate monitor before starting the Morning Readiness test.",
+                    "Please connect a heart rate monitor before starting the Morning Readiness test.",
                     color = TextSecondary
                 )
             },
@@ -210,7 +210,7 @@ private fun IdleContent(onStart: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text("Before you begin:", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
-                Text("1. Connect your Polar H10 heart rate monitor", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                Text("1. Connect a heart rate monitor", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 Text("2. Lie down flat on your back", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 Text("3. Relax and breathe normally", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 Text("4. The test takes approximately 5 minutes", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)

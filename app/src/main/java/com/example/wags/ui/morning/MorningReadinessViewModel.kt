@@ -120,12 +120,15 @@ class MorningReadinessViewModel @Inject constructor(
         // Set FSM callbacks
         fsm.onStandPromptReady = {
             _uiState.update { it.copy(triggerStandAlert = true) }
-            // Arm the stand detector with the last ~1 second of supine ACC data
-            val supineSamples = deviceManager.accBuffer.readLast(200)
-            standDetector.arm(supineSamples)
-            // The FSM timestamp is the fallback if ACC detection times out
-            standDetector.setFallbackTimestamp(System.currentTimeMillis())
-            startAccPolling()
+            // ACC-based stand detection is only available with the H10 (it has
+            // an accelerometer). For other devices, the FSM's own timestamp at
+            // the moment of the stand prompt is used as the stand time.
+            if (deviceManager.isH10Connected()) {
+                val supineSamples = deviceManager.accBuffer.readLast(200)
+                standDetector.arm(supineSamples)
+                standDetector.setFallbackTimestamp(System.currentTimeMillis())
+                startAccPolling()
+            }
         }
         fsm.onQuestionnaireRequired = {
             // UI already reacts to fsmState == QUESTIONNAIRE
@@ -136,11 +139,9 @@ class MorningReadinessViewModel @Inject constructor(
     }
 
     fun startSession() {
-        // Morning readiness requires an H10 (chest strap with ACC for stand detection).
-        // The device type is determined by name — if the connected Polar device's name
-        // contains "H10", it's an H10 regardless of which slot it was assigned to.
-        val h10Id = deviceManager.polarBleManager.connectedH10DeviceId()
-        if (h10Id == null) {
+        // Any HR-capable device can be used for morning readiness.
+        // If no device is connected at all, show the dialog.
+        if (!hrDataSource.isAnyHrDeviceConnected.value) {
             _uiState.update { it.copy(noHrmDialogVisible = true) }
             return
         }
@@ -148,8 +149,15 @@ class MorningReadinessViewModel @Inject constructor(
         sessionHrDeviceLabel = hrDataSource.activeHrDeviceLabel()
         lastRrBufferSize = 0
         standDetector.reset()
-        // Start ACC stream so the stand detector has data
-        deviceManager.startAccStream(h10Id)
+
+        // Start ACC stream only if an H10 is connected (it has the accelerometer
+        // needed for stand detection). Other devices skip ACC-based stand detection
+        // and rely on the FSM's fallback timestamp instead.
+        val h10Id = deviceManager.polarBleManager.connectedH10DeviceId()
+        if (h10Id != null) {
+            deviceManager.startAccStream(h10Id)
+        }
+
         fsm.start(viewModelScope)
         startRrPolling()
     }

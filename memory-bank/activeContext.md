@@ -1,6 +1,6 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-03 02:06 UTC*
+*Last updated: 2026-04-03 02:12 UTC*
 
 ## Current State
 
@@ -256,3 +256,18 @@ New feature allowing users to time how quickly they can shift their heart rate b
   6. `ui/common/AdviceViewModel.kt` — Added `saveNotes()` method
   7. `ui/common/AdviceBanner.kt` — Made banner clickable (tap opens note dialog, swipe still works)
   8. `ui/common/AdviceNoteDialog.kt` — **New file** — Popup dialog showing advice text + editable notes field
+
+---
+
+### 2026-04-02 20:12 (UTC-6)
+
+**Removed H10 restriction from Morning Readiness**
+
+- Previously, `MorningReadinessViewModel.startSession()` required a Polar H10 specifically (`connectedH10DeviceId()`). Now any connected HR device works (checks `hrDataSource.isAnyHrDeviceConnected`).
+- ACC stream for stand detection is only started when an H10 is actually connected. Non-H10 devices skip ACC-based stand detection and rely on the FSM's fallback timestamp.
+- The `onStandPromptReady` callback now conditionally arms the stand detector only when H10 is present.
+- UI text updated: dialog says "connect a heart rate monitor" instead of "Polar H10", idle instructions say "Connect a heart rate monitor" instead of "Connect your Polar H10 heart rate monitor".
+- H10 behavior is completely unchanged — when an H10 is connected, everything works exactly as before (ACC stream, stand detection, etc.).
+- Files modified:
+  1. `ui/morning/MorningReadinessViewModel.kt` — `startSession()` gate changed from H10-only to any-device; ACC stream conditional; `onStandPromptReady` conditional
+  2. `ui/morning/MorningReadinessScreen.kt` — Dialog text and idle instructions updated

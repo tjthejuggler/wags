@@ -141,3 +141,6 @@
 
 ### 2026-04-02 18:17 (UTC-6)
 - ✅ Added: Advice Notes feature — tap any advice banner to open a "My Thoughts" popup dialog. Notes are saved per-advice-item in the `advice` table (`notes` column). DB version bumped to 26 with migration. Notes are included in backup/restore since they're in the Room DB. New file: `ui/common/AdviceNoteDialog.kt`. Modified: AdviceEntity, AdviceDao, WagsDatabase, DatabaseModule, AdviceRepository, AdviceViewModel, AdviceBanner.
+
+### 2026-04-02 20:12 (UTC-6)
+- ✅ Removed H10 restriction from Morning Readiness: any connected HR device (Polar H10, Verity Sense, oximeter, generic HR strap) can now start the test. ACC-based stand detection only activates when H10 is connected; other devices use FSM fallback timestamp. H10 behavior unchanged. Modified: `MorningReadinessViewModel.kt`, `MorningReadinessScreen.kt`.
