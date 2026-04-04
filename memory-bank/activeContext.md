@@ -1,6 +1,6 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-04 19:59 UTC*
+*Last updated: 2026-04-04 20:19 UTC*
 
 ## Current State
 
@@ -50,6 +50,23 @@ Based on open tabs and visible files:
 ## Current Focus / Open Questions
 
 - No specific open questions
+
+---
+
+### 2026-04-04 14:19 (UTC-6)
+
+**Added: Clickable settings banner on FreeHoldActiveScreen with edit popup**
+
+- The settings summary banner at the top of the free hold screen is now **clickable** (underlined text) when the hold is not active.
+- Tapping it opens a `FreeHoldSettingsDialog` — an `AlertDialog` with filter chips for all 5 settings (lung volume, prep type, time of day, posture, audio).
+- Changes are applied **immediately** to both the ViewModel's mutable properties (used when saving the hold record) and to SharedPreferences (so the main ApneaScreen stays in sync).
+- The banner text updates in real-time as settings are changed in the dialog.
+- During an active hold, the banner is not clickable (no underline, no onClick).
+- Files created:
+  1. `ui/apnea/FreeHoldSettingsDialog.kt` — New dialog composable with filter chips for all 5 settings
+- Files modified:
+  1. `ui/apnea/FreeHoldActiveScreen.kt` — ViewModel settings changed from `val` to `var` with `private set`; added `currentLungVolume`/`currentPrepType`/`currentTimeOfDay`/`currentPosture`/`currentAudio` to `FreeHoldActiveUiState`; added `updateLungVolume()`/`updatePrepType()`/`updateTimeOfDay()`/`updatePosture()`/`updateAudio()` methods; banner now reads from UI state and passes `onClick` when hold not active
+  2. `ui/apnea/ApneaSettingsSummaryBanner.kt` — Added optional `onClick` parameter; text is underlined when clickable; display helpers renamed to `internal` with `Banner` suffix for reuse
 
 ---
 

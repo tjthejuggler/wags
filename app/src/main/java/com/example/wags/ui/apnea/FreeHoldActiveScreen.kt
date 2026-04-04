@@ -161,7 +161,13 @@ data class FreeHoldActiveUiState(
     /** True while the guided hyper countdown dialog is showing. */
     val showGuidedCountdown: Boolean = false,
     /** True after the guided countdown has completed — button reverts to plain START. */
-    val guidedCountdownComplete: Boolean = false
+    val guidedCountdownComplete: Boolean = false,
+    // ── Editable settings (mirrored from ViewModel for banner display) ───────
+    val currentLungVolume: String = "FULL",
+    val currentPrepType: String = "NO_PREP",
+    val currentTimeOfDay: String = "DAY",
+    val currentPosture: String = "LAYING",
+    val currentAudio: String = AudioSetting.SILENCE.name
 )
 
 @HiltViewModel
@@ -178,15 +184,20 @@ class FreeHoldActiveViewModel @Inject constructor(
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
-    // Settings passed in via nav arguments — these are the source of truth for what gets saved
-    val lungVolume: String = savedStateHandle.get<String>("lungVolume") ?: "FULL"
-    val prepType: String   = savedStateHandle.get<String>("prepType")   ?: "NO_PREP"
-    val timeOfDay: String  = savedStateHandle.get<String>("timeOfDay")  ?: "DAY"
-    val posture: String    = savedStateHandle.get<String>("posture")    ?: "LAYING"
-    val audio: String      = savedStateHandle.get<String>("audio")      ?: AudioSetting.SILENCE.name
+    // Settings — initialized from nav arguments, mutable so the user can edit them from the banner popup
+    var lungVolume: String = savedStateHandle.get<String>("lungVolume") ?: "FULL"
+        private set
+    var prepType: String   = savedStateHandle.get<String>("prepType")   ?: "NO_PREP"
+        private set
+    var timeOfDay: String  = savedStateHandle.get<String>("timeOfDay")  ?: "DAY"
+        private set
+    var posture: String    = savedStateHandle.get<String>("posture")    ?: "LAYING"
+        private set
+    var audio: String      = savedStateHandle.get<String>("audio")      ?: AudioSetting.SILENCE.name
+        private set
 
-    private val isMusicMode = audio == AudioSetting.MUSIC.name
-    private val isHyperPrep = prepType == PrepType.HYPER.name
+    private var isMusicMode = audio == AudioSetting.MUSIC.name
+    private var isHyperPrep = prepType == PrepType.HYPER.name
 
     private val _uiState = MutableStateFlow(
         FreeHoldActiveUiState(
@@ -196,7 +207,12 @@ class FreeHoldActiveViewModel @Inject constructor(
             guidedHyperEnabled = if (isHyperPrep) prefs.getBoolean("guided_hyper_enabled", false) else false,
             guidedRelaxedExhaleSec = prefs.getInt("guided_relaxed_exhale_sec", 0),
             guidedPurgeExhaleSec = prefs.getInt("guided_purge_exhale_sec", 0),
-            guidedTransitionSec = prefs.getInt("guided_transition_sec", 0)
+            guidedTransitionSec = prefs.getInt("guided_transition_sec", 0),
+            currentLungVolume = lungVolume,
+            currentPrepType = prepType,
+            currentTimeOfDay = timeOfDay,
+            currentPosture = posture,
+            currentAudio = audio
         )
     )
 
@@ -216,7 +232,7 @@ class FreeHoldActiveViewModel @Inject constructor(
         state.copy(
             liveHr = hr,
             liveSpO2 = spo2,
-            nowPlayingSong = if (isMusicMode) song else null,
+            nowPlayingSong = if (state.isMusicMode) song else null,
             spotifyConnected = connected
         )
     }.stateIn(
@@ -306,6 +322,40 @@ class FreeHoldActiveViewModel @Inject constructor(
     fun onGuidedCountdownCancelled() {
         _uiState.update { it.copy(showGuidedCountdown = false, guidedCountdownComplete = true) }
         startFreeHold()
+    }
+
+    // ── Settings edit (from banner popup) ────────────────────────────────────
+
+    fun updateLungVolume(volume: String) {
+        lungVolume = volume
+        prefs.edit().putString("setting_lung_volume", volume).apply()
+        _uiState.update { it.copy(currentLungVolume = volume) }
+    }
+
+    fun updatePrepType(type: String) {
+        prepType = type
+        isHyperPrep = type == PrepType.HYPER.name
+        prefs.edit().putString("setting_prep_type", type).apply()
+        _uiState.update { it.copy(currentPrepType = type, isHyperPrep = isHyperPrep) }
+    }
+
+    fun updateTimeOfDay(tod: String) {
+        timeOfDay = tod
+        prefs.edit().putString("setting_time_of_day", tod).apply()
+        _uiState.update { it.copy(currentTimeOfDay = tod) }
+    }
+
+    fun updatePosture(pos: String) {
+        posture = pos
+        prefs.edit().putString("setting_posture", pos).apply()
+        _uiState.update { it.copy(currentPosture = pos) }
+    }
+
+    fun updateAudio(aud: String) {
+        audio = aud
+        isMusicMode = aud == AudioSetting.MUSIC.name
+        prefs.edit().putString("setting_audio", aud).apply()
+        _uiState.update { it.copy(currentAudio = aud, isMusicMode = isMusicMode) }
     }
 
     private var freeHoldStartTime = 0L
@@ -819,6 +869,8 @@ fun FreeHoldActiveScreen(
     ) { padding ->
         // Song picker dialog state
         var showSongPicker by remember { mutableStateOf(false) }
+        // Settings edit dialog state
+        var showSettingsDialog by remember { mutableStateOf(false) }
 
         if (showSongPicker) {
             SongPickerDialog(
@@ -831,6 +883,23 @@ fun FreeHoldActiveScreen(
                     viewModel.selectSong(track)
                 },
                 onDismiss = { showSongPicker = false }
+            )
+        }
+
+        // Settings edit popup
+        if (showSettingsDialog) {
+            FreeHoldSettingsDialog(
+                lungVolume = state.currentLungVolume,
+                prepType = state.currentPrepType,
+                timeOfDay = state.currentTimeOfDay,
+                posture = state.currentPosture,
+                audio = state.currentAudio,
+                onLungVolumeChange = { viewModel.updateLungVolume(it) },
+                onPrepTypeChange = { viewModel.updatePrepType(it) },
+                onTimeOfDayChange = { viewModel.updateTimeOfDay(it) },
+                onPostureChange = { viewModel.updatePosture(it) },
+                onAudioChange = { viewModel.updateAudio(it) },
+                onDismiss = { showSettingsDialog = false }
             )
         }
 
@@ -852,17 +921,18 @@ fun FreeHoldActiveScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Settings summary — always visible so the user knows which settings are active
+            // Settings summary — clickable to open settings popup (only when hold not active)
             ApneaSettingsSummaryBanner(
-                lungVolume = viewModel.lungVolume,
-                prepType   = viewModel.prepType,
-                timeOfDay  = viewModel.timeOfDay,
-                posture    = viewModel.posture,
-                audio      = viewModel.audio
+                lungVolume = state.currentLungVolume,
+                prepType   = state.currentPrepType,
+                timeOfDay  = state.currentTimeOfDay,
+                posture    = state.currentPosture,
+                audio      = state.currentAudio,
+                onClick    = if (!state.freeHoldActive) {{ showSettingsDialog = true }} else null
             )
 
             // Hyperventilating advice — shown only when prep type is HYPER
-            if (viewModel.prepType == PrepType.HYPER.name) {
+            if (state.currentPrepType == PrepType.HYPER.name) {
                 AdviceBanner(section = AdviceSection.APNEA_HYPER)
             }
 

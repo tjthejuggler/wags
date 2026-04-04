@@ -1,8 +1,9 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-04 19:59 UTC*
+*Last updated: 2026-04-04 20:19 UTC*
 
 ## Recent Changes (2026-04-04)
+- ✅ Added: Clickable settings banner on FreeHoldActiveScreen — tapping the settings summary text at the top of the free hold screen opens a popup dialog with filter chips for all 5 settings (lung volume, prep type, time of day, posture, audio). Changes are applied immediately and persisted to SharedPreferences so the main ApneaScreen stays in sync. Only clickable when hold is not active.
 - ✅ Added: "Repeat This Hold" button on apnea record detail screen — navigates directly to the FreeHoldActiveScreen (not the general ApneaScreen) with all settings pre-filled from the record. Time of Day uses current clock time. Guided hyper settings (checkbox + phase durations) are also restored when the record had guided hyperventilation. If the record used MUSIC audio with a song, the song is auto-loaded into Spotify so the user just needs to tap Start.
 - ✅ Added: Personal Best Chart Screen — tapping any setting label on the Personal Bests screen opens a landscape line chart of breath hold durations over time. Supports pinch-to-zoom, pan, smart date labels, and a "PB only" toggle to filter to holds that were new personal bests at the time. Works for all settings, single settings, and every combination of 2/3/4/5 settings.
 - ✅ Fixed: NowPlayingBanner showing during non-MUSIC free holds — `nowPlayingSong` in the combine block now gated behind `isMusicMode` so the music card only appears when audio setting is MUSIC.
