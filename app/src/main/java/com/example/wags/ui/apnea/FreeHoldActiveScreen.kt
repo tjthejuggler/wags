@@ -216,7 +216,7 @@ class FreeHoldActiveViewModel @Inject constructor(
         state.copy(
             liveHr = hr,
             liveSpO2 = spo2,
-            nowPlayingSong = song,
+            nowPlayingSong = if (isMusicMode) song else null,
             spotifyConnected = connected
         )
     }.stateIn(
@@ -832,8 +832,8 @@ fun FreeHoldActiveScreen(
                 AdviceBanner(section = AdviceSection.APNEA_HYPER)
             }
 
-            // Now-playing banner — shown when MUSIC is selected and a song is detected
-            if (state.freeHoldActive && state.nowPlayingSong != null) {
+            // Now-playing banner — shown only when MUSIC is selected and a song is detected
+            if (state.freeHoldActive && state.isMusicMode && state.nowPlayingSong != null) {
                 NowPlayingBanner(track = state.nowPlayingSong!!)
             }
 

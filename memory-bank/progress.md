@@ -1,6 +1,9 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-03 15:41 UTC*
+*Last updated: 2026-04-04 03:59 UTC*
+
+## Recent Changes (2026-04-04)
+- ✅ Fixed: NowPlayingBanner showing during non-MUSIC free holds — `nowPlayingSong` in the combine block now gated behind `isMusicMode` so the music card only appears when audio setting is MUSIC.
 
 ## Recent Changes (2026-04-03)
 - ✅ Apnea section improvements:

@@ -1,6 +1,6 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-03 15:41 UTC*
+*Last updated: 2026-04-04 03:59 UTC*
 
 ## Current State
 
@@ -50,6 +50,16 @@ Based on open tabs and visible files:
 ## Current Focus / Open Questions
 
 - No specific open questions
+
+---
+
+### 2026-04-03 21:59 (UTC-6)
+
+**Fixed: NowPlayingBanner showing during non-MUSIC free holds**
+
+- Root cause: In `FreeHoldActiveScreen.kt`, the `uiState` combine block always passed `spotifyManager.currentSong` into `nowPlayingSong` regardless of the audio setting. If Spotify was playing in the background, the `NowPlayingBanner` would appear during any free hold — even when audio was set to SILENCE, MOVIE, etc.
+- Fix: In the combine block (line 219), `nowPlayingSong` is now set to `if (isMusicMode) song else null`. This ensures the now-playing banner only appears when the audio setting is MUSIC.
+- File modified: `ui/apnea/FreeHoldActiveScreen.kt` — single line change in the `combine` block
 
 ---
 
