@@ -229,6 +229,40 @@ class FreeHoldActiveViewModel @Inject constructor(
         )
     )
 
+    init {
+        // Check for a pending repeat song (set by "Repeat This Hold" on the detail screen).
+        // If present, auto-select it so the song is pre-loaded and ready when the user taps Start.
+        if (isMusicMode) {
+            val pendingUri = prefs.getString("pending_repeat_song_uri", null)
+            val pendingTitle = prefs.getString("pending_repeat_song_title", null)
+            val pendingArtist = prefs.getString("pending_repeat_song_artist", null)
+            if (!pendingUri.isNullOrBlank() && !pendingTitle.isNullOrBlank() && !pendingArtist.isNullOrBlank()) {
+                // Clear the pending keys immediately so they don't fire again
+                prefs.edit()
+                    .remove("pending_repeat_song_uri")
+                    .remove("pending_repeat_song_title")
+                    .remove("pending_repeat_song_artist")
+                    .apply()
+                // Build a SpotifyTrackDetail and auto-select it (pre-loads into Spotify)
+                val repeatTrack = SpotifyTrackDetail(
+                    spotifyUri = pendingUri,
+                    title = pendingTitle,
+                    artist = pendingArtist,
+                    durationMs = 0L,
+                    albumArt = null
+                )
+                selectSong(repeatTrack)
+            }
+        } else {
+            // Not music mode — clear any stale pending keys
+            prefs.edit()
+                .remove("pending_repeat_song_uri")
+                .remove("pending_repeat_song_title")
+                .remove("pending_repeat_song_artist")
+                .apply()
+        }
+    }
+
     // ── Guided hyperventilation ──────────────────────────────────────────────
 
     fun setShowTimer(show: Boolean) {

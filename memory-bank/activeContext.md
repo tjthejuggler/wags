@@ -1,6 +1,6 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-04 18:33 UTC*
+*Last updated: 2026-04-04 19:59 UTC*
 
 ## Current State
 
@@ -50,6 +50,23 @@ Based on open tabs and visible files:
 ## Current Focus / Open Questions
 
 - No specific open questions
+
+---
+
+### 2026-04-04 13:59 (UTC-6)
+
+**Added: "Repeat This Hold" button on Apnea Record Detail Screen**
+
+- New feature: At the bottom of the apnea hold detail screen (for free holds only, not table records), a "Repeat This Hold" button appears.
+- Tapping it navigates **directly to the FreeHoldActiveScreen** (not the general ApneaScreen) with all settings from the record pre-filled via the navigation route parameters.
+- Settings written to SharedPreferences: lung volume, prep type, posture, audio (so the ApneaScreen stays in sync on future visits).
+- **Time of Day** uses `TimeOfDay.fromCurrentTime()` — always based on the current clock time, not the record's value.
+- **Guided hyperventilation**: If the record had `guidedHyper=true`, the guided hyper checkbox is enabled and the phase durations (relaxed exhale, purge exhale, transition) are written to SharedPreferences so the FreeHoldActiveScreen picks them up.
+- **Spotify song auto-load**: If the record used MUSIC audio and had a song log, the first song's Spotify URI/title/artist are stored as a "pending repeat song" in SharedPreferences. When the FreeHoldActiveViewModel initializes in MUSIC mode, it detects the pending song, auto-selects it via `selectSong()` (which pre-loads it into Spotify playback and pauses), then clears the pending keys. The user just needs to tap Start.
+- Files modified:
+  1. `ui/apnea/ApneaRecordDetailViewModel.kt` — Injected `@Named("apnea_prefs") SharedPreferences`; added `prepareRepeatHold()` and `repeatHoldRoute()` methods
+  2. `ui/apnea/ApneaRecordDetailScreen.kt` — Added `onRepeatHold` callback to `RecordDetailContent`; added "Repeat This Hold" `Button` at bottom of detail content (free holds only); navigates directly to `FREE_HOLD_ACTIVE` route
+  3. `ui/apnea/FreeHoldActiveScreen.kt` — Added `init` block to `FreeHoldActiveViewModel` that checks for pending repeat song in SharedPreferences and auto-selects it
 
 ---
 

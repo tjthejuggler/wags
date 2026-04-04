@@ -39,6 +39,7 @@ import com.example.wags.domain.model.SpotifySong
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.model.trophyEmojis
 import com.example.wags.ui.common.grayscale
+import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -134,6 +135,13 @@ fun ApneaRecordDetailScreen(
                     pbBadges = state.pbBadges,
                     songLog = state.songLog,
                     tableSession = state.tableSession,
+                    onRepeatHold = {
+                        viewModel.prepareRepeatHold()
+                        val route = viewModel.repeatHoldRoute()
+                        if (route != null) {
+                            navController.navigate(route)
+                        }
+                    },
                     modifier = Modifier.padding(padding)
                 )
             }
@@ -435,6 +443,7 @@ private fun RecordDetailContent(
     pbBadges: List<RecordPbBadge>,
     songLog: List<SpotifySong> = emptyList(),
     tableSession: ApneaSessionEntity? = null,
+    onRepeatHold: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val dateStr = remember(record.timestamp) {
@@ -831,6 +840,27 @@ private fun RecordDetailContent(
                         HorizontalDivider(color = TextDisabled.copy(alpha = 0.2f))
                     }
                 }
+            }
+        }
+
+        // ── Repeat This Hold button ───────────────────────────────────────
+        // Only show for free holds (not table records)
+        if (record.tableType == null) {
+            Button(
+                onClick = onRepeatHold,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = SurfaceVariant,
+                    contentColor = TextPrimary
+                )
+            ) {
+                Text(
+                    "Repeat This Hold",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium
+                )
             }
         }
     }

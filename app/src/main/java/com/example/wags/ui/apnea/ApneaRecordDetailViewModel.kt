@@ -1,5 +1,6 @@
 package com.example.wags.ui.apnea
 
+import android.content.SharedPreferences
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import javax.inject.Named
 
 data class ApneaRecordDetailUiState(
     val record: ApneaRecordEntity? = null,
@@ -54,7 +56,8 @@ class ApneaRecordDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val apneaRepository: ApneaRepository,
     private val sessionRepository: ApneaSessionRepository,
-    private val devicePrefs: DevicePreferencesRepository
+    private val devicePrefs: DevicePreferencesRepository,
+    @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
     private val recordId: Long = savedStateHandle.get<Long>("recordId") ?: -1L
@@ -174,5 +177,59 @@ class ApneaRecordDetailViewModel @Inject constructor(
             val badges = apneaRepository.getRecordPbBadges(recordId)
             _uiState.update { it.copy(record = updated, pbBadges = badges, showEditSheet = false) }
         }
+    }
+
+    // ── Repeat hold ───────────────────────────────────────────────────────────
+
+    /**
+     * Writes the current record's settings into SharedPreferences so the
+     * FreeHoldActiveScreen picks them up. Also persists the settings so the
+     * ApneaScreen stays in sync on future visits.
+     * Time of Day is NOT written — it stays based on the current clock time.
+     * If the record used MUSIC audio and has a song log, the first song's
+     * Spotify URI / title / artist are stored as a "pending repeat song"
+     * for the FreeHoldActiveViewModel to auto-load.
+     * If the record used guided hyperventilation, those settings are also written.
+     */
+    fun prepareRepeatHold() {
+        val record = _uiState.value.record ?: return
+        val songLog = _uiState.value.songLog
+        prefs.edit().apply {
+            putString("setting_lung_volume", record.lungVolume)
+            putString("setting_prep_type", record.prepType)
+            putString("setting_posture", record.posture)
+            putString("setting_audio", record.audio)
+            // Guided hyperventilation settings
+            if (record.guidedHyper) {
+                putBoolean("guided_hyper_enabled", true)
+                record.guidedRelaxedExhaleSec?.let { putInt("guided_relaxed_exhale_sec", it) }
+                record.guidedPurgeExhaleSec?.let { putInt("guided_purge_exhale_sec", it) }
+                record.guidedTransitionSec?.let { putInt("guided_transition_sec", it) }
+            }
+            // Store pending repeat song when audio was MUSIC and a song was logged
+            if (record.audio == AudioSetting.MUSIC.name && songLog.isNotEmpty()) {
+                val song = songLog.first()
+                putString("pending_repeat_song_uri", song.spotifyUri ?: "")
+                putString("pending_repeat_song_title", song.title)
+                putString("pending_repeat_song_artist", song.artist)
+            } else {
+                remove("pending_repeat_song_uri")
+                remove("pending_repeat_song_title")
+                remove("pending_repeat_song_artist")
+            }
+            apply()
+        }
+    }
+
+    /**
+     * Returns the navigation route parameters for the FreeHoldActiveScreen
+     * based on the current record's settings. Time of Day uses the current
+     * clock time instead of the record's value.
+     */
+    fun repeatHoldRoute(): String? {
+        val record = _uiState.value.record ?: return null
+        val showTimer = prefs.getBoolean("setting_show_timer", true)
+        return "free_hold_active/${record.lungVolume}/${record.prepType}/" +
+            "${TimeOfDay.fromCurrentTime().name}/${record.posture}/$showTimer/${record.audio}"
     }
 }
