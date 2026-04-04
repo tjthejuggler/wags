@@ -96,6 +96,28 @@ fun PersonalBestsScreen(
                     item { Spacer(modifier = Modifier.height(8.dp)) }
                 }
 
+                // ── Current Settings (quick access) ──────────────────────
+                state.currentSettingsEntry?.let { entry ->
+                    item {
+                        SectionHeader(
+                            trophies = "⚙️",
+                            title = "Current Settings",
+                            subtitle = entry.label
+                        )
+                    }
+                    item {
+                        PersonalBestRow(
+                            entry = entry,
+                            textStyle = TrophyTextStyle.EXACT,
+                            onRecordClick = { recordId ->
+                                navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
+                            },
+                            onChartClick = { navigateToChart(entry) }
+                        )
+                    }
+                    item { Spacer(modifier = Modifier.height(8.dp)) }
+                }
+
                 // 5🏆 Single setting
                 grouped[5]?.let { entries ->
                     item {

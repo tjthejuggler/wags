@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.pm.ActivityInfo
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -25,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -99,6 +101,9 @@ fun PbChartScreen(
             } else {
                 HoldChart(
                     points = points,
+                    onRecordClick = { recordId ->
+                        navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
+                    },
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(padding)
@@ -143,14 +148,21 @@ private fun PbToggleChip(showPbOnly: Boolean, onToggle: () -> Unit) {
 // Chart composable with zoom & pan
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Visible dot position paired with its record ID. */
+private data class DotHit(val offset: Offset, val recordId: Long)
+
 @Composable
 private fun HoldChart(
     points: List<PbChartPoint>,
+    onRecordClick: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     // Zoom & pan state
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
+
+    // Track visible dot positions for tap detection
+    val dotHits = remember { mutableListOf<DotHit>() }
 
     // Reset zoom when points change
     LaunchedEffect(points) {
@@ -167,6 +179,7 @@ private fun HoldChart(
     val dotColor = TextPrimary
     val gridColor = TextDisabled.copy(alpha = 0.3f)
     val labelColor = TextSecondary
+    val tapRadius = 48f // generous tap target in px
 
     val paint = remember {
         android.graphics.Paint().apply {
@@ -180,9 +193,25 @@ private fun HoldChart(
         modifier = modifier
             .background(BackgroundDark)
             .pointerInput(Unit) {
+                detectTapGestures { tapOffset ->
+                    // Find nearest dot within tap radius
+                    val hit = dotHits.minByOrNull {
+                        val dx = it.offset.x - tapOffset.x
+                        val dy = it.offset.y - tapOffset.y
+                        dx * dx + dy * dy
+                    }
+                    if (hit != null) {
+                        val dx = hit.offset.x - tapOffset.x
+                        val dy = hit.offset.y - tapOffset.y
+                        if (dx * dx + dy * dy <= tapRadius * tapRadius) {
+                            onRecordClick(hit.recordId)
+                        }
+                    }
+                }
+            }
+            .pointerInput(Unit) {
                 detectTransformGestures { _, pan, zoom, _ ->
                     val newScale = (scale * zoom).coerceIn(1f, 10f)
-                    // Adjust offset so zoom centers on the gesture
                     val chartW = size.width - leftPad - rightPad
                     val maxOffset = chartW * (newScale - 1f)
                     val newOffset = (offsetX + pan.x).coerceIn(-maxOffset, 0f)
@@ -196,11 +225,14 @@ private fun HoldChart(
         val chartW = w - leftPad - rightPad
         val chartH = h - topPad - bottomPad
 
+        dotHits.clear()
+
         if (points.size < 2) {
             // Single point — draw a dot
             val cx = leftPad + chartW / 2f
             val cy = topPad + chartH / 2f
             drawCircle(dotColor, radius = 6f, center = Offset(cx, cy))
+            dotHits.add(DotHit(Offset(cx, cy), points[0].recordId))
             drawContext.canvas.nativeCanvas.drawText(
                 formatDurationLabel(points[0].durationMs),
                 cx + 10f, cy - 10f, paint
@@ -255,7 +287,6 @@ private fun HoldChart(
         // ── Line path ────────────────────────────────────────────────────
         val path = Path()
         var first = true
-        val visiblePoints = mutableListOf<Offset>()
 
         for (pt in points) {
             val ptT = pt.timestampMs.toFloat()
@@ -270,14 +301,14 @@ private fun HoldChart(
             } else {
                 path.lineTo(clampedX, y)
             }
-            visiblePoints.add(Offset(clampedX, y))
+            dotHits.add(DotHit(Offset(clampedX, y), pt.recordId))
         }
 
         drawPath(path, lineColor, style = Stroke(width = 2.5f))
 
         // ── Dots ─────────────────────────────────────────────────────────
-        for (pt in visiblePoints) {
-            drawCircle(dotColor, radius = 4f, center = pt)
+        for (hit in dotHits) {
+            drawCircle(dotColor, radius = 5f, center = hit.offset)
         }
     }
 }

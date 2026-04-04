@@ -16,6 +16,7 @@ import javax.inject.Inject
 
 /** A single data point for the PB chart. */
 data class PbChartPoint(
+    val recordId: Long,
     val timestampMs: Long,
     val durationMs: Long
 )
@@ -51,7 +52,7 @@ class PbChartViewModel @Inject constructor(
             val records = apneaRepository.getAllFreeHoldsForChart(
                 lungVolume, prepType, timeOfDay, posture, audio
             )
-            val allPoints = records.map { PbChartPoint(it.timestamp, it.durationMs) }
+            val allPoints = records.map { PbChartPoint(it.recordId, it.timestamp, it.durationMs) }
             val pbOnlyPoints = computePbOnly(records)
             _uiState.update {
                 it.copy(
@@ -78,7 +79,7 @@ class PbChartViewModel @Inject constructor(
         for (r in records) {
             if (r.durationMs > runningMax) {
                 runningMax = r.durationMs
-                result.add(PbChartPoint(r.timestamp, r.durationMs))
+                result.add(PbChartPoint(r.recordId, r.timestamp, r.durationMs))
             }
         }
         return result
