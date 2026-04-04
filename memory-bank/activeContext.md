@@ -1,6 +1,6 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-04 03:59 UTC*
+*Last updated: 2026-04-04 18:33 UTC*
 
 ## Current State
 
@@ -50,6 +50,25 @@ Based on open tabs and visible files:
 ## Current Focus / Open Questions
 
 - No specific open questions
+
+---
+
+### 2026-04-04 12:33 (UTC-6)
+
+**Added: Personal Best Chart Screen (PB progress graph)**
+
+- New feature: Tapping any setting label on the Personal Bests screen now navigates to a landscape-oriented line chart showing breath hold duration over time for that setting/combination.
+- **Toggle**: A "PB only" switch filters to show only holds that were a new personal best at the time they happened, vs. all holds matching the selected settings.
+- **Chart features**: Canvas-based line chart with pinch-to-zoom and pan, smart date labels on X-axis that adapt to zoom level (hours → days → months → years), Y-axis in seconds with nice tick spacing, dashed grid lines.
+- Files created:
+  1. `ui/apnea/PbChartScreen.kt` — Landscape chart screen with zoom/pan Canvas
+  2. `ui/apnea/PbChartViewModel.kt` — ViewModel with `PbChartPoint` data class, PB-only computation
+- Files modified:
+  1. `data/db/dao/ApneaRecordDao.kt` — Added `getAllFreeHoldsFiltered()` query (no pagination, ordered by timestamp ASC)
+  2. `data/repository/ApneaRepository.kt` — Added `getAllFreeHoldsForChart()` method; updated `entry()` helper to include filter values in `PersonalBestEntry`
+  3. `domain/model/PersonalBestCategory.kt` — Added `lungVolume`, `prepType`, `timeOfDay`, `posture`, `audio` fields to `PersonalBestEntry`
+  4. `ui/apnea/PersonalBestsScreen.kt` — Made labels clickable → navigates to `PbChartScreen`; added `onChartClick` to `PersonalBestRow`
+  5. `ui/navigation/WagsNavGraph.kt` — Added `PB_CHART` route, `pbChart()` helper, composable entry with 6 nav arguments
 
 ---
 

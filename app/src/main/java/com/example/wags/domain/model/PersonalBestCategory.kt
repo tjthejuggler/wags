@@ -99,5 +99,11 @@ data class PersonalBestEntry(
     val label: String,
     val recordId: Long?,
     val durationMs: Long?,
-    val timestamp: Long?
+    val timestamp: Long?,
+    /** Filter values for chart navigation — empty string means "any". */
+    val lungVolume: String = "",
+    val prepType: String = "",
+    val timeOfDay: String = "",
+    val posture: String = "",
+    val audio: String = ""
 )

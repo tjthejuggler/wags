@@ -539,6 +539,26 @@ interface ApneaRecordDao {
         audio: String
     ): BestRecordTuple?
 
+    // ── All free holds matching dynamic filters (for chart) ──────────────────
+
+    @Query("""
+        SELECT * FROM apnea_records
+        WHERE tableType IS NULL
+          AND (:lungVolume = '' OR lungVolume = :lungVolume)
+          AND (:prepType   = '' OR prepType   = :prepType)
+          AND (:timeOfDay  = '' OR timeOfDay  = :timeOfDay)
+          AND (:posture    = '' OR posture    = :posture)
+          AND (:audio      = '' OR audio      = :audio)
+        ORDER BY timestamp ASC
+    """)
+    suspend fun getAllFreeHoldsFiltered(
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        posture: String,
+        audio: String
+    ): List<ApneaRecordEntity>
+
     // ── Stats queries (all settings combined) ────────────────────────────────
 
     @Query("SELECT COUNT(*) FROM apnea_records WHERE tableType IS NULL")

@@ -7,6 +7,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import java.net.URLDecoder
+import java.net.URLEncoder
 import com.example.wags.domain.model.TableLength
 import com.example.wags.domain.model.TrainingModality
 import com.example.wags.domain.usecase.breathing.RfProtocol
@@ -17,6 +19,7 @@ import com.example.wags.ui.apnea.ApneaRecordDetailScreen
 import com.example.wags.ui.apnea.ApneaScreen
 import com.example.wags.ui.apnea.ApneaTableScreen
 import com.example.wags.ui.apnea.FreeHoldActiveScreen
+import com.example.wags.ui.apnea.PbChartScreen
 import com.example.wags.ui.apnea.PersonalBestsScreen
 import com.example.wags.ui.apnea.SessionAnalyticsHistoryScreen
 import com.example.wags.ui.apnea.SessionAnalyticsScreen
@@ -75,6 +78,7 @@ object WagsRoutes {
     const val APNEA_ALL_RECORDS = "apnea_all_records/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{eventTypes}"
     const val FREE_HOLD_ACTIVE = "free_hold_active/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{showTimer}/{audio}"
     const val PERSONAL_BESTS = "personal_bests"
+    const val PB_CHART = "pb_chart?lungVolume={lungVolume}&prepType={prepType}&timeOfDay={timeOfDay}&posture={posture}&audio={audio}&label={label}"
     // ── Meditation / NSDR ──────────────────────────────────────────────────────
     // ── Garmin Watch ─────────────────────────────────────────────────────────
     const val GARMIN = "garmin"
@@ -134,6 +138,15 @@ object WagsRoutes {
         posture: String = "",
         eventTypes: String = "ALL"
     ) = "apnea_all_records/$lungVolume/$prepType/$timeOfDay/$posture/$eventTypes"
+
+    fun pbChart(
+        lungVolume: String = "",
+        prepType: String = "",
+        timeOfDay: String = "",
+        posture: String = "",
+        audio: String = "",
+        label: String = "All settings"
+    ) = "pb_chart?lungVolume=$lungVolume&prepType=$prepType&timeOfDay=$timeOfDay&posture=$posture&audio=$audio&label=${URLEncoder.encode(label, "UTF-8")}"
 }
 
 @Composable
@@ -328,6 +341,19 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
         }
         composable(WagsRoutes.PERSONAL_BESTS) {
             PersonalBestsScreen(navController = navController)
+        }
+        composable(
+            route = WagsRoutes.PB_CHART,
+            arguments = listOf(
+                navArgument("lungVolume") { type = NavType.StringType; defaultValue = "" },
+                navArgument("prepType")   { type = NavType.StringType; defaultValue = "" },
+                navArgument("timeOfDay")  { type = NavType.StringType; defaultValue = "" },
+                navArgument("posture")    { type = NavType.StringType; defaultValue = "" },
+                navArgument("audio")      { type = NavType.StringType; defaultValue = "" },
+                navArgument("label")      { type = NavType.StringType; defaultValue = "All settings" }
+            )
+        ) {
+            PbChartScreen(navController = navController)
         }
         composable(WagsRoutes.RF_ASSESSMENT_PICKER) {
             AssessmentPickerScreen(

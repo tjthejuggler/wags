@@ -61,6 +61,19 @@ fun PersonalBestsScreen(
                 // Group entries by trophy count for section headers
                 val grouped = state.entries.groupBy { it.trophyCount }
 
+                fun navigateToChart(entry: PersonalBestEntry) {
+                    navController.navigate(
+                        WagsRoutes.pbChart(
+                            lungVolume = entry.lungVolume,
+                            prepType = entry.prepType,
+                            timeOfDay = entry.timeOfDay,
+                            posture = entry.posture,
+                            audio = entry.audio,
+                            label = entry.label
+                        )
+                    )
+                }
+
                 // 6🏆 Global
                 grouped[6]?.let { entries ->
                     item {
@@ -76,7 +89,8 @@ fun PersonalBestsScreen(
                             textStyle = TrophyTextStyle.GLOBAL,
                             onRecordClick = { recordId ->
                                 navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
-                            }
+                            },
+                            onChartClick = { navigateToChart(entry) }
                         )
                     }
                     item { Spacer(modifier = Modifier.height(8.dp)) }
@@ -97,7 +111,8 @@ fun PersonalBestsScreen(
                             textStyle = TrophyTextStyle.ONE_SETTING,
                             onRecordClick = { recordId ->
                                 navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
-                            }
+                            },
+                            onChartClick = { navigateToChart(entry) }
                         )
                     }
                     item { Spacer(modifier = Modifier.height(8.dp)) }
@@ -118,7 +133,8 @@ fun PersonalBestsScreen(
                             textStyle = TrophyTextStyle.TWO_SETTINGS,
                             onRecordClick = { recordId ->
                                 navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
-                            }
+                            },
+                            onChartClick = { navigateToChart(entry) }
                         )
                     }
                     item { Spacer(modifier = Modifier.height(8.dp)) }
@@ -139,7 +155,8 @@ fun PersonalBestsScreen(
                             textStyle = TrophyTextStyle.THREE_SETTINGS,
                             onRecordClick = { recordId ->
                                 navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
-                            }
+                            },
+                            onChartClick = { navigateToChart(entry) }
                         )
                     }
                     item { Spacer(modifier = Modifier.height(8.dp)) }
@@ -160,7 +177,8 @@ fun PersonalBestsScreen(
                             textStyle = TrophyTextStyle.FOUR_SETTINGS,
                             onRecordClick = { recordId ->
                                 navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
-                            }
+                            },
+                            onChartClick = { navigateToChart(entry) }
                         )
                     }
                     item { Spacer(modifier = Modifier.height(8.dp)) }
@@ -181,7 +199,8 @@ fun PersonalBestsScreen(
                             textStyle = TrophyTextStyle.EXACT,
                             onRecordClick = { recordId ->
                                 navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
-                            }
+                            },
+                            onChartClick = { navigateToChart(entry) }
                         )
                     }
                     item { Spacer(modifier = Modifier.height(24.dp)) }
@@ -242,7 +261,8 @@ private enum class TrophyTextStyle {
 private fun PersonalBestRow(
     entry: PersonalBestEntry,
     textStyle: TrophyTextStyle,
-    onRecordClick: (Long) -> Unit
+    onRecordClick: (Long) -> Unit,
+    onChartClick: () -> Unit
 ) {
     val labelFontSize = when (textStyle) {
         TrophyTextStyle.GLOBAL         -> 18.sp
@@ -276,13 +296,15 @@ private fun PersonalBestRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Label
+        // Label — tap to open chart
         Text(
             entry.label,
             fontSize = labelFontSize,
             color = labelColor,
             fontWeight = if (textStyle == TrophyTextStyle.GLOBAL) FontWeight.Bold else FontWeight.Normal,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier
+                .weight(1f)
+                .clickable { onChartClick() }
         )
 
         // Duration + date

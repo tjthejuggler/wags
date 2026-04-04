@@ -538,7 +538,12 @@ class ApneaRepository @Inject constructor(
                 label       = label,
                 recordId    = best?.recordId,
                 durationMs  = best?.durationMs,
-                timestamp   = best?.timestamp
+                timestamp   = best?.timestamp,
+                lungVolume  = lv,
+                prepType    = pt,
+                timeOfDay   = tod,
+                posture     = pos,
+                audio       = aud
             )
         }
 
@@ -638,6 +643,23 @@ class ApneaRepository @Inject constructor(
             entries += entry(1, "${tod.displayTod()} · ${lv.displayLv()} · ${pt.displayPt()} · ${pos.displayPos()} · ${aud.displayAud()}", lv, pt, tod, pos, aud)
 
         entries
+    }
+
+    // ── All free holds for chart (filtered by dynamic settings) ───────────────
+
+    /**
+     * Returns all free-hold records matching the given setting filters, ordered
+     * by timestamp ascending (oldest first) — suitable for charting.
+     * Pass empty string for any setting to relax that constraint.
+     */
+    suspend fun getAllFreeHoldsForChart(
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        posture: String,
+        audio: String
+    ): List<ApneaRecordEntity> = withContext(ioDispatcher) {
+        dao.getAllFreeHoldsFiltered(lungVolume, prepType, timeOfDay, posture, audio)
     }
 
     // ── Paginated all-records (for the All Records screen) ───────────────────
