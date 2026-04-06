@@ -53,6 +53,25 @@ Based on open tabs and visible files:
 
 ---
 
+### 2026-04-06 07:33 (UTC-6)
+
+**Fixed: Spotify song duration bug + missing completion checkmark + recalculate button**
+
+- **Root cause (duration):** `SpotifyManager.startTracking()` correctly reset `startedAtMs` to `sessionStartMs` in `_sessionSongs`, but did NOT update `_currentSong.value`. When the song finished and `handleNewTrack()` closed the previous song, it read the stale `_currentSong.value` (with `startedAtMs` from when `selectSong()` pre-loaded the song) and overwrote the corrected entry in `_sessionSongs`. This caused the song's recorded play time to include the gap between song pre-load and hold start.
+- **Root cause (checkmark):** The `loadPreviousSongs()` function skipped completion checks when `track.durationMs <= 0L` (Spotify API unavailable). Additionally, the SQL query only checked `(endedAtMs - startedAtMs) >= songDurationMs`, which could fail with stale `startedAtMs` values or when the API-provided duration was unavailable.
+- **Fix (duration):** In `SpotifyManager.startTracking()`, now also updates `_currentSong.value` with the corrected `startedAtMs` so that `handleNewTrack()` uses the correct time when closing the song.
+- **Fix (checkmark):** Updated SQL queries in `ApneaSongLogDao` to match by Spotify URI first (reliable across title differences between broadcast and API), falling back to title+artist. Added "next song exists" fallback for completion detection. Removed the `durationMs <= 0L` guard in `loadPreviousSongs()`. Added `normalizeText()` in repository for Unicode apostrophe normalization.
+- **Fix (existing data):** Added "Recalculate" button in the song log section of the hold detail screen. Tapping it looks up each song's actual duration from the Spotify API and recalculates `startedAtMs = endedAtMs - realDurationMs`, fixing records with stale pre-load timestamps.
+- Files modified:
+  1. `data/spotify/SpotifyManager.kt` — `startTracking()`: update `_currentSong.value` alongside `_sessionSongs` (both immediate capture and polling branches)
+  2. `data/db/dao/ApneaSongLogDao.kt` — `wasSongCompletedEver()` and `wasSongCompletedWithSettings()`: added `spotifyUri` param for URI-based matching; added "next song exists" fallback; added `updateStartedAt()`
+  3. `ui/apnea/FreeHoldActiveScreen.kt` — `loadPreviousSongs()`: removed `durationMs <= 0L` guard; passes `spotifyUri` to completion checks
+  4. `data/repository/ApneaRepository.kt` — added `normalizeText()` for Unicode apostrophe normalization; added `spotifyUri` param to completion methods; added `getSongLogEntitiesForRecord()` and `updateSongLogStartedAt()`
+  5. `ui/apnea/ApneaRecordDetailViewModel.kt` — injected `SpotifyApiClient`; added `recalculateSongTimes()`
+  6. `ui/apnea/ApneaRecordDetailScreen.kt` — added `onRecalculateSongs` callback; added "Recalculate" TextButton in song log header
+
+---
+
 ### 2026-04-04 14:19 (UTC-6)
 
 **Added: Clickable settings banner on FreeHoldActiveScreen with edit popup**

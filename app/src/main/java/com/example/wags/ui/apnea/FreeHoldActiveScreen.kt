@@ -535,16 +535,17 @@ class FreeHoldActiveViewModel @Inject constructor(
             // have been stored with different URIs or one with/without URI)
             val dedupedSongs = deduplicateTracks(details)
 
-            // Compute completion status for each song
+            // Compute completion status for each song.
+            // When durationMs is 0 (API unavailable), the SQL query still detects
+            // completion via the "next song exists in same record" fallback.
             val completionMap = mutableMapOf<String, SongCompletionStatus>()
             for (track in dedupedSongs) {
-                if (track.durationMs <= 0L) continue // can't check without duration
                 val key = "${track.title.lowercase().trim()}|${track.artist.lowercase().trim()}"
                 val ever = apneaRepository.wasSongCompletedEver(
-                    track.title, track.artist, track.durationMs
+                    track.title, track.artist, track.durationMs, track.spotifyUri
                 )
                 val withSettings = apneaRepository.wasSongCompletedWithSettings(
-                    track.title, track.artist, track.durationMs,
+                    track.title, track.artist, track.durationMs, track.spotifyUri,
                     lungVolume, prepType, timeOfDay, posture, audio
                 )
                 completionMap[key] = SongCompletionStatus(

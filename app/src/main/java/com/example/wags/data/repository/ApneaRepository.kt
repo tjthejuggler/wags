@@ -774,23 +774,53 @@ class ApneaRepository @Inject constructor(
     /** Deletes all song log entries (clears the song picker history). */
     suspend fun clearSongHistory() = songLogDao.deleteAll()
 
+    /** Returns raw song log entities for a record (needed for recalculation). */
+    suspend fun getSongLogEntitiesForRecord(recordId: Long) =
+        songLogDao.getForRecord(recordId)
+
+    /** Updates the startedAtMs for a single song log entry. */
+    suspend fun updateSongLogStartedAt(songLogId: Long, startedAtMs: Long) =
+        songLogDao.updateStartedAt(songLogId, startedAtMs)
+
+    /**
+     * Normalizes a string for comparison by replacing common Unicode apostrophe/quote
+     * variants with the standard ASCII apostrophe. Spotify broadcasts and the Web API
+     * sometimes use different Unicode characters for the same song title.
+     */
+    private fun normalizeText(text: String): String =
+        text.replace('\u00B4', '\'')   // ´ acute accent
+            .replace('\u2018', '\'')   // ' left single quotation mark
+            .replace('\u2019', '\'')   // ' right single quotation mark
+            .replace('\u201A', '\'')   // ‚ single low-9 quotation mark
+            .replace('\u0060', '\'')   // ` grave accent
+            .replace('\u2032', '\'')   // ′ prime
+            .replace('\u2033', '"')    // ″ double prime
+            .replace('\u201C', '"')    // " left double quotation mark
+            .replace('\u201D', '"')    // " right double quotation mark
+
     /**
      * Returns true if the user has ever completed a free hold whose duration >= [songDurationMs]
-     * while the given song (by title+artist) was playing.
+     * while the given song was playing. Matches by Spotify URI when available, falling back
+     * to title+artist with Unicode normalization.
      */
-    suspend fun wasSongCompletedEver(title: String, artist: String, songDurationMs: Long): Boolean =
-        withContext(ioDispatcher) {
-            songLogDao.wasSongCompletedEver(title, artist, songDurationMs) == 1
-        }
+    suspend fun wasSongCompletedEver(
+        title: String, artist: String, songDurationMs: Long, spotifyUri: String = ""
+    ): Boolean = withContext(ioDispatcher) {
+        songLogDao.wasSongCompletedEver(
+            normalizeText(title), normalizeText(artist), songDurationMs, spotifyUri
+        ) == 1
+    }
 
     /**
      * Returns true if the user has completed a free hold whose duration >= [songDurationMs]
      * while the given song was playing, using the specified 5-setting combination.
+     * Matches by Spotify URI when available, falling back to title+artist.
      */
     suspend fun wasSongCompletedWithSettings(
         title: String,
         artist: String,
         songDurationMs: Long,
+        spotifyUri: String = "",
         lungVolume: String,
         prepType: String,
         timeOfDay: String,
@@ -798,7 +828,7 @@ class ApneaRepository @Inject constructor(
         audio: String
     ): Boolean = withContext(ioDispatcher) {
         songLogDao.wasSongCompletedWithSettings(
-            title, artist, songDurationMs,
+            normalizeText(title), normalizeText(artist), songDurationMs, spotifyUri,
             lungVolume, prepType, timeOfDay, posture, audio
         ) == 1
     }

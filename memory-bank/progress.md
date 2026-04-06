@@ -1,6 +1,11 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-04 20:19 UTC*
+*Last updated: 2026-04-06 13:15 UTC*
+
+## Recent Changes (2026-04-06)
+- ✅ Fixed: Spotify song duration showing inflated time in hold detail song card — `SpotifyManager.startTracking()` now updates `_currentSong.value` alongside `_sessionSongs` so that `handleNewTrack()` uses the correct `startedAtMs` (hold start time) instead of the stale pre-load time from `selectSong()`.
+- ✅ Fixed: Missing completion checkmark in song picker — SQL queries now match by Spotify URI first (reliable across title differences between broadcast and API), falling back to title+artist. Added "next song exists" fallback for completion detection. Removed `durationMs <= 0L` guard. Added `normalizeText()` for Unicode apostrophe normalization.
+- ✅ Added: "Recalculate" button in hold detail song log section — looks up actual song durations from Spotify API and fixes `startedAtMs` for existing records with stale pre-load timestamps.
 
 ## Recent Changes (2026-04-04)
 - ✅ Added: Clickable settings banner on FreeHoldActiveScreen — tapping the settings summary text at the top of the free hold screen opens a popup dialog with filter chips for all 5 settings (lung volume, prep type, time of day, posture, audio). Changes are applied immediately and persisted to SharedPreferences so the main ApneaScreen stays in sync. Only clickable when hold is not active.

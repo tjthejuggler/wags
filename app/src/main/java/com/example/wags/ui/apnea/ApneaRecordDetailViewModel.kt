@@ -1,6 +1,7 @@
 package com.example.wags.ui.apnea
 
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,6 +11,7 @@ import com.example.wags.data.db.entity.ApneaSessionEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
 import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.data.repository.ApneaSessionRepository
+import com.example.wags.data.spotify.SpotifyApiClient
 import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
@@ -57,6 +59,7 @@ class ApneaRecordDetailViewModel @Inject constructor(
     private val apneaRepository: ApneaRepository,
     private val sessionRepository: ApneaSessionRepository,
     private val devicePrefs: DevicePreferencesRepository,
+    private val spotifyApiClient: SpotifyApiClient,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
@@ -231,5 +234,54 @@ class ApneaRecordDetailViewModel @Inject constructor(
         val showTimer = prefs.getBoolean("setting_show_timer", true)
         return "free_hold_active/${record.lungVolume}/${record.prepType}/" +
             "${TimeOfDay.fromCurrentTime().name}/${record.posture}/$showTimer/${record.audio}"
+    }
+
+    // ── Recalculate song times ──────────────────────────────────────────────
+
+    /**
+     * Recalculates song start times for this record using actual Spotify
+     * track durations. For each song that has a non-null endedAtMs and a
+     * Spotify URI, looks up the real duration from the Spotify API and sets
+     * startedAtMs = endedAtMs - realDurationMs. This fixes records where
+     * startedAtMs was incorrectly set to the song pre-load time instead of
+     * the hold start time.
+     *
+     * After updating the DB, refreshes the UI state's songLog.
+     */
+    fun recalculateSongTimes() {
+        viewModelScope.launch {
+            val entities = apneaRepository.getSongLogEntitiesForRecord(recordId)
+            if (entities.isEmpty()) return@launch
+
+            var anyUpdated = false
+            for (entity in entities) {
+                val uri = entity.spotifyUri
+                val endMs = entity.endedAtMs
+                if (uri.isNullOrBlank() || endMs == null) continue
+
+                val detail = spotifyApiClient.getTrackDetail(uri)
+                if (detail == null || detail.durationMs <= 0L) {
+                    Log.w("RecordDetail", "Could not get duration for $uri")
+                    continue
+                }
+
+                val correctedStart = endMs - detail.durationMs
+                // Only update if the corrected start is meaningfully different
+                // (more than 2 seconds off) to avoid unnecessary writes
+                if (kotlin.math.abs(correctedStart - entity.startedAtMs) > 2_000L) {
+                    apneaRepository.updateSongLogStartedAt(entity.songLogId, correctedStart)
+                    anyUpdated = true
+                    Log.d("RecordDetail", "Recalculated ${entity.title}: " +
+                        "old start=${entity.startedAtMs}, new start=$correctedStart, " +
+                        "duration=${detail.durationMs}ms")
+                }
+            }
+
+            if (anyUpdated) {
+                // Refresh the song log from DB
+                val refreshed = apneaRepository.getSongLogForRecord(recordId)
+                _uiState.update { it.copy(songLog = refreshed) }
+            }
+        }
     }
 }

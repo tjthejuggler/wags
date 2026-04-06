@@ -251,10 +251,15 @@ class SpotifyManager @Inject constructor(
         // Also try the MediaSession path (may fail without Notification Access)
         refreshSpotifyController()
 
-        // Capture whatever is currently playing at session start
+        // Capture whatever is currently playing at session start.
+        // IMPORTANT: Also update _currentSong so that handleNewTrack() uses the
+        // corrected startedAtMs when closing this song (otherwise it would use
+        // the stale time from when the song was pre-loaded in selectSong()).
         val captured = _currentSong.value
         if (captured != null) {
-            _sessionSongs.value = listOf(captured.copy(startedAtMs = sessionStartMs))
+            val corrected = captured.copy(startedAtMs = sessionStartMs)
+            _currentSong.value = corrected
+            _sessionSongs.value = listOf(corrected)
         } else {
             // Spotify may not have updated yet after the play command —
             // poll briefly until metadata appears via either path.
@@ -267,7 +272,9 @@ class SpotifyManager @Inject constructor(
                     refreshSpotifyController()
                     val song = _currentSong.value
                     if (song != null && _sessionSongs.value.isEmpty()) {
-                        _sessionSongs.value = listOf(song.copy(startedAtMs = sessionStartMs))
+                        val correctedSong = song.copy(startedAtMs = sessionStartMs)
+                        _currentSong.value = correctedSong
+                        _sessionSongs.value = listOf(correctedSong)
                         return@launch
                     }
                 }

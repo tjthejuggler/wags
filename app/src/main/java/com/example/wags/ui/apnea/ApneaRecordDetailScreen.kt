@@ -142,6 +142,7 @@ fun ApneaRecordDetailScreen(
                             navController.navigate(route)
                         }
                     },
+                    onRecalculateSongs = { viewModel.recalculateSongTimes() },
                     modifier = Modifier.padding(padding)
                 )
             }
@@ -444,6 +445,7 @@ private fun RecordDetailContent(
     songLog: List<SpotifySong> = emptyList(),
     tableSession: ApneaSessionEntity? = null,
     onRepeatHold: () -> Unit = {},
+    onRecalculateSongs: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val dateStr = remember(record.timestamp) {
@@ -813,8 +815,18 @@ private fun RecordDetailContent(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text("🎵 Songs Played", style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.grayscale())
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("🎵 Songs Played", style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.grayscale())
+                        TextButton(onClick = onRecalculateSongs) {
+                            Text("Recalculate", style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary)
+                        }
+                    }
                     songLog.forEach { song ->
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(
