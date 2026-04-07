@@ -41,7 +41,13 @@ class MorningReadinessOrchestrator @Inject constructor(
     )
 
     suspend fun compute(input: Input): MorningReadinessResult {
-        val standingSkipped = input.standingBuffer.isEmpty()
+        // Standing is considered skipped if the buffer is empty OR has too few
+        // intervals to produce meaningful HRV metrics. This handles the case
+        // where the user pressed "Skip Standing" shortly after the standing
+        // phase began — the FSM clears the buffer, but as a safety net we also
+        // guard against tiny buffers that would crash TimeDomainHrvCalculator
+        // (which requires >= 2 NN intervals).
+        val standingSkipped = input.standingBuffer.size < MIN_STANDING_INTERVALS
 
         // 1. Artifact correction
         val supineCorrected = artifactCorrection.execute(
@@ -162,5 +168,15 @@ class MorningReadinessOrchestrator @Inject constructor(
         return (0 until size).map { i ->
             original[i].copy(intervalMs = correctedNn[i])
         }
+    }
+
+    companion object {
+        /**
+         * Minimum number of standing RR intervals required to treat the standing
+         * phase as valid. Below this threshold the orchestrator treats standing as
+         * skipped. 10 matches the artifact correction minimum and prevents
+         * TimeDomainHrvCalculator from crashing on tiny buffers.
+         */
+        private const val MIN_STANDING_INTERVALS = 10
     }
 }
