@@ -1,6 +1,9 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-06 13:15 UTC*
+*Last updated: 2026-04-07 14:35 UTC-6*
+
+## Recent Changes (2026-04-07)
+- ✅ Fixed: "Skip Standing" button during morning readiness crashing with "Need at least 2 NN intervals" — `MorningReadinessFsm.skipStanding()` now clears the standing buffer, peak HR, and stand timestamp when skipping during STANDING phase. `MorningReadinessOrchestrator` now treats standing as skipped if buffer has < 10 intervals (safety net).
 
 ## Recent Changes (2026-04-06)
 - ✅ Fixed: Song picker selection checkmark conflicting with completion checkmarks — removed the redundant `✓` "selected indicator" from `SongCard` in `SongPickerComponents.kt`. Selection is already shown via border/background color changes. The completion checkmarks (bright = completed ever, grey = completed with current settings) remain unchanged.

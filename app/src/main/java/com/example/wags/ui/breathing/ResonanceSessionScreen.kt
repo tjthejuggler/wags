@@ -197,15 +197,29 @@ fun ResonanceSessionScreen(
                         coherenceRatio = state.liveCoherenceRatio
                     )
 
-                    // ── Remaining time (when timer is active) ──────────────
-                    if (!state.infinityMode && state.sessionRemainingSeconds > 0) {
-                        Text(
-                            text = "${rsFmtDuration(state.sessionRemainingSeconds)} remaining",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = RsAsh,
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Center
+                    // ── Remaining time + progress bar (when timer is active) ─
+                    if (!state.infinityMode) {
+                        val totalSeconds = durationMinutes * 60
+                        val progress = if (totalSeconds > 0)
+                            (state.sessionElapsedSeconds.toFloat() / totalSeconds).coerceIn(0f, 1f)
+                        else 0f
+
+                        LinearProgressIndicator(
+                            progress         = { progress },
+                            modifier         = Modifier.fillMaxWidth(),
+                            color            = TextSecondary,
+                            trackColor       = SurfaceVariant
                         )
+
+                        if (state.sessionRemainingSeconds > 0) {
+                            Text(
+                                text = "${rsFmtDuration(state.sessionRemainingSeconds)} remaining",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = RsAsh,
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
 
                     // ── Live HRV metrics ──────────────────────────────────────

@@ -53,6 +53,20 @@ Based on open tabs and visible files:
 
 ---
 
+### 2026-04-07 14:35 (UTC-6)
+
+**Fixed: "Skip Standing" button during morning readiness crashing with "Need at least 2 NN intervals"**
+
+- **Bug:** Pressing "Skip Standing" during the STANDING phase of a morning readiness reading caused the entire session to fail with an error about needing at least 2 NN intervals. The standing data should have been ignored entirely, giving a result based only on the supine (laying) portion.
+- **Root cause:** `MorningReadinessFsm.skipStanding()` cancelled the timer and jumped to QUESTIONNAIRE, but did NOT clear the `_standingBuffer`. Any RR intervals collected during the brief standing period remained in the buffer. The `MorningReadinessOrchestrator` checked `input.standingBuffer.isEmpty()` to determine if standing was skipped — but since the buffer had a few intervals (not empty), it tried to process them as a full standing session. With only 1-2 intervals, `TimeDomainHrvCalculator.calculate()` threw `IllegalArgumentException("Need at least 2 NN intervals")`.
+- **Fix (primary):** `MorningReadinessFsm.skipStanding()` now clears `_standingBuffer`, resets `_peakStandHr` to 0, and nulls `_standTimestampMs` before entering QUESTIONNAIRE. This ensures the orchestrator sees an empty buffer = standing skipped.
+- **Fix (safety net):** `MorningReadinessOrchestrator.compute()` now treats standing as skipped if the buffer has fewer than `MIN_STANDING_INTERVALS` (10) intervals, matching the artifact correction minimum. This prevents crashes even if some other code path sends a tiny standing buffer.
+- Files modified:
+  1. `domain/usecase/readiness/MorningReadinessFsm.kt` — `skipStanding()` now clears standing buffer, peak HR, and stand timestamp
+  2. `domain/usecase/readiness/MorningReadinessOrchestrator.kt` — `standingSkipped` now checks `size < MIN_STANDING_INTERVALS` instead of `isEmpty()`; added companion object with `MIN_STANDING_INTERVALS = 10`
+
+---
+
 ### 2026-04-06 17:55 (UTC-6)
 
 **Fixed: Song picker showing selection checkmark that conflicted with completion checkmarks**
