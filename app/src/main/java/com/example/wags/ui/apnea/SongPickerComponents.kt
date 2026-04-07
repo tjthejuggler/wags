@@ -445,10 +445,6 @@ private fun SongCard(
                 }
             }
 
-            // Selected indicator
-            if (isSelected && !isLoading) {
-                Text("✓", color = TextPrimary, fontWeight = FontWeight.Bold)
-            }
         }
     }
 }

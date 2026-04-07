@@ -53,6 +53,18 @@ Based on open tabs and visible files:
 
 ---
 
+### 2026-04-06 17:55 (UTC-6)
+
+**Fixed: Song picker showing selection checkmark that conflicted with completion checkmarks**
+
+- **Bug:** In the "Choose a Song" popup (SongPickerDialog), selecting any song added a `✓` checkmark to the card. This was confusing because the dialog already uses checkmarks for two different completion statuses: bright `✓` for songs completed during any past hold, and grey `✓` for songs completed with current settings. The selection checkmark was visually identical and misleading.
+- **Root cause:** The `SongCard` composable in `SongPickerComponents.kt` had a "selected indicator" block (lines 449-451) that rendered `Text("✓", ...)` when `isSelected` was true. This was redundant since selection was already visually indicated by border color/width and background color changes.
+- **Fix:** Removed the selected indicator checkmark entirely. The card's existing visual differentiation (thicker border + different background color) is sufficient to show which song is selected.
+- Files modified:
+  1. `ui/apnea/SongPickerComponents.kt` — Removed the `if (isSelected && !isLoading)` checkmark block from `SongCard`
+
+---
+
 ### 2026-04-06 07:33 (UTC-6)
 
 **Fixed: Spotify song duration bug + missing completion checkmark + recalculate button**

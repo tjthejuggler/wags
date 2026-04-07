@@ -3,6 +3,7 @@
 *Last updated: 2026-04-06 13:15 UTC*
 
 ## Recent Changes (2026-04-06)
+- ✅ Fixed: Song picker selection checkmark conflicting with completion checkmarks — removed the redundant `✓` "selected indicator" from `SongCard` in `SongPickerComponents.kt`. Selection is already shown via border/background color changes. The completion checkmarks (bright = completed ever, grey = completed with current settings) remain unchanged.
 - ✅ Fixed: Spotify song duration showing inflated time in hold detail song card — `SpotifyManager.startTracking()` now updates `_currentSong.value` alongside `_sessionSongs` so that `handleNewTrack()` uses the correct `startedAtMs` (hold start time) instead of the stale pre-load time from `selectSong()`.
 - ✅ Fixed: Missing completion checkmark in song picker — SQL queries now match by Spotify URI first (reliable across title differences between broadcast and API), falling back to title+artist. Added "next song exists" fallback for completion detection. Removed `durationMs <= 0L` guard. Added `normalizeText()` for Unicode apostrophe normalization.
 - ✅ Added: "Recalculate" button in hold detail song log section — looks up actual song durations from Spotify API and fixes `startedAtMs` for existing records with stale pre-load timestamps.
