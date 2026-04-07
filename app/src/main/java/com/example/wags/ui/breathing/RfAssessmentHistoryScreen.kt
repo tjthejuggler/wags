@@ -1,5 +1,7 @@
 package com.example.wags.ui.breathing
 
+import android.graphics.Paint as NativePaint
+import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,8 +18,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -945,16 +949,61 @@ private fun RfLineChartCanvas(
     }
 
     val yRange = (yMax - yMin).coerceAtLeast(0.001f)
+    val yMid = (yMin + yMax) / 2f
+
+    // Smart format: use integers when values are large enough, decimals otherwise
+    fun fmtLabel(v: Float): String = when {
+        yRange >= 10f -> String.format("%.0f", v)
+        yRange >= 1f  -> String.format("%.1f", v)
+        else          -> String.format("%.2f", v)
+    }
 
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
-        val xStep = w / (points.size - 1).toFloat()
 
-        fun xOf(i: Int) = i * xStep
+        // ── Y-axis labels ────────────────────────────────────────────────
+        val textPaint = NativePaint().apply {
+            color = android.graphics.Color.rgb(0x70, 0x70, 0x70) // Ash
+            textSize = 24f  // ~10sp at mdpi
+            typeface = Typeface.DEFAULT
+            isAntiAlias = true
+            textAlign = NativePaint.Align.RIGHT
+        }
+        val labelMargin = 48f  // px reserved for Y-axis labels on the left
+        val chartLeft = labelMargin + 4f
+        val chartWidth = w - chartLeft
+
+        val xStep = chartWidth / (points.size - 1).toFloat()
+
+        fun xOf(i: Int) = chartLeft + i * xStep
         fun yOf(v: Float) = h - ((v - yMin) / yRange * h).coerceIn(0f, h)
 
-        // Fill
+        // Draw 3 horizontal grid lines (bottom=yMin, middle=yMid, top=yMax)
+        // with Y-axis labels
+        val gridColor = Color(0xFF2A2A2A)
+        val dashEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f), 0f)
+        val gridValues = listOf(yMin, yMid, yMax)
+        for (v in gridValues) {
+            val gy = yOf(v)
+            // Grid line
+            drawLine(
+                color = gridColor,
+                start = Offset(chartLeft, gy),
+                end = Offset(w, gy),
+                strokeWidth = 1f,
+                pathEffect = dashEffect
+            )
+            // Y-axis label
+            drawContext.canvas.nativeCanvas.drawText(
+                fmtLabel(v),
+                labelMargin - 2f,
+                gy + 8f,  // offset down slightly to vertically center on the line
+                textPaint
+            )
+        }
+
+        // ── Fill ─────────────────────────────────────────────────────────
         val fillPath = Path().apply {
             moveTo(xOf(0), h)
             lineTo(xOf(0), yOf(points[0].second))
@@ -966,7 +1015,7 @@ private fun RfLineChartCanvas(
         }
         drawPath(fillPath, color = lineColor.copy(alpha = fillAlpha))
 
-        // Line
+        // ── Line ─────────────────────────────────────────────────────────
         val linePath = Path().apply {
             moveTo(xOf(0), yOf(points[0].second))
             for (i in 1 until points.size) {
@@ -975,7 +1024,7 @@ private fun RfLineChartCanvas(
         }
         drawPath(linePath, color = lineColor, style = Stroke(width = 2.5f, cap = StrokeCap.Round))
 
-        // Latest dot
+        // ── Latest dot ───────────────────────────────────────────────────
         val lastX = xOf(points.size - 1)
         val lastY = yOf(points.last().second)
         drawCircle(color = lineColor, radius = 5f, center = Offset(lastX, lastY))
