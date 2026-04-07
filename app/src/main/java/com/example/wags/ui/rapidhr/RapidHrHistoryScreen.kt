@@ -108,6 +108,7 @@ fun RapidHrHistoryScreen(
                 RapidHrHistoryTab.GRAPHS -> GraphsTab(
                     state = state,
                     onFilterDirection = viewModel::setDirectionFilter,
+                    onFilterHrCombo = viewModel::setHrComboFilter,
                     onSessionClick = { session ->
                         navController.navigate(WagsRoutes.rapidHrDetail(session.id))
                     }
@@ -126,10 +127,12 @@ fun RapidHrHistoryScreen(
 
 // ── Graphs tab ─────────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun GraphsTab(
     state: RapidHrHistoryUiState,
     onFilterDirection: (RapidHrDirection?) -> Unit,
+    onFilterHrCombo: (HrCombo?) -> Unit,
     onSessionClick: (RapidHrSessionEntity) -> Unit
 ) {
     LazyColumn(
@@ -154,6 +157,17 @@ private fun GraphsTab(
                         label = { Text(dir.label) }
                     )
                 }
+            }
+        }
+
+        // HR combo dropdown (only shown when there are multiple combos)
+        if (state.availableCombos.size > 1) {
+            item {
+                HrComboDropdown(
+                    selected = state.hrComboFilter,
+                    options = state.availableCombos,
+                    onSelect = onFilterHrCombo
+                )
             }
         }
 
@@ -220,6 +234,47 @@ private fun GraphsTab(
         } else {
             items(state.filteredSessions) { session ->
                 SessionRow(session = session, onClick = { onSessionClick(session) })
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HrComboDropdown(
+    selected: HrCombo?,
+    options: List<HrCombo>,
+    onSelect: (HrCombo?) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it }
+    ) {
+        OutlinedTextField(
+            value = selected?.label ?: "All HR combos",
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("HR Range", style = MaterialTheme.typography.labelSmall) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor()
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text("All HR combos") },
+                onClick = { onSelect(null); expanded = false }
+            )
+            options.forEach { combo ->
+                DropdownMenuItem(
+                    text = { Text(combo.label) },
+                    onClick = { onSelect(combo); expanded = false }
+                )
             }
         }
     }

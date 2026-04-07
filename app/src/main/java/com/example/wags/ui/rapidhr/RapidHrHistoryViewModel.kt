@@ -20,11 +20,19 @@ import javax.inject.Inject
 
 data class RapidHrChartPoint(val index: Float, val valueMs: Long, val sessionId: Long)
 
+// ── HR combo (start→end thresholds) ───────────────────────────────────────────
+
+data class HrCombo(val high: Int, val low: Int, val direction: String) {
+    val label: String get() = "$high→$low bpm"
+}
+
 // ── UI state ──────────────────────────────────────────────────────────────────
 
 data class RapidHrHistoryUiState(
     val allSessions: List<RapidHrSessionEntity> = emptyList(),
     val directionFilter: RapidHrDirection? = null,   // null = all
+    val hrComboFilter: HrCombo? = null,              // null = all combos
+    val availableCombos: List<HrCombo> = emptyList(),
     val chartPoints: List<RapidHrChartPoint> = emptyList(),
     val datesWithSessions: Set<LocalDate> = emptySet(),
     val selectedDate: LocalDate? = null,
@@ -32,8 +40,14 @@ data class RapidHrHistoryUiState(
     val selectedTab: RapidHrHistoryTab = RapidHrHistoryTab.GRAPHS
 ) {
     val filteredSessions: List<RapidHrSessionEntity>
-        get() = if (directionFilter == null) allSessions
-        else allSessions.filter { it.direction == directionFilter.name }
+        get() {
+            var list = allSessions
+            if (directionFilter != null) list = list.filter { it.direction == directionFilter.name }
+            if (hrComboFilter != null) list = list.filter {
+                it.highThreshold == hrComboFilter.high && it.lowThreshold == hrComboFilter.low
+            }
+            return list
+        }
 }
 
 enum class RapidHrHistoryTab { GRAPHS, CALENDAR }
@@ -48,6 +62,7 @@ class RapidHrHistoryViewModel @Inject constructor(
     private val _extra = MutableStateFlow(
         ExtraHistoryState(
             directionFilter = null,
+            hrComboFilter = null,
             selectedTab = RapidHrHistoryTab.GRAPHS,
             selectedDate = null
         )
@@ -57,8 +72,20 @@ class RapidHrHistoryViewModel @Inject constructor(
         repository.observeAll(),
         _extra
     ) { sessions, extra ->
-        val filtered = if (extra.directionFilter == null) sessions
-        else sessions.filter { it.direction == extra.directionFilter.name }
+        // Build available combos from all sessions (deduplicated, sorted)
+        val availableCombos = sessions
+            .map { HrCombo(it.highThreshold, it.lowThreshold, it.direction) }
+            .distinct()
+            .sortedWith(compareBy({ it.high }, { it.low }))
+
+        // Resolve combo filter — if the saved combo no longer exists, clear it
+        val resolvedCombo = extra.hrComboFilter?.takeIf { it in availableCombos }
+
+        var filtered = sessions
+        if (extra.directionFilter != null) filtered = filtered.filter { it.direction == extra.directionFilter.name }
+        if (resolvedCombo != null) filtered = filtered.filter {
+            it.highThreshold == resolvedCombo.high && it.lowThreshold == resolvedCombo.low
+        }
 
         val chartPoints = filtered
             .sortedBy { it.timestamp }
@@ -80,6 +107,8 @@ class RapidHrHistoryViewModel @Inject constructor(
         RapidHrHistoryUiState(
             allSessions = sessions,
             directionFilter = extra.directionFilter,
+            hrComboFilter = resolvedCombo,
+            availableCombos = availableCombos,
             chartPoints = chartPoints,
             datesWithSessions = datesWithSessions,
             selectedDate = extra.selectedDate,
@@ -89,7 +118,11 @@ class RapidHrHistoryViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RapidHrHistoryUiState())
 
     fun setDirectionFilter(direction: RapidHrDirection?) {
-        _extra.update { it.copy(directionFilter = direction) }
+        _extra.update { it.copy(directionFilter = direction, hrComboFilter = null) }
+    }
+
+    fun setHrComboFilter(combo: HrCombo?) {
+        _extra.update { it.copy(hrComboFilter = combo) }
     }
 
     fun selectTab(tab: RapidHrHistoryTab) {
@@ -103,6 +136,7 @@ class RapidHrHistoryViewModel @Inject constructor(
 
 private data class ExtraHistoryState(
     val directionFilter: RapidHrDirection?,
+    val hrComboFilter: HrCombo?,
     val selectedTab: RapidHrHistoryTab,
     val selectedDate: LocalDate?
 )
