@@ -74,4 +74,14 @@ object AppModule {
     @Named("spotify_prefs")
     fun provideSpotifyPrefs(@ApplicationContext context: Context): SharedPreferences =
         context.getSharedPreferences("spotify_prefs", Context.MODE_PRIVATE)
+
+    /**
+     * Dedicated SharedPreferences file for Meditation screen settings
+     * (posture, timer, sonification toggle, channel filter).
+     */
+    @Provides
+    @Singleton
+    @Named("meditation_prefs")
+    fun provideMeditationPrefs(@ApplicationContext context: Context): SharedPreferences =
+        context.getSharedPreferences("meditation_prefs", Context.MODE_PRIVATE)
 }

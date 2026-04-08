@@ -6,43 +6,55 @@ import android.media.AudioTrack
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlin.math.PI
+import kotlin.math.exp
 import kotlin.math.sin
 
 /**
- * Continuous HR pitch sonification for meditation/NSDR sessions.
+ * HR-paced heartbeat sonification for meditation/NSDR sessions.
  *
- * Maps HR (40–100 BPM) → pitch (220–440 Hz, A3–A4).
- * Uses AudioTrack in streaming mode with [BUFFER_SIZE]-sample buffer.
- * Smooth frequency transitions via exponential smoothing (portamento).
- * 20ms linear fade-in/fade-out on each buffer to prevent clicks.
+ * Generates a deep, pleasant "lub-dub" heartbeat sound whose pace tracks the
+ * live HR reading. Each beat consists of two short thumps (lub at t=0,
+ * dub at t=100ms) synthesised from a low-frequency sine burst with an
+ * exponential decay envelope — giving a warm, organic thump rather than a
+ * harsh click or continuous tone.
+ *
+ * HR is smoothed with a simple exponential filter so sudden spikes don't
+ * cause jarring tempo jumps.
  */
 class HrSonificationEngine @Inject constructor() {
 
     companion object {
         private const val SAMPLE_RATE = 44100
-        private const val BUFFER_SIZE = 1024
-        private const val MIN_HR_BPM = 40f
-        private const val MAX_HR_BPM = 100f
-        private const val MIN_FREQ_HZ = 220f   // A3
-        private const val MAX_FREQ_HZ = 440f   // A4
-        private const val SMOOTHING = 0.1f
-        private const val VOLUME = 0.3f        // 30% amplitude
-        private val FADE_SAMPLES = (SAMPLE_RATE * 0.020).toInt()  // 20ms
+
+        // Heartbeat sound parameters
+        private const val THUMP_FREQ_HZ = 60.0      // deep bass thump frequency
+        private const val THUMP_DURATION_MS = 120    // each thump lasts 120ms
+        private const val DUB_OFFSET_MS = 110        // "dub" follows "lub" by 110ms
+        private const val VOLUME = 0.55f             // amplitude (0..1)
+
+        // HR smoothing — blends toward new HR at 20% per update (called ~1/s)
+        private const val HR_SMOOTHING = 0.2f
+
+        private const val MIN_HR_BPM = 30f
+        private const val MAX_HR_BPM = 180f
+        private const val DEFAULT_HR_BPM = 60f
     }
 
     private var audioTrack: AudioTrack? = null
-    private var sonificationJob: Job? = null
+    private var beatJob: Job? = null
 
-    @Volatile private var currentFreq = MIN_FREQ_HZ
-    @Volatile private var targetFreq = MIN_FREQ_HZ
-    private var phase = 0.0
+    @Volatile private var smoothedHr: Float = DEFAULT_HR_BPM
+    @Volatile private var targetHr: Float = DEFAULT_HR_BPM
+
+    // ── Public API ─────────────────────────────────────────────────────────────
 
     fun start(scope: CoroutineScope) {
-        val minBufferSize = AudioTrack.getMinBufferSize(
+        val minBuf = AudioTrack.getMinBufferSize(
             SAMPLE_RATE,
             AudioFormat.CHANNEL_OUT_MONO,
             AudioFormat.ENCODING_PCM_FLOAT
@@ -61,47 +73,84 @@ class HrSonificationEngine @Inject constructor() {
                     .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
                     .build()
             )
-            .setBufferSizeInBytes(maxOf(minBufferSize, BUFFER_SIZE * 4))
+            .setBufferSizeInBytes(minBuf * 4)
             .setTransferMode(AudioTrack.MODE_STREAM)
             .build()
         audioTrack?.play()
 
-        sonificationJob = scope.launch(Dispatchers.IO) {
-            val buffer = FloatArray(BUFFER_SIZE)
+        beatJob = scope.launch(Dispatchers.IO) {
             while (isActive) {
-                // Exponential smoothing (portamento)
-                currentFreq += (targetFreq - currentFreq) * SMOOTHING
+                // Smooth HR toward target
+                smoothedHr += (targetHr - smoothedHr) * HR_SMOOTHING
+                val bpm = smoothedHr.coerceIn(MIN_HR_BPM, MAX_HR_BPM)
 
-                for (i in 0 until BUFFER_SIZE) {
-                    val sample = sin(phase).toFloat()
-                    val fade = when {
-                        i < FADE_SAMPLES -> i.toFloat() / FADE_SAMPLES
-                        i > BUFFER_SIZE - FADE_SAMPLES -> (BUFFER_SIZE - i).toFloat() / FADE_SAMPLES
-                        else -> 1.0f
-                    }
-                    buffer[i] = sample * fade * VOLUME
-                    phase += 2.0 * PI * currentFreq / SAMPLE_RATE
-                    if (phase > 2.0 * PI) phase -= 2.0 * PI
-                }
-                audioTrack?.write(buffer, 0, BUFFER_SIZE, AudioTrack.WRITE_BLOCKING)
+                // Beat interval in ms
+                val beatIntervalMs = (60_000f / bpm).toLong()
+
+                // Write lub + dub into the AudioTrack
+                writeLubDub()
+
+                // Wait for the remainder of the beat interval
+                val thumpsMs = (DUB_OFFSET_MS + THUMP_DURATION_MS).toLong()
+                val waitMs = (beatIntervalMs - thumpsMs).coerceAtLeast(50L)
+                delay(waitMs)
             }
         }
     }
 
-    /** Update target pitch from live HR reading. Thread-safe. */
+    /** Update target HR from live reading. Thread-safe. */
     fun updateHr(hrBpm: Float) {
-        val clamped = hrBpm.coerceIn(MIN_HR_BPM, MAX_HR_BPM)
-        val normalized = (clamped - MIN_HR_BPM) / (MAX_HR_BPM - MIN_HR_BPM)
-        targetFreq = MIN_FREQ_HZ + normalized * (MAX_FREQ_HZ - MIN_FREQ_HZ)
+        targetHr = hrBpm.coerceIn(MIN_HR_BPM, MAX_HR_BPM)
     }
 
     fun stop() {
-        sonificationJob?.cancel()
+        beatJob?.cancel()
+        beatJob = null
         audioTrack?.stop()
         audioTrack?.release()
         audioTrack = null
-        phase = 0.0
-        currentFreq = MIN_FREQ_HZ
-        targetFreq = MIN_FREQ_HZ
+        smoothedHr = DEFAULT_HR_BPM
+        targetHr = DEFAULT_HR_BPM
+    }
+
+    // ── Private helpers ────────────────────────────────────────────────────────
+
+    /**
+     * Synthesises and writes a "lub-dub" pair to the AudioTrack.
+     * Each thump is a sine burst at [THUMP_FREQ_HZ] with an exponential decay
+     * envelope — warm and organic, not harsh.
+     */
+    private fun writeLubDub() {
+        val track = audioTrack ?: return
+
+        val totalSamples = ((DUB_OFFSET_MS + THUMP_DURATION_MS) * SAMPLE_RATE / 1000)
+        val buffer = FloatArray(totalSamples)
+
+        // "Lub" starts at sample 0
+        writeThump(buffer, startSample = 0, amplitude = VOLUME)
+
+        // "Dub" starts at DUB_OFFSET_MS — slightly softer
+        val dubStart = DUB_OFFSET_MS * SAMPLE_RATE / 1000
+        writeThump(buffer, startSample = dubStart, amplitude = VOLUME * 0.7f)
+
+        track.write(buffer, 0, buffer.size, AudioTrack.WRITE_BLOCKING)
+    }
+
+    /**
+     * Writes a single thump into [buffer] starting at [startSample].
+     * Shape: sine at [THUMP_FREQ_HZ] × exponential decay envelope.
+     */
+    private fun writeThump(buffer: FloatArray, startSample: Int, amplitude: Float) {
+        val thumpSamples = THUMP_DURATION_MS * SAMPLE_RATE / 1000
+        val decayRate = 30.0 / SAMPLE_RATE   // decay constant — fully silent by ~100ms
+
+        for (i in 0 until thumpSamples) {
+            val idx = startSample + i
+            if (idx >= buffer.size) break
+            val t = i.toDouble() / SAMPLE_RATE
+            val envelope = exp(-decayRate * i * SAMPLE_RATE / 1000.0).toFloat()
+            val sine = sin(2.0 * PI * THUMP_FREQ_HZ * t).toFloat()
+            buffer[idx] += sine * envelope * amplitude
+        }
     }
 }

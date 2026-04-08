@@ -1,6 +1,7 @@
 package com.example.wags.ui.meditation
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.media.MediaPlayer
 import android.net.Uri
 import android.provider.DocumentsContract
@@ -36,6 +37,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
+import javax.inject.Named
 
 // ── Session state machine ──────────────────────────────────────────────────────
 
@@ -120,11 +122,34 @@ class MeditationViewModel @Inject constructor(
     private val artifactCorrection: ArtifactCorrectionUseCase,
     private val sonificationEngine: HrSonificationEngine,
     private val habitRepo: HabitIntegrationRepository,
+    @Named("meditation_prefs") private val prefs: SharedPreferences,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     @MathDispatcher private val mathDispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(MeditationUiState())
+    companion object {
+        private const val PREF_SONIFICATION   = "sonification_enabled"
+        private const val PREF_POSTURE        = "posture"
+        private const val PREF_TIMER_ENABLED  = "timer_enabled"
+        private const val PREF_TIMER_HOURS    = "timer_hours"
+        private const val PREF_TIMER_MINUTES  = "timer_minutes"
+        private const val PREF_TIMER_SECONDS  = "timer_seconds"
+        private const val PREF_CHANNEL_FILTER = "channel_filter"
+    }
+
+    private val _uiState = MutableStateFlow(
+        MeditationUiState(
+            sonificationEnabled   = prefs.getBoolean(PREF_SONIFICATION, false),
+            selectedPosture       = prefs.getString(PREF_POSTURE, null)
+                                        ?.let { runCatching { MeditationPosture.valueOf(it) }.getOrNull() }
+                                        ?: MeditationPosture.LAYING,
+            timerEnabled          = prefs.getBoolean(PREF_TIMER_ENABLED, false),
+            timerHours            = prefs.getInt(PREF_TIMER_HOURS, 0),
+            timerMinutes          = prefs.getInt(PREF_TIMER_MINUTES, 20),
+            timerSeconds          = prefs.getInt(PREF_TIMER_SECONDS, 0),
+            selectedChannelFilter = prefs.getString(PREF_CHANNEL_FILTER, null)
+        )
+    )
     val uiState: StateFlow<MeditationUiState> = combine(
         _uiState,
         hrDataSource.liveHr,
@@ -216,6 +241,11 @@ class MeditationViewModel @Inject constructor(
     /** Pass null to clear the filter (show all). */
     fun setChannelFilter(channel: String?) {
         _uiState.update { it.copy(selectedChannelFilter = channel) }
+        if (channel != null) {
+            prefs.edit().putString(PREF_CHANNEL_FILTER, channel).apply()
+        } else {
+            prefs.edit().remove(PREF_CHANNEL_FILTER).apply()
+        }
     }
 
     // ── URL edit dialog ────────────────────────────────────────────────────────
@@ -272,11 +302,13 @@ class MeditationViewModel @Inject constructor(
 
     fun setSonificationEnabled(enabled: Boolean) {
         _uiState.update { it.copy(sonificationEnabled = enabled) }
+        prefs.edit().putBoolean(PREF_SONIFICATION, enabled).apply()
     }
 
     fun setPosture(posture: MeditationPosture) {
         if (_uiState.value.sessionState == MeditationSessionState.IDLE) {
             _uiState.update { it.copy(selectedPosture = posture) }
+            prefs.edit().putString(PREF_POSTURE, posture.name).apply()
         }
     }
 
@@ -284,18 +316,25 @@ class MeditationViewModel @Inject constructor(
 
     fun setTimerEnabled(enabled: Boolean) {
         _uiState.update { it.copy(timerEnabled = enabled) }
+        prefs.edit().putBoolean(PREF_TIMER_ENABLED, enabled).apply()
     }
 
     fun setTimerHours(hours: Int) {
-        _uiState.update { it.copy(timerHours = hours.coerceIn(0, 23)) }
+        val v = hours.coerceIn(0, 23)
+        _uiState.update { it.copy(timerHours = v) }
+        prefs.edit().putInt(PREF_TIMER_HOURS, v).apply()
     }
 
     fun setTimerMinutes(minutes: Int) {
-        _uiState.update { it.copy(timerMinutes = minutes.coerceIn(0, 59)) }
+        val v = minutes.coerceIn(0, 59)
+        _uiState.update { it.copy(timerMinutes = v) }
+        prefs.edit().putInt(PREF_TIMER_MINUTES, v).apply()
     }
 
     fun setTimerSeconds(seconds: Int) {
-        _uiState.update { it.copy(timerSeconds = seconds.coerceIn(0, 59)) }
+        val v = seconds.coerceIn(0, 59)
+        _uiState.update { it.copy(timerSeconds = v) }
+        prefs.edit().putInt(PREF_TIMER_SECONDS, v).apply()
     }
 
     // ── Session lifecycle ──────────────────────────────────────────────────────
