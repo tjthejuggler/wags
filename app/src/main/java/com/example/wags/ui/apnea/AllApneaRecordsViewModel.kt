@@ -18,6 +18,17 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Sort order
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum class RecordSortOrder(val label: String) {
+    RECENT_DESC("Recent first"),
+    RECENT_ASC("Oldest first"),
+    LENGTH_DESC("Longest first"),
+    LENGTH_ASC("Shortest first"),
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Event-type descriptor
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -89,10 +100,12 @@ data class AllApneaRecordsUiState(
      */
     val selectedEventTypes: Set<String?> = ApneaEventType.REAL_TABLE_TYPE_VALUES,
 
+    // ── Sort order ────────────────────────────────────────────────────────────
+    val sortOrder: RecordSortOrder = RecordSortOrder.RECENT_DESC,
+
     // ── Loaded records ────────────────────────────────────────────────────────
     val records: List<ApneaRecordEntity> = emptyList(),
-    val isLoadingMore: Boolean = false,
-    val hasMore: Boolean = true,
+    val isLoading: Boolean = false,
 
     // ── Chart ─────────────────────────────────────────────────────────────────
     /**
@@ -112,7 +125,7 @@ data class AllApneaRecordsUiState(
 // ViewModel
 // ─────────────────────────────────────────────────────────────────────────────
 
-private const val PAGE_SIZE = 30
+private const val FETCH_ALL = 100_000
 
 @HiltViewModel
 class AllApneaRecordsViewModel @Inject constructor(
@@ -156,34 +169,39 @@ class AllApneaRecordsViewModel @Inject constructor(
             )
         }
 
-        loadNextPage(reset = true)
+        loadAllRecords()
     }
 
     // ── Public filter actions ─────────────────────────────────────────────────
 
     fun setLungVolumeFilter(value: String) {
         _uiState.update { it.copy(filterLungVolume = value) }
-        loadNextPage(reset = true)
+        loadAllRecords()
     }
 
     fun setPrepTypeFilter(value: String) {
         _uiState.update { it.copy(filterPrepType = value) }
-        loadNextPage(reset = true)
+        loadAllRecords()
     }
 
     fun setTimeOfDayFilter(value: String) {
         _uiState.update { it.copy(filterTimeOfDay = value) }
-        loadNextPage(reset = true)
+        loadAllRecords()
     }
 
     fun setPostureFilter(value: String) {
         _uiState.update { it.copy(filterPosture = value) }
-        loadNextPage(reset = true)
+        loadAllRecords()
     }
 
     fun setAudioFilter(value: String) {
         _uiState.update { it.copy(filterAudio = value) }
-        loadNextPage(reset = true)
+        loadAllRecords()
+    }
+
+    fun setSortOrder(order: RecordSortOrder) {
+        _uiState.update { it.copy(sortOrder = order) }
+        loadAllRecords()
     }
 
     /** Removes a single record from the in-memory list without a full reload. */
@@ -199,35 +217,26 @@ class AllApneaRecordsViewModel @Inject constructor(
             current.add(tableTypeValue)
         }
         _uiState.update { it.copy(selectedEventTypes = current) }
-        loadNextPage(reset = true)
+        loadAllRecords()
     }
 
     fun selectAllEventTypes() {
         // "Select All" includes every event type, including the PB sentinel
         val all = ApneaEventType.ALL.map { it.tableTypeValue }.toSet()
         _uiState.update { it.copy(selectedEventTypes = all) }
-        loadNextPage(reset = true)
+        loadAllRecords()
     }
 
     fun clearAllEventTypes() {
         _uiState.update { it.copy(selectedEventTypes = emptySet()) }
-        loadNextPage(reset = true)
+        loadAllRecords()
     }
 
-    // ── Infinite scroll ───────────────────────────────────────────────────────
+    // ── Load all records ──────────────────────────────────────────────────────
 
-    fun loadNextPage(reset: Boolean = false) {
-        val state = _uiState.value
-        if (!reset && (state.isLoadingMore || !state.hasMore)) return
-
-        val offset = if (reset) 0 else state.records.size
-
+    private fun loadAllRecords() {
         _uiState.update {
-            it.copy(
-                isLoadingMore = true,
-                records       = if (reset) emptyList() else it.records,
-                hasMore       = if (reset) true else it.hasMore
-            )
+            it.copy(isLoading = true, records = emptyList())
         }
 
         viewModelScope.launch {
@@ -238,7 +247,7 @@ class AllApneaRecordsViewModel @Inject constructor(
             val pbSelected    = selected.contains(ApneaEventType.FREE_HOLD_PB_SENTINEL)
             val realSelected  = selected.filter { it != ApneaEventType.FREE_HOLD_PB_SENTINEL }.toSet()
 
-            val page: List<ApneaRecordEntity> = when {
+            val allRecords: List<ApneaRecordEntity> = when {
                 // Nothing selected → empty
                 selected.isEmpty() -> emptyList()
 
@@ -250,8 +259,8 @@ class AllApneaRecordsViewModel @Inject constructor(
                         timeOfDay  = s.filterTimeOfDay,
                         posture    = s.filterPosture,
                         audio      = s.filterAudio,
-                        pageSize   = PAGE_SIZE,
-                        offset     = offset
+                        pageSize   = FETCH_ALL,
+                        offset     = 0
                     )
                 }
 
@@ -263,11 +272,11 @@ class AllApneaRecordsViewModel @Inject constructor(
                         timeOfDay  = s.filterTimeOfDay,
                         posture    = s.filterPosture,
                         audio      = s.filterAudio,
-                        pageSize   = PAGE_SIZE,
-                        offset     = offset
+                        pageSize   = FETCH_ALL,
+                        offset     = 0
                     )
-                    val realPage = fetchRealTypes(s, realSelected, PAGE_SIZE, offset)
-                    (pbPage + realPage).sortedByDescending { it.timestamp }.take(PAGE_SIZE)
+                    val realPage = fetchRealTypes(s, realSelected, FETCH_ALL, 0)
+                    (pbPage + realPage).distinctBy { it.recordId }
                 }
 
                 // Only real types (all selected = no type filter)
@@ -279,24 +288,29 @@ class AllApneaRecordsViewModel @Inject constructor(
                         posture    = s.filterPosture,
                         audio      = s.filterAudio,
                         eventTypes = emptyList(),
-                        pageSize   = PAGE_SIZE,
-                        offset     = offset
+                        pageSize   = FETCH_ALL,
+                        offset     = 0
                     )
                 }
 
-                else -> fetchRealTypes(s, realSelected, PAGE_SIZE, offset)
+                else -> fetchRealTypes(s, realSelected, FETCH_ALL, 0)
             }
 
-            val merged = if (reset) page else state.records + page
+            // Apply sort order
+            val sorted = when (s.sortOrder) {
+                RecordSortOrder.RECENT_DESC -> allRecords.sortedByDescending { it.timestamp }
+                RecordSortOrder.RECENT_ASC  -> allRecords.sortedBy { it.timestamp }
+                RecordSortOrder.LENGTH_DESC -> allRecords.sortedByDescending { it.durationMs }
+                RecordSortOrder.LENGTH_ASC  -> allRecords.sortedBy { it.durationMs }
+            }
 
             // Build chart points when exactly one event type is selected
-            val (chartPoints, chartYLabel) = buildChartData(s, selected, merged, reset, offset)
+            val (chartPoints, chartYLabel) = buildChartData(s, selected, sorted, true, 0)
 
             _uiState.update { current ->
                 current.copy(
-                    records       = merged,
-                    isLoadingMore = false,
-                    hasMore       = page.size == PAGE_SIZE,
+                    records       = sorted,
+                    isLoading     = false,
                     isInitialLoad = false,
                     chartPoints   = chartPoints,
                     chartYLabel   = chartYLabel
