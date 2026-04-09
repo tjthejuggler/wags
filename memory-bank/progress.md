@@ -1,6 +1,9 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-07 14:35 UTC-6*
+*Last updated: 2026-04-09 11:19 UTC-6*
+
+## Recent Changes (2026-04-09)
+- ✅ Added: Vibration haptics for apnea table sessions — `ApneaAudioHapticEngine` now has `vibrateBreathingCountdownTick()` (single 80ms pulse) replacing the old `vibrateFinalCountdown()`. When a hold ends (APNEA→VENTILATION), a single 500ms `vibrateHoldEnd()` fires. During the last 10 seconds of each breathing (VENTILATION) phase, a quick 80ms tick fires every second to warn the user the next hold is approaching. `onWarning` in `ApneaViewModel` reads phase directly from `stateMachine.state.value` (StateFlow, always current) to avoid race conditions.
 
 ## Recent Changes (2026-04-07)
 - ✅ Fixed: "Skip Standing" button during morning readiness crashing with "Need at least 2 NN intervals" — `MorningReadinessFsm.skipStanding()` now clears the standing buffer, peak HR, and stand timestamp when skipping during STANDING phase. `MorningReadinessOrchestrator` now treats standing as skipped if buffer has < 10 intervals (safety net).

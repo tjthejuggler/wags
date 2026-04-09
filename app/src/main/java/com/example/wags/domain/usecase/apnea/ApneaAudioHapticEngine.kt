@@ -82,14 +82,15 @@ class ApneaAudioHapticEngine @Inject constructor(
         vibrator.vibrate(VibrationEffect.createOneShot(80L, AMPLITUDE_LOW))
     }
 
-    /** 3 short pulses for the final 10 seconds of rest. */
-    fun vibrateFinalCountdown() {
-        val timings = longArrayOf(0L, 80L, 80L, 80L, 80L, 80L)
-        val amplitudes = intArrayOf(0, AMPLITUDE_MEDIUM, 0, AMPLITUDE_MEDIUM, 0, AMPLITUDE_MEDIUM)
-        vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+    /**
+     * Single short tick (80ms) fired once per second during the last 10s of a
+     * breathing (VENTILATION) phase — warns the user that the next hold is coming.
+     */
+    fun vibrateBreathingCountdownTick() {
+        vibrator.vibrate(VibrationEffect.createOneShot(80L, AMPLITUDE_MEDIUM))
     }
 
-    /** Continuous 500ms high-intensity pulse at end of breath-hold. */
+    /** Single longer 500ms pulse to signal the end of a hold (stop holding). */
     fun vibrateHoldEnd() {
         vibrator.vibrate(VibrationEffect.createOneShot(500L, AMPLITUDE_HIGH))
     }

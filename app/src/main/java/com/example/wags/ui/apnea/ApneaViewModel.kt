@@ -410,6 +410,8 @@ class ApneaViewModel @Inject constructor(
                 onApneaPhaseStarted()
             }
             ApneaState.VENTILATION -> {
+                // Single longer vibration: signals the user to stop holding
+                audioHapticEngine.vibrateHoldEnd()
                 audioHapticEngine.announceBreath()
                 // Capture hold duration for the contraction summary card
                 val table = _uiState.value.currentTable
@@ -705,9 +707,11 @@ class ApneaViewModel @Inject constructor(
 
     private fun onWarning(remainingSeconds: Long) {
         audioHapticEngine.announceTimeRemaining(remainingSeconds.toInt())
-        when {
-            remainingSeconds <= 3L -> audioHapticEngine.vibrateFinalCountdown()
-            remainingSeconds == 10L -> audioHapticEngine.vibrateFinalCountdown()
+        // During the VENTILATION (breathing) phase, fire a single tick vibration every
+        // second for the last 10 seconds — warns the user the next hold is approaching.
+        // Read directly from the StateFlow (always current) to avoid race with _uiState collector.
+        if (stateMachine.state.value == ApneaState.VENTILATION && remainingSeconds in 1L..10L) {
+            audioHapticEngine.vibrateBreathingCountdownTick()
         }
     }
 
