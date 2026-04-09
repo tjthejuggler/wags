@@ -1,6 +1,6 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-09 11:19 UTC-6*
+*Last updated: 2026-04-09 11:39 UTC-6*
 
 ## Current State
 
@@ -50,6 +50,18 @@ Based on open tabs and visible files:
 ## Current Focus / Open Questions
 
 - No specific open questions
+
+---
+
+### 2026-04-09 11:39 (UTC-6)
+
+**Fixed: Screen turning off during active sessions (persistent issue)**
+
+- **Bug:** The phone screen would go black after ~10 minutes of inactivity during any active session (resonance breathing, apnea tables, apnea drills, meditation, etc.) even though `KeepScreenOn` was called in all session screens.
+- **Root cause:** The `KeepScreenOn` composable in `ui/common/SessionGuards.kt` used `view.keepScreenOn = true` (View-level flag). The `onDispose` lambda **always** set `keepScreenOn = false` unconditionally — meaning every time the `DisposableEffect` re-ran (on `enabled` key change), the old effect's dispose cleared the flag. More critically, the View-level flag is less persistent than the Window-level flag and can be lost during navigation transitions or Activity lifecycle events.
+- **Fix:** Replaced `view.keepScreenOn` with `Window.addFlags(FLAG_KEEP_SCREEN_ON)` / `Window.clearFlags(FLAG_KEEP_SCREEN_ON)` directly on the Activity window. The `onDispose` now only clears the flag when `enabled` was `true` (captured in the closure), preventing spurious flag clears. The Window-level flag is the most reliable mechanism — it persists across recompositions and navigation transitions.
+- Files modified:
+  1. `ui/common/SessionGuards.kt` — `KeepScreenOn()`: switched from `LocalView.current.keepScreenOn` to `(context as ComponentActivity).window.addFlags/clearFlags(FLAG_KEEP_SCREEN_ON)`; `onDispose` now guarded by `if (enabled)`
 
 ---
 

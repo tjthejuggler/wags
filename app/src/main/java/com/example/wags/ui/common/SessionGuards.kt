@@ -6,7 +6,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
-import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalContext
+import androidx.activity.ComponentActivity
 
 /**
  * Intercepts the system back gesture / button while [enabled] is true and shows
@@ -54,19 +55,26 @@ fun SessionBackHandler(
 /**
  * Keeps the screen on (prevents auto-dim / auto-off) while [enabled] is true.
  *
- * Uses [WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON] on the current window.
- * The flag is automatically cleared when [enabled] becomes false or when the
- * composable leaves the composition.
+ * Sets [WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON] directly on the Activity
+ * window — this is more reliable than the View-level flag because it survives
+ * recompositions and navigation transitions without flickering off.
+ *
+ * The flag is cleared only when [enabled] is false or when the composable
+ * leaves the composition.
  */
 @Composable
 fun KeepScreenOn(enabled: Boolean) {
-    val currentView = LocalView.current
+    val context = LocalContext.current
     DisposableEffect(enabled) {
+        val window = (context as? ComponentActivity)?.window
         if (enabled) {
-            currentView.keepScreenOn = true
+            window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
         onDispose {
-            currentView.keepScreenOn = false
+            // Only clear the flag if we were the ones who set it.
+            if (enabled) {
+                window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
         }
     }
 }
