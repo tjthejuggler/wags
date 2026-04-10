@@ -380,7 +380,7 @@ class AllApneaRecordsViewModel @Inject constructor(
             )
             "MIN_BREATH" -> Pair(
                 { r: ApneaRecordEntity -> r.durationMs.toFloat() },
-                "Hold duration"
+                "Total hold time"
             )
             "WONKA_FIRST_CONTRACTION" -> Pair(
                 { r: ApneaRecordEntity -> r.firstContractionMs?.toFloat() },

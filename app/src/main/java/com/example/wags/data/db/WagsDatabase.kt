@@ -29,7 +29,7 @@ import com.example.wags.data.db.entity.*
         RapidHrSessionEntity::class,
         RapidHrTelemetryEntity::class
     ],
-    version = 28,
+    version = 29,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -800,6 +800,34 @@ abstract class WagsDatabase : RoomDatabase() {
                         )
                         WHERE tableType = 'MIN_BREATH'
                           AND drillParamValue IS NULL
+                    """.trimIndent())
+                }
+            }
+
+            /**
+             * Backfill durationMs for old Min Breath records: replace longest-hold
+             * value with totalHoldTimeMs from the matching session's tableParamsJson.
+             */
+            val MIGRATION_28_29 = object : Migration(28, 29) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("""
+                        UPDATE apnea_records
+                        SET durationMs = (
+                            SELECT CAST(json_extract(s.tableParamsJson, '${'$'}.totalHoldTimeMs') AS INTEGER)
+                            FROM apnea_sessions s
+                            WHERE s.tableType = 'MIN_BREATH'
+                              AND s.timestamp = apnea_records.timestamp
+                              AND json_extract(s.tableParamsJson, '${'$'}.totalHoldTimeMs') IS NOT NULL
+                            LIMIT 1
+                        )
+                        WHERE tableType = 'MIN_BREATH'
+                          AND (
+                            SELECT CAST(json_extract(s.tableParamsJson, '${'$'}.totalHoldTimeMs') AS INTEGER)
+                            FROM apnea_sessions s
+                            WHERE s.tableType = 'MIN_BREATH'
+                              AND s.timestamp = apnea_records.timestamp
+                            LIMIT 1
+                          ) IS NOT NULL
                     """.trimIndent())
                 }
             }

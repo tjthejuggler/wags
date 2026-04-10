@@ -557,7 +557,7 @@ private fun ApneaProgressChart(
         return
     }
 
-    val isDuration = yLabel == "Hold duration"
+    val isDuration = yLabel == "Hold duration" || yLabel == "Total hold time"
 
     val lineColor   = TextPrimary
     val dotColor    = TextPrimary
@@ -749,7 +749,10 @@ private fun AllRecordsRow(
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        "Longest hold: ${formatAllRecordsMs(record.durationMs)}",
+                        if (record.tableType == "MIN_BREATH")
+                            "Total hold time: ${formatAllRecordsMs(record.durationMs)}"
+                        else
+                            "Longest hold: ${formatAllRecordsMs(record.durationMs)}",
                         style = MaterialTheme.typography.labelSmall,
                         color = TextSecondary
                     )

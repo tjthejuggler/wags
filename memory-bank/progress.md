@@ -1,6 +1,27 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-09 21:04 UTC-6*
+*Last updated: 2026-04-10 06:43 UTC-6*
+
+## Recent Changes (2026-04-10 06:43)
+- ✅ **Min Breath detail screen follow-up fixes:**
+  - Removed redundant "Total Hold Time" from Summary section (already in Min Breath Session section)
+  - Header changed from "Hold Detail" to "Session Details" with "Min Breath" subtitle
+  - Hold Breakdown now shows breathing time after each hold (comma-separated) instead of ⚡ contraction time
+  - Per-breath-period durations tracked in ViewModel and stored in `tableParamsJson` as `breathDurationMs`
+  - DB migration v28→v29 backfills old MIN_BREATH records' `durationMs` with `totalHoldTimeMs` from session JSON
+  - Modified: `ApneaRecordDetailScreen.kt`, `MinBreathDetailContent.kt`, `MinBreathViewModel.kt`, `WagsDatabase.kt`, `DatabaseModule.kt`
+
+## Recent Changes (2026-04-10 06:10)
+- ✅ **Min Breath drill — 7 fixes** across detail screen, active screen, All Records, and trophy system:
+  - Detail screen chart now shows HR/SpO₂ across entire session with breathing-period shading and first-contraction dashed lines (`MinBreathSessionChart`)
+  - Button colors changed from teal/orange to greyscale monochrome (`SurfaceVariant`, `ButtonPrimary`, `TextPrimary`)
+  - First contraction data now correctly parsed and displayed from `tableParamsJson` holds array format
+  - "Table Session" renamed to "Min Breath Session" with Min Breath-specific layout (total hold time, breath time, hold %, per-hold breakdown)
+  - `durationMs` on `ApneaRecordEntity` now stores `totalHoldTimeMs` (not longest single hold) for Min Breath records
+  - All Records card shows "Total hold time" instead of "Longest hold" for Min Breath
+  - Trophy/PB system now correctly based on total hold time (automatic since `durationMs` changed)
+  - New file: `MinBreathDetailContent.kt`
+  - Modified: `MinBreathActiveScreen.kt`, `MinBreathViewModel.kt`, `ApneaRecordDetailScreen.kt`, `AllApneaRecordsScreen.kt`, `AllApneaRecordsViewModel.kt`
 
 ## Recent Changes (2026-04-09 21:04)
 - ✅ **Backfill drillParamValue for old records** — DB migration v27→v28 uses `json_extract()` to populate `drillParamValue` from `apnea_sessions.tableParamsJson` for old Progressive O₂ (`breathPeriodSec`) and Min Breath (`sessionDurationSec`) records that had `drillParamValue IS NULL`.

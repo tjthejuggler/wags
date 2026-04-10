@@ -79,7 +79,17 @@ fun ApneaRecordDetailScreen(
         containerColor = BackgroundDark,
         topBar = {
             TopAppBar(
-                title = { Text("Hold Detail") },
+                title = {
+                    val record = state.record
+                    if (record?.tableType == "MIN_BREATH") {
+                        Column {
+                            Text("Session Details", style = MaterialTheme.typography.titleMedium)
+                            Text("Min Breath", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                        }
+                    } else {
+                        Text("Hold Detail")
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
@@ -490,12 +500,14 @@ private fun RecordDetailContent(
             ) {
                 Text("Summary", style = MaterialTheme.typography.titleLarge)
                 DetailRow(label = "Date", value = dateStr)
-                DetailRow(
-                    label = "Duration",
-                    value = formatMsDetail(record.durationMs),
-                    valueColor = TextPrimary,
-                    valueBold = true
-                )
+                if (record.tableType != "MIN_BREATH") {
+                    DetailRow(
+                        label = "Duration",
+                        value = formatMsDetail(record.durationMs),
+                        valueColor = TextPrimary,
+                        valueBold = true
+                    )
+                }
                 DetailRow(
                     label = "Lung Volume",
                     value = if (record.lungVolume == "PARTIAL") "Half"
@@ -595,74 +607,98 @@ private fun RecordDetailContent(
             }
         }
 
-        // ── Table Session Details ───────────────────────────────────────
+        // ── Table / Drill Session Details ────────────────────────────────
         if (tableSession != null) {
+            val isMinBreath = record.tableType == "MIN_BREATH"
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceVariant)) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text("Table Session", style = MaterialTheme.typography.titleLarge)
-
-                    // Parse variant: "SHORT_EASY" → "Short" + "Easy"
-                    val parts = tableSession.tableVariant.split("_")
-                    val lengthLabel = parts.getOrNull(0)?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "—"
-                    val difficultyLabel = parts.getOrNull(1)?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "—"
-
-                    DetailRow(label = "Size", value = lengthLabel)
-                    DetailRow(label = "Difficulty", value = difficultyLabel)
-                    DetailRow(
-                        label = "Rounds",
-                        value = "${tableSession.roundsCompleted} / ${tableSession.totalRounds}"
-                    )
-                    DetailRow(
-                        label = "Total Duration",
-                        value = formatMsDetail(tableSession.totalSessionDurationMs)
-                    )
-                    DetailRow(
-                        label = "PB at Session",
-                        value = formatMsDetail(tableSession.pbAtSessionMs)
-                    )
-                    DetailRow(
-                        label = "Longest Hold",
-                        value = formatMsDetail(record.durationMs),
-                        valueColor = TextPrimary,
-                        valueBold = true
+                    Text(
+                        if (isMinBreath) "Min Breath Session" else "Table Session",
+                        style = MaterialTheme.typography.titleLarge
                     )
 
-                    // Per-round first contraction data from tableParamsJson
-                    // Format: {"1":12345,"3":23456} where key=round, value=elapsed ms
-                    val fcJson = tableSession.tableParamsJson
-                    if (fcJson.length > 2 && fcJson != "{}") {
-                        HorizontalDivider(
-                            color = TextDisabled.copy(alpha = 0.3f),
-                            modifier = Modifier.padding(vertical = 4.dp)
+                    if (isMinBreath) {
+                        // ── Min Breath specific layout ──────────────────────
+                        MinBreathSessionDetails(
+                            tableSession = tableSession,
+                            record = record
                         )
-                        Text(
-                            "First Contractions",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = TextPrimary
+                    } else {
+                        // ── Generic table layout (O₂/CO₂/Progressive O₂) ───
+                        val parts = tableSession.tableVariant.split("_")
+                        val lengthLabel = parts.getOrNull(0)?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "—"
+                        val difficultyLabel = parts.getOrNull(1)?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "—"
+
+                        DetailRow(label = "Size", value = lengthLabel)
+                        DetailRow(label = "Difficulty", value = difficultyLabel)
+                        DetailRow(
+                            label = "Rounds",
+                            value = "${tableSession.roundsCompleted} / ${tableSession.totalRounds}"
                         )
-                        // Simple parse: remove braces, split by comma
-                        val entries = fcJson.trim('{', '}').split(",")
-                            .mapNotNull { entry ->
-                                val kv = entry.split(":")
-                                if (kv.size == 2) {
-                                    val round = kv[0].trim().trim('"').toIntOrNull()
-                                    val ms = kv[1].trim().toLongOrNull()
-                                    if (round != null && ms != null) round to ms else null
-                                } else null
-                            }
-                            .sortedBy { it.first }
-                        entries.forEach { (round, ms) ->
-                            DetailRow(
-                                label = "Round $round",
-                                value = formatMsDetail(ms)
+                        DetailRow(
+                            label = "Total Duration",
+                            value = formatMsDetail(tableSession.totalSessionDurationMs)
+                        )
+                        DetailRow(
+                            label = "PB at Session",
+                            value = formatMsDetail(tableSession.pbAtSessionMs)
+                        )
+                        DetailRow(
+                            label = "Longest Hold",
+                            value = formatMsDetail(record.durationMs),
+                            valueColor = TextPrimary,
+                            valueBold = true
+                        )
+
+                        // Per-round first contraction data from tableParamsJson
+                        // Format: {"1":12345,"3":23456} where key=round, value=elapsed ms
+                        val fcJson = tableSession.tableParamsJson
+                        if (fcJson.length > 2 && fcJson != "{}") {
+                            HorizontalDivider(
+                                color = TextDisabled.copy(alpha = 0.3f),
+                                modifier = Modifier.padding(vertical = 4.dp)
                             )
+                            Text(
+                                "First Contractions",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = TextPrimary
+                            )
+                            val entries = fcJson.trim('{', '}').split(",")
+                                .mapNotNull { entry ->
+                                    val kv = entry.split(":")
+                                    if (kv.size == 2) {
+                                        val round = kv[0].trim().trim('"').toIntOrNull()
+                                        val ms = kv[1].trim().toLongOrNull()
+                                        if (round != null && ms != null) round to ms else null
+                                    } else null
+                                }
+                                .sortedBy { it.first }
+                            entries.forEach { (round, ms) ->
+                                DetailRow(
+                                    label = "Round $round",
+                                    value = formatMsDetail(ms)
+                                )
+                            }
                         }
                     }
                 }
             }
+        }
+
+        // ── Parse Min Breath holds for session-aware charts ─────────────
+        val isMinBreath = record.tableType == "MIN_BREATH"
+        val minBreathHolds = remember(tableSession, isMinBreath) {
+            if (isMinBreath && tableSession != null) {
+                parseMinBreathParams(tableSession.tableParamsJson)?.holds ?: emptyList()
+            } else emptyList()
+        }
+        val sessionTotalDurationMs = remember(tableSession, isMinBreath) {
+            if (isMinBreath && tableSession != null) {
+                tableSession.totalSessionDurationMs
+            } else 0L
         }
 
         // ── Heart Rate chart ──────────────────────────────────────────────
@@ -704,18 +740,34 @@ private fun RecordDetailContent(
                             color = TextPrimary
                         )
                     }
-                    LineChart(
-                        samples = hrValues,
-                        lineColor = TextPrimary,
-                        durationMs = record.durationMs,
-                        firstContractionMs = record.firstContractionMs,
-                        showYLabels = true,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(180.dp)
-                    )
+                    if (isMinBreath && minBreathHolds.isNotEmpty()) {
+                        val hrTimestamps = remember(hrSamples) { hrSamples.map { it.second } }
+                        MinBreathSessionChart(
+                            samples = hrValues,
+                            sampleTimestampsMs = hrTimestamps,
+                            lineColor = TextPrimary,
+                            sessionDurationMs = sessionTotalDurationMs,
+                            holds = minBreathHolds,
+                            showYLabels = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(180.dp)
+                        )
+                    } else {
+                        LineChart(
+                            samples = hrValues,
+                            lineColor = TextPrimary,
+                            durationMs = record.durationMs,
+                            firstContractionMs = record.firstContractionMs,
+                            showYLabels = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(180.dp)
+                        )
+                    }
                     Text(
-                        "HR over the hold (${hrValues.size} beats)",
+                        if (isMinBreath) "HR across the session (${hrValues.size} samples)"
+                        else "HR over the hold (${hrValues.size} beats)",
                         style = MaterialTheme.typography.labelSmall,
                         color = TextSecondary
                     )
@@ -781,20 +833,38 @@ private fun RecordDetailContent(
                             color = TextPrimary
                         )
                     }
-                    LineChart(
-                        samples = spO2Values,
-                        lineColor = SpO2Blue,
-                        yMin = 70f,
-                        yMax = 100f,
-                        durationMs = record.durationMs,
-                        firstContractionMs = record.firstContractionMs,
-                        showYLabels = false,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(160.dp)
-                    )
+                    if (isMinBreath && minBreathHolds.isNotEmpty()) {
+                        val spO2Timestamps = remember(spO2Samples) { spO2Samples.map { it.second } }
+                        MinBreathSessionChart(
+                            samples = spO2Values,
+                            sampleTimestampsMs = spO2Timestamps,
+                            lineColor = SpO2Blue,
+                            sessionDurationMs = sessionTotalDurationMs,
+                            holds = minBreathHolds,
+                            showYLabels = false,
+                            yMin = 70f,
+                            yMax = 100f,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(160.dp)
+                        )
+                    } else {
+                        LineChart(
+                            samples = spO2Values,
+                            lineColor = SpO2Blue,
+                            yMin = 70f,
+                            yMax = 100f,
+                            durationMs = record.durationMs,
+                            firstContractionMs = record.firstContractionMs,
+                            showYLabels = false,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(160.dp)
+                        )
+                    }
                     Text(
-                        "SpO₂ over the hold (${spO2Values.size} samples)",
+                        if (isMinBreath) "SpO₂ across the session (${spO2Values.size} samples)"
+                        else "SpO₂ over the hold (${spO2Values.size} samples)",
                         style = MaterialTheme.typography.labelSmall,
                         color = TextSecondary
                     )

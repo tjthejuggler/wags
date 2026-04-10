@@ -23,9 +23,6 @@ import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 
-private val TealButton = Color(0xFF4ECDC4)
-private val ContractionOrange = Color(0xFFE8A849)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MinBreathActiveScreen(
@@ -135,7 +132,7 @@ private fun HoldContent(
                         onClick = onContraction,
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                         shape = MaterialTheme.shapes.large,
-                        colors = ButtonDefaults.buttonColors(containerColor = ContractionOrange, contentColor = Color.White)
+                        colors = ButtonDefaults.buttonColors(containerColor = SurfaceVariant, contentColor = TextPrimary)
                     ) {
                         Text("First\nContraction", style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
@@ -144,7 +141,7 @@ private fun HoldContent(
                         onClick = onBreath,
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                         shape = MaterialTheme.shapes.large,
-                        colors = ButtonDefaults.buttonColors(containerColor = TealButton, contentColor = Color.White)
+                        colors = ButtonDefaults.buttonColors(containerColor = ButtonPrimary, contentColor = TextPrimary)
                     ) {
                         Text("Breath", style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
@@ -155,13 +152,13 @@ private fun HoldContent(
                     onClick = onBreath,
                     modifier = Modifier.fillMaxWidth(0.92f).fillMaxHeight(0.85f),
                     shape = MaterialTheme.shapes.large,
-                    colors = ButtonDefaults.buttonColors(containerColor = TealButton, contentColor = Color.White)
+                    colors = ButtonDefaults.buttonColors(containerColor = ButtonPrimary, contentColor = TextPrimary)
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("Breath", style = MaterialTheme.typography.displayMedium,
                             fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
                         Text("⚡ ${formatMmSs(session.currentHoldContractionMs!!)}",
-                            style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.7f))
+                            style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
                     }
                 }
             }
@@ -187,7 +184,7 @@ private fun BreathingContent(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("BREATHING", style = MaterialTheme.typography.labelLarge,
-                        color = TealButton, fontWeight = FontWeight.Bold)
+                        color = TextPrimary, fontWeight = FontWeight.Bold)
                     Text("Remaining: ${formatMmSs(session.sessionRemainingMs)}",
                         style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                     SmallStopButton(onStop)

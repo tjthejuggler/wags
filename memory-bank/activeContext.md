@@ -1,6 +1,46 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-09 20:57 UTC-6*
+*Last updated: 2026-04-10 06:43 UTC-6*
+
+### 2026-04-10 06:43 (UTC-6)
+
+**Follow-up fixes for Min Breath detail screen**
+
+1. **Removed "Total Hold Time" from Summary section** — For MIN_BREATH records, the Duration/Total Hold Time row is no longer shown in the top Summary card since it's already displayed in the Min Breath Session section below.
+
+2. **Header changed to "Session Details" / "Min Breath"** — For MIN_BREATH records, the top bar now shows "Session Details" as the title with "Min Breath" as a smaller subtitle below it. Other record types still show "Hold Detail".
+
+3. **Hold Breakdown shows breathing time** — Removed ⚡ contraction time from hold breakdown. Now shows breathing time after each hold with comma separator (e.g. "Hold #1: 1m 30s, breath 15s"). Per-breath-period durations are now tracked in the ViewModel (`breathDurations` map) and stored in `tableParamsJson` as `breathDurationMs` per hold. For old data without per-period breath durations, the total breath time is distributed evenly.
+
+4. **DB migration v28→v29** — Backfills old MIN_BREATH records' `durationMs` with `totalHoldTimeMs` from the matching session's `tableParamsJson`. This fixes the All Records card showing the wrong value for old records.
+
+Files modified: `ApneaRecordDetailScreen.kt`, `MinBreathDetailContent.kt`, `MinBreathViewModel.kt`, `WagsDatabase.kt`, `DatabaseModule.kt`
+
+### 2026-04-10 06:10 (UTC-6)
+
+**Fixed: Min Breath drill — 7 issues across detail screen, active screen, All Records, and trophy system**
+
+1. **Detail screen chart now shows entire session** — For MIN_BREATH records, HR/SpO₂ charts use `MinBreathSessionChart` (new composable in `MinBreathDetailContent.kt`) that plots data across the full session duration with shaded breathing-period bands and dashed vertical lines for first contractions.
+
+2. **Button colors now greyscale** — Replaced `TealButton` (teal `#4ECDC4`) and `ContractionOrange` (orange `#E8A849`) with `ButtonPrimary`/`SurfaceVariant`/`TextPrimary` greyscale theme colors in `MinBreathActiveScreen.kt`. "BREATHING" label also changed from teal to `TextPrimary`.
+
+3. **First contraction data now displayed** — The "Table Session" section for MIN_BREATH now uses `MinBreathSessionDetails` composable which correctly parses the `tableParamsJson` holds array format (`{"holds":[{"hold":1,"durationMs":...,"contractionMs":...}]}`) and shows per-hold breakdown with ⚡ contraction times.
+
+4. **"Table Session" renamed to "Min Breath Session"** — The detail screen now shows "Min Breath Session" header for MIN_BREATH records, with Min Breath-specific layout (total hold time, total breath time, hold %, hold breakdown). Generic "Table Session" layout preserved for O₂/CO₂ tables.
+
+5. **Total hold time shown in detail screen** — Summary card shows "Total Hold Time" instead of "Duration" for MIN_BREATH records. The `durationMs` field on `ApneaRecordEntity` now stores `totalHoldTimeMs` (not longest single hold) for Min Breath records.
+
+6. **Total hold time on All Records card** — Min Breath cards in the All Records list now show "Total hold time: X" instead of "Longest hold: X". Progress chart Y-label changed to "Total hold time".
+
+7. **Trophy/PB system now based on total hold time** — Since `durationMs` now stores `totalHoldTimeMs` for Min Breath, the existing `checkBroaderPersonalBest()` call automatically compares total hold times. PB celebrations and trophy tiers are now correctly based on cumulative hold time across the session.
+
+Key files:
+- New: `MinBreathDetailContent.kt` (~300 lines) — `MinBreathSessionDetails`, `MinBreathSessionChart`, `parseMinBreathParams()`
+- Modified: `MinBreathActiveScreen.kt` — greyscale button colors
+- Modified: `MinBreathViewModel.kt` — `durationMs = totalHoldTimeMs` (was `longestHoldMs`)
+- Modified: `ApneaRecordDetailScreen.kt` — Min Breath session section, session-aware charts, "Total Hold Time" label
+- Modified: `AllApneaRecordsScreen.kt` — "Total hold time" on Min Breath cards
+- Modified: `AllApneaRecordsViewModel.kt` — chart Y-label "Total hold time"
 
 ### 2026-04-09 20:57 (UTC-6)
 

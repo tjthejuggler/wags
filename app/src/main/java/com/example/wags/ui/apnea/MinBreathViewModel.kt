@@ -118,6 +118,9 @@ class MinBreathViewModel @Inject constructor(
     private var telemetryJob: Job? = null
     private var sessionStartMs: Long = 0L
 
+    // Per-breath-period duration tracking (indexed by hold number that preceded the breath)
+    private val breathDurations = mutableMapOf<Int, Long>()
+
     init {
         // Restore persisted session duration
         val savedDuration = prefs.getInt("min_breath_session_duration_sec", 300)
@@ -288,6 +291,7 @@ class MinBreathViewModel @Inject constructor(
     fun startSession() {
         val durationMs = _uiState.value.sessionDurationSec * 1000L
         sessionStartMs = System.currentTimeMillis()
+        breathDurations.clear()
         _uiState.update { it.copy(isSessionActive = true, completedRecordId = null) }
 
         // Start telemetry collection
@@ -334,6 +338,13 @@ class MinBreathViewModel @Inject constructor(
     }
 
     fun switchToHolding() {
+        // Capture breath duration before state machine transitions
+        val currentState = stateMachine.state.value
+        if (currentState.phase == MinBreathPhase.BREATHING) {
+            val holdNumber = currentState.currentHoldNumber
+            // holdNumber is the hold that just ended; breath follows it
+            breathDurations[holdNumber] = currentState.currentPhaseElapsedMs
+        }
         stateMachine.switchToHolding()
     }
 
@@ -384,16 +395,16 @@ class MinBreathViewModel @Inject constructor(
         )
         val sessionId = sessionRepository.saveSession(sessionEntity)
 
-        // 2. Save ApneaRecordEntity (longest single hold as durationMs)
-        val longestHoldMs = holdResults.maxOfOrNull { it.holdDurationMs } ?: 0L
+        // 2. Save ApneaRecordEntity (total hold time as durationMs for Min Breath)
+        val totalHoldTimeMs = finalState.totalHoldTimeMs
 
         val currentState = _uiState.value
 
         // Check broader PB BEFORE saving so queries compare against prior records only
         val drill = DrillContext.minBreath(sessionDurationSec)
-        val pbResult = if (longestHoldMs > 0L) {
+        val pbResult = if (totalHoldTimeMs > 0L) {
             apneaRepository.checkBroaderPersonalBest(
-                drill, longestHoldMs,
+                drill, totalHoldTimeMs,
                 currentState.lungVolume, currentState.prepType, currentState.timeOfDay,
                 currentState.posture, currentState.audio
             )
@@ -402,7 +413,7 @@ class MinBreathViewModel @Inject constructor(
         val recordId = apneaRepository.saveRecord(
             ApneaRecordEntity(
                 timestamp = now,
-                durationMs = longestHoldMs,
+                durationMs = totalHoldTimeMs,
                 lungVolume = currentState.lungVolume,
                 prepType = currentState.prepType,
                 minHrBpm = minHr?.toFloat() ?: 0f,
@@ -477,6 +488,13 @@ class MinBreathViewModel @Inject constructor(
                 obj.put("contractionMs", r.firstContractionMs)
             } else {
                 obj.put("contractionMs", JSONObject.NULL)
+            }
+            // Add per-hold breath duration (captured when user switched back to holding)
+            val breathMs = breathDurations[r.holdNumber]
+            if (breathMs != null) {
+                obj.put("breathDurationMs", breathMs)
+            } else {
+                obj.put("breathDurationMs", JSONObject.NULL)
             }
             holdsArray.put(obj)
         }
