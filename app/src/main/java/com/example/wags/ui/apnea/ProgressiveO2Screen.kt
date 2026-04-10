@@ -139,6 +139,14 @@ fun ProgressiveO2Screen(
                 onSetBreathPeriod = { viewModel.setBreathPeriod(it) }
             )
 
+            // 2b. Voice / vibration toggles
+            VoiceVibrationToggles(
+                voiceEnabled = state.voiceEnabled,
+                vibrationEnabled = state.vibrationEnabled,
+                onVoiceToggle = { viewModel.setVoiceEnabled(it) },
+                onVibrationToggle = { viewModel.setVibrationEnabled(it) }
+            )
+
             // 3. Start button
             Button(
                 onClick = { navController.navigate(WagsRoutes.PROGRESSIVE_O2_ACTIVE) },

@@ -61,6 +61,9 @@ data class ProgressiveO2UiState(
     val timeOfDay: String = "DAY",
     val posture: String = "LAYING",
     val audio: String = "SILENCE",
+    // ── Voice / vibration toggles ─────────────────────────────────────────────
+    val voiceEnabled: Boolean = true,
+    val vibrationEnabled: Boolean = true,
     // ── Song picker / Spotify ────────────────────────────────────────────────
     val spotifyConnected: Boolean = false,
     val isMusicMode: Boolean = false,
@@ -145,7 +148,9 @@ class ProgressiveO2ViewModel @Inject constructor(
                 timeOfDay   = TimeOfDay.fromCurrentTime().name,
                 posture     = savedPosture,
                 audio       = savedAudio,
-                isMusicMode = savedAudio == AudioSetting.MUSIC.name
+                isMusicMode = savedAudio == AudioSetting.MUSIC.name,
+                voiceEnabled = audioHapticEngine.voiceEnabled,
+                vibrationEnabled = audioHapticEngine.vibrationEnabled
             )
         }
 
@@ -183,6 +188,16 @@ class ProgressiveO2ViewModel @Inject constructor(
     fun setAudio(v: String) {
         prefs.edit().putString("setting_audio", v).apply()
         _uiState.update { it.copy(audio = v, isMusicMode = v == AudioSetting.MUSIC.name) }
+    }
+
+    fun setVoiceEnabled(enabled: Boolean) {
+        audioHapticEngine.voiceEnabled = enabled
+        _uiState.update { it.copy(voiceEnabled = enabled) }
+    }
+
+    fun setVibrationEnabled(enabled: Boolean) {
+        audioHapticEngine.vibrationEnabled = enabled
+        _uiState.update { it.copy(vibrationEnabled = enabled) }
     }
 
     // ── Song picker ─────────────────────────────────────────────────────────
@@ -339,7 +354,8 @@ class ProgressiveO2ViewModel @Inject constructor(
         if (state.phase == previousPhase) {
             // Same phase — check for breathing countdown tick
             if (state.phase == ProgressiveO2Phase.BREATHING && state.timerMs in 1000..10_000) {
-                audioHapticEngine.vibrateBreathingCountdownTick()
+                val isLast = state.timerMs <= 1000L
+                audioHapticEngine.vibrateBreathingCountdownTick(isLastTick = isLast)
             }
             return
         }

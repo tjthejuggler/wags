@@ -90,6 +90,9 @@ data class ApneaUiState(
     val timeOfDay: TimeOfDay = TimeOfDay.fromCurrentTime(),
     val posture: Posture = Posture.LAYING,
     val audio: AudioSetting = AudioSetting.SILENCE,
+    // ── Voice / vibration toggles ─────────────────────────────────────────────
+    val voiceEnabled: Boolean = true,
+    val vibrationEnabled: Boolean = true,
     /** When true, a live elapsed-time counter is shown during the breath hold. */
     val showTimer: Boolean = true,
     /** Best free-hold for the current lungVolume + prepType combination (from DB). */
@@ -296,7 +299,9 @@ class ApneaViewModel @Inject constructor(
                 selectedLength = savedLength,
                 selectedDifficulty = savedDifficulty,
                 progO2BreathPeriodSec = savedBreathPeriod,
-                minBreathSessionDurationSec = savedSessionDuration
+                minBreathSessionDurationSec = savedSessionDuration,
+                voiceEnabled = audioHapticEngine.voiceEnabled,
+                vibrationEnabled = audioHapticEngine.vibrationEnabled
             )
         }
 
@@ -776,7 +781,8 @@ class ApneaViewModel @Inject constructor(
         // second for the last 10 seconds — warns the user the next hold is approaching.
         // Read directly from the StateFlow (always current) to avoid race with _uiState collector.
         if (stateMachine.state.value == ApneaState.VENTILATION && remainingSeconds in 1L..10L) {
-            audioHapticEngine.vibrateBreathingCountdownTick()
+            val isLast = remainingSeconds == 1L
+            audioHapticEngine.vibrateBreathingCountdownTick(isLastTick = isLast)
         }
     }
 
@@ -1047,6 +1053,16 @@ class ApneaViewModel @Inject constructor(
     fun setDifficulty(difficulty: TableDifficulty) {
         _uiState.update { it.copy(selectedDifficulty = difficulty) }
         prefs.edit().putString("setting_difficulty", difficulty.name).apply()
+    }
+
+    fun setVoiceEnabled(enabled: Boolean) {
+        audioHapticEngine.voiceEnabled = enabled
+        _uiState.update { it.copy(voiceEnabled = enabled) }
+    }
+
+    fun setVibrationEnabled(enabled: Boolean) {
+        audioHapticEngine.vibrationEnabled = enabled
+        _uiState.update { it.copy(vibrationEnabled = enabled) }
     }
 
     // ── Layout / accordion ────────────────────────────────────────────────────

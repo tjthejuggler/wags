@@ -1,6 +1,6 @@
 # WAGS — System Patterns
 
-*Last updated: 2026-04-09 20:23 UTC-6*
+*Last updated: 2026-04-10 07:39 UTC-6*
 
 ## Architecture Pattern
 
@@ -137,3 +137,28 @@ The trophy/personal-best system is generalized via `DrillContext` to work with a
 - `ApneaPbSoundPlayer` — 6 tiered celebration sounds
 - `PersonalBestsScreen` — full trophy hierarchy display
 - `PbChartScreen` — landscape line chart with zoom/pan
+
+## Audio/Haptic Indication System (2026-04-10 07:39 UTC-6)
+
+### Architecture
+- [`ApneaAudioHapticEngine`](app/src/main/java/com/example/wags/domain/usecase/apnea/ApneaAudioHapticEngine.kt) — `@Singleton` with `@Inject constructor`, provides TTS + vibration
+- Voice and vibration independently toggleable via `voiceEnabled` / `vibrationEnabled` properties
+- Settings persisted in `@Named("apnea_prefs") SharedPreferences` (`apnea_voice_enabled`, `apnea_vibration_enabled`)
+- Safety abort calls (`vibrateAbort()`, `announceAbort()`) always fire regardless of settings
+
+### Countdown Vibration Pattern
+- During last 10s of VENTILATION/BREATHING phase: 80ms medium-amplitude tick every second
+- **Final tick** (1s remaining): 400ms high-amplitude pulse — signals "hold starts NOW"
+- Hold end: 500ms high-amplitude pulse
+- Contraction logged: 80ms low-amplitude pulse
+
+### Voice Announcement Pattern
+- Phase transitions ("Hold", "Breathe"): prefixed with 500ms silence via `playSilentUtterance()` to prevent audio clipping
+- Countdown numbers (10-1): no silence prefix (rapid-fire)
+- Session complete: no silence prefix
+
+### UI Toggle Pattern
+- [`VoiceVibrationToggles`](app/src/main/java/com/example/wags/ui/apnea/VoiceVibrationToggles.kt) — reusable composable with two checkboxes
+- Shown on setup screens for timer-driven drills (Progressive O₂, O₂/CO₂ tables)
+- NOT shown on user-driven drills (Min Breath — no countdowns)
+- Each ViewModel exposes `voiceEnabled`/`vibrationEnabled` in UI state + `setVoiceEnabled()`/`setVibrationEnabled()` setters

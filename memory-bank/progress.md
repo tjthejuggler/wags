@@ -1,6 +1,18 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-10 07:11 UTC-6*
+*Last updated: 2026-04-10 07:39 UTC-6*
+
+## Recent Changes (2026-04-10 07:39)
+- ✅ **Vibration/Voice indication system standardized:**
+  - Final countdown vibration (last of 10) is now extra-long (400ms high-amplitude) to signal "hold starts NOW"
+  - Voice and vibration independently toggleable via persisted SharedPreferences settings
+  - New `VoiceVibrationToggles` composable with checkboxes shown on Progressive O₂ and O₂/CO₂ table setup screens
+  - Min Breath does NOT get toggles (user-driven, no countdowns)
+  - Voice announcements ("Hold", "Breathe") now have 500ms silence prefix to prevent audio clipping
+  - Settings shared across all screens via `@Singleton` `ApneaAudioHapticEngine`
+  - Safety abort calls always fire regardless of settings
+  - New file: `VoiceVibrationToggles.kt`
+  - Modified: `ApneaAudioHapticEngine.kt`, `ProgressiveO2ViewModel.kt`, `ProgressiveO2Screen.kt`, `ApneaViewModel.kt`, `ApneaTableScreen.kt`
 
 ## Recent Changes (2026-04-10 07:11)
 - ✅ **Tail habits integration expanded:**

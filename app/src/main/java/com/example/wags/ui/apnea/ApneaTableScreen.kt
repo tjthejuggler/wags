@@ -154,6 +154,17 @@ fun ApneaTableScreen(
                             }
                         }
                     }
+                    // Voice / vibration toggles — shown when session is not active
+                    if (state.apneaState == ApneaState.IDLE || state.apneaState == ApneaState.COMPLETE) {
+                        item {
+                            VoiceVibrationToggles(
+                                voiceEnabled = state.voiceEnabled,
+                                vibrationEnabled = state.vibrationEnabled,
+                                onVoiceToggle = { viewModel.setVoiceEnabled(it) },
+                                onVibrationToggle = { viewModel.setVibrationEnabled(it) }
+                            )
+                        }
+                    }
                     item {
                         SessionControlRow(
                             apneaState = state.apneaState,

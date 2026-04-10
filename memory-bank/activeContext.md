@@ -1,6 +1,37 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-10 07:11 UTC-6*
+*Last updated: 2026-04-10 07:39 UTC-6*
+
+### 2026-04-10 07:39 (UTC-6)
+
+**Vibration/Voice indication system standardized for apnea drills**
+
+1. **Extra-long final countdown vibration** — `vibrateBreathingCountdownTick(isLastTick)` now accepts a boolean parameter. When `isLastTick=true` (the last of the 10 countdown vibrations, at 1s remaining), fires a 400ms high-amplitude pulse instead of the normal 80ms medium pulse. This signals "hold starts NOW". Updated in both `ApneaViewModel.onWarning()` (O₂/CO₂ tables) and `ProgressiveO2ViewModel.handlePhaseTransition()`.
+
+2. **Persisted voice/vibration settings** — `ApneaAudioHapticEngine` now reads/writes `apnea_voice_enabled` and `apnea_vibration_enabled` booleans from `@Named("apnea_prefs") SharedPreferences`. All TTS calls gated behind `voiceEnabled`, all vibration calls gated behind `vibrationEnabled`. Safety abort calls (`vibrateAbort()`, `announceAbort()`) always fire regardless of settings.
+
+3. **Checkmark toggles on setup screens** — New `VoiceVibrationToggles` composable (in `VoiceVibrationToggles.kt`) shows two checkboxes (🔊 Voice, 📳 Vibration) next to the Start button. Added to:
+   - `ProgressiveO2Screen` — above the Start button
+   - `ApneaTableScreen` — above the Start/Restart button (hidden during active session)
+   - NOT added to `MinBreathScreen` (user-driven, no countdowns)
+
+4. **Voice cutoff fix** — `announceHoldBegin()` and `announceBreath()` now use `speakWithSilencePrefix()` which queues a 500ms silent utterance before the actual word, preventing the audio system from clipping the beginning of "Hold" and "Breathe".
+
+5. **Settings shared across all screens** — Since `ApneaAudioHapticEngine` is `@Singleton` and reads/writes directly from SharedPreferences, the voice/vibration state is consistent across Progressive O₂, O₂/CO₂ tables, and any future drill that uses the engine. Each ViewModel exposes the current values and provides setters that update both the engine and the UI state.
+
+Files modified (7):
+- `ApneaAudioHapticEngine.kt` — added `voiceEnabled`/`vibrationEnabled` properties, `isLastTick` param, `speakWithSilencePrefix()`, gating on all methods
+- `ProgressiveO2ViewModel.kt` — added `voiceEnabled`/`vibrationEnabled` to UI state + setters, `isLastTick` in countdown
+- `ProgressiveO2Screen.kt` — added `VoiceVibrationToggles` above Start button
+- `ApneaViewModel.kt` — added `voiceEnabled`/`vibrationEnabled` to UI state + setters, `isLastTick` in `onWarning()`
+- `ApneaTableScreen.kt` — added `VoiceVibrationToggles` above Start button
+
+New file (1):
+- `VoiceVibrationToggles.kt` — reusable composable with voice + vibration checkboxes
+
+Build: ✅ Successful, installed on SM-S918U1
+
+---
 
 ### 2026-04-10 07:11 (UTC-6)
 
