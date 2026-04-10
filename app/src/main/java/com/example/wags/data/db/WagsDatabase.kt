@@ -29,7 +29,7 @@ import com.example.wags.data.db.entity.*
         RapidHrSessionEntity::class,
         RapidHrTelemetryEntity::class
     ],
-    version = 27,
+    version = 28,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -764,6 +764,43 @@ abstract class WagsDatabase : RoomDatabase() {
             val MIGRATION_26_27 = object : Migration(26, 27) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE apnea_records ADD COLUMN drillParamValue INTEGER DEFAULT NULL")
+                }
+            }
+
+            /**
+             * Backfill drillParamValue for old Progressive O₂ and Min Breath records
+             * that were saved before the trophy system was added.
+             * Extracts the param from the matching session's tableParamsJson.
+             */
+            val MIGRATION_27_28 = object : Migration(27, 28) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // Backfill Progressive O₂: extract breathPeriodSec from session JSON
+                    db.execSQL("""
+                        UPDATE apnea_records
+                        SET drillParamValue = (
+                            SELECT CAST(json_extract(s.tableParamsJson, '${'$'}.breathPeriodSec') AS INTEGER)
+                            FROM apnea_sessions s
+                            WHERE s.tableType = 'PROGRESSIVE_O2'
+                              AND s.timestamp = apnea_records.timestamp
+                            LIMIT 1
+                        )
+                        WHERE tableType = 'PROGRESSIVE_O2'
+                          AND drillParamValue IS NULL
+                    """.trimIndent())
+
+                    // Backfill Min Breath: extract sessionDurationSec from session JSON
+                    db.execSQL("""
+                        UPDATE apnea_records
+                        SET drillParamValue = (
+                            SELECT CAST(json_extract(s.tableParamsJson, '${'$'}.sessionDurationSec') AS INTEGER)
+                            FROM apnea_sessions s
+                            WHERE s.tableType = 'MIN_BREATH'
+                              AND s.timestamp = apnea_records.timestamp
+                            LIMIT 1
+                        )
+                        WHERE tableType = 'MIN_BREATH'
+                          AND drillParamValue IS NULL
+                    """.trimIndent())
                 }
             }
         }

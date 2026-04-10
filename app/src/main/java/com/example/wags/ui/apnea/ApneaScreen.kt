@@ -61,6 +61,18 @@ fun ApneaScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // Re-read drill params (breath period, session duration) every time this screen is shown
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshDrillParams()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     // New personal best congratulations dialog
     state.newPersonalBest?.let { pbResult ->
         NewPersonalBestDialog(
@@ -234,12 +246,16 @@ fun ApneaScreen(
                     DrillSectionContent(
                         bestTimeMs = state.progO2BestMs,
                         trophyCategory = state.progO2TrophyCategory,
+                        paramLabel = "${state.progO2BreathPeriodSec}s breath period",
                         description = "Endless breath-hold drill: 15s → 30s → 45s → … with a configurable breathing period between holds.",
                         buttonLabel = "Open Progressive O₂",
                         onOpenDrill = { navController.navigate(WagsRoutes.PROGRESSIVE_O2) },
                         onTrophyClick = {
                             navController.navigate(
-                                WagsRoutes.personalBests(drillType = "PROGRESSIVE_O2")
+                                WagsRoutes.personalBests(
+                                    drillType = "PROGRESSIVE_O2",
+                                    drillParamValue = state.progO2BreathPeriodSec
+                                )
                             )
                         }
                     )
@@ -258,6 +274,7 @@ fun ApneaScreen(
                     DrillSectionContent(
                         bestTimeMs = state.minBreathBestMs,
                         trophyCategory = state.minBreathTrophyCategory,
+                        paramLabel = "${state.minBreathSessionDurationSec / 60}min session",
                         description = "Choose a session duration, then minimize your breathing time. " +
                             "You control when to hold and when to breathe.",
                         buttonLabel = "Open Min Breath",
@@ -265,7 +282,10 @@ fun ApneaScreen(
                         onOpenDrill = { navController.navigate(WagsRoutes.MIN_BREATH) },
                         onTrophyClick = {
                             navController.navigate(
-                                WagsRoutes.personalBests(drillType = "MIN_BREATH")
+                                WagsRoutes.personalBests(
+                                    drillType = "MIN_BREATH",
+                                    drillParamValue = state.minBreathSessionDurationSec
+                                )
                             )
                         }
                     )
@@ -786,6 +806,7 @@ private fun FreeHoldContent(
 private fun DrillSectionContent(
     bestTimeMs: Long,
     trophyCategory: PersonalBestCategory?,
+    paramLabel: String = "",
     description: String,
     buttonLabel: String,
     buttonColor: Color = ButtonDefaults.buttonColors().containerColor,
@@ -797,6 +818,15 @@ private fun DrillSectionContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        // Param label (e.g. "60s breath period", "5min session")
+        if (paramLabel.isNotEmpty()) {
+            Text(
+                paramLabel,
+                style = MaterialTheme.typography.labelMedium,
+                color = TextSecondary
+            )
+        }
+
         // Trophy + best time (if any records exist)
         if (bestTimeMs > 0L) {
             val trophies = trophyCategory?.trophyEmojis() ?: "🏆"

@@ -1,18 +1,23 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-09 20:31 UTC-6*
+*Last updated: 2026-04-09 20:57 UTC-6*
+
+### 2026-04-09 20:57 (UTC-6)
+
+**Fixed: Trophy display uses specific param value + shows param label + refreshes on resume**
+
+Trophy display on main ApneaScreen now shows PBs for the **currently selected** breath period / session duration (not across all). When user changes param in drill setup screen and navigates back, trophies update via `refreshDrillParams()` on ON_RESUME. Param label shown above trophies (e.g. "60s breath period", "5min session"). Trophy click navigates with specific `drillParamValue`.
+
+Key changes:
+- `ApneaViewModel.kt`: Added `_progO2BreathPeriodSec` / `_minBreathSessionDurationSec` MutableStateFlows. Trophy queries use specific `DrillContext.progressiveO2(bp)` / `DrillContext.minBreath(sd)`. Added `refreshDrillParams()`.
+- `ApneaUiState`: Added `progO2BreathPeriodSec`, `minBreathSessionDurationSec` fields.
+- `ApneaScreen.kt`: Added lifecycle observer for ON_RESUME → `refreshDrillParams()`. `DrillSectionContent` shows `paramLabel`. Trophy click passes specific `drillParamValue`.
 
 ### 2026-04-09 20:31 (UTC-6)
 
 **Added: Trophy display on main ApneaScreen for Progressive O₂ and Min Breath**
 
-The Progressive O₂ and Min Breath collapsible card sections on the main ApneaScreen now show trophies + best hold time inline (matching the free hold pattern). Clicking the trophies navigates to the Personal Bests screen for that drill type (across all param values).
-
-Key changes:
-- `DrillContext.kt`: Added `PROGRESSIVE_O2_ANY` and `MIN_BREATH_ANY` constants (match drill type but no specific param value). Updated `fromNavArgs()` to return "ANY" variants when `drillParamValue` is null.
-- `ApneaRepository.kt`: Added `computeBroadestCurrentCategoryForDrill()` (drill-aware version of `computeBroadestCurrentCategory`) and `getDrillBestAndTrophy()` method that returns best duration + trophy category for a drill context.
-- `ApneaViewModel.kt`: Added `progO2BestMs`, `progO2TrophyCategory`, `minBreathBestMs`, `minBreathTrophyCategory` to `ApneaUiState`. Added two `collectLatest` coroutines in `init` that react to settings changes and load drill best + trophy.
-- `ApneaScreen.kt`: Added reusable `DrillSectionContent` composable (trophy + best time + description + button). Progressive O₂ and Min Breath sections now use it instead of plain description + button.
+Added `DrillSectionContent` composable, `getDrillBestAndTrophy()` repo method, `computeBroadestCurrentCategoryForDrill()`, `PROGRESSIVE_O2_ANY` / `MIN_BREATH_ANY` DrillContext constants.
 
 ### 2026-04-09 20:23 (UTC-6)
 

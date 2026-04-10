@@ -106,12 +106,16 @@ data class ApneaUiState(
      */
     val bestTimeTrophyCategory: PersonalBestCategory? = null,
     // ── Progressive O₂ trophy display ────────────────────────────────────────
-    /** Best hold duration across ALL breath periods for current settings. */
+    /** Currently selected breath period (seconds) for Progressive O₂. */
+    val progO2BreathPeriodSec: Int = 60,
+    /** Best hold duration for the current breath period + current settings. */
     val progO2BestMs: Long = 0L,
     /** Trophy category for the Progressive O₂ best record. */
     val progO2TrophyCategory: PersonalBestCategory? = null,
     // ── Min Breath trophy display ────────────────────────────────────────────
-    /** Best hold duration across ALL session durations for current settings. */
+    /** Currently selected session duration (seconds) for Min Breath. */
+    val minBreathSessionDurationSec: Int = 300,
+    /** Best hold duration for the current session duration + current settings. */
     val minBreathBestMs: Long = 0L,
     /** Trophy category for the Min Breath best record. */
     val minBreathTrophyCategory: PersonalBestCategory? = null,
@@ -244,6 +248,10 @@ class ApneaViewModel @Inject constructor(
     private val _posture     = MutableStateFlow(Posture.LAYING)
     private val _audio       = MutableStateFlow(AudioSetting.SILENCE)
 
+    // Drill-specific param flows — drive trophy queries for Progressive O₂ and Min Breath
+    private val _progO2BreathPeriodSec = MutableStateFlow(60)
+    private val _minBreathSessionDurationSec = MutableStateFlow(300)
+
     init {
         // ── Restore persisted settings (except Time of Day which is always smart-set) ──
         val savedPb = prefs.getLong("pb_ms", 0L)
@@ -271,6 +279,12 @@ class ApneaViewModel @Inject constructor(
         _posture.value = savedPosture
         _audio.value = savedAudio
 
+        // Restore drill-specific param values
+        val savedBreathPeriod = prefs.getInt("prog_o2_breath_period_sec", 60)
+        val savedSessionDuration = prefs.getInt("min_breath_session_duration_sec", 300)
+        _progO2BreathPeriodSec.value = savedBreathPeriod
+        _minBreathSessionDurationSec.value = savedSessionDuration
+
         _uiState.update {
             it.copy(
                 personalBestMs = if (savedPb > 0L) savedPb else it.personalBestMs,
@@ -280,7 +294,9 @@ class ApneaViewModel @Inject constructor(
                 audio = savedAudio,
                 showTimer = savedShowTimer,
                 selectedLength = savedLength,
-                selectedDifficulty = savedDifficulty
+                selectedDifficulty = savedDifficulty,
+                progO2BreathPeriodSec = savedBreathPeriod,
+                minBreathSessionDurationSec = savedSessionDuration
             )
         }
 
@@ -412,46 +428,40 @@ class ApneaViewModel @Inject constructor(
                 _uiState.update { it.copy(allStats = stats) }
             }
         }
-        // ── Progressive O₂ best + trophy (across all breath periods, for current settings) ──
+        // ── Progressive O₂ best + trophy (for current breath period + current settings) ──
         viewModelScope.launch {
-            combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud -> arrayOf(lv, pt, tod, pos, aud) }
-                .collectLatest { arr ->
-                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as TimeOfDay
-                    val pos = arr[3] as Posture; val aud = arr[4] as AudioSetting
-                    Log.d("ApneaVM", "ProgO2 trophy query: lv=$lv pt=${pt.name} tod=${tod.name} pos=${pos.name} aud=${aud.name}")
-                    // First try with all settings
-                    val result = apneaRepository.getDrillBestAndTrophy(
-                        DrillContext.PROGRESSIVE_O2_ANY, lv, pt.name, tod.name, pos.name, aud.name
-                    )
-                    Log.d("ApneaVM", "ProgO2 trophy result (with settings): ${result?.first}ms, ${result?.second}")
-                    // If no result with exact settings, try without settings to see if records exist at all
-                    if (result == null) {
-                        val anyResult = apneaRepository.getDrillBestAndTrophy(
-                            DrillContext.PROGRESSIVE_O2_ANY, "", "", "", "", ""
-                        )
-                        Log.d("ApneaVM", "ProgO2 trophy result (no settings filter): ${anyResult?.first}ms, ${anyResult?.second}")
-                    }
+            combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio, _progO2BreathPeriodSec) { args ->
+                args
+            }.collectLatest { arr ->
+                    val lv = arr[0] as String; val pt = (arr[1] as PrepType).name
+                    val tod = (arr[2] as TimeOfDay).name; val pos = (arr[3] as Posture).name
+                    val aud = (arr[4] as AudioSetting).name; val bp = arr[5] as Int
+                    val drill = DrillContext.progressiveO2(bp)
+                    val result = apneaRepository.getDrillBestAndTrophy(drill, lv, pt, tod, pos, aud)
                     _uiState.update {
                         it.copy(
                             progO2BestMs = result?.first ?: 0L,
-                            progO2TrophyCategory = result?.second
+                            progO2TrophyCategory = result?.second,
+                            progO2BreathPeriodSec = bp
                         )
                     }
                 }
         }
-        // ── Min Breath best + trophy (across all session durations, for current settings) ──
+        // ── Min Breath best + trophy (for current session duration + current settings) ──
         viewModelScope.launch {
-            combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud -> arrayOf(lv, pt, tod, pos, aud) }
-                .collectLatest { arr ->
-                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as TimeOfDay
-                    val pos = arr[3] as Posture; val aud = arr[4] as AudioSetting
-                    val result = apneaRepository.getDrillBestAndTrophy(
-                        DrillContext.MIN_BREATH_ANY, lv, pt.name, tod.name, pos.name, aud.name
-                    )
+            combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio, _minBreathSessionDurationSec) { args ->
+                args
+            }.collectLatest { arr ->
+                    val lv = arr[0] as String; val pt = (arr[1] as PrepType).name
+                    val tod = (arr[2] as TimeOfDay).name; val pos = (arr[3] as Posture).name
+                    val aud = (arr[4] as AudioSetting).name; val sd = arr[5] as Int
+                    val drill = DrillContext.minBreath(sd)
+                    val result = apneaRepository.getDrillBestAndTrophy(drill, lv, pt, tod, pos, aud)
                     _uiState.update {
                         it.copy(
                             minBreathBestMs = result?.first ?: 0L,
-                            minBreathTrophyCategory = result?.second
+                            minBreathTrophyCategory = result?.second,
+                            minBreathSessionDurationSec = sd
                         )
                     }
                 }
@@ -1047,6 +1057,19 @@ class ApneaViewModel @Inject constructor(
 
     fun toggleShowAllStats() {
         _uiState.update { it.copy(showAllStats = !it.showAllStats) }
+    }
+
+    /**
+     * Re-reads drill-specific param values from SharedPreferences.
+     * Call this when the ApneaScreen resumes (e.g. after navigating back from
+     * the Progressive O₂ or Min Breath setup screens where the user may have
+     * changed the breath period or session duration).
+     */
+    fun refreshDrillParams() {
+        val bp = prefs.getInt("prog_o2_breath_period_sec", 60)
+        val sd = prefs.getInt("min_breath_session_duration_sec", 300)
+        _progO2BreathPeriodSec.value = bp
+        _minBreathSessionDurationSec.value = sd
     }
 
     /**

@@ -1,9 +1,17 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-09 20:31 UTC-6*
+*Last updated: 2026-04-09 21:04 UTC-6*
+
+## Recent Changes (2026-04-09 21:04)
+- ✅ **Backfill drillParamValue for old records** — DB migration v27→v28 uses `json_extract()` to populate `drillParamValue` from `apnea_sessions.tableParamsJson` for old Progressive O₂ (`breathPeriodSec`) and Min Breath (`sessionDurationSec`) records that had `drillParamValue IS NULL`.
+  - Modified: `WagsDatabase.kt` (version 27→28, added `MIGRATION_27_28`), `DatabaseModule.kt` (registered migration)
+
+## Recent Changes (2026-04-09 20:57)
+- ✅ **Per-param-value trophy display** on main ApneaScreen. Trophies now show PBs for the currently selected breath period (Progressive O₂) or session duration (Min Breath). Param label shown above trophies. `refreshDrillParams()` re-reads from SharedPreferences on ON_RESUME so trophies update after changing param in drill setup screen. Trophy click navigates with specific `drillParamValue`.
+  - Modified: `ApneaViewModel.kt`, `ApneaScreen.kt`
 
 ## Recent Changes (2026-04-09 20:31)
-- ✅ **Trophy display on main ApneaScreen** for Progressive O₂ and Min Breath sections. When expanded, these sections now show trophies + best hold time inline (matching the free hold pattern). Clicking trophies navigates to Personal Bests for that drill type (across all param values). Added `DrillContext.PROGRESSIVE_O2_ANY` / `MIN_BREATH_ANY` constants, drill-aware `computeBroadestCurrentCategoryForDrill()` and `getDrillBestAndTrophy()` in repository, new state fields in `ApneaUiState`, and reusable `DrillSectionContent` composable.
+- ✅ **Trophy display on main ApneaScreen** for Progressive O₂ and Min Breath sections. Added `DrillSectionContent` composable, `getDrillBestAndTrophy()`, `computeBroadestCurrentCategoryForDrill()`, `PROGRESSIVE_O2_ANY` / `MIN_BREATH_ANY` DrillContext constants.
   - Modified: `DrillContext.kt`, `ApneaRepository.kt`, `ApneaViewModel.kt`, `ApneaScreen.kt`
 
 ## Recent Changes (2026-04-09 20:23)
