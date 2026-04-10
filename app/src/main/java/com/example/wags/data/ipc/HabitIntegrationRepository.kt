@@ -82,6 +82,16 @@ class HabitIntegrationRepository @Inject constructor(
             idKey   = "habit_id_rapid_hr_change",
             nameKey = "habit_name_rapid_hr_change",
             label   = "Rapid HR Change"
+        ),
+        PROGRESSIVE_O2(
+            idKey   = "habit_id_progressive_o2",
+            nameKey = "habit_name_progressive_o2",
+            label   = "Progressive O₂"
+        ),
+        MIN_BREATH(
+            idKey   = "habit_id_min_breath",
+            nameKey = "habit_name_min_breath",
+            label   = "Min Breath"
         )
     }
 

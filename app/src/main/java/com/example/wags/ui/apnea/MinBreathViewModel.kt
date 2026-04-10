@@ -9,6 +9,8 @@ import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.ApneaSessionEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
 import com.example.wags.data.db.entity.TelemetryEntity
+import com.example.wags.data.ipc.HabitIntegrationRepository
+import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.data.repository.ApneaSessionRepository
 import com.example.wags.data.spotify.SpotifyApiClient
@@ -84,6 +86,7 @@ class MinBreathViewModel @Inject constructor(
     private val apneaRepository: ApneaRepository,
     private val hrDataSource: HrDataSource,
     private val audioHapticEngine: ApneaAudioHapticEngine,
+    private val habitRepo: HabitIntegrationRepository,
     private val spotifyManager: SpotifyManager,
     private val spotifyApiClient: SpotifyApiClient,
     private val spotifyAuthManager: SpotifyAuthManager,
@@ -428,10 +431,14 @@ class MinBreathViewModel @Inject constructor(
             )
         )
 
-        // Show PB celebration if applicable
+        // Show PB celebration + fire Tail habit if applicable
         if (pbResult != null) {
             _uiState.update { it.copy(newPersonalBest = pbResult) }
+            try { habitRepo.sendHabitIncrement(Slot.APNEA_NEW_RECORD) } catch (_: Exception) {}
         }
+
+        // Fire Tail habit for every completed Min Breath session
+        try { habitRepo.sendHabitIncrement(Slot.MIN_BREATH) } catch (_: Exception) {}
 
         // 3. Save FreeHoldTelemetryEntity rows (linked to recordId)
         if (recordId > 0 && telemetrySnapshot.isNotEmpty()) {

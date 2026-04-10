@@ -1,6 +1,14 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-10 06:43 UTC-6*
+*Last updated: 2026-04-10 07:11 UTC-6*
+
+## Recent Changes (2026-04-10 07:11)
+- ✅ **Tail habits integration expanded:**
+  - `APNEA_NEW_RECORD` now fires for **all drill types** (Progressive O₂ and Min Breath), not just free holds — fires whenever `checkBroaderPersonalBest()` returns a non-null result
+  - New `Slot.PROGRESSIVE_O2` — fires on every completed Progressive O₂ session
+  - New `Slot.MIN_BREATH` — fires on every completed Min Breath session
+  - Both new slots wired end-to-end: `HabitIntegrationRepository` → `ProgressiveO2ViewModel` / `MinBreathViewModel` → `SettingsViewModel` → `SettingsScreen.TailAppIntegrationCard`
+  - Modified: `HabitIntegrationRepository.kt`, `ProgressiveO2ViewModel.kt`, `MinBreathViewModel.kt`, `SettingsViewModel.kt`, `SettingsScreen.kt`
 
 ## Recent Changes (2026-04-10 06:43)
 - ✅ **Min Breath detail screen follow-up fixes:**

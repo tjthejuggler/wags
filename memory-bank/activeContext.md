@@ -1,6 +1,30 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-10 06:43 UTC-6*
+*Last updated: 2026-04-10 07:11 UTC-6*
+
+### 2026-04-10 07:11 (UTC-6)
+
+**Tail habits integration expanded — APNEA_NEW_RECORD + Progressive O₂ + Min Breath**
+
+1. **`APNEA_NEW_RECORD` now fires for all drill types** — Previously only `FreeHoldActiveScreen` fired `Slot.APNEA_NEW_RECORD` when a personal best was set. Now `ProgressiveO2ViewModel` and `MinBreathViewModel` also fire it whenever `checkBroaderPersonalBest()` returns a non-null result (i.e. any trophy/PB is set in any drill type).
+
+2. **New `Slot.PROGRESSIVE_O2`** — Added to `HabitIntegrationRepository.Slot` enum. `ProgressiveO2ViewModel.saveSession()` fires it on every completed session (regardless of PB). User can map it to a Tail habit in Settings.
+
+3. **New `Slot.MIN_BREATH`** — Added to `HabitIntegrationRepository.Slot` enum. `MinBreathViewModel.saveSession()` fires it on every completed session. User can map it to a Tail habit in Settings.
+
+4. **Settings wired end-to-end** — `SettingsViewModel` has `progressiveO2Habit` and `minBreathHabit` fields in both `SettingsUiState` and `HabitPartialState`, with `copySlot()` cases for the new slots. `SettingsScreen.TailAppIntegrationCard` shows the two new rows (placed after Table Training, before Morning Readiness).
+
+Files modified (5):
+- `HabitIntegrationRepository.kt` — added `PROGRESSIVE_O2` and `MIN_BREATH` slots
+- `ProgressiveO2ViewModel.kt` — injected `habitRepo`, fires `APNEA_NEW_RECORD` on PB + `PROGRESSIVE_O2` on every session
+- `MinBreathViewModel.kt` — injected `habitRepo`, fires `APNEA_NEW_RECORD` on PB + `MIN_BREATH` on every session
+- `SettingsViewModel.kt` — added `progressiveO2Habit`/`minBreathHabit` fields + `copySlot()` cases
+- `SettingsScreen.kt` — added two new slots to `TailAppIntegrationCard` params and slot list
+
+Build: ✅ Successful, installed on SM-S918U1
+
+---
+
 
 ### 2026-04-10 06:43 (UTC-6)
 
