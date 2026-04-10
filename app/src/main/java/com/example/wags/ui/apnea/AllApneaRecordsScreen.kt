@@ -749,7 +749,7 @@ private fun AllRecordsRow(
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        if (record.tableType == "MIN_BREATH")
+                        if (record.tableType == "MIN_BREATH" || record.tableType == "O2" || record.tableType == "CO2")
                             "Total hold time: ${formatAllRecordsMs(record.durationMs)}"
                         else
                             "Longest hold: ${formatAllRecordsMs(record.durationMs)}",

@@ -1,6 +1,17 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-10 14:46 UTC-6*
+*Last updated: 2026-04-10 15:41 UTC-6*
+
+## Recent Changes (2026-04-10 15:41)
+- ✅ **Fix O2/CO2 table duration display bug:**
+  - Root cause: `durationMs` on `ApneaRecordEntity` stored longest single hold instead of total hold time for O2/CO2 tables
+  - `ApneaViewModel.saveCompletedSession()` — now stores `sumOf { apneaDurationMs }` instead of `maxOfOrNull { apneaDurationMs }`
+  - DB Migration v29→v30 backfills existing records: CO2 = `durationMs * totalRounds`, O2 = `totalSessionDurationMs - (totalRounds * 60000)`
+  - `AllApneaRecordsScreen` — O2/CO2 cards show "Total hold time" label
+  - `AllApneaRecordsViewModel` — chart Y-axis label updated
+  - `ApneaRecordDetailScreen` — Summary hides Duration for O2/CO2; Table Session shows "Total Hold Time" + "Total Session Time"; HR/SpO2 charts use `totalSessionDurationMs` for X-axis
+  - Stats tab and TimeChartViewModel automatically correct (they sum `durationMs` which is now correct)
+  - Modified: `ApneaViewModel.kt`, `WagsDatabase.kt`, `DatabaseModule.kt`, `AllApneaRecordsScreen.kt`, `AllApneaRecordsViewModel.kt`, `ApneaRecordDetailScreen.kt`
 
 ## Recent Changes (2026-04-10 14:46)
 - ✅ **Clickable Time Charts for Total Times section:**

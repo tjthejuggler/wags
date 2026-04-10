@@ -29,7 +29,7 @@ import com.example.wags.data.db.entity.*
         RapidHrSessionEntity::class,
         RapidHrTelemetryEntity::class
     ],
-    version = 29,
+    version = 30,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -825,6 +825,59 @@ abstract class WagsDatabase : RoomDatabase() {
                             SELECT CAST(json_extract(s.tableParamsJson, '${'$'}.totalHoldTimeMs') AS INTEGER)
                             FROM apnea_sessions s
                             WHERE s.tableType = 'MIN_BREATH'
+                              AND s.timestamp = apnea_records.timestamp
+                            LIMIT 1
+                          ) IS NOT NULL
+                    """.trimIndent())
+                }
+            }
+
+            /**
+             * Backfill durationMs for old O2/CO2 table records: replace longest-hold
+             * value with total hold time (sum of all hold durations).
+             *
+             * CO2: all holds are the same duration (= current durationMs), so
+             *      totalHold = durationMs * totalRounds.
+             * O2:  breathing time per round is always 60 s, so
+             *      totalHold = totalSessionDurationMs − (totalRounds × 60000).
+             */
+            val MIGRATION_29_30 = object : Migration(29, 30) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // CO2 tables: total hold = holdPerRound × totalRounds
+                    db.execSQL("""
+                        UPDATE apnea_records
+                        SET durationMs = durationMs * (
+                            SELECT s.totalRounds
+                            FROM apnea_sessions s
+                            WHERE s.tableType = 'CO2'
+                              AND s.timestamp = apnea_records.timestamp
+                            LIMIT 1
+                        )
+                        WHERE tableType = 'CO2'
+                          AND (
+                            SELECT s.totalRounds
+                            FROM apnea_sessions s
+                            WHERE s.tableType = 'CO2'
+                              AND s.timestamp = apnea_records.timestamp
+                            LIMIT 1
+                          ) IS NOT NULL
+                    """.trimIndent())
+
+                    // O2 tables: total hold = totalSessionDurationMs − (totalRounds × 60000)
+                    db.execSQL("""
+                        UPDATE apnea_records
+                        SET durationMs = (
+                            SELECT s.totalSessionDurationMs - (s.totalRounds * 60000)
+                            FROM apnea_sessions s
+                            WHERE s.tableType = 'O2'
+                              AND s.timestamp = apnea_records.timestamp
+                            LIMIT 1
+                        )
+                        WHERE tableType = 'O2'
+                          AND (
+                            SELECT s.totalSessionDurationMs
+                            FROM apnea_sessions s
+                            WHERE s.tableType = 'O2'
                               AND s.timestamp = apnea_records.timestamp
                             LIMIT 1
                           ) IS NOT NULL

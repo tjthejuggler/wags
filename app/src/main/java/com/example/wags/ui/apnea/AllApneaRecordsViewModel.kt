@@ -372,7 +372,7 @@ class AllApneaRecordsViewModel @Inject constructor(
             )
             "O2", "CO2" -> Pair(
                 { r: ApneaRecordEntity -> r.durationMs.toFloat() },
-                "Hold duration"
+                "Total hold time"
             )
             "PROGRESSIVE_O2" -> Pair(
                 { r: ApneaRecordEntity -> r.durationMs.toFloat() },

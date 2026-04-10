@@ -1,6 +1,44 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-10 14:46 UTC-6*
+*Last updated: 2026-04-10 15:41 UTC-6*
+
+### 2026-04-10 15:41 (UTC-6)
+
+**Fix O2/CO2 table duration display bug — total hold time & session time**
+
+Bug: O2/CO2 table records stored the **longest single hold** in `durationMs` instead of the **total hold time** (sum of all hold durations). This caused incorrect values in:
+- All Records list cards (showed "Longest hold" with wrong value)
+- Detail screen Summary section (showed single hold as "Duration")
+- Stats tab total hold time sums (summed longest holds instead of total holds)
+- Time chart hold time data (plotted longest holds)
+
+Fixes applied:
+
+1. **`ApneaViewModel.saveCompletedSession()`** — Changed `durationMs` from `table.steps.maxOfOrNull { it.apneaDurationMs }` (longest hold) to `table.steps.sumOf { it.apneaDurationMs }` (total hold time).
+
+2. **DB Migration v29→v30** — Backfills existing O2/CO2 records:
+   - CO2: `durationMs = durationMs * totalRounds` (all holds are identical)
+   - O2: `durationMs = totalSessionDurationMs - (totalRounds * 60000)` (breathing is always 60s/round)
+
+3. **`AllApneaRecordsScreen`** — O2/CO2 cards now show "Total hold time" label (matching MIN_BREATH) instead of "Longest hold". Chart Y-axis label updated to "Total hold time".
+
+4. **`ApneaRecordDetailScreen`** — Summary section hides "Duration" for O2/CO2 (like MIN_BREATH). Table Session section shows "Total Hold Time" + "Total Session Time" instead of "Longest Hold" + "Total Duration". HR/SpO2 charts use `totalSessionDurationMs` for X-axis (not `durationMs`).
+
+5. **Stats tab** — No code changes needed; DAO queries sum `durationMs` which now correctly contains total hold time after migration.
+
+6. **TimeChartViewModel** — No code changes needed; `loadHoldTimeData()` sums `durationMs` which is now correct.
+
+Modified files (6):
+- `ApneaViewModel.kt` — `saveCompletedSession()` stores total hold time
+- `WagsDatabase.kt` — MIGRATION_29_30, version 29→30
+- `DatabaseModule.kt` — registered MIGRATION_29_30
+- `AllApneaRecordsScreen.kt` — "Total hold time" label for O2/CO2
+- `AllApneaRecordsViewModel.kt` — chart Y-axis label "Total hold time"
+- `ApneaRecordDetailScreen.kt` — Summary/Table Session sections, chart X-axis fix
+
+Build: ✅ Compiled successfully (device connectivity issue prevented install)
+
+---
 
 ### 2026-04-10 14:46 (UTC-6)
 

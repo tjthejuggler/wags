@@ -558,12 +558,12 @@ class ApneaViewModel @Inject constructor(
 
             // 2. Save a SINGLE ApneaRecordEntity for the whole table session
             //    so it appears in All Records, Stats, and Calendar.
-            //    Duration = longest hold; tableType identifies it as a table.
-            val longestHoldMs = table.steps.maxOfOrNull { it.apneaDurationMs } ?: 0L
+            //    Duration = total hold time (sum of all hold durations).
+            val totalHoldMs = table.steps.sumOf { it.apneaDurationMs }
             val recordId = apneaRepository.saveRecord(
                 ApneaRecordEntity(
                     timestamp = now,
-                    durationMs = longestHoldMs,
+                    durationMs = totalHoldMs,
                     lungVolume = state.selectedLungVolume,
                     prepType = state.prepType.name,
                     minHrBpm = minHr,

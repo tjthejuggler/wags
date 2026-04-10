@@ -500,7 +500,8 @@ private fun RecordDetailContent(
             ) {
                 Text("Summary", style = MaterialTheme.typography.titleLarge)
                 DetailRow(label = "Date", value = dateStr)
-                if (record.tableType != "MIN_BREATH") {
+                if (record.tableType == null || record.tableType == "PROGRESSIVE_O2" ||
+                    record.tableType == "WONKA_FIRST_CONTRACTION" || record.tableType == "WONKA_ENDURANCE") {
                     DetailRow(
                         label = "Duration",
                         value = formatMsDetail(record.durationMs),
@@ -639,18 +640,18 @@ private fun RecordDetailContent(
                             value = "${tableSession.roundsCompleted} / ${tableSession.totalRounds}"
                         )
                         DetailRow(
-                            label = "Total Duration",
+                            label = "Total Hold Time",
+                            value = formatMsDetail(record.durationMs),
+                            valueColor = TextPrimary,
+                            valueBold = true
+                        )
+                        DetailRow(
+                            label = "Total Session Time",
                             value = formatMsDetail(tableSession.totalSessionDurationMs)
                         )
                         DetailRow(
                             label = "PB at Session",
                             value = formatMsDetail(tableSession.pbAtSessionMs)
-                        )
-                        DetailRow(
-                            label = "Longest Hold",
-                            value = formatMsDetail(record.durationMs),
-                            valueColor = TextPrimary,
-                            valueBold = true
                         )
 
                         // Per-round first contraction data from tableParamsJson
@@ -754,10 +755,16 @@ private fun RecordDetailContent(
                                 .height(180.dp)
                         )
                     } else {
+                        // For table sessions, use totalSessionDurationMs for the chart X-axis
+                        // since telemetry spans the entire session (hold + breathing).
+                        val chartDurationMs = if (tableSession != null)
+                            tableSession.totalSessionDurationMs
+                        else
+                            record.durationMs
                         LineChart(
                             samples = hrValues,
                             lineColor = TextPrimary,
-                            durationMs = record.durationMs,
+                            durationMs = chartDurationMs,
                             firstContractionMs = record.firstContractionMs,
                             showYLabels = true,
                             modifier = Modifier
@@ -849,12 +856,16 @@ private fun RecordDetailContent(
                                 .height(160.dp)
                         )
                     } else {
+                        val spO2ChartDurationMs = if (tableSession != null)
+                            tableSession.totalSessionDurationMs
+                        else
+                            record.durationMs
                         LineChart(
                             samples = spO2Values,
                             lineColor = SpO2Blue,
                             yMin = 70f,
                             yMax = 100f,
-                            durationMs = record.durationMs,
+                            durationMs = spO2ChartDurationMs,
                             firstContractionMs = record.firstContractionMs,
                             showYLabels = false,
                             modifier = Modifier
