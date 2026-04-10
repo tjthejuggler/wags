@@ -1,6 +1,6 @@
 # WAGS — System Patterns
 
-*Last updated: 2026-03-28*
+*Last updated: 2026-04-09 15:32 UTC-6*
 
 ## Architecture Pattern
 
@@ -77,3 +77,30 @@ Artifact correction follows **Lipponen & Tarvainen 2019** — split into Phase1D
 - No file > 500 lines
 - Large use cases split into orchestrator + sub-components
 - Feature-based UI package structure (`ui/apnea/`, `ui/breathing/`, `ui/meditation/`, etc.)
+
+## Apnea Drill State Machine Patterns (2026-04-09 15:32 UTC-6)
+
+Two distinct state machine patterns exist for apnea drills:
+
+### Timer-Driven (Progressive O₂, O₂/CO₂ Tables)
+- State machine controls phase transitions automatically via countdown timers
+- Phases: IDLE → HOLD (countdown) → BREATHING (countdown) → next round or COMPLETE
+- Audio/haptic cues fire at phase transitions and during final countdown seconds
+- User only controls start/stop; the timer drives everything else
+- Example: [`ProgressiveO2StateMachine.kt`](app/src/main/java/com/example/wags/domain/usecase/apnea/ProgressiveO2StateMachine.kt)
+
+### User-Driven (Min Breath)
+- State machine only tracks elapsed time; the **user** controls all phase transitions by tapping buttons
+- Phases: IDLE → HOLD (count-up) → BREATHING (count-up) → HOLD → … → COMPLETE (when session duration reached)
+- No audio/haptic cues during session (nothing to warn about since user decides when to breathe/hold)
+- Only `announceSessionComplete()` fires when total elapsed time reaches session duration
+- 100ms tick loop with wall-clock deltas for smooth count-up display (vs 1000ms for countdown timers)
+- HOLD phase shows "First Contraction" + "Breath" buttons; BREATHING phase shows "HOLD" button
+- Example: [`MinBreathStateMachine.kt`](app/src/main/java/com/example/wags/domain/usecase/apnea/MinBreathStateMachine.kt)
+
+### Shared Patterns (both types)
+- All state machines are `@Singleton` with `@Inject constructor()`
+- State exposed via `StateFlow<State>` with immutable data class
+- Both save 4 entities: `ApneaSessionEntity`, `ApneaRecordEntity`, `TelemetryEntity`, `FreeHoldTelemetryEntity`
+- Both use `tableParamsJson` for drill-specific per-session data
+- Both reuse shared `ApneaRecordDetailScreen` for post-session details (no custom detail screens)

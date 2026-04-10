@@ -231,15 +231,22 @@ fun ApneaScreen(
                         TableHelpIcon(title = PROGRESSIVE_O2_HELP_TITLE, text = PROGRESSIVE_O2_HELP_TEXT)
                     }
                 ) {
-                    InlineAdvancedSessionContent(
-                        modality = TrainingModality.PROGRESSIVE_O2,
-                        activeModality = state.activeModalitySession,
-                        advancedState = state.advancedSessionState,
-                        onStart = { viewModel.startAdvancedSession(TrainingModality.PROGRESSIVE_O2) },
-                        onStop = { viewModel.stopAdvancedSession() },
-                        onBreathTaken = { viewModel.signalBreathTaken() },
-                        onFirstContraction = { viewModel.signalFirstContraction() }
-                    )
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            "Endless breath-hold drill: 15s → 30s → 45s → … with a configurable breathing period between holds.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                        Button(
+                            onClick = { navController.navigate(WagsRoutes.PROGRESSIVE_O2) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Open Progressive O₂")
+                        }
+                    }
                 }
 
                 // ── Min Breath ────────────────────────────────────────────────
@@ -252,16 +259,24 @@ fun ApneaScreen(
                         TableHelpIcon(title = MIN_BREATH_HELP_TITLE, text = MIN_BREATH_HELP_TEXT)
                     }
                 ) {
-                    InlineAdvancedSessionContent(
-                        modality = TrainingModality.MIN_BREATH,
-                        activeModality = state.activeModalitySession,
-                        advancedState = state.advancedSessionState,
-                        enabled = state.personalBestMs > 0L,
-                        onStart = { viewModel.startAdvancedSession(TrainingModality.MIN_BREATH) },
-                        onStop = { viewModel.stopAdvancedSession() },
-                        onBreathTaken = { viewModel.signalBreathTaken() },
-                        onFirstContraction = { viewModel.signalFirstContraction() }
-                    )
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            "Choose a session duration, then minimize your breathing time. " +
+                            "You control when to hold and when to breathe.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                        Button(
+                            onClick = { navController.navigate(WagsRoutes.MIN_BREATH) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = ButtonPrimary)
+                        ) {
+                            Text("Open Min Breath")
+                        }
+                    }
                 }
 
                 // ── Wonka: Till Contraction ───────────────────────────────────

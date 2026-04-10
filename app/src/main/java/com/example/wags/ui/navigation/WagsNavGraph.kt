@@ -21,6 +21,10 @@ import com.example.wags.ui.apnea.ApneaTableScreen
 import com.example.wags.ui.apnea.FreeHoldActiveScreen
 import com.example.wags.ui.apnea.PbChartScreen
 import com.example.wags.ui.apnea.PersonalBestsScreen
+import com.example.wags.ui.apnea.MinBreathActiveScreen
+import com.example.wags.ui.apnea.MinBreathScreen
+import com.example.wags.ui.apnea.ProgressiveO2ActiveScreen
+import com.example.wags.ui.apnea.ProgressiveO2Screen
 import com.example.wags.ui.apnea.SessionAnalyticsHistoryScreen
 import com.example.wags.ui.apnea.SessionAnalyticsScreen
 import com.example.wags.ui.breathing.AssessmentPickerScreen
@@ -88,6 +92,14 @@ object WagsRoutes {
     const val MEDITATION = "meditation"
     const val MEDITATION_HISTORY = "meditation_history"
     const val MEDITATION_SESSION_DETAIL = "meditation_session_detail/{sessionId}"
+
+    // ── Progressive O₂ ──────────────────────────────────────────────────────
+    const val PROGRESSIVE_O2 = "progressive_o2"
+    const val PROGRESSIVE_O2_ACTIVE = "progressive_o2_active"
+
+    // ── Min Breath ──
+    const val MIN_BREATH = "min_breath"
+    const val MIN_BREATH_ACTIVE = "min_breath_active"
 
     // ── Rapid HR Change ───────────────────────────────────────────────────────
     const val RAPID_HR = "rapid_hr"
@@ -271,6 +283,20 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
                 modality = modality,
                 length = length
             )
+        }
+        // ── Progressive O₂ ──────────────────────────────────────────────────
+        composable(WagsRoutes.PROGRESSIVE_O2) {
+            ProgressiveO2Screen(navController = navController)
+        }
+        composable(WagsRoutes.PROGRESSIVE_O2_ACTIVE) {
+            ProgressiveO2ActiveScreen(navController = navController)
+        }
+        // ── Min Breath ──────────────────────────────────────────────────────
+        composable(WagsRoutes.MIN_BREATH) {
+            MinBreathScreen(navController = navController)
+        }
+        composable(WagsRoutes.MIN_BREATH_ACTIVE) {
+            MinBreathActiveScreen(navController = navController)
         }
         composable(WagsRoutes.SESSION) { backStackEntry ->
             val sessionType = backStackEntry.arguments?.getString("sessionType") ?: "MEDITATION"

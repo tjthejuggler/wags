@@ -1,6 +1,130 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-09 11:39 UTC-6*
+*Last updated: 2026-04-09 15:32 UTC-6*
+
+### 2026-04-09 15:00 (UTC-6)
+
+**Three Fixes for Progressive O₂ Screens**
+
+1. **Fix 1 — Use existing ApneaRecordDetailScreen for Progressive O₂ details:**
+   - Changed `completedSessionId` → `completedRecordId` in `ProgressiveO2UiState` and `ProgressiveO2ViewModel`. The `saveSession()` method now returns the `recordId` (from `apneaRepository.saveRecord()`) instead of `sessionId`.
+   - In `ProgressiveO2ActiveScreen.kt`, the "View Details" button now navigates to `WagsRoutes.apneaRecordDetail(recordId)` instead of `WagsRoutes.progressiveO2Detail(sessionId)`.
+   - Removed `PROGRESSIVE_O2_DETAIL` route, `progressiveO2Detail()` helper, and `ProgressiveO2DetailScreen` import from `WagsNavGraph.kt`. The orphaned `ProgressiveO2DetailScreen.kt` and `ProgressiveO2DetailViewModel.kt` files remain but are unreferenced.
+
+2. **Fix 2 — Replace past sessions list with breath period history:**
+   - Replaced `ProgressiveO2PastSession` data class with `BreathPeriodHistory(breathPeriodSec, maxHoldReachedSec, sessionCount)`.
+   - Renamed `loadPastSessions()` → `loadBreathPeriodHistory()` in ViewModel. New `buildBreathPeriodHistory()` method groups all PROGRESSIVE_O2 sessions by `breathPeriodSec` from `tableParamsJson`, computes max completed hold per group.
+   - Replaced `PastSessionsSection`/`PastSessionCard` composables with `BreathPeriodHistorySection` — simple clickable rows showing breath period and max hold. Clicking a row sets the current breath period to that value. Currently selected breath period is highlighted.
+
+3. **Fix 3 — Center the breath period stepper:**
+   - Restructured `BreathPeriodSection` composable: Column with `horizontalAlignment = CenterHorizontally`, Row with `horizontalArrangement = Center`, fixed `widthIn(min = 80.dp)` on value text. Title upgraded from `titleSmall`/`TextSecondary` to `titleMedium`/`TextPrimary`. Spacers (24.dp) between buttons and value for symmetry.
+
+Files modified:
+1. `ui/apnea/ProgressiveO2ViewModel.kt` — UI state, data classes, save/load methods
+2. `ui/apnea/ProgressiveO2ActiveScreen.kt` — Navigation to record detail
+3. `ui/apnea/ProgressiveO2Screen.kt` — Breath period history section, centered stepper
+4. `ui/navigation/WagsNavGraph.kt` — Removed detail route/import
+
+---
+
+### 2026-04-09 14:34 (UTC-6)
+
+**Fix: Progressive O₂ Screen Navigation + Greyscale Compliance**
+
+- Fixed past session cards in `ProgressiveO2Screen.kt` navigating to wrong screen — changed `WagsRoutes.sessionAnalytics(sessionId)` → `WagsRoutes.progressiveO2Detail(sessionId)` so cards now open the Progressive O₂ Detail screen instead of the generic SessionAnalytics screen.
+- Fixed `ProgressiveO2ActiveScreen.kt` using colored text (red `#FF6B6B` for HOLD, teal `#4ECDC4` for BREATHE) — replaced all `Color(...)` usages with greyscale theme colors: phase labels → `TextPrimary`, countdown timer → `TextPrimary`, stop button → `TextSecondary` border/text, round ✓/✗ icons → `TextPrimary`/`TextSecondary`. Removed `HoldColor`/`BreatheColor` constants and `Color` import.
+- Fixed `ProgressiveO2DetailScreen.kt` HR chart line color from red `#FF6B6B` → light grey `#D0D0D0` (greyscale). Changed HR stat text labels (`SmallLabel`, `StatBox`) from `HrLineColor` → `TextPrimary` for greyscale compliance. SpO₂ chart line was already grey (`#B0B0B0`), no change needed.
+
+Files modified:
+1. `ui/apnea/ProgressiveO2Screen.kt` — Line 162: navigation route fix
+2. `ui/apnea/ProgressiveO2ActiveScreen.kt` — Removed colored constants, replaced all Color usages with greyscale theme colors
+3. `ui/apnea/ProgressiveO2DetailScreen.kt` — HR line color greyscale, stat text labels greyscale
+
+---
+
+### 2026-04-09 14:08 (UTC-6)
+
+**Follow-up: Progressive O₂ — Settings Banner, Song Picker, and Guide Document**
+
+- Added clickable `ApneaSettingsSummaryBanner` to the Progressive O₂ setup screen — tapping opens `FreeHoldSettingsDialog` popup (monochrome greyscale, matching app aesthetic). Settings changes persist to SharedPreferences.
+- Added Spotify song picker to Progressive O₂ setup screen — "Choose a Song" button when audio=MUSIC, `SongPickerDialog`, `SpotifyConnectPrompt` when not connected, selected song banner.
+- Added Spotify integration to `ProgressiveO2ViewModel` — injected `SpotifyManager`, `SpotifyApiClient`, `SpotifyAuthManager`; added `loadPreviousSongs()`, `selectSong()`, `clearSelectedSong()` methods.
+- Created comprehensive guide document at `plans/apnea_drill_screen_guide.md` — 12-section, ~830-line guide for creating new apnea drill screens. Covers state machine, ViewModel, 3 screens, navigation, data storage, reusable components, and step-by-step checklist. Can be used as a template for Min Breath, Wonka, and future drills.
+
+Files modified:
+1. `ui/apnea/ProgressiveO2ViewModel.kt` — Added Spotify DI, settings state/setters, song picker methods
+2. `ui/apnea/ProgressiveO2Screen.kt` — Added settings banner, settings dialog, song picker UI
+
+Files created:
+1. `plans/apnea_drill_screen_guide.md` — Comprehensive guide for creating new apnea drill screens
+
+---
+
+### 2026-04-09 14:07 (UTC-6)
+
+**Created: Apnea Drill Screen Guide Document**
+
+- **What:** Wrote a comprehensive guide document at `plans/apnea_drill_screen_guide.md` (830 lines) explaining how to create a new dedicated apnea drill screen in the WAGS app.
+- **Purpose:** Serves as a repeatable recipe/template for implementing Min Breath, Wonka: Till Contraction, Wonka: Endurance, or any future drill type. Based on the Progressive O₂ implementation.
+- **Sections covered (12):**
+  1. Overview — 3-screen flow (Setup → Active → Detail)
+  2. Files to Create (6 per drill)
+  3. Files to Modify (always 2: WagsNavGraph.kt + ApneaScreen.kt)
+  4. State Machine Pattern — Phase enum, State data class, timer tick, round transitions
+  5. ViewModel Pattern — DI, UI state, combined StateFlow, settings, Spotify, telemetry, audio/haptic
+  6. Setup Screen Pattern — TopAppBar, settings banner, song picker, config inputs, past sessions
+  7. Active Screen Pattern — Guards, auto-start, phase display, vitals, rounds list, stop button
+  8. Detail Screen Pattern — Summary card, HR/SpO₂ charts, rounds breakdown
+  9. Navigation Wiring — Routes, composable blocks, imports, ApneaScreen update
+  10. Data Storage — 4 entities (ApneaSessionEntity, ApneaRecordEntity, TelemetryEntity, FreeHoldTelemetryEntity), tableParamsJson format, history integration
+  11. Reusable Components — 10 existing composables to reuse
+  12. Step-by-Step Checklist — 7 phases with ~50 checkbox items
+- **References actual file paths** throughout so the reader can look at the real Progressive O₂ code
+- **No code changes** — documentation only
+
+---
+
+### 2026-04-09 13:57 (UTC-6)
+
+**Added: Clickable Settings Banner + Song Picker to ProgressiveO2Screen**
+
+- **What changed:** The Progressive O₂ setup screen now has a clickable settings summary banner at the top (showing lung volume, prep type, time of day, posture, audio) that opens the same `FreeHoldSettingsDialog` popup used by `FreeHoldActiveScreen`. Also added a "Choose a Song" button with full Spotify song picker integration.
+- **Settings banner:** `ApneaSettingsSummaryBanner` displayed at the top of the body column, before the explanation card. Tapping opens `FreeHoldSettingsDialog` with filter chips for all 5 settings. Changes are persisted to SharedPreferences immediately.
+- **Song picker:** When audio setting is MUSIC, shows `SongPickerButton` (if Spotify connected) or `SpotifyConnectPrompt` (if not). `SelectedSongBanner` shown when a song is pre-selected. Full `SongPickerDialog` with song list, sort options, and pre-load into Spotify.
+- **Monochrome check:** `FreeHoldSettingsDialog` already uses the app's greyscale palette (`SurfaceVariant`, `TextPrimary`, `TextSecondary`) — no changes needed.
+- **ViewModel changes:** `ProgressiveO2ViewModel` now injects `SpotifyManager`, `SpotifyApiClient`, `SpotifyAuthManager`. Added settings state fields (`lungVolume`, `prepType`, `timeOfDay`, `posture`, `audio`, `isMusicMode`, `spotifyConnected`) and setter methods (`setLungVolume`, `setPrepType`, `setTimeOfDay`, `setPosture`, `setAudio`). Added song picker methods (`loadPreviousSongs`, `selectSong`, `clearSelectedSong`) following the same pattern as `AdvancedApneaViewModel`. `saveSession()` now reads settings from UI state instead of directly from SharedPreferences.
+- Files modified:
+  1. `ui/apnea/ProgressiveO2ViewModel.kt` — Added Spotify dependencies, settings state fields, settings setters, song picker methods
+  2. `ui/apnea/ProgressiveO2Screen.kt` — Added settings banner, settings dialog, song picker UI
+
+---
+
+### 2026-04-09 13:30 (UTC-6)
+
+**Implemented: Progressive O₂ Drill — Dedicated Screen with Endless Mode**
+
+- **What changed:** The Progressive O₂ drill was completely revamped from an inline accordion card in ApneaScreen to a full 3-screen flow: Setup → Active → Detail.
+- **New behavior:** The drill is now endless — starts at 15s hold, adds 15s each round (15→30→45→60→…), with a user-configurable breathing period between holds. Only ends when the user taps "Stop Drill".
+- **Setup screen:** Breath period stepper (15–180s, ±5s), explanation card, past session history grouped by breath period showing max hold reached and total hold time.
+- **Active screen:** Giant countdown timer, phase-colored display (HOLD=red, BREATHE=teal), live HR/SpO₂, completed rounds list, stop button.
+- **Detail screen:** Post-session analytics with HR line chart, SpO₂ line chart, session summary (total hold time, max hold, rounds, duration), round-by-round breakdown.
+- **Data storage:** Sessions saved as `ApneaSessionEntity` (tableType=PROGRESSIVE_O2, variant=ENDLESS) + `ApneaRecordEntity` (durationMs=longest completed hold) + `TelemetryEntity` (HR/SpO₂ samples). Per-round data in `tableParamsJson`.
+- **History integration:** Progressive O₂ sessions appear in All Records, Stats, and Calendar tabs of ApneaHistoryScreen (already supported via existing `tableType` filtering).
+- **No DB migration needed** — all data fits within existing schema.
+
+Files created (7):
+1. `domain/usecase/apnea/ProgressiveO2StateMachine.kt` — Endless state machine (IDLE→HOLD→BREATHING→COMPLETE)
+2. `ui/apnea/ProgressiveO2ViewModel.kt` — Shared ViewModel for all 3 screens
+3. `ui/apnea/ProgressiveO2Screen.kt` — Setup/landing screen
+4. `ui/apnea/ProgressiveO2ActiveScreen.kt` — Active drill screen
+5. `ui/apnea/ProgressiveO2DetailScreen.kt` — Post-session analytics
+6. `ui/apnea/ProgressiveO2DetailViewModel.kt` — Detail screen ViewModel
+
+Files modified (4):
+1. `ui/navigation/WagsNavGraph.kt` — Added 3 routes + composable destinations
+2. `ui/apnea/ApneaScreen.kt` — Replaced inline session with navigation button
+3. `ui/apnea/ProgressiveO2Screen.kt` — Fixed route placeholder
+4. `ui/apnea/ProgressiveO2ActiveScreen.kt` — Fixed route placeholder + popUpTo
 
 ## Current State
 
@@ -8,13 +132,10 @@ The project is in an **advanced implementation stage**. All major architecture p
 
 ## Recently Active Areas
 
-Based on open tabs and visible files:
-- **Meditation screen** (`ui/meditation/MeditationScreen.kt`) — actively being worked on
-- **Garmin DataTransmitter** (`garmin/source/DataTransmitter.mc`) — visible but per rules, not to be modified unless instructed
+- **Progressive O₂ Drill implementation (complete)** — All 3 screens + ViewModel + StateMachine created. Detail screen (`ProgressiveO2DetailScreen.kt` + `ProgressiveO2DetailViewModel.kt`) added for post-session analytics. Nav routes wired into `WagsNavGraph.kt` (3 routes: `PROGRESSIVE_O2`, `PROGRESSIVE_O2_ACTIVE`, `PROGRESSIVE_O2_DETAIL`). `ApneaScreen.kt` Progressive O₂ section replaced from inline `InlineAdvancedSessionContent` to a navigation card with description + "Open Progressive O₂" button. `ProgressiveO2Screen.kt` and `ProgressiveO2ActiveScreen.kt` updated to use `WagsRoutes` constants instead of hardcoded strings. Active→Detail navigation uses `popUpTo(inclusive=true)` so back from detail goes to setup, not active screen.
 - **HRV pipeline** — Multiple HRV use case files open (RrPreFilter, Phase1/2, TimeDomain, PchipResampler)
 - **Domain models** — Several model files open (RrInterval, HrvMetrics, ReadinessScore, ApneaRecord, etc.)
 - **BLE layer** — BlePermissionManager, AccRespirationEngine open
-- **DI** — DispatcherModule open
 
 ## Features Implemented (based on file structure)
 
@@ -436,3 +557,37 @@ New feature allowing users to time how quickly they can shift their heart rate b
 - Files modified:
   1. `ui/morning/MorningReadinessViewModel.kt` — `startSession()` gate changed from H10-only to any-device; ACC stream conditional; `onStandPromptReady` conditional
   2. `ui/morning/MorningReadinessScreen.kt` — Dialog text and idle instructions updated
+
+---
+
+### 2026-04-09 15:32 (UTC-6)
+
+**Implemented: Min Breath Drill — Full 2-screen flow (Setup → Active), using shared detail screen**
+
+4 new files created:
+1. `domain/usecase/apnea/MinBreathStateMachine.kt` (160 lines) — User-driven state machine with IDLE/HOLD/BREATHING/COMPLETE phases, 100ms tick loop, wall-clock timing
+2. `ui/apnea/MinBreathViewModel.kt` (490 lines) — Shared ViewModel for Setup+Active screens, saves 4 entities (tableType="MIN_BREATH"), no audio/haptic cues except session complete
+3. `ui/apnea/MinBreathScreen.kt` (~290 lines) — Setup screen with session duration stepper (60-600s, ±30s), settings banner, Spotify, past session history grouped by duration
+4. `ui/apnea/MinBreathActiveScreen.kt` (351 lines) — Active screen with user-driven buttons: HOLD phase shows "First Contraction" + "Breath" side-by-side (or just "Breath" after contraction logged), BREATHING phase shows full-screen "HOLD" button
+
+2 files modified:
+5. `ui/navigation/WagsNavGraph.kt` — Added MIN_BREATH and MIN_BREATH_ACTIVE routes + composable blocks
+6. `ui/apnea/ApneaScreen.kt` — Replaced inline InlineAdvancedSessionContent with navigation button to WagsRoutes.MIN_BREATH
+
+Key design decisions:
+- No custom detail screen — uses shared `ApneaRecordDetailScreen` (same pattern as Progressive O₂)
+- No audio/haptic cues during session (user-driven, no timers to warn about) — only `announceSessionComplete()` when session ends
+- State machine uses 100ms tick with wall-clock deltas for smooth count-up display
+- `tableParamsJson` includes sessionDurationSec, totalHoldTimeMs, totalBreathTimeMs, holdPct, and holds array with contraction timestamps
+- Past sessions grouped by session duration with best hold percentage per group
+
+## Current State
+
+The project is in an **advanced implementation stage**. All major architecture phases from the plan have been implemented. The apnea training section now has 5 drill types: Free Hold, O₂/CO₂ Tables, Advanced Tables, Progressive O₂, and Min Breath.
+
+## Recently Active Areas
+
+- **Min Breath Drill implementation (complete)** — 2-screen flow (Setup → Active) with shared detail screen. User-driven state machine (no countdown timers). Nav routes wired into `WagsNavGraph.kt` (2 routes: `MIN_BREATH`, `MIN_BREATH_ACTIVE`). `ApneaScreen.kt` Min Breath section replaced from inline content to a navigation card with "Open Min Breath" button.
+- **Progressive O₂ Drill (complete)** — All screens + ViewModel + StateMachine created. Detail screen uses shared `ApneaRecordDetailScreen`.
+- **HRV pipeline** — Multiple HRV use case files open (RrPreFilter, Phase1/2, TimeDomain, PchipResampler)
+- **BLE layer** — BlePermissionManager, AccRespirationEngine open
