@@ -46,6 +46,16 @@ fun MinBreathActiveScreen(
         if (!state.isSessionActive) viewModel.startSession()
     }
 
+    // ── PB celebration dialog ──────────────────────────────────────────
+    state.newPersonalBest?.let { pbResult ->
+        NewPersonalBestDialog(
+            newPbMs = pbResult.durationMs,
+            categoryDescription = pbResult.description,
+            category = pbResult.category,
+            onDismiss = { viewModel.dismissNewPersonalBest() }
+        )
+    }
+
     Scaffold(
         containerColor = BackgroundDark,
         topBar = {

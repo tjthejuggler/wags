@@ -52,6 +52,16 @@ fun ProgressiveO2ActiveScreen(
     // ── Wall-clock session start for total session time ─────────────────
     val sessionStartMs = remember { System.currentTimeMillis() }
 
+    // ── PB celebration dialog ──────────────────────────────────────────
+    state.newPersonalBest?.let { pbResult ->
+        NewPersonalBestDialog(
+            newPbMs = pbResult.durationMs,
+            categoryDescription = pbResult.description,
+            category = pbResult.category,
+            onDismiss = { viewModel.dismissNewPersonalBest() }
+        )
+    }
+
     Scaffold(
         containerColor = BackgroundDark,
         topBar = {

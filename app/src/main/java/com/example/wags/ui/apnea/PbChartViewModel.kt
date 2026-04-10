@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.repository.ApneaRepository
+import com.example.wags.domain.model.DrillContext
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -44,14 +45,30 @@ class PbChartViewModel @Inject constructor(
         URLDecoder.decode(savedStateHandle["label"] ?: "All settings", "UTF-8")
     }.getOrDefault("All settings")
 
+    private val drillTypeArg: String = savedStateHandle["drillType"] ?: ""
+    private val drillParamValueArg: Int? = (savedStateHandle.get<String>("drillParamValue"))
+        ?.takeIf { it.isNotEmpty() }?.toIntOrNull()
+
+    private val drill: DrillContext = DrillContext.fromNavArgs(
+        drillTypeArg.takeIf { it.isNotEmpty() },
+        drillParamValueArg
+    )
+
     private val _uiState = MutableStateFlow(PbChartUiState(label = labelArg))
     val uiState: StateFlow<PbChartUiState> = _uiState.asStateFlow()
 
     init {
         viewModelScope.launch {
-            val records = apneaRepository.getAllFreeHoldsForChart(
-                lungVolume, prepType, timeOfDay, posture, audio
-            )
+            val records = if (drill.drillType == null) {
+                // Legacy path for free holds — uses the existing optimized query
+                apneaRepository.getAllFreeHoldsForChart(
+                    lungVolume, prepType, timeOfDay, posture, audio
+                )
+            } else {
+                apneaRepository.getAllRecordsForChart(
+                    drill, lungVolume, prepType, timeOfDay, posture, audio
+                )
+            }
             val allPoints = records.map { PbChartPoint(it.recordId, it.timestamp, it.durationMs) }
             val pbOnlyPoints = computePbOnly(records)
             _uiState.update {

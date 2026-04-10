@@ -1,6 +1,54 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-09 15:32 UTC-6*
+*Last updated: 2026-04-09 20:31 UTC-6*
+
+### 2026-04-09 20:31 (UTC-6)
+
+**Added: Trophy display on main ApneaScreen for Progressive O₂ and Min Breath**
+
+The Progressive O₂ and Min Breath collapsible card sections on the main ApneaScreen now show trophies + best hold time inline (matching the free hold pattern). Clicking the trophies navigates to the Personal Bests screen for that drill type (across all param values).
+
+Key changes:
+- `DrillContext.kt`: Added `PROGRESSIVE_O2_ANY` and `MIN_BREATH_ANY` constants (match drill type but no specific param value). Updated `fromNavArgs()` to return "ANY" variants when `drillParamValue` is null.
+- `ApneaRepository.kt`: Added `computeBroadestCurrentCategoryForDrill()` (drill-aware version of `computeBroadestCurrentCategory`) and `getDrillBestAndTrophy()` method that returns best duration + trophy category for a drill context.
+- `ApneaViewModel.kt`: Added `progO2BestMs`, `progO2TrophyCategory`, `minBreathBestMs`, `minBreathTrophyCategory` to `ApneaUiState`. Added two `collectLatest` coroutines in `init` that react to settings changes and load drill best + trophy.
+- `ApneaScreen.kt`: Added reusable `DrillSectionContent` composable (trophy + best time + description + button). Progressive O₂ and Min Breath sections now use it instead of plain description + button.
+
+### 2026-04-09 20:23 (UTC-6)
+
+**Implemented: Universal Trophy System (DrillContext abstraction)**
+
+The trophy/personal-best system has been generalized from free-hold-only to work with **any drill type**. Each drill type × drill-specific parameter value gets its own full 6-tier trophy hierarchy across the 5 standard apnea settings.
+
+**Core abstraction:** `DrillContext` data class (`domain/model/DrillContext.kt`) identifies a PB pool:
+- `DrillContext.FREE_HOLD` → `tableType IS NULL` (unchanged behavior)
+- `DrillContext.progressiveO2(breathPeriodSec=60)` → `tableType='PROGRESSIVE_O2' AND drillParamValue=60`
+- `DrillContext.minBreath(sessionDurationSec=300)` → `tableType='MIN_BREATH' AND drillParamValue=300`
+
+**Changes made:**
+1. **New file:** `domain/model/DrillContext.kt` (~50 lines) — DrillContext data class with factory methods and `fromNavArgs()` for navigation reconstruction
+2. **DB migration v26→v27:** Added `drillParamValue INTEGER DEFAULT NULL` column to `apnea_records` table
+3. **DAO generalization:** New `buildBestDrillQuery()`, `buildIsBestDrillQuery()`, `buildWasBestAtTimeDrillQuery()`, `buildBestDrillRecordQuery()`, `buildAllDrillRecordsQuery()` functions. Old free-hold builders are now thin wrappers.
+4. **Repository generalization:** New drill-aware `checkBroaderPersonalBest(drill, ...)`, `getAllPersonalBests(drill)`, `getAllRecordsForChart(drill, ...)` methods. Old free-hold methods unchanged.
+5. **PersonalBestsViewModel:** Reads `DrillContext` from `SavedStateHandle` nav args, passes to `getAllPersonalBests(drill)`
+6. **PersonalBestsScreen:** Shows drill name in title bar when not free hold; passes drill params to chart navigation
+7. **PbChartViewModel:** Reads `DrillContext` from `SavedStateHandle`, uses `getAllRecordsForChart(drill, ...)` for non-free-hold drills
+8. **Navigation routes:** `PERSONAL_BESTS` and `PB_CHART` now accept optional `drillType` and `drillParamValue` query params with empty defaults
+9. **ProgressiveO2ViewModel:** Sets `drillParamValue=breathPeriodSec` on record save, checks PB before saving, shows celebration dialog
+10. **ProgressiveO2ActiveScreen:** Shows `NewPersonalBestDialog` when `state.newPersonalBest != null`
+11. **ProgressiveO2Screen:** Added "🏆 Personal Bests" `OutlinedButton` navigating to `personalBests(drillType="PROGRESSIVE_O2", drillParamValue=breathPeriodSec)`
+12. **MinBreathViewModel:** Sets `drillParamValue=sessionDurationSec` on record save, checks PB before saving, shows celebration dialog
+13. **MinBreathActiveScreen:** Shows `NewPersonalBestDialog` when `state.newPersonalBest != null`
+14. **MinBreathScreen:** Added "🏆 Personal Bests" `OutlinedButton` navigating to `personalBests(drillType="MIN_BREATH", drillParamValue=sessionDurationSec)`
+
+**Zero regression risk for free holds:** All existing free-hold PB behavior is unchanged — old methods are thin wrappers around the new generalized ones, and `DrillContext.FREE_HOLD` produces identical SQL (`tableType IS NULL`).
+
+**Build status:** Compiles successfully. Device was offline so `installDebug` failed at install step only.
+
+Files created (1): `domain/model/DrillContext.kt`
+Files modified (13): `ApneaRecordEntity.kt`, `WagsDatabase.kt`, `DatabaseModule.kt`, `ApneaRecordDao.kt`, `ApneaRepository.kt`, `PersonalBestsViewModel.kt`, `PersonalBestsScreen.kt`, `PbChartViewModel.kt`, `WagsNavGraph.kt`, `ProgressiveO2ViewModel.kt`, `ProgressiveO2ActiveScreen.kt`, `ProgressiveO2Screen.kt`, `MinBreathViewModel.kt`, `MinBreathActiveScreen.kt`, `MinBreathScreen.kt`, `ApneaScreen.kt`
+
+---
 
 ### 2026-04-09 15:00 (UTC-6)
 

@@ -4,6 +4,7 @@ import androidx.room.*
 import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteQuery
 import com.example.wags.data.db.entity.ApneaRecordEntity
+import com.example.wags.domain.model.DrillContext
 import kotlinx.coroutines.flow.Flow
 
 /** Lightweight projection returned by [ApneaRecordDao.getBestFreeHoldRecord]. */
@@ -22,13 +23,38 @@ data class BestRecordTuple(
 // @RawQuery approach with a Kotlin builder that constructs the SQL at runtime.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ── Drill-type filter helper ─────────────────────────────────────────────────
+
+/** Appends drill-type + drillParamValue conditions to the given lists. */
+private fun addDrillFilter(
+    drill: DrillContext,
+    conditions: MutableList<String>,
+    args: MutableList<Any>,
+    tableAlias: String = ""
+) {
+    val prefix = if (tableAlias.isNotEmpty()) "$tableAlias." else ""
+    if (drill.drillType == null) {
+        conditions += "${prefix}tableType IS NULL"
+    } else {
+        conditions += "${prefix}tableType = ?"
+        args += drill.drillType
+        if (drill.drillParamValue != null) {
+            conditions += "${prefix}drillParamValue = ?"
+            args += drill.drillParamValue
+        }
+    }
+}
+
+// ── Generalized drill-aware query builders ───────────────────────────────────
+
 /**
- * Builds a parameterised query to find the best free-hold duration matching
- * a subset of the 5 settings. Pass null for any setting to relax that constraint.
+ * Builds a parameterised query to find the best duration for a [DrillContext]
+ * matching a subset of the 5 settings. Pass null for any setting to relax.
  *
  * Returns: MAX(durationMs) or null.
  */
-internal fun buildBestFreeHoldQuery(
+internal fun buildBestDrillQuery(
+    drill: DrillContext,
     timeOfDay: String?,
     lungVolume: String?,
     prepType: String?,
@@ -36,7 +62,8 @@ internal fun buildBestFreeHoldQuery(
     audio: String?
 ): SupportSQLiteQuery {
     val args = mutableListOf<Any>()
-    val conditions = mutableListOf("tableType IS NULL")
+    val conditions = mutableListOf<String>()
+    addDrillFilter(drill, conditions, args)
     if (timeOfDay  != null) { conditions += "timeOfDay = ?";  args += timeOfDay  }
     if (lungVolume != null) { conditions += "lungVolume = ?"; args += lungVolume }
     if (prepType   != null) { conditions += "prepType = ?";   args += prepType   }
@@ -48,11 +75,12 @@ internal fun buildBestFreeHoldQuery(
 
 /**
  * Builds a query to check if a specific record is currently the best for a
- * given subset of settings.
+ * [DrillContext] and a given subset of settings.
  *
  * Returns: 1 if best, 0 otherwise.
  */
-internal fun buildIsBestQuery(
+internal fun buildIsBestDrillQuery(
+    drill: DrillContext,
     recordId: Long,
     timeOfDay: String?,
     lungVolume: String?,
@@ -61,7 +89,9 @@ internal fun buildIsBestQuery(
     audio: String?
 ): SupportSQLiteQuery {
     val args = mutableListOf<Any>()
-    val innerConditions = mutableListOf("o.tableType IS NULL", "o.recordId != ?")
+    val innerConditions = mutableListOf<String>()
+    addDrillFilter(drill, innerConditions, args, "o")
+    innerConditions += "o.recordId != ?"
     args += recordId
     if (timeOfDay  != null) { innerConditions += "o.timeOfDay = r.timeOfDay";   }
     if (lungVolume != null) { innerConditions += "o.lungVolume = r.lungVolume"; }
@@ -81,11 +111,12 @@ internal fun buildIsBestQuery(
 
 /**
  * Builds a query to check if a specific record WAS the best at the time it
- * was recorded, for a given subset of settings.
+ * was recorded, for a [DrillContext] and a given subset of settings.
  *
  * Returns: 1 if it was the best at the time, 0 otherwise.
  */
-internal fun buildWasBestAtTimeQuery(
+internal fun buildWasBestAtTimeDrillQuery(
+    drill: DrillContext,
     recordId: Long,
     timeOfDay: String?,
     lungVolume: String?,
@@ -94,7 +125,10 @@ internal fun buildWasBestAtTimeQuery(
     audio: String?
 ): SupportSQLiteQuery {
     val args = mutableListOf<Any>()
-    val innerConditions = mutableListOf("o.tableType IS NULL", "o.timestamp < r.timestamp", "o.durationMs >= r.durationMs")
+    val innerConditions = mutableListOf<String>()
+    addDrillFilter(drill, innerConditions, args, "o")
+    innerConditions += "o.timestamp < r.timestamp"
+    innerConditions += "o.durationMs >= r.durationMs"
     if (timeOfDay  != null) { innerConditions += "o.timeOfDay = r.timeOfDay";   }
     if (lungVolume != null) { innerConditions += "o.lungVolume = r.lungVolume"; }
     if (prepType   != null) { innerConditions += "o.prepType = r.prepType";     }
@@ -108,6 +142,92 @@ internal fun buildWasBestAtTimeQuery(
         FROM apnea_records r WHERE r.recordId = ?
     """.trimIndent()
     args += recordId
+    return SimpleSQLiteQuery(sql, args.toTypedArray())
+}
+
+// ── Legacy free-hold wrappers (delegate to drill-aware builders) ─────────────
+
+/** @see buildBestDrillQuery */
+internal fun buildBestFreeHoldQuery(
+    timeOfDay: String?, lungVolume: String?, prepType: String?,
+    posture: String?, audio: String?
+): SupportSQLiteQuery = buildBestDrillQuery(
+    DrillContext.FREE_HOLD, timeOfDay, lungVolume, prepType, posture, audio
+)
+
+/** @see buildIsBestDrillQuery */
+internal fun buildIsBestQuery(
+    recordId: Long, timeOfDay: String?, lungVolume: String?,
+    prepType: String?, posture: String?, audio: String?
+): SupportSQLiteQuery = buildIsBestDrillQuery(
+    DrillContext.FREE_HOLD, recordId, timeOfDay, lungVolume, prepType, posture, audio
+)
+
+/** @see buildWasBestAtTimeDrillQuery */
+internal fun buildWasBestAtTimeQuery(
+    recordId: Long, timeOfDay: String?, lungVolume: String?,
+    prepType: String?, posture: String?, audio: String?
+): SupportSQLiteQuery = buildWasBestAtTimeDrillQuery(
+    DrillContext.FREE_HOLD, recordId, timeOfDay, lungVolume, prepType, posture, audio
+)
+
+// ── Drill-aware query builders for best-record and chart queries ─────────────
+
+/**
+ * Builds a query to get the best record (recordId, durationMs, timestamp)
+ * for a [DrillContext] matching a subset of the 5 settings.
+ * Pass empty string for any setting to relax that constraint.
+ */
+internal fun buildBestDrillRecordQuery(
+    drill: DrillContext,
+    lungVolume: String,
+    prepType: String,
+    timeOfDay: String,
+    posture: String,
+    audio: String
+): SupportSQLiteQuery {
+    val args = mutableListOf<Any>()
+    val conditions = mutableListOf<String>()
+    addDrillFilter(drill, conditions, args)
+    if (lungVolume.isNotEmpty()) { conditions += "lungVolume = ?"; args += lungVolume }
+    if (prepType.isNotEmpty())   { conditions += "prepType = ?";   args += prepType   }
+    if (timeOfDay.isNotEmpty())  { conditions += "timeOfDay = ?";  args += timeOfDay  }
+    if (posture.isNotEmpty())    { conditions += "posture = ?";    args += posture    }
+    if (audio.isNotEmpty())      { conditions += "audio = ?";      args += audio      }
+    val sql = """
+        SELECT recordId, durationMs, timestamp FROM apnea_records
+        WHERE ${conditions.joinToString(" AND ")}
+        ORDER BY durationMs DESC LIMIT 1
+    """.trimIndent()
+    return SimpleSQLiteQuery(sql, args.toTypedArray())
+}
+
+/**
+ * Builds a query to get all records for a [DrillContext] matching a subset
+ * of the 5 settings, ordered by timestamp ASC (for charting).
+ * Pass empty string for any setting to relax that constraint.
+ */
+internal fun buildAllDrillRecordsQuery(
+    drill: DrillContext,
+    lungVolume: String,
+    prepType: String,
+    timeOfDay: String,
+    posture: String,
+    audio: String
+): SupportSQLiteQuery {
+    val args = mutableListOf<Any>()
+    val conditions = mutableListOf<String>()
+    addDrillFilter(drill, conditions, args)
+    if (lungVolume.isNotEmpty()) { conditions += "lungVolume = ?"; args += lungVolume }
+    if (prepType.isNotEmpty())   { conditions += "prepType = ?";   args += prepType   }
+    if (timeOfDay.isNotEmpty())  { conditions += "timeOfDay = ?";  args += timeOfDay  }
+    if (posture.isNotEmpty())    { conditions += "posture = ?";    args += posture    }
+    if (audio.isNotEmpty())      { conditions += "audio = ?";      args += audio      }
+    val sql = """
+        SELECT * FROM apnea_records
+        WHERE ${conditions.joinToString(" AND ")}
+        ORDER BY timestamp ASC
+    """.trimIndent()
     return SimpleSQLiteQuery(sql, args.toTypedArray())
 }
 
@@ -558,6 +678,16 @@ interface ApneaRecordDao {
         posture: String,
         audio: String
     ): List<ApneaRecordEntity>
+
+    // ── Drill-aware RawQuery methods ─────────────────────────────────────────
+
+    /** Best record (recordId, durationMs, timestamp) for any drill + settings combo. */
+    @RawQuery
+    suspend fun getBestDrillRecordRaw(query: SupportSQLiteQuery): BestRecordTuple?
+
+    /** All records for a drill + settings combo, ordered by timestamp ASC (for chart). */
+    @RawQuery
+    suspend fun getAllDrillRecordsRaw(query: SupportSQLiteQuery): List<ApneaRecordEntity>
 
     // ── Stats queries (all settings combined) ────────────────────────────────
 

@@ -81,8 +81,8 @@ object WagsRoutes {
     const val APNEA_RECORD_DETAIL = "apnea_record_detail/{recordId}"
     const val APNEA_ALL_RECORDS = "apnea_all_records/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{eventTypes}"
     const val FREE_HOLD_ACTIVE = "free_hold_active/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{showTimer}/{audio}"
-    const val PERSONAL_BESTS = "personal_bests"
-    const val PB_CHART = "pb_chart?lungVolume={lungVolume}&prepType={prepType}&timeOfDay={timeOfDay}&posture={posture}&audio={audio}&label={label}"
+    const val PERSONAL_BESTS = "personal_bests?drillType={drillType}&drillParamValue={drillParamValue}"
+    const val PB_CHART = "pb_chart?lungVolume={lungVolume}&prepType={prepType}&timeOfDay={timeOfDay}&posture={posture}&audio={audio}&label={label}&drillType={drillType}&drillParamValue={drillParamValue}"
     // ── Meditation / NSDR ──────────────────────────────────────────────────────
     // ── Garmin Watch ─────────────────────────────────────────────────────────
     const val GARMIN = "garmin"
@@ -151,14 +151,21 @@ object WagsRoutes {
         eventTypes: String = "ALL"
     ) = "apnea_all_records/$lungVolume/$prepType/$timeOfDay/$posture/$eventTypes"
 
+    fun personalBests(
+        drillType: String = "",
+        drillParamValue: Int? = null
+    ) = "personal_bests?drillType=$drillType&drillParamValue=${drillParamValue ?: ""}"
+
     fun pbChart(
         lungVolume: String = "",
         prepType: String = "",
         timeOfDay: String = "",
         posture: String = "",
         audio: String = "",
-        label: String = "All settings"
-    ) = "pb_chart?lungVolume=$lungVolume&prepType=$prepType&timeOfDay=$timeOfDay&posture=$posture&audio=$audio&label=${URLEncoder.encode(label, "UTF-8")}"
+        label: String = "All settings",
+        drillType: String = "",
+        drillParamValue: Int? = null
+    ) = "pb_chart?lungVolume=$lungVolume&prepType=$prepType&timeOfDay=$timeOfDay&posture=$posture&audio=$audio&label=${URLEncoder.encode(label, "UTF-8")}&drillType=$drillType&drillParamValue=${drillParamValue ?: ""}"
 }
 
 @Composable
@@ -365,18 +372,26 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
         ) {
             ApneaRecordDetailScreen(navController = navController)
         }
-        composable(WagsRoutes.PERSONAL_BESTS) {
+        composable(
+            route = WagsRoutes.PERSONAL_BESTS,
+            arguments = listOf(
+                navArgument("drillType")       { type = NavType.StringType; defaultValue = "" },
+                navArgument("drillParamValue")  { type = NavType.StringType; defaultValue = "" }
+            )
+        ) {
             PersonalBestsScreen(navController = navController)
         }
         composable(
             route = WagsRoutes.PB_CHART,
             arguments = listOf(
-                navArgument("lungVolume") { type = NavType.StringType; defaultValue = "" },
-                navArgument("prepType")   { type = NavType.StringType; defaultValue = "" },
-                navArgument("timeOfDay")  { type = NavType.StringType; defaultValue = "" },
-                navArgument("posture")    { type = NavType.StringType; defaultValue = "" },
-                navArgument("audio")      { type = NavType.StringType; defaultValue = "" },
-                navArgument("label")      { type = NavType.StringType; defaultValue = "All settings" }
+                navArgument("lungVolume")       { type = NavType.StringType; defaultValue = "" },
+                navArgument("prepType")         { type = NavType.StringType; defaultValue = "" },
+                navArgument("timeOfDay")        { type = NavType.StringType; defaultValue = "" },
+                navArgument("posture")          { type = NavType.StringType; defaultValue = "" },
+                navArgument("audio")            { type = NavType.StringType; defaultValue = "" },
+                navArgument("label")            { type = NavType.StringType; defaultValue = "All settings" },
+                navArgument("drillType")        { type = NavType.StringType; defaultValue = "" },
+                navArgument("drillParamValue")  { type = NavType.StringType; defaultValue = "" }
             )
         ) {
             PbChartScreen(navController = navController)

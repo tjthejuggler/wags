@@ -23,6 +23,7 @@ import com.example.wags.domain.model.ApneaTable
 import com.example.wags.domain.model.ApneaTableType
 import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.OximeterReading
+import com.example.wags.domain.model.DrillContext
 import com.example.wags.domain.model.PersonalBestCategory
 import com.example.wags.domain.model.PersonalBestResult
 import com.example.wags.domain.model.Posture
@@ -104,6 +105,16 @@ data class ApneaUiState(
      * Determines how many trophy emojis to show (1–6). Null when no best record exists.
      */
     val bestTimeTrophyCategory: PersonalBestCategory? = null,
+    // ── Progressive O₂ trophy display ────────────────────────────────────────
+    /** Best hold duration across ALL breath periods for current settings. */
+    val progO2BestMs: Long = 0L,
+    /** Trophy category for the Progressive O₂ best record. */
+    val progO2TrophyCategory: PersonalBestCategory? = null,
+    // ── Min Breath trophy display ────────────────────────────────────────────
+    /** Best hold duration across ALL session durations for current settings. */
+    val minBreathBestMs: Long = 0L,
+    /** Trophy category for the Min Breath best record. */
+    val minBreathTrophyCategory: PersonalBestCategory? = null,
     val selectedLength: TableLength = TableLength.MEDIUM,
     val selectedDifficulty: TableDifficulty = TableDifficulty.MEDIUM,
     // Contraction tracking
@@ -400,6 +411,50 @@ class ApneaViewModel @Inject constructor(
             apneaRepository.getStatsAll().collect { stats ->
                 _uiState.update { it.copy(allStats = stats) }
             }
+        }
+        // ── Progressive O₂ best + trophy (across all breath periods, for current settings) ──
+        viewModelScope.launch {
+            combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud -> arrayOf(lv, pt, tod, pos, aud) }
+                .collectLatest { arr ->
+                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as TimeOfDay
+                    val pos = arr[3] as Posture; val aud = arr[4] as AudioSetting
+                    Log.d("ApneaVM", "ProgO2 trophy query: lv=$lv pt=${pt.name} tod=${tod.name} pos=${pos.name} aud=${aud.name}")
+                    // First try with all settings
+                    val result = apneaRepository.getDrillBestAndTrophy(
+                        DrillContext.PROGRESSIVE_O2_ANY, lv, pt.name, tod.name, pos.name, aud.name
+                    )
+                    Log.d("ApneaVM", "ProgO2 trophy result (with settings): ${result?.first}ms, ${result?.second}")
+                    // If no result with exact settings, try without settings to see if records exist at all
+                    if (result == null) {
+                        val anyResult = apneaRepository.getDrillBestAndTrophy(
+                            DrillContext.PROGRESSIVE_O2_ANY, "", "", "", "", ""
+                        )
+                        Log.d("ApneaVM", "ProgO2 trophy result (no settings filter): ${anyResult?.first}ms, ${anyResult?.second}")
+                    }
+                    _uiState.update {
+                        it.copy(
+                            progO2BestMs = result?.first ?: 0L,
+                            progO2TrophyCategory = result?.second
+                        )
+                    }
+                }
+        }
+        // ── Min Breath best + trophy (across all session durations, for current settings) ──
+        viewModelScope.launch {
+            combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud -> arrayOf(lv, pt, tod, pos, aud) }
+                .collectLatest { arr ->
+                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as TimeOfDay
+                    val pos = arr[3] as Posture; val aud = arr[4] as AudioSetting
+                    val result = apneaRepository.getDrillBestAndTrophy(
+                        DrillContext.MIN_BREATH_ANY, lv, pt.name, tod.name, pos.name, aud.name
+                    )
+                    _uiState.update {
+                        it.copy(
+                            minBreathBestMs = result?.first ?: 0L,
+                            minBreathTrophyCategory = result?.second
+                        )
+                    }
+                }
         }
     }
 

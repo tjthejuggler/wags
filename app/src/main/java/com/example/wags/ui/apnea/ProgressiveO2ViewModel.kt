@@ -16,6 +16,8 @@ import com.example.wags.data.spotify.SpotifyAuthManager
 import com.example.wags.data.spotify.SpotifyManager
 import com.example.wags.data.spotify.SpotifyTrackDetail
 import com.example.wags.domain.model.AudioSetting
+import com.example.wags.domain.model.DrillContext
+import com.example.wags.domain.model.PersonalBestResult
 import com.example.wags.domain.model.SpotifySong
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
@@ -63,7 +65,9 @@ data class ProgressiveO2UiState(
     val previousSongs: List<SpotifyTrackDetail> = emptyList(),
     val loadingSongs: Boolean = false,
     val selectedSong: SpotifyTrackDetail? = null,
-    val loadingSelectedSong: Boolean = false
+    val loadingSelectedSong: Boolean = false,
+    // ── Personal best celebration ──────────────────────────────────────────────
+    val newPersonalBest: PersonalBestResult? = null
 )
 
 data class BreathPeriodHistory(
@@ -321,6 +325,11 @@ class ProgressiveO2ViewModel @Inject constructor(
         _uiState.update { it.copy(completedRecordId = null) }
     }
 
+    /** Dismiss the PB celebration dialog. */
+    fun dismissNewPersonalBest() {
+        _uiState.update { it.copy(newPersonalBest = null) }
+    }
+
     // ── Audio / haptic cues ─────────────────────────────────────────────────
 
     private fun handlePhaseTransition(state: ProgressiveO2State) {
@@ -399,6 +408,14 @@ class ProgressiveO2ViewModel @Inject constructor(
         val posture = currentState.posture
         val audio = currentState.audio
 
+        // Check broader PB BEFORE saving so queries compare against prior records only
+        val drill = DrillContext.progressiveO2(breathPeriodSec)
+        val pbResult = if (longestCompletedHoldMs > 0L) {
+            apneaRepository.checkBroaderPersonalBest(
+                drill, longestCompletedHoldMs, lungVolume, prepType, timeOfDay, posture, audio
+            )
+        } else null
+
         val recordId = apneaRepository.saveRecord(
             ApneaRecordEntity(
                 timestamp = now,
@@ -412,9 +429,15 @@ class ProgressiveO2ViewModel @Inject constructor(
                 timeOfDay = timeOfDay,
                 hrDeviceId = deviceLabel,
                 posture = posture,
-                audio = audio
+                audio = audio,
+                drillParamValue = breathPeriodSec
             )
         )
+
+        // Show PB celebration if applicable
+        if (pbResult != null) {
+            _uiState.update { it.copy(newPersonalBest = pbResult) }
+        }
 
         // 3. Save FreeHoldTelemetryEntity rows (linked to recordId)
         if (recordId > 0 && telemetrySnapshot.isNotEmpty()) {

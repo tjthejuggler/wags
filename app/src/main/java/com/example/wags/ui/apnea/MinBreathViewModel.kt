@@ -16,6 +16,8 @@ import com.example.wags.data.spotify.SpotifyAuthManager
 import com.example.wags.data.spotify.SpotifyManager
 import com.example.wags.data.spotify.SpotifyTrackDetail
 import com.example.wags.domain.model.AudioSetting
+import com.example.wags.domain.model.DrillContext
+import com.example.wags.domain.model.PersonalBestResult
 import com.example.wags.domain.model.SpotifySong
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
@@ -62,7 +64,9 @@ data class MinBreathUiState(
     val previousSongs: List<SpotifyTrackDetail> = emptyList(),
     val loadingSongs: Boolean = false,
     val selectedSong: SpotifyTrackDetail? = null,
-    val loadingSelectedSong: Boolean = false
+    val loadingSelectedSong: Boolean = false,
+    // ── Personal best celebration ──────────────────────────────────────────────
+    val newPersonalBest: PersonalBestResult? = null
 )
 
 data class DurationHistory(
@@ -338,6 +342,11 @@ class MinBreathViewModel @Inject constructor(
         _uiState.update { it.copy(completedRecordId = null) }
     }
 
+    /** Dismiss the PB celebration dialog. */
+    fun dismissNewPersonalBest() {
+        _uiState.update { it.copy(newPersonalBest = null) }
+    }
+
     // ── Session saving ──────────────────────────────────────────────────────
 
     private suspend fun saveSession(finalState: MinBreathState): Long {
@@ -379,6 +388,17 @@ class MinBreathViewModel @Inject constructor(
         val longestHoldMs = holdResults.maxOfOrNull { it.holdDurationMs } ?: 0L
 
         val currentState = _uiState.value
+
+        // Check broader PB BEFORE saving so queries compare against prior records only
+        val drill = DrillContext.minBreath(sessionDurationSec)
+        val pbResult = if (longestHoldMs > 0L) {
+            apneaRepository.checkBroaderPersonalBest(
+                drill, longestHoldMs,
+                currentState.lungVolume, currentState.prepType, currentState.timeOfDay,
+                currentState.posture, currentState.audio
+            )
+        } else null
+
         val recordId = apneaRepository.saveRecord(
             ApneaRecordEntity(
                 timestamp = now,
@@ -392,9 +412,15 @@ class MinBreathViewModel @Inject constructor(
                 timeOfDay = currentState.timeOfDay,
                 hrDeviceId = deviceLabel,
                 posture = currentState.posture,
-                audio = currentState.audio
+                audio = currentState.audio,
+                drillParamValue = sessionDurationSec
             )
         )
+
+        // Show PB celebration if applicable
+        if (pbResult != null) {
+            _uiState.update { it.copy(newPersonalBest = pbResult) }
+        }
 
         // 3. Save FreeHoldTelemetryEntity rows (linked to recordId)
         if (recordId > 0 && telemetrySnapshot.isNotEmpty()) {

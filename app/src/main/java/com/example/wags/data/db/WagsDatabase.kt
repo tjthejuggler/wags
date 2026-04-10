@@ -29,7 +29,7 @@ import com.example.wags.data.db.entity.*
         RapidHrSessionEntity::class,
         RapidHrTelemetryEntity::class
     ],
-    version = 26,
+    version = 27,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -752,6 +752,18 @@ abstract class WagsDatabase : RoomDatabase() {
             val MIGRATION_25_26 = object : Migration(25, 26) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE advice ADD COLUMN notes TEXT DEFAULT NULL")
+                }
+            }
+
+            /**
+             * v26 → v27: Add drillParamValue column to apnea_records.
+             * Used to partition personal-best pools by drill-specific parameter
+             * (e.g. breathPeriodSec for Progressive O₂, sessionDurationSec for Min Breath).
+             * Existing free-hold records default to NULL (no drill param).
+             */
+            val MIGRATION_26_27 = object : Migration(26, 27) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE apnea_records ADD COLUMN drillParamValue INTEGER DEFAULT NULL")
                 }
             }
         }

@@ -34,8 +34,17 @@ fun PersonalBestsScreen(
     Scaffold(
         containerColor = BackgroundDark,
         topBar = {
-            TopAppBar(
-                title = { Text("Personal Bests") },
+        TopAppBar(
+            title = {
+                if (state.drillType.isEmpty()) {
+                    Text("Personal Bests")
+                } else {
+                    Column {
+                        Text("Personal Bests", style = MaterialTheme.typography.titleMedium)
+                        Text(state.drillDisplayName, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    }
+                }
+            },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
@@ -69,7 +78,9 @@ fun PersonalBestsScreen(
                             timeOfDay = entry.timeOfDay,
                             posture = entry.posture,
                             audio = entry.audio,
-                            label = entry.label
+                            label = entry.label,
+                            drillType = state.drillType,
+                            drillParamValue = state.drillParamValue
                         )
                     )
                 }

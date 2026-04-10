@@ -3,8 +3,13 @@ package com.example.wags.data.repository
 import com.example.wags.data.db.dao.ApneaRecordDao
 import com.example.wags.data.db.dao.ApneaSongLogDao
 import com.example.wags.data.db.dao.FreeHoldTelemetryDao
+import com.example.wags.data.db.dao.buildAllDrillRecordsQuery
+import com.example.wags.data.db.dao.buildBestDrillQuery
+import com.example.wags.data.db.dao.buildBestDrillRecordQuery
 import com.example.wags.data.db.dao.buildBestFreeHoldQuery
+import com.example.wags.data.db.dao.buildIsBestDrillQuery
 import com.example.wags.data.db.dao.buildIsBestQuery
+import com.example.wags.data.db.dao.buildWasBestAtTimeDrillQuery
 import com.example.wags.data.db.dao.buildWasBestAtTimeQuery
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.ApneaSongLogEntity
@@ -13,6 +18,7 @@ import com.example.wags.domain.model.ApneaStats
 import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.SpotifySong
 import com.example.wags.domain.model.PersonalBestCategory
+import com.example.wags.domain.model.DrillContext
 import com.example.wags.domain.model.PersonalBestEntry
 import com.example.wags.domain.model.PersonalBestResult
 import com.example.wags.domain.model.Posture
@@ -510,6 +516,88 @@ class ApneaRepository @Inject constructor(
         return PersonalBestCategory.EXACT
     }
 
+    /**
+     * Drill-aware version of [computeBroadestCurrentCategory].
+     * Determines the broadest trophy category for a record within its drill context.
+     */
+    private suspend fun computeBroadestCurrentCategoryForDrill(recordId: Long, drill: DrillContext): PersonalBestCategory {
+        val record = dao.getById(recordId) ?: return PersonalBestCategory.EXACT
+        val tod = record.timeOfDay; val lv = record.lungVolume
+        val pt  = record.prepType;  val pos = record.posture; val aud = record.audio
+
+        if (dao.isBestDynamic(buildIsBestDrillQuery(drill, recordId, null, null, null, null, null)) == 1)
+            return PersonalBestCategory.GLOBAL
+
+        val settings = mapOf("timeOfDay" to tod, "lungVolume" to lv, "prepType" to pt, "posture" to pos, "audio" to aud)
+        val settingsList = settings.entries.toList()
+
+        for ((key, value) in settingsList) {
+            if (dao.isBestDynamic(buildIsBestDrillQuery(drill, recordId,
+                    timeOfDay  = if (key == "timeOfDay")  value else null,
+                    lungVolume = if (key == "lungVolume") value else null,
+                    prepType   = if (key == "prepType")   value else null,
+                    posture    = if (key == "posture")    value else null,
+                    audio      = if (key == "audio")      value else null
+                )) == 1) return PersonalBestCategory.ONE_SETTING
+        }
+
+        for (i in settingsList.indices) for (j in i + 1 until settingsList.size) {
+            val keys = setOf(settingsList[i].key, settingsList[j].key)
+            if (dao.isBestDynamic(buildIsBestDrillQuery(drill, recordId,
+                    timeOfDay  = if ("timeOfDay"  in keys) tod else null,
+                    lungVolume = if ("lungVolume" in keys) lv  else null,
+                    prepType   = if ("prepType"   in keys) pt  else null,
+                    posture    = if ("posture"    in keys) pos else null,
+                    audio      = if ("audio"      in keys) aud else null
+                )) == 1) return PersonalBestCategory.TWO_SETTINGS
+        }
+
+        for (i in settingsList.indices) for (j in i + 1 until settingsList.size) for (k in j + 1 until settingsList.size) {
+            val keys = setOf(settingsList[i].key, settingsList[j].key, settingsList[k].key)
+            if (dao.isBestDynamic(buildIsBestDrillQuery(drill, recordId,
+                    timeOfDay  = if ("timeOfDay"  in keys) tod else null,
+                    lungVolume = if ("lungVolume" in keys) lv  else null,
+                    prepType   = if ("prepType"   in keys) pt  else null,
+                    posture    = if ("posture"    in keys) pos else null,
+                    audio      = if ("audio"      in keys) aud else null
+                )) == 1) return PersonalBestCategory.THREE_SETTINGS
+        }
+
+        for (i in settingsList.indices) {
+            val keys = settings.keys - settingsList[i].key
+            if (dao.isBestDynamic(buildIsBestDrillQuery(drill, recordId,
+                    timeOfDay  = if ("timeOfDay"  in keys) tod else null,
+                    lungVolume = if ("lungVolume" in keys) lv  else null,
+                    prepType   = if ("prepType"   in keys) pt  else null,
+                    posture    = if ("posture"    in keys) pos else null,
+                    audio      = if ("audio"      in keys) aud else null
+                )) == 1) return PersonalBestCategory.FOUR_SETTINGS
+        }
+
+        return PersonalBestCategory.EXACT
+    }
+
+    /**
+     * Gets the best record for a [DrillContext] matching the given 5 settings,
+     * and computes its broadest trophy category.
+     *
+     * Returns a pair of (bestDurationMs, trophyCategory) or null if no records exist.
+     */
+    suspend fun getDrillBestAndTrophy(
+        drill: DrillContext,
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        posture: String,
+        audio: String
+    ): Pair<Long, PersonalBestCategory>? = withContext(ioDispatcher) {
+        val best = dao.getBestDrillRecordRaw(
+            buildBestDrillRecordQuery(drill, lungVolume, prepType, timeOfDay, posture, audio)
+        ) ?: return@withContext null
+        val category = computeBroadestCurrentCategoryForDrill(best.recordId, drill)
+        Pair(best.durationMs, category)
+    }
+
     // ── All Personal Bests (for the Personal Bests screen) ───────────────────
 
     /**
@@ -660,6 +748,267 @@ class ApneaRepository @Inject constructor(
         audio: String
     ): List<ApneaRecordEntity> = withContext(ioDispatcher) {
         dao.getAllFreeHoldsFiltered(lungVolume, prepType, timeOfDay, posture, audio)
+    }
+
+    // ── Drill-aware PB methods (generalized for any drill type) ──────────────
+
+    /**
+     * Determines the **broadest** personal-best category that a new hold of
+     * [durationMs] beats for the given [drill] context and 5 settings.
+     *
+     * Must be called **before** the new record is saved to the database.
+     * Returns null when the hold is not even a PB for the exact settings combo.
+     */
+    suspend fun checkBroaderPersonalBest(
+        drill: DrillContext,
+        durationMs: Long,
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        posture: String,
+        audio: String
+    ): PersonalBestResult? = withContext(ioDispatcher) {
+        // ── Exact settings (5 constraints) ─────────────────────────────────
+        val exactBest = dao.getBestFreeHoldDynamic(
+            buildBestDrillQuery(drill, timeOfDay, lungVolume, prepType, posture, audio)
+        )
+        val isExactPb = exactBest == null || durationMs > exactBest
+        if (!isExactPb) return@withContext null
+
+        fun fmt(s: String): String = s.lowercase().replace('_', ' ')
+            .replaceFirstChar { it.uppercase() }
+
+        // ── Global (0 constraints) ─────────────────────────────────────────
+        val globalBest = dao.getBestFreeHoldDynamic(
+            buildBestDrillQuery(drill, null, null, null, null, null)
+        )
+        if (globalBest == null || durationMs > globalBest) {
+            return@withContext PersonalBestResult(durationMs, PersonalBestCategory.GLOBAL, "all settings")
+        }
+
+        // ── Single-setting categories (1 constraint, 4 relaxed) ────────────
+        val settings = mapOf(
+            "timeOfDay"  to timeOfDay,
+            "lungVolume" to lungVolume,
+            "prepType"   to prepType,
+            "posture"    to posture,
+            "audio"      to audio
+        )
+        for ((key, value) in settings) {
+            val best = dao.getBestFreeHoldDynamic(
+                buildBestDrillQuery(drill,
+                    timeOfDay  = if (key == "timeOfDay")  value else null,
+                    lungVolume = if (key == "lungVolume") value else null,
+                    prepType   = if (key == "prepType")   value else null,
+                    posture    = if (key == "posture")    value else null,
+                    audio      = if (key == "audio")      value else null
+                )
+            )
+            if (best == null || durationMs > best) {
+                return@withContext PersonalBestResult(durationMs, PersonalBestCategory.ONE_SETTING, fmt(value))
+            }
+        }
+
+        // ── Two-setting categories (2 constraints, 3 relaxed) ──────────────
+        val settingsList = settings.entries.toList()
+        for (i in settingsList.indices) {
+            for (j in i + 1 until settingsList.size) {
+                val a = settingsList[i]; val b = settingsList[j]
+                val best = dao.getBestFreeHoldDynamic(
+                    buildBestDrillQuery(drill,
+                        timeOfDay  = if (a.key == "timeOfDay"  || b.key == "timeOfDay")  timeOfDay  else null,
+                        lungVolume = if (a.key == "lungVolume" || b.key == "lungVolume") lungVolume else null,
+                        prepType   = if (a.key == "prepType"   || b.key == "prepType")   prepType   else null,
+                        posture    = if (a.key == "posture"    || b.key == "posture")    posture    else null,
+                        audio      = if (a.key == "audio"      || b.key == "audio")      audio      else null
+                    )
+                )
+                if (best == null || durationMs > best) {
+                    return@withContext PersonalBestResult(
+                        durationMs, PersonalBestCategory.TWO_SETTINGS,
+                        "${fmt(a.value)} · ${fmt(b.value)}"
+                    )
+                }
+            }
+        }
+
+        // ── Three-setting categories (3 constraints, 2 relaxed) ────────────
+        for (i in settingsList.indices) {
+            for (j in i + 1 until settingsList.size) {
+                for (k in j + 1 until settingsList.size) {
+                    val a = settingsList[i]; val b = settingsList[j]; val c = settingsList[k]
+                    val keys = setOf(a.key, b.key, c.key)
+                    val best = dao.getBestFreeHoldDynamic(
+                        buildBestDrillQuery(drill,
+                            timeOfDay  = if ("timeOfDay"  in keys) timeOfDay  else null,
+                            lungVolume = if ("lungVolume" in keys) lungVolume else null,
+                            prepType   = if ("prepType"   in keys) prepType   else null,
+                            posture    = if ("posture"    in keys) posture    else null,
+                            audio      = if ("audio"      in keys) audio      else null
+                        )
+                    )
+                    if (best == null || durationMs > best) {
+                        return@withContext PersonalBestResult(
+                            durationMs, PersonalBestCategory.THREE_SETTINGS,
+                            "${fmt(a.value)} · ${fmt(b.value)} · ${fmt(c.value)}"
+                        )
+                    }
+                }
+            }
+        }
+
+        // ── Four-setting categories (4 constraints, 1 relaxed) ─────────────
+        for (i in settingsList.indices) {
+            val relaxed = settingsList[i]
+            val keys = settings.keys - relaxed.key
+            val best = dao.getBestFreeHoldDynamic(
+                buildBestDrillQuery(drill,
+                    timeOfDay  = if ("timeOfDay"  in keys) timeOfDay  else null,
+                    lungVolume = if ("lungVolume" in keys) lungVolume else null,
+                    prepType   = if ("prepType"   in keys) prepType   else null,
+                    posture    = if ("posture"    in keys) posture    else null,
+                    audio      = if ("audio"      in keys) audio      else null
+                )
+            )
+            if (best == null || durationMs > best) {
+                val included = settingsList.filter { it.key != relaxed.key }
+                return@withContext PersonalBestResult(
+                    durationMs, PersonalBestCategory.FOUR_SETTINGS,
+                    included.joinToString(" · ") { fmt(it.value) }
+                )
+            }
+        }
+
+        // ── Exact only ─────────────────────────────────────────────────────
+        PersonalBestResult(
+            durationMs  = durationMs,
+            category    = PersonalBestCategory.EXACT,
+            description = "${fmt(timeOfDay)} · ${fmt(lungVolume)} · ${fmt(prepType)} · ${fmt(posture)} · ${fmt(audio)}"
+        )
+    }
+
+    /**
+     * Builds the complete list of personal-best entries for a [DrillContext]
+     * across every combination of 5 settings, ordered from broadest (6🏆) to narrowest (1🏆).
+     */
+    suspend fun getAllPersonalBests(drill: DrillContext): List<PersonalBestEntry> = withContext(ioDispatcher) {
+        val entries = mutableListOf<PersonalBestEntry>()
+
+        val lungVolumes = listOf("FULL", "PARTIAL", "EMPTY")
+        val prepTypes   = PrepType.entries.map { it.name }
+        val timesOfDay  = TimeOfDay.entries.map { it.name }
+        val postures    = Posture.entries.map { it.name }
+        val audios      = AudioSetting.entries.map { it.name }
+
+        fun String.displayLv()  = if (this == "PARTIAL") "Half" else lowercase().replaceFirstChar { it.uppercase() }
+        fun String.displayPt()  = PrepType.valueOf(this).displayName()
+        fun String.displayTod() = TimeOfDay.valueOf(this).displayName()
+        fun String.displayPos() = Posture.valueOf(this).displayName()
+        fun String.displayAud() = AudioSetting.valueOf(this).displayName()
+
+        suspend fun entry(trophies: Int, label: String, lv: String, pt: String, tod: String, pos: String, aud: String): PersonalBestEntry {
+            val best = dao.getBestDrillRecordRaw(buildBestDrillRecordQuery(drill, lv, pt, tod, pos, aud))
+            return PersonalBestEntry(
+                trophyCount = trophies,
+                label       = label,
+                recordId    = best?.recordId,
+                durationMs  = best?.durationMs,
+                timestamp   = best?.timestamp,
+                lungVolume  = lv,
+                prepType    = pt,
+                timeOfDay   = tod,
+                posture     = pos,
+                audio       = aud
+            )
+        }
+
+        // ── 6🏆 Global ──────────────────────────────────────────────────────
+        entries += entry(6, "All settings", "", "", "", "", "")
+
+        // ── 5🏆 Single setting ──────────────────────────────────────────────
+        for (tod in timesOfDay) entries += entry(5, tod.displayTod(), "", "", tod, "", "")
+        for (lv  in lungVolumes) entries += entry(5, lv.displayLv(),  lv, "", "", "", "")
+        for (pt  in prepTypes)   entries += entry(5, pt.displayPt(),  "", pt, "", "", "")
+        for (pos in postures)    entries += entry(5, pos.displayPos(), "", "", "", pos, "")
+        for (aud in audios)      entries += entry(5, aud.displayAud(), "", "", "", "", aud)
+
+        // ── 4🏆 Two-setting pairs ──────────────────────────────────────────
+        for (tod in timesOfDay) for (lv in lungVolumes)
+            entries += entry(4, "${tod.displayTod()} · ${lv.displayLv()}", lv, "", tod, "", "")
+        for (tod in timesOfDay) for (pt in prepTypes)
+            entries += entry(4, "${tod.displayTod()} · ${pt.displayPt()}", "", pt, tod, "", "")
+        for (tod in timesOfDay) for (pos in postures)
+            entries += entry(4, "${tod.displayTod()} · ${pos.displayPos()}", "", "", tod, pos, "")
+        for (tod in timesOfDay) for (aud in audios)
+            entries += entry(4, "${tod.displayTod()} · ${aud.displayAud()}", "", "", tod, "", aud)
+        for (lv in lungVolumes) for (pt in prepTypes)
+            entries += entry(4, "${lv.displayLv()} · ${pt.displayPt()}", lv, pt, "", "", "")
+        for (lv in lungVolumes) for (pos in postures)
+            entries += entry(4, "${lv.displayLv()} · ${pos.displayPos()}", lv, "", "", pos, "")
+        for (lv in lungVolumes) for (aud in audios)
+            entries += entry(4, "${lv.displayLv()} · ${aud.displayAud()}", lv, "", "", "", aud)
+        for (pt in prepTypes) for (pos in postures)
+            entries += entry(4, "${pt.displayPt()} · ${pos.displayPos()}", "", pt, "", pos, "")
+        for (pt in prepTypes) for (aud in audios)
+            entries += entry(4, "${pt.displayPt()} · ${aud.displayAud()}", "", pt, "", "", aud)
+        for (pos in postures) for (aud in audios)
+            entries += entry(4, "${pos.displayPos()} · ${aud.displayAud()}", "", "", "", pos, aud)
+
+        // ── 3🏆 Three-setting combos ────────────────────────────────────────
+        for (tod in timesOfDay) for (lv in lungVolumes) for (pt in prepTypes)
+            entries += entry(3, "${tod.displayTod()} · ${lv.displayLv()} · ${pt.displayPt()}", lv, pt, tod, "", "")
+        for (tod in timesOfDay) for (lv in lungVolumes) for (pos in postures)
+            entries += entry(3, "${tod.displayTod()} · ${lv.displayLv()} · ${pos.displayPos()}", lv, "", tod, pos, "")
+        for (tod in timesOfDay) for (lv in lungVolumes) for (aud in audios)
+            entries += entry(3, "${tod.displayTod()} · ${lv.displayLv()} · ${aud.displayAud()}", lv, "", tod, "", aud)
+        for (tod in timesOfDay) for (pt in prepTypes) for (pos in postures)
+            entries += entry(3, "${tod.displayTod()} · ${pt.displayPt()} · ${pos.displayPos()}", "", pt, tod, pos, "")
+        for (tod in timesOfDay) for (pt in prepTypes) for (aud in audios)
+            entries += entry(3, "${tod.displayTod()} · ${pt.displayPt()} · ${aud.displayAud()}", "", pt, tod, "", aud)
+        for (tod in timesOfDay) for (pos in postures) for (aud in audios)
+            entries += entry(3, "${tod.displayTod()} · ${pos.displayPos()} · ${aud.displayAud()}", "", "", tod, pos, aud)
+        for (lv in lungVolumes) for (pt in prepTypes) for (pos in postures)
+            entries += entry(3, "${lv.displayLv()} · ${pt.displayPt()} · ${pos.displayPos()}", lv, pt, "", pos, "")
+        for (lv in lungVolumes) for (pt in prepTypes) for (aud in audios)
+            entries += entry(3, "${lv.displayLv()} · ${pt.displayPt()} · ${aud.displayAud()}", lv, pt, "", "", aud)
+        for (lv in lungVolumes) for (pos in postures) for (aud in audios)
+            entries += entry(3, "${lv.displayLv()} · ${pos.displayPos()} · ${aud.displayAud()}", lv, "", "", pos, aud)
+        for (pt in prepTypes) for (pos in postures) for (aud in audios)
+            entries += entry(3, "${pt.displayPt()} · ${pos.displayPos()} · ${aud.displayAud()}", "", pt, "", pos, aud)
+
+        // ── 2🏆 Four-setting combos ─────────────────────────────────────────
+        for (tod in timesOfDay) for (lv in lungVolumes) for (pt in prepTypes) for (pos in postures)
+            entries += entry(2, "${tod.displayTod()} · ${lv.displayLv()} · ${pt.displayPt()} · ${pos.displayPos()}", lv, pt, tod, pos, "")
+        for (tod in timesOfDay) for (lv in lungVolumes) for (pt in prepTypes) for (aud in audios)
+            entries += entry(2, "${tod.displayTod()} · ${lv.displayLv()} · ${pt.displayPt()} · ${aud.displayAud()}", lv, pt, tod, "", aud)
+        for (tod in timesOfDay) for (lv in lungVolumes) for (pos in postures) for (aud in audios)
+            entries += entry(2, "${tod.displayTod()} · ${lv.displayLv()} · ${pos.displayPos()} · ${aud.displayAud()}", lv, "", tod, pos, aud)
+        for (tod in timesOfDay) for (pt in prepTypes) for (pos in postures) for (aud in audios)
+            entries += entry(2, "${tod.displayTod()} · ${pt.displayPt()} · ${pos.displayPos()} · ${aud.displayAud()}", "", pt, tod, pos, aud)
+        for (lv in lungVolumes) for (pt in prepTypes) for (pos in postures) for (aud in audios)
+            entries += entry(2, "${lv.displayLv()} · ${pt.displayPt()} · ${pos.displayPos()} · ${aud.displayAud()}", lv, pt, "", pos, aud)
+
+        // ── 1🏆 Exact 5-setting combos ──────────────────────────────────────
+        for (tod in timesOfDay) for (lv in lungVolumes) for (pt in prepTypes) for (pos in postures) for (aud in audios)
+            entries += entry(1, "${tod.displayTod()} · ${lv.displayLv()} · ${pt.displayPt()} · ${pos.displayPos()} · ${aud.displayAud()}", lv, pt, tod, pos, aud)
+
+        entries
+    }
+
+    /**
+     * Returns all records for a [DrillContext] matching the given setting filters,
+     * ordered by timestamp ascending (oldest first) — suitable for charting.
+     * Pass empty string for any setting to relax that constraint.
+     */
+    suspend fun getAllRecordsForChart(
+        drill: DrillContext,
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        posture: String,
+        audio: String
+    ): List<ApneaRecordEntity> = withContext(ioDispatcher) {
+        dao.getAllDrillRecordsRaw(buildAllDrillRecordsQuery(drill, lungVolume, prepType, timeOfDay, posture, audio))
     }
 
     // ── Paginated all-records (for the All Records screen) ───────────────────

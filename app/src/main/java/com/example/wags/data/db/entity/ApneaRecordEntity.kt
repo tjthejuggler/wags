@@ -51,5 +51,8 @@ data class ApneaRecordEntity(
     val guidedPurgeExhaleSec: Int? = null,
     /** Transition phase duration in seconds (guided hyperventilation). Null when not used. */
     @ColumnInfo(defaultValue = "NULL")
-    val guidedTransitionSec: Int? = null
+    val guidedTransitionSec: Int? = null,
+    /** Drill-specific partition value for PB grouping (e.g. breathPeriodSec, sessionDurationSec). Null for free holds. */
+    @ColumnInfo(defaultValue = "NULL")
+    val drillParamValue: Int? = null
 )

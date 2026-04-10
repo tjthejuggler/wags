@@ -190,7 +190,7 @@ fun ApneaScreen(
                             navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
                         },
                         onTrophyClick = {
-                            navController.navigate(WagsRoutes.PERSONAL_BESTS)
+                            navController.navigate(WagsRoutes.personalBests())
                         }
                     )
                 }
@@ -231,22 +231,18 @@ fun ApneaScreen(
                         TableHelpIcon(title = PROGRESSIVE_O2_HELP_TITLE, text = PROGRESSIVE_O2_HELP_TEXT)
                     }
                 ) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            "Endless breath-hold drill: 15s → 30s → 45s → … with a configurable breathing period between holds.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
-                        )
-                        Button(
-                            onClick = { navController.navigate(WagsRoutes.PROGRESSIVE_O2) },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Open Progressive O₂")
+                    DrillSectionContent(
+                        bestTimeMs = state.progO2BestMs,
+                        trophyCategory = state.progO2TrophyCategory,
+                        description = "Endless breath-hold drill: 15s → 30s → 45s → … with a configurable breathing period between holds.",
+                        buttonLabel = "Open Progressive O₂",
+                        onOpenDrill = { navController.navigate(WagsRoutes.PROGRESSIVE_O2) },
+                        onTrophyClick = {
+                            navController.navigate(
+                                WagsRoutes.personalBests(drillType = "PROGRESSIVE_O2")
+                            )
                         }
-                    }
+                    )
                 }
 
                 // ── Min Breath ────────────────────────────────────────────────
@@ -259,24 +255,20 @@ fun ApneaScreen(
                         TableHelpIcon(title = MIN_BREATH_HELP_TITLE, text = MIN_BREATH_HELP_TEXT)
                     }
                 ) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            "Choose a session duration, then minimize your breathing time. " +
+                    DrillSectionContent(
+                        bestTimeMs = state.minBreathBestMs,
+                        trophyCategory = state.minBreathTrophyCategory,
+                        description = "Choose a session duration, then minimize your breathing time. " +
                             "You control when to hold and when to breathe.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
-                        )
-                        Button(
-                            onClick = { navController.navigate(WagsRoutes.MIN_BREATH) },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = ButtonPrimary)
-                        ) {
-                            Text("Open Min Breath")
+                        buttonLabel = "Open Min Breath",
+                        buttonColor = ButtonPrimary,
+                        onOpenDrill = { navController.navigate(WagsRoutes.MIN_BREATH) },
+                        onTrophyClick = {
+                            navController.navigate(
+                                WagsRoutes.personalBests(drillType = "MIN_BREATH")
+                            )
                         }
-                    }
+                    )
                 }
 
                 // ── Wonka: Till Contraction ───────────────────────────────────
@@ -783,6 +775,62 @@ private fun FreeHoldContent(
             colors = ButtonDefaults.buttonColors(containerColor = ButtonSuccess, contentColor = TextPrimary),
             modifier = Modifier.fillMaxWidth()
         ) { Text("Start Hold") }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Drill Section Content — reusable trophy + button for Progressive O₂, Min Breath, etc.
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun DrillSectionContent(
+    bestTimeMs: Long,
+    trophyCategory: PersonalBestCategory?,
+    description: String,
+    buttonLabel: String,
+    buttonColor: Color = ButtonDefaults.buttonColors().containerColor,
+    onOpenDrill: () -> Unit,
+    onTrophyClick: () -> Unit = {}
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Trophy + best time (if any records exist)
+        if (bestTimeMs > 0L) {
+            val trophies = trophyCategory?.trophyEmojis() ?: "🏆"
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    trophies,
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.clickable { onTrophyClick() }.grayscale()
+                )
+                Text(" ", style = MaterialTheme.typography.headlineSmall)
+                Text(
+                    formatMs(bestTimeMs),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        Text(
+            description,
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary
+        )
+        Button(
+            onClick = onOpenDrill,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = buttonColor)
+        ) {
+            Text(buttonLabel)
+        }
     }
 }
 

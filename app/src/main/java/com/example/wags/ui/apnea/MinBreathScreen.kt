@@ -1,5 +1,6 @@
 package com.example.wags.ui.apnea
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -150,6 +151,27 @@ fun MinBreathScreen(
                     "Start Session",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+            }
+
+            // 3b. Personal Bests button
+            OutlinedButton(
+                onClick = {
+                    navController.navigate(
+                        WagsRoutes.personalBests(
+                            drillType = "MIN_BREATH",
+                            drillParamValue = state.sessionDurationSec
+                        )
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, TextSecondary)
+            ) {
+                Text(
+                    "🏆  Personal Bests",
+                    style = MaterialTheme.typography.bodyLarge,
                     color = TextPrimary
                 )
             }

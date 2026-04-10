@@ -1,6 +1,15 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-09 15:32 UTC-6*
+*Last updated: 2026-04-09 20:31 UTC-6*
+
+## Recent Changes (2026-04-09 20:31)
+- ✅ **Trophy display on main ApneaScreen** for Progressive O₂ and Min Breath sections. When expanded, these sections now show trophies + best hold time inline (matching the free hold pattern). Clicking trophies navigates to Personal Bests for that drill type (across all param values). Added `DrillContext.PROGRESSIVE_O2_ANY` / `MIN_BREATH_ANY` constants, drill-aware `computeBroadestCurrentCategoryForDrill()` and `getDrillBestAndTrophy()` in repository, new state fields in `ApneaUiState`, and reusable `DrillSectionContent` composable.
+  - Modified: `DrillContext.kt`, `ApneaRepository.kt`, `ApneaViewModel.kt`, `ApneaScreen.kt`
+
+## Recent Changes (2026-04-09 20:23)
+- ✅ Implemented: **Universal Trophy System** — generalized the free-hold-only trophy/PB system to work with any drill type via `DrillContext` abstraction. New `drillParamValue` column on `apnea_records` (DB v26→v27). Generalized DAO query builders, repository methods, PersonalBestsScreen, PbChartScreen, and navigation routes. Wired Progressive O₂ (PB per breath period) and Min Breath (PB per session duration) with full celebration dialogs, confetti, sounds, and "🏆 Personal Bests" buttons on setup screens. Zero regression for free holds — old methods are thin wrappers. Plan doc at `plans/universal_trophy_system_plan.md`.
+  - New files: `DrillContext.kt`
+  - Modified: `ApneaRecordEntity.kt`, `WagsDatabase.kt`, `DatabaseModule.kt`, `ApneaRecordDao.kt`, `ApneaRepository.kt`, `PersonalBestsViewModel.kt`, `PersonalBestsScreen.kt`, `PbChartViewModel.kt`, `WagsNavGraph.kt`, `ProgressiveO2ViewModel.kt`, `ProgressiveO2ActiveScreen.kt`, `ProgressiveO2Screen.kt`, `MinBreathViewModel.kt`, `MinBreathActiveScreen.kt`, `MinBreathScreen.kt`, `ApneaScreen.kt`
 
 ## Recent Changes (2026-04-09 15:32)
 - ✅ Implemented: **Min Breath Drill** — full 2-screen flow (Setup → Active) using shared `ApneaRecordDetailScreen` for post-session details. User-driven state machine (IDLE/HOLD/BREATHING/COMPLETE) with 100ms tick loop and wall-clock timing. No audio/haptic cues during session (user controls all transitions), only `announceSessionComplete()` at end. Setup screen has session duration stepper (60-600s, ±30s), settings banner, Spotify song picker, past session history grouped by duration with best hold percentage. Active screen has user-driven buttons: HOLD shows "First Contraction" + "Breath" side-by-side, BREATHING shows full-screen "HOLD" button. `tableParamsJson` stores sessionDurationSec, totalHoldTimeMs, totalBreathTimeMs, holdPct, and holds array with contraction timestamps.

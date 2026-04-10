@@ -1,6 +1,6 @@
 # WAGS — System Patterns
 
-*Last updated: 2026-04-09 15:32 UTC-6*
+*Last updated: 2026-04-09 20:23 UTC-6*
 
 ## Architecture Pattern
 
@@ -104,3 +104,36 @@ Two distinct state machine patterns exist for apnea drills:
 - Both save 4 entities: `ApneaSessionEntity`, `ApneaRecordEntity`, `TelemetryEntity`, `FreeHoldTelemetryEntity`
 - Both use `tableParamsJson` for drill-specific per-session data
 - Both reuse shared `ApneaRecordDetailScreen` for post-session details (no custom detail screens)
+
+## Universal Trophy System (DrillContext) (2026-04-09 20:23 UTC-6)
+
+The trophy/personal-best system is generalized via `DrillContext` to work with any drill type:
+
+### DrillContext Abstraction
+- [`DrillContext`](app/src/main/java/com/example/wags/domain/model/DrillContext.kt) identifies a PB pool: `drillType` (null=free hold) + `drillParamValue` (e.g. breathPeriodSec, sessionDurationSec)
+- Factory methods: `FREE_HOLD`, `PROGRESSIVE_O2_ANY`, `MIN_BREATH_ANY`, `progressiveO2(breathPeriodSec)`, `minBreath(sessionDurationSec)`, `fromNavArgs()`
+- "ANY" variants (null `drillParamValue`) match all records of a drill type — used for main screen trophy display and cross-param-value PB screens
+- `fromNavArgs()` returns "ANY" variant when `drillParamValue` is null (2026-04-09 20:31 UTC-6)
+- `drillParamValue` column on `apnea_records` table partitions PBs by drill-specific parameter
+
+### How PBs Work Per Drill
+- **Free Hold:** `tableType IS NULL` — one PB pool (just 5 apnea settings)
+- **Progressive O₂:** `tableType='PROGRESSIVE_O2' AND drillParamValue=X` — separate PB pool per breath period
+- **Min Breath:** `tableType='MIN_BREATH' AND drillParamValue=X` — separate PB pool per session duration
+
+### Adding a New Drill's Trophy System
+1. Add `DrillContext.myDrill(param)` factory method
+2. Set `drillParamValue` when saving `ApneaRecordEntity`
+3. Call `apneaRepository.checkBroaderPersonalBest(drill, ...)` before saving
+4. Add `newPersonalBest: PersonalBestResult?` to UI state
+5. Show `NewPersonalBestDialog` in active screen
+6. Add "🏆 Personal Bests" button navigating to `WagsRoutes.personalBests(drillType, drillParamValue)`
+7. Add trophy display to main ApneaScreen section using `DrillSectionContent` composable with `getDrillBestAndTrophy()` (2026-04-09 20:31 UTC-6)
+- No new screens needed — reuses existing `PersonalBestsScreen`, `PbChartScreen`, `NewPersonalBestDialog`
+
+### Reused UI Components (unchanged)
+- `NewPersonalBestDialog` — confetti + sound celebration dialog
+- `ConfettiOverlay` — Canvas particle system
+- `ApneaPbSoundPlayer` — 6 tiered celebration sounds
+- `PersonalBestsScreen` — full trophy hierarchy display
+- `PbChartScreen` — landscape line chart with zoom/pan

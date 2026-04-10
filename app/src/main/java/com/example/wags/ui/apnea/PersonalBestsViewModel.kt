@@ -1,10 +1,12 @@
 package com.example.wags.ui.apnea
 
 import android.content.SharedPreferences
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.domain.model.AudioSetting
+import com.example.wags.domain.model.DrillContext
 import com.example.wags.domain.model.PersonalBestEntry
 import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
@@ -22,21 +24,40 @@ data class PersonalBestsUiState(
     val entries: List<PersonalBestEntry> = emptyList(),
     /** The exact-settings entry for the user's current apnea settings. */
     val currentSettingsEntry: PersonalBestEntry? = null,
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    /** Human-readable title for the drill type (e.g. "Free Hold", "Progressive O₂ (60s breath)"). */
+    val drillDisplayName: String = "Free Hold",
+    /** The drill context used for chart navigation. */
+    val drillType: String = "",
+    val drillParamValue: Int? = null
 )
 
 @HiltViewModel
 class PersonalBestsViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
     private val apneaRepository: ApneaRepository,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(PersonalBestsUiState())
+    private val drillTypeArg: String = savedStateHandle["drillType"] ?: ""
+    private val drillParamValueArg: Int? = (savedStateHandle.get<String>("drillParamValue"))
+        ?.takeIf { it.isNotEmpty() }?.toIntOrNull()
+
+    private val drill: DrillContext = DrillContext.fromNavArgs(
+        drillTypeArg.takeIf { it.isNotEmpty() },
+        drillParamValueArg
+    )
+
+    private val _uiState = MutableStateFlow(PersonalBestsUiState(
+        drillDisplayName = drill.displayName,
+        drillType = drillTypeArg,
+        drillParamValue = drillParamValueArg
+    ))
     val uiState: StateFlow<PersonalBestsUiState> = _uiState.asStateFlow()
 
     init {
         viewModelScope.launch {
-            val entries = apneaRepository.getAllPersonalBests()
+            val entries = apneaRepository.getAllPersonalBests(drill)
 
             // Read current settings from SharedPreferences
             val lv = prefs.getString("setting_lung_volume", "FULL") ?: "FULL"
