@@ -20,6 +20,18 @@ data class ApneaStats(
     val wonkaContractionCount: Int = 0,
     val wonkaEnduranceCount: Int = 0,
 
+    // ── Total times (ms) — per drill type ─────────────────────────────────────
+    val freeHoldTotalHoldMs: Long = 0L,
+    val o2TableTotalHoldMs: Long = 0L,
+    val co2TableTotalHoldMs: Long = 0L,
+    val progressiveO2TotalHoldMs: Long = 0L,
+    val minBreathTotalHoldMs: Long = 0L,
+    val freeHoldTotalSessionMs: Long = 0L,
+    val o2TableTotalSessionMs: Long = 0L,
+    val co2TableTotalSessionMs: Long = 0L,
+    val progressiveO2TotalSessionMs: Long = 0L,
+    val minBreathTotalSessionMs: Long = 0L,
+
     // ── Overall HR / SpO2 extremes (across entire hold) ───────────────────────
     val maxHrEver: Float? = null,
     val maxHrEverRecordId: Long? = null,
@@ -47,4 +59,14 @@ data class ApneaStats(
     val maxEndSpO2RecordId: Long? = null,
     val minEndSpO2: Int? = null,
     val minEndSpO2RecordId: Long? = null,
-)
+) {
+    /** Total hold time across all drill types (ms). */
+    val totalHoldMs: Long get() =
+        freeHoldTotalHoldMs + o2TableTotalHoldMs + co2TableTotalHoldMs +
+        progressiveO2TotalHoldMs + minBreathTotalHoldMs
+
+    /** Total session time across all drill types (ms). */
+    val totalSessionMs: Long get() =
+        freeHoldTotalSessionMs + o2TableTotalSessionMs + co2TableTotalSessionMs +
+        progressiveO2TotalSessionMs + minBreathTotalSessionMs
+}

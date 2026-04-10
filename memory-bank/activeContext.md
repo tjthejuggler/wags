@@ -1,6 +1,71 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-10 07:39 UTC-6*
+*Last updated: 2026-04-10 14:46 UTC-6*
+
+### 2026-04-10 14:46 (UTC-6)
+
+**Clickable Time Charts for Total Times section**
+
+1. **Time Chart screen** — New landscape-forced screen (`TimeChartScreen.kt`) that shows time data over time with a toggle between:
+   - **Daily bar chart** — bars showing the amount of time per day
+   - **Cumulative line chart** — running total that only stays same or goes higher
+
+2. **TimeChartViewModel** — Loads all records/sessions once, computes per-day aggregation in-memory. Supports both "hold" and "session" metric types, and per-drill-type filtering (FREE_HOLD, O2, CO2, PROGRESSIVE_O2, MIN_BREATH, TOTAL).
+
+3. **Navigation wiring** — `WagsRoutes.TIME_CHART` route with query params `metricType`, `drillType`, `title`. Helper function `timeChart()` URL-encodes the title. Composable block registered in NavHost.
+
+4. **Clickable rows** — All rows in the Total Times section (both Hold Time and Session Time sub-sections, including per-drill-type rows and the bold Total row) are now clickable. Tapping navigates to the TimeChartScreen with the appropriate metric type, drill type, and title.
+
+5. **HistoryStatsRow updated** — Added optional `onClick` parameter. When provided, the row becomes clickable.
+
+6. **DAO support** — `getAllOnce()` suspend queries added to both `ApneaRecordDao` and `ApneaSessionDao` for one-shot loading of all records/sessions. Repository methods `getAllRecordsOnce()` and `getAllSessionsOnce()` wrap these.
+
+New files (2):
+- `TimeChartViewModel.kt` — ViewModel with per-day aggregation logic
+- `TimeChartScreen.kt` — Landscape chart screen with bar/line toggle
+
+Modified files (3):
+- `WagsNavGraph.kt` — Added TimeChartScreen import, timeChart() helper, composable block
+- `ApneaHistoryScreen.kt` — onTimeChartClick callback threaded through StatsTabContent → ApneaStatsContent, Total Times rows now clickable with Triple-based data, HistoryStatsRow gets optional onClick
+- `ApneaRecordDao.kt` — getAllOnce() query
+- `ApneaSessionDao.kt` — getAllOnce() query
+- `ApneaRepository.kt` — getAllRecordsOnce() method
+- `ApneaSessionRepository.kt` — getAllSessionsOnce() method
+
+Build: ✅ Successful, installed on device
+
+---
+
+### 2026-04-10 08:11 (UTC-6)
+
+**Apnea Stats: Total Times section + "All" filter option for each setting**
+
+1. **"Total Times" section on Stats tab** — New section between Activity Counts and Overall Session Extremes. Shows per-drill-type Total Hold Time and Total Session Time (Free Hold, O₂ Table, CO₂ Table, Progressive O₂, Min Breath) plus a bold "Total" row summing all drill types. Only drill types with >0 time are shown. Duration formatted as `Xh Xm Xs`.
+
+2. **"All" filter chip for each setting** — Each setting row in the Stats filter dialog (Lung Volume, Prep, Time of Day, Posture, Audio) now has an "All" chip as the first option. Selecting "All" for a setting means "don't filter on this column" — the SQL uses `(:param = 'ALL' OR column = :param)` pattern so the WHERE clause is effectively skipped for that setting.
+
+3. **ViewModel refactored to String-based settings** — `ApneaHistoryUiState` now stores all 5 settings as `String` (was typed enums for prepType, timeOfDay, posture, audio). `FILTER_ALL = "ALL"` sentinel constant. ViewModel setters all accept `String`. This allows mixing specific values with "All" per-setting.
+
+4. **DAO queries updated for "ALL" support** — All filtered stats queries in `ApneaRecordDao`, `FreeHoldTelemetryDao`, and `ApneaSessionDao` now use `(:param = 'ALL' OR column = :param)` pattern instead of `column = :param`. Backward-compatible — passing a specific value works exactly as before.
+
+5. **New DAO queries for total times** — `ApneaRecordDao`: `sumFreeHoldDuration()`, `sumHoldDurationByTableType()`, `sumFreeHoldDurationAll()`, `sumHoldDurationByTableTypeAll()`. `ApneaSessionDao`: `sumSessionDuration()` (joins with records for settings filter), `sumSessionDurationAll()`.
+
+6. **`ApneaStats` model expanded** — 10 new fields: `freeHoldTotalHoldMs`, `o2TableTotalHoldMs`, `co2TableTotalHoldMs`, `progressiveO2TotalHoldMs`, `minBreathTotalHoldMs`, `freeHoldTotalSessionMs`, `o2TableTotalSessionMs`, `co2TableTotalSessionMs`, `progressiveO2TotalSessionMs`, `minBreathTotalSessionMs`. Plus computed `totalHoldMs` and `totalSessionMs` properties.
+
+7. **`ApneaRepository` expanded** — Added `sessionDao: ApneaSessionDao` to constructor. Both `getStats()` and `getStatsAll()` now include groupG (hold time sums) and groupH (session time sums) in their combine chains.
+
+Files modified (8):
+- `ApneaStats.kt` — 10 new fields + 2 computed properties
+- `ApneaRecordDao.kt` — 4 new SUM queries + all filtered queries updated for ALL support
+- `ApneaSessionDao.kt` — 2 new SUM queries + filtered query updated for ALL support
+- `FreeHoldTelemetryDao.kt` — all filtered queries updated for ALL support
+- `ApneaRepository.kt` — added sessionDao, expanded getStats() and getStatsAll()
+- `ApneaHistoryViewModel.kt` — all settings now String-based, FILTER_ALL constant
+- `ApneaHistoryScreen.kt` — Total Times section, All chips in dialog, displaySettingLabel(), formatStatsDuration()
+
+Build: ✅ Successful, installed on SM-S918U1
+
+---
 
 ### 2026-04-10 07:39 (UTC-6)
 

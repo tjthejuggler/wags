@@ -56,4 +56,9 @@ class ApneaSessionRepository @Inject constructor(
     suspend fun getTelemetryForSession(sessionId: Long): List<TelemetryEntity> = withContext(ioDispatcher) {
         telemetryDao.getForSession(sessionId)
     }
+
+    /** One-shot: all sessions ever, oldest first — used for time charts. */
+    suspend fun getAllSessionsOnce(): List<ApneaSessionEntity> = withContext(ioDispatcher) {
+        apneaSessionDao.getAllOnce()
+    }
 }

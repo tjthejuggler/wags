@@ -119,6 +119,9 @@ fun ApneaHistoryScreen(
                     onRecordClick = { recordId ->
                         navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
                     },
+                    onTimeChartClick = { metricType, drillType, title ->
+                        navController.navigate(WagsRoutes.timeChart(metricType, drillType, title))
+                    },
                     onSetLungVolume = { viewModel.setLungVolume(it) },
                     onSetPrepType   = { viewModel.setPrepType(it) },
                     onSetTimeOfDay  = { viewModel.setTimeOfDay(it) },
@@ -154,11 +157,12 @@ private fun StatsTabContent(
     state: ApneaHistoryUiState,
     onToggleShowAll: () -> Unit,
     onRecordClick: (Long) -> Unit,
+    onTimeChartClick: (metricType: String, drillType: String, title: String) -> Unit,
     onSetLungVolume: (String) -> Unit,
-    onSetPrepType: (PrepType) -> Unit,
-    onSetTimeOfDay: (TimeOfDay) -> Unit,
-    onSetPosture: (Posture) -> Unit,
-    onSetAudio: (AudioSetting) -> Unit
+    onSetPrepType: (String) -> Unit,
+    onSetTimeOfDay: (String) -> Unit,
+    onSetPosture: (String) -> Unit,
+    onSetAudio: (String) -> Unit
 ) {
     val stats = if (state.showAllStats) state.allStats else state.filteredStats
     var showSettingsDialog by remember { mutableStateOf(false) }
@@ -201,8 +205,8 @@ private fun StatsTabContent(
                 if (!state.showAllStats) {
                     // Clickable settings label — opens the settings popup
                     Text(
-                        "${state.lungVolume.displayLungVolume()}  ·  ${state.prepType.displayName()}  ·  " +
-                        "${state.timeOfDay.displayName()}  ·  ${state.posture.displayName()}  ·  ${state.audio.displayName()}",
+                        "${state.lungVolume.displaySettingLabel()}  ·  ${state.prepType.displaySettingLabel()}  ·  " +
+                        "${state.timeOfDay.displaySettingLabel()}  ·  ${state.posture.displaySettingLabel()}  ·  ${state.audio.displaySettingLabel()}",
                         style = MaterialTheme.typography.labelSmall,
                         color = TextSecondary,
                         modifier = Modifier.clickable { showSettingsDialog = true }
@@ -226,7 +230,7 @@ private fun StatsTabContent(
 
         HorizontalDivider(color = SurfaceVariant)
 
-        ApneaStatsContent(stats = stats, onRecordClick = onRecordClick)
+        ApneaStatsContent(stats = stats, onRecordClick = onRecordClick, onTimeChartClick = onTimeChartClick)
     }
 }
 
@@ -235,17 +239,22 @@ private fun StatsTabContent(
 @Composable
 private fun StatsSettingsDialog(
     lungVolume: String,
-    prepType: PrepType,
-    timeOfDay: TimeOfDay,
-    posture: Posture,
-    audio: AudioSetting,
+    prepType: String,
+    timeOfDay: String,
+    posture: String,
+    audio: String,
     onSetLungVolume: (String) -> Unit,
-    onSetPrepType: (PrepType) -> Unit,
-    onSetTimeOfDay: (TimeOfDay) -> Unit,
-    onSetPosture: (Posture) -> Unit,
-    onSetAudio: (AudioSetting) -> Unit,
+    onSetPrepType: (String) -> Unit,
+    onSetTimeOfDay: (String) -> Unit,
+    onSetPosture: (String) -> Unit,
+    onSetAudio: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val chipColors = FilterChipDefaults.filterChipColors(
+        selectedContainerColor = SurfaceVariant,
+        selectedLabelColor = TextPrimary
+    )
+
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = SurfaceDark,
@@ -256,72 +265,37 @@ private fun StatsSettingsDialog(
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 // Lung Volume
                 SettingRow(label = "Lung Volume") {
+                    SettingChip(FILTER_ALL, "All", lungVolume == FILTER_ALL, { onSetLungVolume(FILTER_ALL) }, chipColors)
                     listOf("FULL", "PARTIAL", "EMPTY").forEach { lv ->
-                        FilterChip(
-                            selected = lungVolume == lv,
-                            onClick = { onSetLungVolume(lv) },
-                            label = { Text(lv.displayLungVolume(), style = MaterialTheme.typography.labelSmall) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = SurfaceVariant,
-                                selectedLabelColor = TextPrimary
-                            )
-                        )
+                        SettingChip(lv, lv.displayLungVolume(), lungVolume == lv, { onSetLungVolume(lv) }, chipColors)
                     }
                 }
                 // Prep Type
                 SettingRow(label = "Prep") {
+                    SettingChip(FILTER_ALL, "All", prepType == FILTER_ALL, { onSetPrepType(FILTER_ALL) }, chipColors)
                     PrepType.entries.forEach { pt ->
-                        FilterChip(
-                            selected = prepType == pt,
-                            onClick = { onSetPrepType(pt) },
-                            label = { Text(pt.displayName(), style = MaterialTheme.typography.labelSmall) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = SurfaceVariant,
-                                selectedLabelColor = TextPrimary
-                            )
-                        )
+                        SettingChip(pt.name, pt.displayName(), prepType == pt.name, { onSetPrepType(pt.name) }, chipColors)
                     }
                 }
                 // Time of Day
                 SettingRow(label = "Time of Day") {
+                    SettingChip(FILTER_ALL, "All", timeOfDay == FILTER_ALL, { onSetTimeOfDay(FILTER_ALL) }, chipColors)
                     TimeOfDay.entries.forEach { tod ->
-                        FilterChip(
-                            selected = timeOfDay == tod,
-                            onClick = { onSetTimeOfDay(tod) },
-                            label = { Text(tod.displayName(), style = MaterialTheme.typography.labelSmall) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = SurfaceVariant,
-                                selectedLabelColor = TextPrimary
-                            )
-                        )
+                        SettingChip(tod.name, tod.displayName(), timeOfDay == tod.name, { onSetTimeOfDay(tod.name) }, chipColors)
                     }
                 }
                 // Posture
                 SettingRow(label = "Posture") {
+                    SettingChip(FILTER_ALL, "All", posture == FILTER_ALL, { onSetPosture(FILTER_ALL) }, chipColors)
                     Posture.entries.forEach { pos ->
-                        FilterChip(
-                            selected = posture == pos,
-                            onClick = { onSetPosture(pos) },
-                            label = { Text(pos.displayName(), style = MaterialTheme.typography.labelSmall) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = SurfaceVariant,
-                                selectedLabelColor = TextPrimary
-                            )
-                        )
+                        SettingChip(pos.name, pos.displayName(), posture == pos.name, { onSetPosture(pos.name) }, chipColors)
                     }
                 }
                 // Audio
                 SettingRow(label = "Audio") {
+                    SettingChip(FILTER_ALL, "All", audio == FILTER_ALL, { onSetAudio(FILTER_ALL) }, chipColors)
                     AudioSetting.entries.forEach { aud ->
-                        FilterChip(
-                            selected = audio == aud,
-                            onClick = { onSetAudio(aud) },
-                            label = { Text(aud.displayName(), style = MaterialTheme.typography.labelSmall) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = SurfaceVariant,
-                                selectedLabelColor = TextPrimary
-                            )
-                        )
+                        SettingChip(aud.name, aud.displayName(), audio == aud.name, { onSetAudio(aud.name) }, chipColors)
                     }
                 }
             }
@@ -335,12 +309,29 @@ private fun StatsSettingsDialog(
 }
 
 @Composable
-private fun SettingRow(label: String, chips: @Composable RowScope.() -> Unit) {
+private fun SettingChip(
+    @Suppress("UNUSED_PARAMETER") key: String,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    colors: SelectableChipColors
+) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+        colors = colors
+    )
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SettingRow(label: String, chips: @Composable FlowRowScope.() -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = TextSecondary)
-        Row(
+        FlowRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) { chips() }
     }
 }
@@ -641,7 +632,8 @@ private fun ApneaSessionSummaryCard(
 @Composable
 private fun ApneaStatsContent(
     stats: ApneaStats,
-    onRecordClick: (Long) -> Unit
+    onRecordClick: (Long) -> Unit,
+    onTimeChartClick: (metricType: String, drillType: String, title: String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         // Activity counts
@@ -664,6 +656,65 @@ private fun ApneaStatsContent(
             activities.forEach { (label, count) ->
                 HistoryStatsRow(label = label, value = count.toString())
             }
+        }
+
+        HorizontalDivider(color = SurfaceVariant)
+
+        // ── Total Times section ────────────────────────────────────────────
+        Text(
+            "Total Times",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = TextPrimary
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            // Per drill type — hold time
+            Text("Hold Time", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+            val holdTimes = listOf(
+                Triple("Free Hold",      stats.freeHoldTotalHoldMs,      "FREE_HOLD"),
+                Triple("O₂ Table",       stats.o2TableTotalHoldMs,       "O2"),
+                Triple("CO₂ Table",      stats.co2TableTotalHoldMs,      "CO2"),
+                Triple("Progressive O₂", stats.progressiveO2TotalHoldMs, "PROGRESSIVE_O2"),
+                Triple("Min Breath",     stats.minBreathTotalHoldMs,     "MIN_BREATH"),
+            )
+            holdTimes.forEach { (label, ms, drill) ->
+                HistoryStatsRow(
+                    label = label,
+                    value = formatStatsDuration(ms),
+                    onClick = { onTimeChartClick("hold", drill, "$label — Hold Time") }
+                )
+            }
+            HistoryStatsRow(
+                label = "Total",
+                value = formatStatsDuration(stats.totalHoldMs),
+                bold = true,
+                onClick = { onTimeChartClick("hold", "TOTAL", "Total Hold Time") }
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            // Per drill type — session time
+            Text("Session Time", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+            val sessionTimes = listOf(
+                Triple("Free Hold",      stats.freeHoldTotalSessionMs,      "FREE_HOLD"),
+                Triple("O₂ Table",       stats.o2TableTotalSessionMs,       "O2"),
+                Triple("CO₂ Table",      stats.co2TableTotalSessionMs,      "CO2"),
+                Triple("Progressive O₂", stats.progressiveO2TotalSessionMs, "PROGRESSIVE_O2"),
+                Triple("Min Breath",     stats.minBreathTotalSessionMs,     "MIN_BREATH"),
+            )
+            sessionTimes.forEach { (label, ms, drill) ->
+                HistoryStatsRow(
+                    label = label,
+                    value = formatStatsDuration(ms),
+                    onClick = { onTimeChartClick("session", drill, "$label — Session Time") }
+                )
+            }
+            HistoryStatsRow(
+                label = "Total",
+                value = formatStatsDuration(stats.totalSessionMs),
+                bold = true,
+                onClick = { onTimeChartClick("session", "TOTAL", "Total Session Time") }
+            )
         }
 
         HorizontalDivider(color = SurfaceVariant)
@@ -751,22 +802,73 @@ private fun HistoryExtremeRow(
 }
 
 @Composable
-private fun HistoryStatsRow(label: String, value: String) {
+private fun HistoryStatsRow(label: String, value: String, bold: Boolean = false, onClick: (() -> Unit)? = null) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-        Text(value, style = MaterialTheme.typography.bodySmall, color = TextPrimary, fontWeight = FontWeight.Medium)
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (bold) TextPrimary else TextSecondary,
+            fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.bodySmall,
+            color = TextPrimary,
+            fontWeight = if (bold) FontWeight.Bold else FontWeight.Medium
+        )
     }
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
+/** Converts a setting string (enum name or "ALL") to a display label. */
+private fun String.displaySettingLabel(): String = when (this) {
+    FILTER_ALL -> "All"
+    // Lung volume
+    "FULL"     -> "Full"
+    "PARTIAL"  -> "Half"
+    "EMPTY"    -> "Empty"
+    // PrepType
+    "NO_PREP"  -> "No Prep"
+    "RESONANCE"-> "Resonance"
+    "HYPER"    -> "Hyper"
+    // TimeOfDay
+    "MORNING"  -> "Morning"
+    "DAY"      -> "Day"
+    "NIGHT"    -> "Night"
+    // Posture
+    "SITTING"  -> "Sitting"
+    "LAYING"   -> "Laying"
+    // AudioSetting
+    "SILENCE"  -> "Silence"
+    "MUSIC"    -> "Music"
+    "MOVIE"    -> "Movie"
+    else       -> lowercase().replaceFirstChar { it.uppercase() }
+}
 
 private fun formatHistoryDuration(ms: Long): String {
     val totalSeconds = ms / 1000L
     val minutes = totalSeconds / 60L
     val seconds = totalSeconds % 60L
     return if (minutes > 0) "${minutes}m ${seconds}s" else "${seconds}s"
+}
+
+/** Formats a duration in ms to a human-readable string with hours if needed. */
+private fun formatStatsDuration(ms: Long): String {
+    if (ms <= 0L) return "0s"
+    val totalSeconds = ms / 1000L
+    val hours = totalSeconds / 3600L
+    val minutes = (totalSeconds % 3600L) / 60L
+    val seconds = totalSeconds % 60L
+    return buildString {
+        if (hours > 0) append("${hours}h ")
+        if (minutes > 0) append("${minutes}m ")
+        append("${seconds}s")
+    }.trim()
 }

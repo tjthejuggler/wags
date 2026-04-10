@@ -24,12 +24,15 @@ import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
 
+/** Sentinel value meaning "don't filter on this setting". */
+const val FILTER_ALL = "ALL"
+
 data class ApneaHistoryUiState(
     val lungVolume: String = "FULL",
-    val prepType: PrepType = PrepType.NO_PREP,
-    val timeOfDay: TimeOfDay = TimeOfDay.DAY,
-    val posture: Posture = Posture.LAYING,
-    val audio: AudioSetting = AudioSetting.SILENCE,
+    val prepType: String = PrepType.NO_PREP.name,
+    val timeOfDay: String = TimeOfDay.DAY.name,
+    val posture: String = Posture.LAYING.name,
+    val audio: String = AudioSetting.SILENCE.name,
     val isLoading: Boolean = true,
     // Stats tab
     val filteredStats: ApneaStats = ApneaStats(),
@@ -64,20 +67,16 @@ class ApneaHistoryViewModel @Inject constructor(
         savedStateHandle.get<String>("lungVolume") ?: "FULL"
     )
     private val _prepType = MutableStateFlow(
-        runCatching { PrepType.valueOf(savedStateHandle.get<String>("prepType") ?: PrepType.NO_PREP.name) }
-            .getOrDefault(PrepType.NO_PREP)
+        savedStateHandle.get<String>("prepType") ?: PrepType.NO_PREP.name
     )
     private val _timeOfDay = MutableStateFlow(
-        runCatching { TimeOfDay.valueOf(savedStateHandle.get<String>("timeOfDay") ?: TimeOfDay.DAY.name) }
-            .getOrDefault(TimeOfDay.DAY)
+        savedStateHandle.get<String>("timeOfDay") ?: TimeOfDay.DAY.name
     )
     private val _posture = MutableStateFlow(
-        runCatching { Posture.valueOf(savedStateHandle.get<String>("posture") ?: Posture.LAYING.name) }
-            .getOrDefault(Posture.LAYING)
+        savedStateHandle.get<String>("posture") ?: Posture.LAYING.name
     )
     private val _audio = MutableStateFlow(
-        runCatching { AudioSetting.valueOf(savedStateHandle.get<String>("audio") ?: AudioSetting.SILENCE.name) }
-            .getOrDefault(AudioSetting.SILENCE)
+        savedStateHandle.get<String>("audio") ?: AudioSetting.SILENCE.name
     )
 
     private val _selectedDate = MutableStateFlow<LocalDate?>(null)
@@ -90,7 +89,7 @@ class ApneaHistoryViewModel @Inject constructor(
 
     // ── Filtered stats (react to settings changes) ────────────────────────────
     private val filteredStatsFlow = settingsFlow.flatMapLatest { (lv, pt, tod, pos, aud) ->
-        apneaRepository.getStats(lv, pt.name, tod.name, pos.name, aud.name)
+        apneaRepository.getStats(lv, pt, tod, pos, aud)
     }
 
     val uiState: StateFlow<ApneaHistoryUiState> = combine(
@@ -138,11 +137,11 @@ class ApneaHistoryViewModel @Inject constructor(
     )
 
     // ── Settings setters (for Stats tab popup) ────────────────────────────────
-    fun setLungVolume(v: String)       { _lungVolume.value = v }
-    fun setPrepType(v: PrepType)       { _prepType.value = v }
-    fun setTimeOfDay(v: TimeOfDay)     { _timeOfDay.value = v }
-    fun setPosture(v: Posture)         { _posture.value = v }
-    fun setAudio(v: AudioSetting)      { _audio.value = v }
+    fun setLungVolume(v: String)   { _lungVolume.value = v }
+    fun setPrepType(v: String)     { _prepType.value = v }
+    fun setTimeOfDay(v: String)    { _timeOfDay.value = v }
+    fun setPosture(v: String)      { _posture.value = v }
+    fun setAudio(v: String)        { _audio.value = v }
 
     /** Called when user taps a day on the calendar. */
     fun selectDate(date: LocalDate) { _selectedDate.value = date }

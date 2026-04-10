@@ -1,6 +1,27 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-10 07:39 UTC-6*
+*Last updated: 2026-04-10 14:46 UTC-6*
+
+## Recent Changes (2026-04-10 14:46)
+- ✅ **Clickable Time Charts for Total Times section:**
+  - New `TimeChartScreen.kt` — landscape-forced screen with Daily bar chart / Cumulative line chart toggle
+  - New `TimeChartViewModel.kt` — loads all records/sessions, computes per-day aggregation for hold or session time by drill type
+  - All Total Times rows (per-drill-type + Total) now clickable, navigating to the chart screen
+  - `WagsNavGraph.kt` — added TIME_CHART route, timeChart() helper, composable block
+  - `ApneaHistoryScreen.kt` — onTimeChartClick callback threaded through, HistoryStatsRow gets optional onClick
+  - `ApneaRecordDao.kt` / `ApneaSessionDao.kt` — getAllOnce() queries
+  - `ApneaRepository.kt` / `ApneaSessionRepository.kt` — getAllRecordsOnce() / getAllSessionsOnce() methods
+
+## Recent Changes (2026-04-10 08:11)
+- ✅ **Apnea Stats: Total Times section + "All" filter option:**
+  - New "Total Times" section on Stats tab showing per-drill-type Total Hold Time and Total Session Time with bold totals
+  - "All" chip added to each setting in the Stats filter dialog (Lung Volume, Prep, Time of Day, Posture, Audio)
+  - DAO queries updated with `(:param = 'ALL' OR column = :param)` pattern for flexible filtering
+  - ViewModel refactored from typed enums to String-based settings with `FILTER_ALL = "ALL"` sentinel
+  - New SUM queries in ApneaRecordDao and ApneaSessionDao for total hold/session times
+  - ApneaStats model expanded with 10 new total time fields + 2 computed properties
+  - ApneaRepository expanded with sessionDao injection and total time flow groups
+  - Modified: `ApneaStats.kt`, `ApneaRecordDao.kt`, `ApneaSessionDao.kt`, `FreeHoldTelemetryDao.kt`, `ApneaRepository.kt`, `ApneaHistoryViewModel.kt`, `ApneaHistoryScreen.kt`
 
 ## Recent Changes (2026-04-10 07:39)
 - ✅ **Vibration/Voice indication system standardized:**

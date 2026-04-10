@@ -20,6 +20,7 @@ import com.example.wags.ui.apnea.ApneaScreen
 import com.example.wags.ui.apnea.ApneaTableScreen
 import com.example.wags.ui.apnea.FreeHoldActiveScreen
 import com.example.wags.ui.apnea.PbChartScreen
+import com.example.wags.ui.apnea.TimeChartScreen
 import com.example.wags.ui.apnea.PersonalBestsScreen
 import com.example.wags.ui.apnea.MinBreathActiveScreen
 import com.example.wags.ui.apnea.MinBreathScreen
@@ -101,6 +102,9 @@ object WagsRoutes {
     const val MIN_BREATH = "min_breath"
     const val MIN_BREATH_ACTIVE = "min_breath_active"
 
+    // ── Time Chart (stats drill-down) ─────────────────────────────────────────
+    const val TIME_CHART = "time_chart?metricType={metricType}&drillType={drillType}&title={title}"
+
     // ── Rapid HR Change ───────────────────────────────────────────────────────
     const val RAPID_HR = "rapid_hr"
     const val RAPID_HR_HISTORY = "rapid_hr_history"
@@ -166,6 +170,12 @@ object WagsRoutes {
         drillType: String = "",
         drillParamValue: Int? = null
     ) = "pb_chart?lungVolume=$lungVolume&prepType=$prepType&timeOfDay=$timeOfDay&posture=$posture&audio=$audio&label=${URLEncoder.encode(label, "UTF-8")}&drillType=$drillType&drillParamValue=${drillParamValue ?: ""}"
+
+    fun timeChart(
+        metricType: String,
+        drillType: String,
+        title: String
+    ) = "time_chart?metricType=$metricType&drillType=$drillType&title=${URLEncoder.encode(title, "UTF-8")}"
 }
 
 @Composable
@@ -468,6 +478,17 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             arguments = listOf(navArgument("sessionId") { type = NavType.LongType })
         ) {
             RapidHrDetailScreen(navController = navController)
+        }
+        // ── Time Chart (stats drill-down) ─────────────────────────────────
+        composable(
+            route = WagsRoutes.TIME_CHART,
+            arguments = listOf(
+                navArgument("metricType") { type = NavType.StringType; defaultValue = "hold" },
+                navArgument("drillType")  { type = NavType.StringType; defaultValue = "TOTAL" },
+                navArgument("title")      { type = NavType.StringType; defaultValue = "Time Chart" }
+            )
+        ) {
+            TimeChartScreen(onBack = { navController.popBackStack() })
         }
         // ── Garmin Watch ────────────────────────────────────────────────────
         composable(WagsRoutes.GARMIN) {

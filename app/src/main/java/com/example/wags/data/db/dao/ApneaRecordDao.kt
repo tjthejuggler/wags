@@ -246,6 +246,9 @@ interface ApneaRecordDao {
     @Query("SELECT * FROM apnea_records ORDER BY timestamp DESC")
     fun observeAll(): Flow<List<ApneaRecordEntity>>
 
+    @Query("SELECT * FROM apnea_records ORDER BY timestamp ASC")
+    suspend fun getAllOnce(): List<ApneaRecordEntity>
+
     @Query("SELECT * FROM apnea_records WHERE tableType = :type ORDER BY timestamp DESC")
     fun getByType(type: String): Flow<List<ApneaRecordEntity>>
 
@@ -391,8 +394,8 @@ interface ApneaRecordDao {
 
     @Query("""
         SELECT COUNT(*) FROM apnea_records
-        WHERE lungVolume = :lungVolume AND prepType = :prepType AND timeOfDay = :timeOfDay
-          AND posture = :posture AND audio = :audio AND tableType IS NULL
+        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND (:timeOfDay = 'ALL' OR timeOfDay = :timeOfDay)
+          AND (:posture = 'ALL' OR posture = :posture) AND (:audio = 'ALL' OR audio = :audio) AND tableType IS NULL
     """)
     fun countFreeHolds(
         lungVolume: String,
@@ -404,8 +407,8 @@ interface ApneaRecordDao {
 
     @Query("""
         SELECT COUNT(*) FROM apnea_records
-        WHERE lungVolume = :lungVolume AND prepType = :prepType AND timeOfDay = :timeOfDay
-          AND posture = :posture AND audio = :audio AND tableType = :tableType
+        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND (:timeOfDay = 'ALL' OR timeOfDay = :timeOfDay)
+          AND (:posture = 'ALL' OR posture = :posture) AND (:audio = 'ALL' OR audio = :audio) AND tableType = :tableType
     """)
     fun countByTableType(
         lungVolume: String,
@@ -418,8 +421,8 @@ interface ApneaRecordDao {
 
     @Query("""
         SELECT MAX(maxHrBpm) FROM apnea_records
-        WHERE lungVolume = :lungVolume AND prepType = :prepType AND timeOfDay = :timeOfDay
-          AND posture = :posture AND audio = :audio AND maxHrBpm BETWEEN 20 AND 250
+        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND (:timeOfDay = 'ALL' OR timeOfDay = :timeOfDay)
+          AND (:posture = 'ALL' OR posture = :posture) AND (:audio = 'ALL' OR audio = :audio) AND maxHrBpm BETWEEN 20 AND 250
     """)
     fun getMaxHrEver(
         lungVolume: String,
@@ -431,8 +434,8 @@ interface ApneaRecordDao {
 
     @Query("""
         SELECT recordId FROM apnea_records
-        WHERE lungVolume = :lungVolume AND prepType = :prepType AND timeOfDay = :timeOfDay
-          AND posture = :posture AND audio = :audio AND maxHrBpm BETWEEN 20 AND 250
+        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND (:timeOfDay = 'ALL' OR timeOfDay = :timeOfDay)
+          AND (:posture = 'ALL' OR posture = :posture) AND (:audio = 'ALL' OR audio = :audio) AND maxHrBpm BETWEEN 20 AND 250
         ORDER BY maxHrBpm DESC LIMIT 1
     """)
     fun getMaxHrRecordId(
@@ -445,8 +448,8 @@ interface ApneaRecordDao {
 
     @Query("""
         SELECT MIN(minHrBpm) FROM apnea_records
-        WHERE lungVolume = :lungVolume AND prepType = :prepType AND timeOfDay = :timeOfDay
-          AND posture = :posture AND audio = :audio AND minHrBpm BETWEEN 20 AND 250
+        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND (:timeOfDay = 'ALL' OR timeOfDay = :timeOfDay)
+          AND (:posture = 'ALL' OR posture = :posture) AND (:audio = 'ALL' OR audio = :audio) AND minHrBpm BETWEEN 20 AND 250
     """)
     fun getMinHrEver(
         lungVolume: String,
@@ -458,8 +461,8 @@ interface ApneaRecordDao {
 
     @Query("""
         SELECT recordId FROM apnea_records
-        WHERE lungVolume = :lungVolume AND prepType = :prepType AND timeOfDay = :timeOfDay
-          AND posture = :posture AND audio = :audio AND minHrBpm BETWEEN 20 AND 250
+        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND (:timeOfDay = 'ALL' OR timeOfDay = :timeOfDay)
+          AND (:posture = 'ALL' OR posture = :posture) AND (:audio = 'ALL' OR audio = :audio) AND minHrBpm BETWEEN 20 AND 250
         ORDER BY minHrBpm ASC LIMIT 1
     """)
     fun getMinHrRecordId(
@@ -472,8 +475,8 @@ interface ApneaRecordDao {
 
     @Query("""
         SELECT MIN(lowestSpO2) FROM apnea_records
-        WHERE lungVolume = :lungVolume AND prepType = :prepType AND timeOfDay = :timeOfDay
-          AND posture = :posture AND audio = :audio
+        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND (:timeOfDay = 'ALL' OR timeOfDay = :timeOfDay)
+          AND (:posture = 'ALL' OR posture = :posture) AND (:audio = 'ALL' OR audio = :audio)
           AND lowestSpO2 IS NOT NULL AND lowestSpO2 BETWEEN 1 AND 100
     """)
     fun getLowestSpO2Ever(
@@ -486,8 +489,8 @@ interface ApneaRecordDao {
 
     @Query("""
         SELECT recordId FROM apnea_records
-        WHERE lungVolume = :lungVolume AND prepType = :prepType AND timeOfDay = :timeOfDay
-          AND posture = :posture AND audio = :audio
+        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND (:timeOfDay = 'ALL' OR timeOfDay = :timeOfDay)
+          AND (:posture = 'ALL' OR posture = :posture) AND (:audio = 'ALL' OR audio = :audio)
           AND lowestSpO2 IS NOT NULL AND lowestSpO2 BETWEEN 1 AND 100
         ORDER BY lowestSpO2 ASC LIMIT 1
     """)
@@ -689,6 +692,28 @@ interface ApneaRecordDao {
     @RawQuery
     suspend fun getAllDrillRecordsRaw(query: SupportSQLiteQuery): List<ApneaRecordEntity>
 
+    // ── Total hold time SUM queries (filtered by 5 settings) ────────────────
+
+    @Query("""
+        SELECT COALESCE(SUM(durationMs), 0) FROM apnea_records
+        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND (:timeOfDay = 'ALL' OR timeOfDay = :timeOfDay)
+          AND (:posture = 'ALL' OR posture = :posture) AND (:audio = 'ALL' OR audio = :audio) AND tableType IS NULL
+    """)
+    fun sumFreeHoldDuration(
+        lungVolume: String, prepType: String, timeOfDay: String,
+        posture: String, audio: String
+    ): Flow<Long>
+
+    @Query("""
+        SELECT COALESCE(SUM(durationMs), 0) FROM apnea_records
+        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND (:timeOfDay = 'ALL' OR timeOfDay = :timeOfDay)
+          AND (:posture = 'ALL' OR posture = :posture) AND (:audio = 'ALL' OR audio = :audio) AND tableType = :tableType
+    """)
+    fun sumHoldDurationByTableType(
+        lungVolume: String, prepType: String, timeOfDay: String,
+        posture: String, audio: String, tableType: String
+    ): Flow<Long>
+
     // ── Stats queries (all settings combined) ────────────────────────────────
 
     @Query("SELECT COUNT(*) FROM apnea_records WHERE tableType IS NULL")
@@ -696,6 +721,12 @@ interface ApneaRecordDao {
 
     @Query("SELECT COUNT(*) FROM apnea_records WHERE tableType = :tableType")
     fun countByTableTypeAll(tableType: String): Flow<Int>
+
+    @Query("SELECT COALESCE(SUM(durationMs), 0) FROM apnea_records WHERE tableType IS NULL")
+    fun sumFreeHoldDurationAll(): Flow<Long>
+
+    @Query("SELECT COALESCE(SUM(durationMs), 0) FROM apnea_records WHERE tableType = :tableType")
+    fun sumHoldDurationByTableTypeAll(tableType: String): Flow<Long>
 
     @Query("SELECT MAX(maxHrBpm) FROM apnea_records WHERE maxHrBpm BETWEEN 20 AND 250")
     fun getMaxHrEverAll(): Flow<Float?>

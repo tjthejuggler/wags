@@ -1,6 +1,7 @@
 package com.example.wags.data.repository
 
 import com.example.wags.data.db.dao.ApneaRecordDao
+import com.example.wags.data.db.dao.ApneaSessionDao
 import com.example.wags.data.db.dao.ApneaSongLogDao
 import com.example.wags.data.db.dao.FreeHoldTelemetryDao
 import com.example.wags.data.db.dao.buildAllDrillRecordsQuery
@@ -38,6 +39,7 @@ class ApneaRepository @Inject constructor(
     private val dao: ApneaRecordDao,
     private val telemetryDao: FreeHoldTelemetryDao,
     private val songLogDao: ApneaSongLogDao,
+    private val sessionDao: ApneaSessionDao,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) {
     fun getLatestRecords(limit: Int = 20): Flow<List<ApneaRecordEntity>> =
@@ -58,6 +60,9 @@ class ApneaRepository @Inject constructor(
 
     /** All records ever, newest first — used for the calendar tab. */
     fun getAllRecords(): Flow<List<ApneaRecordEntity>> = dao.observeAll()
+
+    /** One-shot: all records ever, oldest first — used for time charts. */
+    suspend fun getAllRecordsOnce(): List<ApneaRecordEntity> = withContext(ioDispatcher) { dao.getAllOnce() }
 
     /** The [limit] most recent records for a given 5-setting combination, across ALL event types. */
     fun getRecentBySettings(
@@ -1238,9 +1243,29 @@ class ApneaRepository @Inject constructor(
             telemetryDao.getMinEndSpO2RecordId(lungVolume, prepType, timeOfDay, posture),
         ) { mxESp, mxESpId, mnESp, mnESpId -> listOf<Any?>(mxESp, mxESpId, mnESp, mnESpId) }
 
+        // Total hold time per drill type (from apnea_records.durationMs)
+        val groupG = combine(
+            dao.sumFreeHoldDuration(lungVolume, prepType, timeOfDay, posture, audio),
+            dao.sumHoldDurationByTableType(lungVolume, prepType, timeOfDay, posture, audio, "O2"),
+            dao.sumHoldDurationByTableType(lungVolume, prepType, timeOfDay, posture, audio, "CO2"),
+            dao.sumHoldDurationByTableType(lungVolume, prepType, timeOfDay, posture, audio, "PROGRESSIVE_O2"),
+            dao.sumHoldDurationByTableType(lungVolume, prepType, timeOfDay, posture, audio, "MIN_BREATH"),
+        ) { fh, o2, co2, po2, mb -> listOf<Any?>(fh, o2, co2, po2, mb) }
+
+        // Total session time per drill type (free hold session = hold; others from apnea_sessions)
+        val groupH = combine(
+            dao.sumFreeHoldDuration(lungVolume, prepType, timeOfDay, posture, audio), // free hold: session = hold
+            sessionDao.sumSessionDuration(lungVolume, prepType, timeOfDay, posture, audio, "O2"),
+            sessionDao.sumSessionDuration(lungVolume, prepType, timeOfDay, posture, audio, "CO2"),
+            sessionDao.sumSessionDuration(lungVolume, prepType, timeOfDay, posture, audio, "PROGRESSIVE_O2"),
+            sessionDao.sumSessionDuration(lungVolume, prepType, timeOfDay, posture, audio, "MIN_BREATH"),
+        ) { fh, o2, co2, po2, mb -> listOf<Any?>(fh, o2, co2, po2, mb) }
+
         return combine(groupA, groupB, groupC, groupD, groupE) { a, b, c, d, e -> a + b + c + d + e }
-            .combine(groupF) { abcde, f ->
-                val v = abcde + f
+            .combine(groupF) { abcde, f -> abcde + f }
+            .combine(groupG) { prev, g -> prev + g }
+            .combine(groupH) { prev, h ->
+                val v = prev + h
                 ApneaStats(
                     freeHoldCount            = v[0] as Int,
                     o2TableCount             = v[1] as Int,
@@ -1271,6 +1296,18 @@ class ApneaRepository @Inject constructor(
                     maxEndSpO2RecordId       = v[26] as? Long,
                     minEndSpO2               = v[27] as? Int,
                     minEndSpO2RecordId       = v[28] as? Long,
+                    // Total hold times (indices 29-33)
+                    freeHoldTotalHoldMs      = v[29] as Long,
+                    o2TableTotalHoldMs       = v[30] as Long,
+                    co2TableTotalHoldMs      = v[31] as Long,
+                    progressiveO2TotalHoldMs = v[32] as Long,
+                    minBreathTotalHoldMs     = v[33] as Long,
+                    // Total session times (indices 34-38)
+                    freeHoldTotalSessionMs      = v[34] as Long,
+                    o2TableTotalSessionMs       = v[35] as Long,
+                    co2TableTotalSessionMs      = v[36] as Long,
+                    progressiveO2TotalSessionMs = v[37] as Long,
+                    minBreathTotalSessionMs     = v[38] as Long,
                 )
             }
     }
@@ -1325,9 +1362,29 @@ class ApneaRepository @Inject constructor(
             telemetryDao.getMinEndSpO2RecordIdAll(),
         ) { mxESp, mxESpId, mnESp, mnESpId -> listOf<Any?>(mxESp, mxESpId, mnESp, mnESpId) }
 
+        // Total hold time per drill type (from apnea_records.durationMs)
+        val groupG = combine(
+            dao.sumFreeHoldDurationAll(),
+            dao.sumHoldDurationByTableTypeAll("O2"),
+            dao.sumHoldDurationByTableTypeAll("CO2"),
+            dao.sumHoldDurationByTableTypeAll("PROGRESSIVE_O2"),
+            dao.sumHoldDurationByTableTypeAll("MIN_BREATH"),
+        ) { fh, o2, co2, po2, mb -> listOf<Any?>(fh, o2, co2, po2, mb) }
+
+        // Total session time per drill type
+        val groupH = combine(
+            dao.sumFreeHoldDurationAll(), // free hold: session = hold
+            sessionDao.sumSessionDurationAll("O2"),
+            sessionDao.sumSessionDurationAll("CO2"),
+            sessionDao.sumSessionDurationAll("PROGRESSIVE_O2"),
+            sessionDao.sumSessionDurationAll("MIN_BREATH"),
+        ) { fh, o2, co2, po2, mb -> listOf<Any?>(fh, o2, co2, po2, mb) }
+
         return combine(groupA, groupB, groupC, groupD, groupE) { a, b, c, d, e -> a + b + c + d + e }
-            .combine(groupF) { abcde, f ->
-                val v = abcde + f
+            .combine(groupF) { abcde, f -> abcde + f }
+            .combine(groupG) { prev, g -> prev + g }
+            .combine(groupH) { prev, h ->
+                val v = prev + h
                 ApneaStats(
                     freeHoldCount            = v[0] as Int,
                     o2TableCount             = v[1] as Int,
@@ -1358,6 +1415,18 @@ class ApneaRepository @Inject constructor(
                     maxEndSpO2RecordId       = v[26] as? Long,
                     minEndSpO2               = v[27] as? Int,
                     minEndSpO2RecordId       = v[28] as? Long,
+                    // Total hold times (indices 29-33)
+                    freeHoldTotalHoldMs      = v[29] as Long,
+                    o2TableTotalHoldMs       = v[30] as Long,
+                    co2TableTotalHoldMs      = v[31] as Long,
+                    progressiveO2TotalHoldMs = v[32] as Long,
+                    minBreathTotalHoldMs     = v[33] as Long,
+                    // Total session times (indices 34-38)
+                    freeHoldTotalSessionMs      = v[34] as Long,
+                    o2TableTotalSessionMs       = v[35] as Long,
+                    co2TableTotalSessionMs      = v[36] as Long,
+                    progressiveO2TotalSessionMs = v[37] as Long,
+                    minBreathTotalSessionMs     = v[38] as Long,
                 )
             }
     }
