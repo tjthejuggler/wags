@@ -68,6 +68,8 @@ fun ApneaTableScreen(
     ) { padding ->
         // Song picker dialog state
         var showSongPicker by remember { mutableStateOf(false) }
+        // Guided audio picker dialog state
+        var showGuidedPicker by remember { mutableStateOf(false) }
 
         if (showSongPicker) {
             SongPickerDialog(
@@ -77,6 +79,19 @@ fun ApneaTableScreen(
                 loadingSelectedSong = state.loadingSelectedSong,
                 onSongSelected = { track -> viewModel.selectSong(track) },
                 onDismiss = { showSongPicker = false }
+            )
+        }
+
+        if (showGuidedPicker) {
+            LaunchedEffect(Unit) { viewModel.loadGuidedCompletionStatuses() }
+            GuidedAudioPickerDialog(
+                audios = state.guidedAudios,
+                selectedId = state.guidedSelectedId,
+                completionStatuses = state.guidedCompletionStatuses,
+                onSelect = { audio -> viewModel.selectGuidedAudio(audio) },
+                onAddNew = { uri, name, url -> viewModel.addGuidedAudio(uri, name, url) },
+                onDelete = { audio -> viewModel.deleteGuidedAudio(audio) },
+                onDismiss = { showGuidedPicker = false }
             )
         }
 
@@ -152,6 +167,17 @@ fun ApneaTableScreen(
                                     onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) }
                                 )
                             }
+                        }
+                    }
+                    // Guided audio picker — shown when GUIDED is selected, session not active
+                    if (state.audio == AudioSetting.GUIDED && state.apneaState == ApneaState.IDLE) {
+                        item {
+                            if (state.guidedSelectedName.isNotBlank()) {
+                                SelectedGuidedAudioBanner(name = state.guidedSelectedName)
+                            }
+                            GuidedAudioPickerButton(onClick = {
+                                showGuidedPicker = true
+                            })
                         }
                     }
                     // Voice / vibration toggles — shown when session is not active

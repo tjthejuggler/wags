@@ -1187,6 +1187,28 @@ class ApneaRepository @Inject constructor(
         ) == 1
     }
 
+    // ── Guided audio completion queries ─────────────────────────────────────
+
+    /** Returns true if any apnea record used the given guided audio name. */
+    suspend fun wasGuidedAudioUsedEver(guidedAudioName: String): Boolean =
+        withContext(ioDispatcher) {
+            dao.wasGuidedAudioUsedEver(guidedAudioName) == 1
+        }
+
+    /** Returns true if any apnea record used the given guided audio name with the specified settings. */
+    suspend fun wasGuidedAudioUsedWithSettings(
+        guidedAudioName: String,
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        posture: String,
+        audio: String
+    ): Boolean = withContext(ioDispatcher) {
+        dao.wasGuidedAudioUsedWithSettings(
+            guidedAudioName, lungVolume, prepType, timeOfDay, posture, audio
+        ) == 1
+    }
+
     // ── Stats (filtered by 5 settings) ───────────────────────────────────────
 
     fun getStats(

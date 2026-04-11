@@ -88,6 +88,7 @@ internal fun String.displayAudioBanner(): String = when (uppercase()) {
     "SILENCE" -> "Silence"
     "MUSIC"   -> "Music"
     "MOVIE"   -> "Movie"
+    "GUIDED"  -> "Guided"
     else      -> lowercase().replaceFirstChar { it.uppercase() }
 }
 

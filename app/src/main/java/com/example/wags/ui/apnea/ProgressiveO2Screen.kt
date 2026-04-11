@@ -130,6 +130,29 @@ fun ProgressiveO2Screen(
                 }
             }
 
+            // 0c. Guided audio picker — shown when GUIDED mode
+            var showGuidedPicker by remember { mutableStateOf(false) }
+            if (state.isGuidedMode) {
+                if (state.guidedSelectedName.isNotBlank()) {
+                    SelectedGuidedAudioBanner(name = state.guidedSelectedName)
+                }
+                GuidedAudioPickerButton(onClick = {
+                    showGuidedPicker = true
+                })
+            }
+            if (showGuidedPicker) {
+                LaunchedEffect(Unit) { viewModel.loadGuidedCompletionStatuses() }
+                GuidedAudioPickerDialog(
+                    audios = state.guidedAudios,
+                    selectedId = state.guidedSelectedId,
+                    completionStatuses = state.guidedCompletionStatuses,
+                    onSelect = { audio -> viewModel.selectGuidedAudio(audio) },
+                    onAddNew = { uri, name, url -> viewModel.addGuidedAudio(uri, name, url) },
+                    onDelete = { audio -> viewModel.deleteGuidedAudio(audio) },
+                    onDismiss = { showGuidedPicker = false }
+                )
+            }
+
             // 1. Explanation card
             ExplanationCard()
 

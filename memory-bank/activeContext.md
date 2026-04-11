@@ -1,6 +1,312 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-10 15:41 UTC-6*
+*Last updated: 2026-04-11 10:11 UTC-6*
+
+### 2026-04-11 10:11 (UTC-6)
+**Task:** Implement two-checkmark completion system for Guided Audio Picker dialog
+
+**What was done:**
+- Added `GuidedCompletionStatus` data class to `GuidedAudioPicker.kt` with `completedWithAnySettings` and `completedWithCurrentSettings` fields
+- Added `wasGuidedAudioUsedEver(guidedAudioName: String): Boolean` and `wasGuidedAudioUsedWithSettings(guidedAudioName, lungVolume, prepType, timeOfDay, posture, audio): Boolean` queries to `ApneaRecordDao.kt`
+- Added corresponding repository methods to `ApneaRepository.kt`
+- Added `guidedCompletionStatuses: Map<Long, GuidedCompletionStatus>` to UiState in: `FreeHoldActiveScreen.kt`, `AdvancedApneaViewModel.kt`, `ProgressiveO2ViewModel.kt`, `MinBreathViewModel.kt`, `ApneaViewModel.kt`
+- Added `loadGuidedCompletionStatuses()` method to all 5 ViewModels
+- Updated `GuidedAudioPickerDialog` to accept `completionStatuses` parameter and display two-checkmark system (bright ✓ = used with any settings, grey ✓ = used with current settings) — removed simple selected checkmark
+- Updated all 5 call sites (`FreeHoldActiveScreen`, `AdvancedApneaScreen`, `ProgressiveO2Screen`, `MinBreathScreen`, `ApneaTableScreen`) with `LaunchedEffect` trigger + `completionStatuses` parameter
+- Build successful, installed on SM-S918U1
+
+**Current state:** Guided audio two-checkmark system fully implemented and deployed.
+
+### 2026-04-11 10:08 (UTC-6)
+
+**Guided Audio Picker — Two-Checkmark Completion System**
+
+Added the same two-checkmark completion system used in the Spotify "Choose a Song" popup to the Guided Audio Picker dialog. Each guided audio in the library now shows:
+- **Bright checkmark** (✓ in `TextPrimary`) — audio was used during any past apnea session
+- **Grey checkmark** (✓ in `Color(0xFF888888)`) — audio was used with the current 5-setting combination (lungVolume, prepType, timeOfDay, posture, audio)
+- **No checkmark** — never used
+
+**Changes:**
+- `ApneaRecordDao.kt` — Added `wasGuidedAudioUsedEver()` and `wasGuidedAudioUsedWithSettings()` queries on `apnea_records.guidedAudioName`
+- `ApneaRepository.kt` — Added `wasGuidedAudioUsedEver()` and `wasGuidedAudioUsedWithSettings()` repository methods
+- `GuidedAudioPicker.kt` — Added `GuidedCompletionStatus` data class, updated `GuidedAudioPickerDialog` to accept `completionStatuses: Map<Long, GuidedCompletionStatus>`, updated `GuidedAudioCard` to show two checkmarks (replacing the old single ✓ for selected item)
+- All 5 UiStates updated with `guidedCompletionStatuses: Map<Long, GuidedCompletionStatus>`:
+  - `FreeHoldActiveUiState`, `AdvancedApneaScreenUiState`, `ProgressiveO2UiState`, `MinBreathUiState`, `ApneaUiState`
+- All 5 ViewModels updated with `loadGuidedCompletionStatuses()`:
+  - `FreeHoldActiveViewModel`, `AdvancedApneaViewModel`, `ProgressiveO2ViewModel`, `MinBreathViewModel`, `ApneaViewModel`
+- All 5 call sites updated to pass `completionStatuses` and trigger `LaunchedEffect` load:
+  - `FreeHoldActiveScreen.kt`, `AdvancedApneaScreen.kt`, `ProgressiveO2Screen.kt`, `MinBreathScreen.kt`, `ApneaTableScreen.kt`
+
+Build: ✅ Successful, installed on SM-S918U1
+
+### 2026-04-11 09:37 (UTC-6)
+
+**Guided Audio — complete rework with DB-backed library + Spotify-style picker**
+
+Added "Guided" as a 4th audio option (Silence, Music, Movie, Guided) across the entire apnea section. The guided audio system uses a persistent DB-backed library where users can add MP3 files from their device, optionally associate a YouTube/source URL, and select one for playback during any apnea drill.
+
+**UX Flow:**
+1. User selects "Guided" in audio settings (on main ApneaScreen or any drill's settings dialog)
+2. On any drill setup screen (Free Hold, O₂/CO₂ Table, Progressive O₂, Min Breath, Advanced), a "Choose a guided MP3" button appears (like Spotify's "Choose a Song")
+3. Tapping opens a popup dialog showing the guided audio library
+4. User can add new MP3s (file browser + optional source URL), tap to select, long-press for details (delete, copy URL)
+5. Selected audio name shown in a banner above the button
+6. Audio plays (looping) during the session, stops when session ends
+7. Guided audio name saved to `ApneaRecordEntity.guidedAudioName` and shown in history/detail screens
+
+**Architecture:**
+- `guided_audios` DB table (v31→v32) with `audioId`, `fileName`, `uri`, `sourceUrl`
+- `GuidedAudioDao` — Room DAO with Flow-based `observeAll()`, CRUD operations
+- `GuidedAudioManager` — @Singleton, DB-backed library + SharedPreferences for selected ID + MediaPlayer playback
+- `GuidedAudioPickerButton` — styled like `SongPickerButton`
+- `GuidedAudioPickerDialog` — 3-view dialog (LIST, ADD_NEW, DETAIL) with file picker, long-press, delete, copy URL
+- `SelectedGuidedAudioBanner` — shows current selection
+- NOT shown on main ApneaScreen settings (only on drill setup screens, like Spotify)
+
+New files (4):
+- `GuidedAudioEntity.kt`, `GuidedAudioDao.kt`, `GuidedAudioManager.kt`, `GuidedAudioPicker.kt`
+
+Modified files (19):
+- `AudioSetting.kt` — GUIDED enum entry
+- `ApneaRecordEntity.kt` — `guidedAudioName` column
+- `WagsDatabase.kt` — MIGRATION_30_31 (guidedAudioName column) + MIGRATION_31_32 (guided_audios table), version 30→32
+- `DatabaseModule.kt` — registered both migrations + GuidedAudioDao provider
+- `ApneaSettingsSummaryBanner.kt` — GUIDED display helper
+- `ApneaHistoryScreen.kt` — GUIDED display label
+- `ApneaViewModel.kt` — guided state/methods, playback, record saves
+- `ApneaScreen.kt` — guided picker removed from settings (only on drill screens)
+- `FreeHoldActiveScreen.kt` — guided picker button+dialog+banner
+- `ProgressiveO2ViewModel.kt` + `ProgressiveO2Screen.kt` — guided integration
+- `MinBreathViewModel.kt` + `MinBreathScreen.kt` — guided integration
+- `AdvancedApneaViewModel.kt` + `AdvancedApneaScreen.kt` — guided integration
+- `ApneaTableScreen.kt` — guided picker button+dialog+banner
+- `AllApneaRecordsScreen.kt` — guided audio name in record rows
+- `ApneaRecordDetailScreen.kt` — guided audio name in detail view
+
+Build: ✅ Successful, installed on SM-S918U1
+
+### 2026-04-11 09:35 (UTC-6)
+
+**Rework Part C: Wire New Guided Audio UI into All ViewModels + Screens**
+
+Updated all apnea ViewModels and screens to use the new DB-backed `GuidedAudioManager` API (from Part A) and the new `GuidedAudioPickerButton`/`SelectedGuidedAudioBanner`/`GuidedAudioPickerDialog` UI components (from Part B).
+
+Key changes across all ViewModels:
+- **UI State**: Replaced `guidedAudioName: String` + `guidedAudioYoutubeUrl: String` with `guidedAudios: List<GuidedAudioEntity>` + `guidedSelectedId: Long` + `guidedSelectedName: String`
+- **Init block**: Added `guidedAudioManager.allAudios` Flow collection + async `getSelectedName()` load
+- **Methods**: Replaced `onGuidedFilePicked(uri, name)` / `onGuidedYoutubeUrlChanged(url)` / `clearGuidedAudio()` with `selectGuidedAudio(audio)` / `addGuidedAudio(uri, fileName, sourceUrl)` / `deleteGuidedAudio(audio)`
+- **setAudio()**: Now uses async `getSelectedName()` instead of synchronous `guidedAudioManager.selectedName`
+- **Playback**: All `guidedAudioManager.startPlayback()` calls now preceded by `guidedAudioManager.preparePlayback()` in a coroutine
+- **Record saves**: `guidedAudioName` field now reads from `_uiState.value.guidedSelectedName` instead of `guidedAudioManager.selectedName`
+
+Key changes across all screens:
+- Replaced `GuidedAudioPicker(selectedName, youtubeUrl, onFilePicked, onYoutubeUrlChanged, onClear)` with:
+  - `SelectedGuidedAudioBanner(name)` — shows selected audio name
+  - `GuidedAudioPickerButton(onClick)` — opens the picker dialog
+  - `GuidedAudioPickerDialog(audios, selectedId, onSelect, onAddNew, onDelete, onDismiss)` — full library dialog
+- `ApneaScreen.kt`: Removed guided audio picker entirely from `ApneaSettingsContent` (settings section)
+
+Also fixed: `MIGRATION_31_32` was accidentally nested inside `MIGRATION_30_31` in `WagsDatabase.kt` — moved it to be a sibling in the companion object.
+
+Modified files (9):
+- `ApneaViewModel.kt` — New guided state fields, new methods, preparePlayback(), async name loading
+- `ApneaScreen.kt` — Removed guided params from `ApneaSettingsContent`, removed `GuidedAudioPicker` block
+- `FreeHoldActiveScreen.kt` — ViewModel: new state/methods/preparePlayback; Screen: button+dialog pattern
+- `ProgressiveO2ViewModel.kt` — New guided state/methods, preparePlayback, async name
+- `ProgressiveO2Screen.kt` — Button+dialog pattern replacing old `GuidedAudioPicker`
+- `MinBreathViewModel.kt` — New guided state/methods, preparePlayback, async name
+- `MinBreathScreen.kt` — Button+dialog pattern replacing old `GuidedAudioPicker`
+- `AdvancedApneaViewModel.kt` — New guided state/methods, preparePlayback, async name
+- `AdvancedApneaScreen.kt` — Button+dialog pattern replacing old `GuidedAudioPicker`
+- `ApneaTableScreen.kt` — Button+dialog pattern replacing old `GuidedAudioPicker`
+- `WagsDatabase.kt` — Fixed `MIGRATION_31_32` nesting bug
+
+---
+
+### 2026-04-11 08:40 (UTC-6)
+
+**Rework Part B: New Guided Audio UI Components — Button + Popup Dialog**
+
+Replaced the entire contents of `GuidedAudioPicker.kt` with 3 new composables mirroring the Spotify song picker pattern from `SongPickerComponents.kt`:
+
+1. **`GuidedAudioPickerButton`** — `Surface` + `Button` styled like `SongPickerButton`, says "🎧 Choose a guided MP3", uses `SurfaceDark`/`SurfaceVariant` colors
+2. **`SelectedGuidedAudioBanner`** — Shows "🎧 {name}" with `SurfaceVariant` background, `TextPrimary` color
+3. **`GuidedAudioPickerDialog`** — `AlertDialog` with 3 internal views managed by `GuidedDialogView` enum:
+   - **LIST**: scrollable `LazyColumn` of `GuidedAudioCard`s with "➕ Add New MP3" button, tap-to-select (dismisses dialog), long-press for detail, selected item has checkmark + highlighted border
+   - **ADD_NEW**: file picker via `ActivityResultContracts.OpenDocument` with `audio/*`, optional source URL `OutlinedTextField`, Save/Cancel buttons
+   - **DETAIL**: shows file name, source URL with "Copy URL" button (via `LocalClipboardManager`), Delete + Back buttons
+
+Also kept `resolveDisplayName` helper (changed from `private` to `internal` visibility).
+
+Removed: old `GuidedAudioPicker` composable (inline file browser + YouTube URL field).
+
+Modified files (1): `GuidedAudioPicker.kt`
+
+**Note:** UI screens and ViewModels still reference the old `GuidedAudioPicker` composable — they need to be updated in a subsequent part to use the new `GuidedAudioPickerButton`/`SelectedGuidedAudioBanner`/`GuidedAudioPickerDialog` components.
+
+---
+
+### 2026-04-11 08:35 (UTC-6)
+
+**Rework Part A: DB-backed Guided Audio Library + Manager Update**
+
+Reworked the guided audio system from a single-selection SharedPreferences approach to a persistent DB-backed library (like meditation's `meditation_audios` table). This is Part A of the rework — DB layer + manager only, no UI/ViewModel changes.
+
+Key changes:
+- New `guided_audios` Room table stores ALL guided MP3s the user has ever added (fileName, uri, sourceUrl)
+- `GuidedAudioManager` now reads/writes from DB via `GuidedAudioDao`, only keeps selected audio ID in SharedPreferences
+- Old SharedPreferences keys (`guided_audio_uri`, `guided_audio_name`, `guided_audio_youtube_url`) removed — no migration needed, they'll just be ignored
+- `selectedName` and `selectedUri` replaced by suspend functions (`getSelectedName()`, `getSelectedAudio()`) since they now need DB access
+- New `preparePlayback()` suspend function caches URI before `startPlayback()` (called from ViewModel coroutine)
+- Library management methods: `addAudio()`, `deleteAudio()`, `selectAudio()`, `clearSelection()`
+- `allAudios: Flow<List<GuidedAudioEntity>>` for observing the full library
+
+New files (2):
+- `GuidedAudioEntity.kt` — Room entity for `guided_audios` table
+- `GuidedAudioDao.kt` — DAO with observeAll, getAll, getById, insert, delete, deleteById
+
+Modified files (3):
+- `WagsDatabase.kt` — Added `GuidedAudioEntity` to entities, `guidedAudioDao()` abstract fun, `MIGRATION_31_32`, version 31→32
+- `DatabaseModule.kt` — Registered `MIGRATION_31_32`, added `provideGuidedAudioDao()`
+- `GuidedAudioManager.kt` — Complete rewrite: DB-backed library with `GuidedAudioDao` injection, selected ID in prefs, suspend functions for DB access, `preparePlayback()` pattern
+
+**Note:** UI files and ViewModels are NOT updated yet — they still reference the old `selectedName`/`selectedUri`/`youtubeUrl` properties and `selectAudio(uri, name)`/`setYoutubeUrl()` methods. Part B will update those.
+
+---
+
+### 2026-04-10 17:00 (UTC-6)
+
+**Guided Audio — new audio type for apnea section**
+
+Added "Guided" as a 4th audio option (alongside Silence, Music, Movie) across the entire apnea section. When GUIDED is selected, the user can browse to and select an MP3 file on their device and optionally provide a YouTube URL. The guided audio name is stored with each apnea record and displayed in history/detail screens.
+
+Key design decisions:
+- No separate DB table for guided audio files (unlike meditation's `MeditationAudioEntity`) — just SharedPreferences for the current selection + `guidedAudioName` column on `ApneaRecordEntity`
+- `GuidedAudioManager` singleton handles file selection persistence + MediaPlayer playback (looping)
+- `GuidedAudioPicker` reusable composable with SAF file picker + YouTube URL field
+- Pattern mirrors MUSIC/Spotify: `isGuidedMode` flag controls picker visibility, playback starts/stops with session
+
+New files (2):
+- `GuidedAudioManager.kt` — @Singleton, SharedPreferences-backed, MediaPlayer playback
+- `GuidedAudioPicker.kt` — Reusable composable with OpenDocument file picker + YouTube URL field
+
+Modified files (17):
+- `AudioSetting.kt` — Added GUIDED enum entry
+- `ApneaRecordEntity.kt` — Added `guidedAudioName: String?` column
+- `WagsDatabase.kt` — MIGRATION_30_31, version 30→31
+- `DatabaseModule.kt` — Registered MIGRATION_30_31
+- `ApneaSettingsSummaryBanner.kt` — GUIDED display helper
+- `ApneaHistoryScreen.kt` — GUIDED display label
+- `ApneaViewModel.kt` — GuidedAudioManager injection, guided state/methods, playback start/stop, guidedAudioName in record saves
+- `ApneaScreen.kt` — GuidedAudioPicker in settings section
+- `FreeHoldActiveScreen.kt` — GuidedAudioManager in ViewModel, guided picker on screen, playback start/stop
+- `ProgressiveO2ViewModel.kt` — GuidedAudioManager injection, guided state/methods
+- `ProgressiveO2Screen.kt` — GuidedAudioPicker on setup screen
+- `MinBreathViewModel.kt` — GuidedAudioManager injection, guided state/methods
+- `MinBreathScreen.kt` — GuidedAudioPicker on setup screen
+- `AdvancedApneaViewModel.kt` — GuidedAudioManager injection, guided state/methods
+- `AdvancedApneaScreen.kt` — GuidedAudioPicker on setup screen
+- `ApneaTableScreen.kt` — GuidedAudioPicker on setup screen
+- `AllApneaRecordsScreen.kt` — Guided audio name in record rows
+- `ApneaRecordDetailScreen.kt` — Guided audio name in detail view
+
+---
+
+### 2026-04-10 16:58 (UTC-6)
+
+**Phase 3c: Guided Audio — History/Stats/AllRecords/Detail screen filters + display**
+
+Ensured GUIDED appears correctly in all filter/display screens. Most filter chips already iterate `AudioSetting.entries`, so GUIDED appeared automatically. The main new work was showing `guidedAudioName` in record list rows and the detail screen.
+
+Changes to 2 files:
+
+1. **`AllApneaRecordsScreen.kt`** — Added `TextOverflow` import. In `AllRecordsRow`, added "🎧 {guidedAudioName}" text line for both table records (after duration line) and free hold records (after duration, before date). Only shown when `record.audio == "GUIDED"` and `guidedAudioName` is not null/blank. Uses `labelSmall` style, `TextSecondary` color, `maxLines = 1`, `TextOverflow.Ellipsis`.
+
+2. **`ApneaRecordDetailScreen.kt`** — Added `TextOverflow` import. In `RecordDetailContent` Summary card, added a "Guided Audio" row after the "Audio" row. Shows `record.guidedAudioName` with `bodySmall` style, `TextPrimary` color, `maxLines = 1`, `TextOverflow.Ellipsis`, `widthIn(max = 200.dp)`. Only shown when `record.audio == "GUIDED"` and `guidedAudioName` is not null/blank.
+
+Verified (no changes needed):
+- **`ApneaHistoryScreen.kt`** — Stats filter dialog (line 297) already uses `AudioSetting.entries.forEach` ✅
+- **`AllApneaRecordsViewModel.kt`** — String-based `filterAudio` with `AudioSetting.valueOf()` handles GUIDED automatically ✅
+- **`ApneaRecordDetailViewModel.kt`** — `editAudio: AudioSetting` type handles GUIDED automatically ✅
+- **`AllApneaRecordsScreen.kt` filter section** — Audio filter (line 304) already uses `AudioSetting.entries.forEach` ✅
+- **`buildFilterSummary()`** — Uses `AudioSetting.valueOf()` which handles GUIDED automatically ✅
+- **`EditRecordSheet`** — Audio chips (line 356) already use `AudioSetting.entries.forEach` ✅
+
+---
+
+### 2026-04-10 16:53 (UTC-6)
+
+**Phase 3b: Guided Audio — Remaining 4 drill ViewModels + screens wired**
+
+Wired `GuidedAudioManager` and `GuidedAudioPicker` into the 4 remaining drill ViewModels and their setup/active screens. The pattern is identical to Phase 3a (ApneaViewModel/ApneaScreen/FreeHoldActiveScreen).
+
+Changes to 7 files:
+
+1. **`ProgressiveO2ViewModel.kt`** — Injected `GuidedAudioManager`. Added `isGuidedMode`, `guidedAudioName`, `guidedAudioYoutubeUrl` to `ProgressiveO2UiState`. Initialized guided state in init. Updated `setAudio()` to track guided mode. Added `onGuidedFilePicked()`, `onGuidedYoutubeUrlChanged()`, `clearGuidedAudio()`. Added `guidedAudioManager.startPlayback()` in `startSession()`, `stopPlayback()` in `stopSession()` and `onCleared()`. Added `guidedAudioName` to `ApneaRecordEntity` construction.
+
+2. **`ProgressiveO2Screen.kt`** — Added `GuidedAudioPicker` block after song picker section, visible when `state.isGuidedMode`.
+
+3. **`MinBreathViewModel.kt`** — Same pattern as ProgressiveO2ViewModel. Injected `GuidedAudioManager`, added guided state fields, init, methods, start/stop playback, `guidedAudioName` to record entity, cleanup in `onCleared()`.
+
+4. **`MinBreathScreen.kt`** — Added `GuidedAudioPicker` block after song picker section, visible when `state.isGuidedMode`.
+
+5. **`AdvancedApneaViewModel.kt`** — Injected `GuidedAudioManager`. Added guided state to `AdvancedApneaScreenUiState`. Initialized from `audioSetting` local variable. Added guided methods. Start/stop playback in `startSession()`/`stopSession()`. Cleanup in `onCleared()`. (No record entity — advanced sessions save `ApneaSessionEntity` only.)
+
+6. **`AdvancedApneaScreen.kt`** — Added `GuidedAudioPicker` block after song picker section, visible when `uiState.isGuidedMode && state.phase == AdvancedApneaPhase.IDLE`.
+
+7. **`ApneaTableScreen.kt`** — Added `GuidedAudioPicker` block after song picker section, visible when `state.audio == AudioSetting.GUIDED && state.apneaState == ApneaState.IDLE`. Uses `ApneaViewModel` methods (`onGuidedFilePicked`, `onGuidedYoutubeUrlChanged`, `clearGuidedAudio`) which were already added in Phase 3a.
+
+---
+
+### 2026-04-10 16:47 (UTC-6)
+
+**Phase 3a: Guided Audio — ViewModel + Screen wiring**
+
+Wired the `GuidedAudioManager` and `GuidedAudioPicker` (created in Phase 2) into the main apnea ViewModel and 3 key screens. The pattern mirrors exactly how MUSIC/Spotify is handled.
+
+Changes to 3 files:
+
+1. **`ApneaViewModel.kt`** — Injected `GuidedAudioManager` in constructor. Added `isGuidedMode`, `guidedAudioName`, `guidedAudioYoutubeUrl` to `ApneaUiState`. Restored guided state in init block. Updated `setAudio()` to track guided mode. Added `onGuidedFilePicked()`, `onGuidedYoutubeUrlChanged()`, `clearGuidedAudio()` methods. Added `guidedAudioName` to all 3 `ApneaRecordEntity` constructions (free hold, table session, advanced session — though advanced doesn't create a record entity directly). Added `guidedAudioManager.startPlayback()` / `stopPlayback()` calls in free hold start/stop, table session start/stop, advanced session start/stop, and cancel methods. Added `guidedAudioManager.stopPlayback()` in `onCleared()`.
+
+2. **`ApneaScreen.kt`** — Added guided audio parameters (`guidedAudioName`, `guidedAudioYoutubeUrl`, `onGuidedFilePicked`, `onGuidedYoutubeUrlChanged`, `onClearGuidedAudio`) to `ApneaSettingsContent` composable. Threaded callbacks from ViewModel through the caller. Added `GuidedAudioPicker` below the Audio filter chips, visible only when `audio == AudioSetting.GUIDED`.
+
+3. **`FreeHoldActiveScreen.kt`** — Injected `GuidedAudioManager` in `FreeHoldActiveViewModel` constructor. Added `isGuidedMode`, `guidedAudioName`, `guidedAudioYoutubeUrl` to `FreeHoldActiveUiState`. Initialized `isGuidedMode` from audio setting. Added guided audio methods. Updated `updateAudio()` to track guided mode. Added start/stop playback calls in `startFreeHold()`, `cancelFreeHold()`, `stopFreeHold()`. Added `guidedAudioName` to `ApneaRecordEntity` construction. Added `GuidedAudioPicker` to screen composable (visible when GUIDED mode + hold not active).
+
+4. **`FreeHoldSettingsDialog.kt`** — No changes needed (already uses `AudioSetting.entries` so GUIDED appears automatically).
+
+---
+
+### 2026-04-10 16:38 (UTC-6)
+
+**Phase 2: GuidedAudioPicker composable + GuidedAudioManager**
+
+Created the reusable UI component and audio playback manager for the "Guided" audio feature in the apnea section.
+
+New files (2):
+1. **`GuidedAudioManager.kt`** (`domain/usecase/apnea/`) — `@Singleton` with `@Inject constructor` that manages guided audio selection (persisted in `@Named("apnea_prefs") SharedPreferences`) and `MediaPlayer` playback. Keys: `guided_audio_uri`, `guided_audio_name`, `guided_audio_youtube_url`. Methods: `selectAudio()`, `setYoutubeUrl()`, `clearSelection()`, `startPlayback()`, `stopPlayback()`. Properties: `selectedName`, `selectedUri`, `youtubeUrl`, `hasSelection`, `isPlaying`.
+2. **`GuidedAudioPicker.kt`** (`ui/apnea/`) — Reusable `@Composable` that shows a "Browse MP3" button (using `ActivityResultContracts.OpenDocument()` with persistable URI permissions), selected file name display, YouTube URL text field, and "Clear" button. Accepts callbacks (`onFilePicked`, `onYoutubeUrlChanged`, `onClear`) — does NOT directly access SharedPreferences or GuidedAudioManager.
+
+No existing files modified. Not wired into any screens yet (Phase 3 will do that).
+
+---
+
+### 2026-04-10 16:35 (UTC-6)
+
+**Phase 1: Add GUIDED audio type to apnea section — Foundation layer**
+
+Added the 4th audio setting `GUIDED` to the apnea section. This is Phase 1 (data layer only — no UI screens or ViewModels modified).
+
+Changes:
+1. **`AudioSetting.kt`** — Added `GUIDED` enum entry + `displayName()` case
+2. **`ApneaRecordEntity.kt`** — Added nullable `guidedAudioName: String?` column with `@ColumnInfo(defaultValue = "NULL")`
+3. **`WagsDatabase.kt`** — Bumped version 30→31, added `MIGRATION_30_31` (ALTER TABLE adds `guidedAudioName TEXT DEFAULT NULL`)
+4. **`DatabaseModule.kt`** — Registered `MIGRATION_30_31` in `.addMigrations()`
+5. **`ApneaSettingsSummaryBanner.kt`** — Added `"GUIDED" -> "Guided"` case to `displayAudioBanner()`
+6. **`ApneaHistoryScreen.kt`** — Added `"GUIDED" -> "Guided"` case to `displaySettingLabel()`
+
+Build: ✅ Compiled and installed on device successfully
+
+---
 
 ### 2026-04-10 15:41 (UTC-6)
 

@@ -27,9 +27,10 @@ import com.example.wags.data.db.entity.*
         ApneaSongLogEntity::class,
         ResonanceSessionEntity::class,
         RapidHrSessionEntity::class,
-        RapidHrTelemetryEntity::class
+        RapidHrTelemetryEntity::class,
+        GuidedAudioEntity::class
     ],
-    version = 30,
+    version = 32,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -52,6 +53,7 @@ abstract class WagsDatabase : RoomDatabase() {
     abstract fun resonanceSessionDao(): ResonanceSessionDao
     abstract fun rapidHrSessionDao(): RapidHrSessionDao
     abstract fun rapidHrTelemetryDao(): RapidHrTelemetryDao
+    abstract fun guidedAudioDao(): GuidedAudioDao
 
     companion object {
         /**
@@ -881,6 +883,31 @@ abstract class WagsDatabase : RoomDatabase() {
                               AND s.timestamp = apnea_records.timestamp
                             LIMIT 1
                           ) IS NOT NULL
+                    """.trimIndent())
+                }
+            }
+
+            /**
+             * v30 → v31: Add guidedAudioName column to apnea_records for GUIDED audio type.
+             */
+            val MIGRATION_30_31 = object : Migration(30, 31) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE apnea_records ADD COLUMN guidedAudioName TEXT DEFAULT NULL")
+                }
+            }
+
+            /**
+             * v31 → v32: Create guided_audios table for DB-backed guided audio library.
+             */
+            val MIGRATION_31_32 = object : Migration(31, 32) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("""
+                        CREATE TABLE IF NOT EXISTS guided_audios (
+                            audioId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            fileName TEXT NOT NULL,
+                            uri TEXT NOT NULL,
+                            sourceUrl TEXT NOT NULL DEFAULT ''
+                        )
                     """.trimIndent())
                 }
             }

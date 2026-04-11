@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.HrDataSource
 import com.example.wags.data.db.entity.ApneaSessionEntity
+import com.example.wags.data.db.entity.GuidedAudioEntity
 import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.data.repository.ApneaSessionRepository
 import com.example.wags.data.spotify.SpotifyApiClient
@@ -22,6 +23,7 @@ import com.example.wags.domain.usecase.apnea.AdvancedApneaPhase
 import com.example.wags.domain.usecase.apnea.AdvancedApneaState
 import com.example.wags.domain.usecase.apnea.AdvancedApneaStateMachine
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
+import com.example.wags.domain.usecase.apnea.GuidedAudioManager
 import com.example.wags.domain.usecase.apnea.ProgressiveO2Generator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +40,11 @@ data class AdvancedApneaScreenUiState(
     val sessionState: AdvancedApneaState = AdvancedApneaState(),
     val spotifyConnected: Boolean = false,
     val isMusicMode: Boolean = false,
+    val isGuidedMode: Boolean = false,
+    val guidedAudios: List<GuidedAudioEntity> = emptyList(),
+    val guidedSelectedId: Long = -1L,
+    val guidedSelectedName: String = "",
+    val guidedCompletionStatuses: Map<Long, GuidedCompletionStatus> = emptyMap(),
     val previousSongs: List<SpotifyTrackDetail> = emptyList(),
     val loadingSongs: Boolean = false,
     val selectedSong: SpotifyTrackDetail? = null,
@@ -61,6 +68,7 @@ class AdvancedApneaViewModel @Inject constructor(
     private val spotifyManager: SpotifyManager,
     private val spotifyApiClient: SpotifyApiClient,
     private val spotifyAuthManager: SpotifyAuthManager,
+    private val guidedAudioManager: GuidedAudioManager,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
@@ -101,12 +109,29 @@ class AdvancedApneaViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 isMusicMode = audioSetting == AudioSetting.MUSIC,
+                isGuidedMode = audioSetting == AudioSetting.GUIDED,
+                guidedSelectedId = guidedAudioManager.selectedId,
                 lungVolume  = savedLungVolume,
                 prepType    = savedPrepType,
                 timeOfDay   = TimeOfDay.fromCurrentTime().name,
                 posture     = savedPosture,
                 audio       = audioSetting.name
             )
+        }
+
+        // Collect guided audio library from DB
+        viewModelScope.launch {
+            guidedAudioManager.allAudios.collect { audios ->
+                _uiState.update { it.copy(guidedAudios = audios) }
+            }
+        }
+        // Load the selected guided audio name from DB
+        viewModelScope.launch {
+            val name = guidedAudioManager.getSelectedName()
+            _uiState.update { it.copy(
+                guidedSelectedId = guidedAudioManager.selectedId,
+                guidedSelectedName = name
+            ) }
         }
 
         viewModelScope.launch {
@@ -135,6 +160,13 @@ class AdvancedApneaViewModel @Inject constructor(
             spotifyManager.startTracking()
             spotifyManager.sendPlayCommand()
         }
+        // Start guided audio if GUIDED is selected
+        if (audioSetting == AudioSetting.GUIDED) {
+            viewModelScope.launch {
+                guidedAudioManager.preparePlayback()
+                guidedAudioManager.startPlayback()
+            }
+        }
     }
 
     fun signalBreathTaken() {
@@ -153,12 +185,65 @@ class AdvancedApneaViewModel @Inject constructor(
             spotifyManager.sendPauseAndRewindCommand()
             tracks
         } else emptyList()
+        // Stop guided audio if GUIDED was selected
+        if (audioSetting == AudioSetting.GUIDED) {
+            guidedAudioManager.stopPlayback()
+        }
         stateMachine.stop()
         if (tracksPlayed.isNotEmpty()) {
             val songs = tracksPlayed.map { t ->
                 SpotifySong(t.title, t.artist, null, t.spotifyUri, t.startedAtMs, t.endedAtMs)
             }
             persistSongHistory(songs)
+        }
+    }
+
+    // ── Guided audio library methods ─────────────────────────────────────────
+
+    fun selectGuidedAudio(audio: GuidedAudioEntity) {
+        guidedAudioManager.selectAudio(audio.audioId)
+        _uiState.update { it.copy(
+            guidedSelectedId = audio.audioId,
+            guidedSelectedName = audio.fileName
+        ) }
+    }
+
+    fun addGuidedAudio(uri: String, fileName: String, sourceUrl: String) {
+        viewModelScope.launch {
+            val id = guidedAudioManager.addAudio(fileName, uri, sourceUrl)
+            guidedAudioManager.selectAudio(id)
+            _uiState.update { it.copy(
+                guidedSelectedId = id,
+                guidedSelectedName = fileName
+            ) }
+        }
+    }
+
+    fun deleteGuidedAudio(audio: GuidedAudioEntity) {
+        viewModelScope.launch {
+            guidedAudioManager.deleteAudio(audio.audioId)
+            if (_uiState.value.guidedSelectedId == audio.audioId) {
+                _uiState.update { it.copy(guidedSelectedId = -1L, guidedSelectedName = "") }
+            }
+        }
+    }
+
+    fun loadGuidedCompletionStatuses() {
+        viewModelScope.launch {
+            val audios = _uiState.value.guidedAudios
+            val map = mutableMapOf<Long, GuidedCompletionStatus>()
+            for (audio in audios) {
+                val ever = apneaRepository.wasGuidedAudioUsedEver(audio.fileName)
+                val ui = _uiState.value
+                val withSettings = apneaRepository.wasGuidedAudioUsedWithSettings(
+                    audio.fileName, ui.lungVolume, ui.prepType, ui.timeOfDay, ui.posture, ui.audio
+                )
+                map[audio.audioId] = GuidedCompletionStatus(
+                    completedEver = ever,
+                    completedWithCurrentSettings = withSettings
+                )
+            }
+            _uiState.update { it.copy(guidedCompletionStatuses = map) }
         }
     }
 
@@ -286,6 +371,7 @@ class AdvancedApneaViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        guidedAudioManager.stopPlayback()
         stateMachine.stop()
         super.onCleared()
     }

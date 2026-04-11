@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -756,6 +757,15 @@ private fun AllRecordsRow(
                         style = MaterialTheme.typography.labelSmall,
                         color = TextSecondary
                     )
+                    if (record.audio == "GUIDED" && !record.guidedAudioName.isNullOrBlank()) {
+                        Text(
+                            "🎧 ${record.guidedAudioName}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 } else {
                     // Free hold: show duration as primary
                     Text(
@@ -763,6 +773,15 @@ private fun AllRecordsRow(
                         style = MaterialTheme.typography.bodyLarge,
                         color = EcgCyan,
                         fontWeight = FontWeight.SemiBold
+                    )
+                }
+                if (record.tableType == null && record.audio == "GUIDED" && !record.guidedAudioName.isNullOrBlank()) {
+                    Text(
+                        "🎧 ${record.guidedAudioName}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
                 Text(

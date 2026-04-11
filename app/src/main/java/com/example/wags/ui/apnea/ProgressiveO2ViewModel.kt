@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.HrDataSource
 import com.example.wags.data.db.entity.ApneaRecordEntity
+import com.example.wags.data.db.entity.GuidedAudioEntity
 import com.example.wags.data.db.entity.ApneaSessionEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
 import com.example.wags.data.db.entity.TelemetryEntity
@@ -23,6 +24,7 @@ import com.example.wags.domain.model.PersonalBestResult
 import com.example.wags.domain.model.SpotifySong
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
+import com.example.wags.domain.usecase.apnea.GuidedAudioManager
 import com.example.wags.domain.usecase.apnea.ProgressiveO2Phase
 import com.example.wags.domain.usecase.apnea.ProgressiveO2RoundResult
 import com.example.wags.domain.usecase.apnea.ProgressiveO2State
@@ -67,6 +69,11 @@ data class ProgressiveO2UiState(
     // ── Song picker / Spotify ────────────────────────────────────────────────
     val spotifyConnected: Boolean = false,
     val isMusicMode: Boolean = false,
+    val isGuidedMode: Boolean = false,
+    val guidedAudios: List<GuidedAudioEntity> = emptyList(),
+    val guidedSelectedId: Long = -1L,
+    val guidedSelectedName: String = "",
+    val guidedCompletionStatuses: Map<Long, GuidedCompletionStatus> = emptyMap(),
     val previousSongs: List<SpotifyTrackDetail> = emptyList(),
     val loadingSongs: Boolean = false,
     val selectedSong: SpotifyTrackDetail? = null,
@@ -96,6 +103,7 @@ class ProgressiveO2ViewModel @Inject constructor(
     private val spotifyManager: SpotifyManager,
     private val spotifyApiClient: SpotifyApiClient,
     private val spotifyAuthManager: SpotifyAuthManager,
+    private val guidedAudioManager: GuidedAudioManager,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
@@ -149,9 +157,26 @@ class ProgressiveO2ViewModel @Inject constructor(
                 posture     = savedPosture,
                 audio       = savedAudio,
                 isMusicMode = savedAudio == AudioSetting.MUSIC.name,
+                isGuidedMode = savedAudio == AudioSetting.GUIDED.name,
+                guidedSelectedId = guidedAudioManager.selectedId,
                 voiceEnabled = audioHapticEngine.voiceEnabled,
                 vibrationEnabled = audioHapticEngine.vibrationEnabled
             )
+        }
+
+        // Collect guided audio library from DB
+        viewModelScope.launch {
+            guidedAudioManager.allAudios.collect { audios ->
+                _uiState.update { it.copy(guidedAudios = audios) }
+            }
+        }
+        // Load the selected guided audio name from DB
+        viewModelScope.launch {
+            val name = guidedAudioManager.getSelectedName()
+            _uiState.update { it.copy(
+                guidedSelectedId = guidedAudioManager.selectedId,
+                guidedSelectedName = name
+            ) }
         }
 
         // Observe state machine for audio/haptic cues
@@ -187,7 +212,25 @@ class ProgressiveO2ViewModel @Inject constructor(
 
     fun setAudio(v: String) {
         prefs.edit().putString("setting_audio", v).apply()
-        _uiState.update { it.copy(audio = v, isMusicMode = v == AudioSetting.MUSIC.name) }
+        val isGuided = v == AudioSetting.GUIDED.name
+        _uiState.update {
+            it.copy(
+                audio = v,
+                isMusicMode = v == AudioSetting.MUSIC.name,
+                isGuidedMode = isGuided
+            )
+        }
+        if (isGuided) {
+            viewModelScope.launch {
+                val name = guidedAudioManager.getSelectedName()
+                _uiState.update { it.copy(
+                    guidedSelectedId = guidedAudioManager.selectedId,
+                    guidedSelectedName = name
+                ) }
+            }
+        } else {
+            _uiState.update { it.copy(guidedSelectedName = "") }
+        }
     }
 
     fun setVoiceEnabled(enabled: Boolean) {
@@ -198,6 +241,55 @@ class ProgressiveO2ViewModel @Inject constructor(
     fun setVibrationEnabled(enabled: Boolean) {
         audioHapticEngine.vibrationEnabled = enabled
         _uiState.update { it.copy(vibrationEnabled = enabled) }
+    }
+
+    // ── Guided audio library methods ─────────────────────────────────────────
+
+    fun selectGuidedAudio(audio: GuidedAudioEntity) {
+        guidedAudioManager.selectAudio(audio.audioId)
+        _uiState.update { it.copy(
+            guidedSelectedId = audio.audioId,
+            guidedSelectedName = audio.fileName
+        ) }
+    }
+
+    fun addGuidedAudio(uri: String, fileName: String, sourceUrl: String) {
+        viewModelScope.launch {
+            val id = guidedAudioManager.addAudio(fileName, uri, sourceUrl)
+            guidedAudioManager.selectAudio(id)
+            _uiState.update { it.copy(
+                guidedSelectedId = id,
+                guidedSelectedName = fileName
+            ) }
+        }
+    }
+
+    fun deleteGuidedAudio(audio: GuidedAudioEntity) {
+        viewModelScope.launch {
+            guidedAudioManager.deleteAudio(audio.audioId)
+            if (_uiState.value.guidedSelectedId == audio.audioId) {
+                _uiState.update { it.copy(guidedSelectedId = -1L, guidedSelectedName = "") }
+            }
+        }
+    }
+
+    fun loadGuidedCompletionStatuses() {
+        viewModelScope.launch {
+            val audios = _uiState.value.guidedAudios
+            val map = mutableMapOf<Long, GuidedCompletionStatus>()
+            for (audio in audios) {
+                val ever = apneaRepository.wasGuidedAudioUsedEver(audio.fileName)
+                val ui = _uiState.value
+                val withSettings = apneaRepository.wasGuidedAudioUsedWithSettings(
+                    audio.fileName, ui.lungVolume, ui.prepType, ui.timeOfDay, ui.posture, ui.audio
+                )
+                map[audio.audioId] = GuidedCompletionStatus(
+                    completedEver = ever,
+                    completedWithCurrentSettings = withSettings
+                )
+            }
+            _uiState.update { it.copy(guidedCompletionStatuses = map) }
+        }
     }
 
     // ── Song picker ─────────────────────────────────────────────────────────
@@ -300,6 +392,14 @@ class ProgressiveO2ViewModel @Inject constructor(
         sessionStartMs = System.currentTimeMillis()
         _uiState.update { it.copy(isSessionActive = true, completedRecordId = null) }
 
+        // Start guided audio if GUIDED is selected
+        if (_uiState.value.isGuidedMode) {
+            viewModelScope.launch {
+                guidedAudioManager.preparePlayback()
+                guidedAudioManager.startPlayback()
+            }
+        }
+
         // Start telemetry collection
         telemetrySamples.clear()
         telemetryJob?.cancel()
@@ -323,6 +423,11 @@ class ProgressiveO2ViewModel @Inject constructor(
         // Stop telemetry collection first for a stable snapshot
         telemetryJob?.cancel()
         telemetryJob = null
+
+        // Stop guided audio if GUIDED was selected
+        if (_uiState.value.isGuidedMode) {
+            guidedAudioManager.stopPlayback()
+        }
 
         stateMachine.stop()
         val finalState = stateMachine.state.value
@@ -449,7 +554,8 @@ class ProgressiveO2ViewModel @Inject constructor(
                 hrDeviceId = deviceLabel,
                 posture = posture,
                 audio = audio,
-                drillParamValue = breathPeriodSec
+                drillParamValue = breathPeriodSec,
+                guidedAudioName = if (audio == AudioSetting.GUIDED.name) _uiState.value.guidedSelectedName else null
             )
         )
 
@@ -550,6 +656,11 @@ class ProgressiveO2ViewModel @Inject constructor(
                 )
             }
             .sortedBy { it.breathPeriodSec }
+    }
+
+    override fun onCleared() {
+        guidedAudioManager.stopPlayback()
+        super.onCleared()
     }
 
     companion object {

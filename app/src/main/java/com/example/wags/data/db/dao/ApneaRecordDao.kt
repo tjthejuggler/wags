@@ -745,4 +745,35 @@ interface ApneaRecordDao {
 
     @Query("SELECT recordId FROM apnea_records WHERE lowestSpO2 IS NOT NULL AND lowestSpO2 BETWEEN 1 AND 100 ORDER BY lowestSpO2 ASC LIMIT 1")
     fun getLowestSpO2RecordIdAll(): Flow<Long?>
+
+    // ── Guided audio completion queries ─────────────────────────────────────
+
+    /** Returns 1 if any record has the given guidedAudioName, 0 otherwise. */
+    @Query("""
+        SELECT CASE WHEN EXISTS (
+            SELECT 1 FROM apnea_records WHERE guidedAudioName = :guidedAudioName
+        ) THEN 1 ELSE 0 END
+    """)
+    suspend fun wasGuidedAudioUsedEver(guidedAudioName: String): Int
+
+    /** Returns 1 if any record matches the given guidedAudioName AND 5-setting combination. */
+    @Query("""
+        SELECT CASE WHEN EXISTS (
+            SELECT 1 FROM apnea_records
+            WHERE guidedAudioName = :guidedAudioName
+              AND lungVolume = :lungVolume
+              AND prepType   = :prepType
+              AND timeOfDay  = :timeOfDay
+              AND posture    = :posture
+              AND audio      = :audio
+        ) THEN 1 ELSE 0 END
+    """)
+    suspend fun wasGuidedAudioUsedWithSettings(
+        guidedAudioName: String,
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        posture: String,
+        audio: String
+    ): Int
 }

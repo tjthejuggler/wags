@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -540,6 +541,22 @@ private fun RecordDetailContent(
                     label = "Audio",
                     value = record.audio.lowercase().replaceFirstChar { it.uppercase() }
                 )
+                if (record.audio == "GUIDED" && !record.guidedAudioName.isNullOrBlank()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Guided Audio", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                        Text(
+                            record.guidedAudioName!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 200.dp)
+                        )
+                    }
+                }
                 if (songLog.isNotEmpty()) {
                     val songText = if (songLog.size == 1) {
                         "♪ ${songLog[0].title} — ${songLog[0].artist}"

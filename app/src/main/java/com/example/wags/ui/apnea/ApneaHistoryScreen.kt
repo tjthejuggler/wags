@@ -849,6 +849,7 @@ private fun String.displaySettingLabel(): String = when (this) {
     "SILENCE"  -> "Silence"
     "MUSIC"    -> "Music"
     "MOVIE"    -> "Movie"
+    "GUIDED"   -> "Guided"
     else       -> lowercase().replaceFirstChar { it.uppercase() }
 }
 

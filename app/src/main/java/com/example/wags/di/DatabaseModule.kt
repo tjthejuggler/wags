@@ -8,6 +8,7 @@ import com.example.wags.data.db.dao.AdviceDao
 import com.example.wags.data.db.dao.ApneaRecordDao
 import com.example.wags.data.db.dao.ApneaSessionDao
 import com.example.wags.data.db.dao.ApneaSongLogDao
+import com.example.wags.data.db.dao.GuidedAudioDao
 import com.example.wags.data.db.dao.ResonanceSessionDao
 import com.example.wags.data.db.dao.ContractionDao
 import com.example.wags.data.db.dao.DailyReadingDao
@@ -66,7 +67,9 @@ object DatabaseModule {
                 WagsDatabase.MIGRATION_26_27,
                 WagsDatabase.MIGRATION_27_28,
                 WagsDatabase.MIGRATION_28_29,
-                WagsDatabase.MIGRATION_29_30
+                WagsDatabase.MIGRATION_29_30,
+                WagsDatabase.MIGRATION_30_31,
+                WagsDatabase.MIGRATION_31_32
             )
             .build()
 
@@ -89,4 +92,5 @@ object DatabaseModule {
     @Provides fun provideResonanceSessionDao(db: WagsDatabase): ResonanceSessionDao = db.resonanceSessionDao()
     @Provides fun provideRapidHrSessionDao(db: WagsDatabase): RapidHrSessionDao = db.rapidHrSessionDao()
     @Provides fun provideRapidHrTelemetryDao(db: WagsDatabase): RapidHrTelemetryDao = db.rapidHrTelemetryDao()
+    @Provides fun provideGuidedAudioDao(db: WagsDatabase): GuidedAudioDao = db.guidedAudioDao()
 }

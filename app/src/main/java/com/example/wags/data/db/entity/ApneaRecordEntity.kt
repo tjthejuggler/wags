@@ -54,5 +54,8 @@ data class ApneaRecordEntity(
     val guidedTransitionSec: Int? = null,
     /** Drill-specific partition value for PB grouping (e.g. breathPeriodSec, sessionDurationSec). Null for free holds. */
     @ColumnInfo(defaultValue = "NULL")
-    val drillParamValue: Int? = null
+    val drillParamValue: Int? = null,
+    /** Display name of the guided audio file used during this hold (null when audio != GUIDED). */
+    @ColumnInfo(defaultValue = "NULL")
+    val guidedAudioName: String? = null
 )

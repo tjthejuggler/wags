@@ -130,6 +130,29 @@ fun AdvancedApneaScreen(
                 }
             }
 
+            // Guided audio picker — shown when GUIDED mode + session not yet started
+            var showGuidedPicker by remember { mutableStateOf(false) }
+            if (uiState.isGuidedMode && state.phase == AdvancedApneaPhase.IDLE) {
+                if (uiState.guidedSelectedName.isNotBlank()) {
+                    SelectedGuidedAudioBanner(name = uiState.guidedSelectedName)
+                }
+                GuidedAudioPickerButton(onClick = {
+                    showGuidedPicker = true
+                })
+            }
+            if (showGuidedPicker) {
+                LaunchedEffect(Unit) { viewModel.loadGuidedCompletionStatuses() }
+                GuidedAudioPickerDialog(
+                    audios = uiState.guidedAudios,
+                    selectedId = uiState.guidedSelectedId,
+                    completionStatuses = uiState.guidedCompletionStatuses,
+                    onSelect = { audio -> viewModel.selectGuidedAudio(audio) },
+                    onAddNew = { uri, name, url -> viewModel.addGuidedAudio(uri, name, url) },
+                    onDelete = { audio -> viewModel.deleteGuidedAudio(audio) },
+                    onDismiss = { showGuidedPicker = false }
+                )
+            }
+
             RoundProgressBar(state = state)
             PhaseTimerCard(state = state, modality = modality)
             ActionArea(

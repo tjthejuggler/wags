@@ -34,6 +34,7 @@ import com.example.wags.data.ble.HrDataSource
 import com.example.wags.data.ble.UnifiedDeviceManager
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
+import com.example.wags.data.db.entity.GuidedAudioEntity
 import com.example.wags.data.ipc.HabitIntegrationRepository
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.data.repository.ApneaRepository
@@ -49,6 +50,7 @@ import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.SpotifySong
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
+import com.example.wags.domain.usecase.apnea.GuidedAudioManager
 import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.KeepScreenOn
@@ -134,6 +136,16 @@ data class FreeHoldActiveUiState(
     val spotifyConnected: Boolean = false,
     /** True when audio setting is MUSIC — controls whether the song picker button is shown. */
     val isMusicMode: Boolean = false,
+    /** True when audio setting is GUIDED — controls whether the guided audio picker is shown. */
+    val isGuidedMode: Boolean = false,
+    /** All guided audios in the library (for the picker dialog). */
+    val guidedAudios: List<GuidedAudioEntity> = emptyList(),
+    /** ID of the currently selected guided audio (-1 if none). */
+    val guidedSelectedId: Long = -1L,
+    /** Display name of the currently selected guided audio file. */
+    val guidedSelectedName: String = "",
+    /** Guided audio completion status keyed by audioId. */
+    val guidedCompletionStatuses: Map<Long, GuidedCompletionStatus> = emptyMap(),
     /** Songs previously played during breath holds (loaded from DB + enriched via API). */
     val previousSongs: List<SpotifyTrackDetail> = emptyList(),
     /** True while previous songs are being loaded. */
@@ -181,6 +193,7 @@ class FreeHoldActiveViewModel @Inject constructor(
     private val spotifyManager: SpotifyManager,
     private val spotifyApiClient: SpotifyApiClient,
     private val spotifyAuthManager: SpotifyAuthManager,
+    private val guidedAudioManager: GuidedAudioManager,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
@@ -197,12 +210,15 @@ class FreeHoldActiveViewModel @Inject constructor(
         private set
 
     private var isMusicMode = audio == AudioSetting.MUSIC.name
+    private var isGuidedMode = audio == AudioSetting.GUIDED.name
     private var isHyperPrep = prepType == PrepType.HYPER.name
 
     private val _uiState = MutableStateFlow(
         FreeHoldActiveUiState(
             showTimer = savedStateHandle.get<Boolean>("showTimer") ?: true,
             isMusicMode = isMusicMode,
+            isGuidedMode = isGuidedMode,
+            guidedSelectedId = guidedAudioManager.selectedId,
             isHyperPrep = isHyperPrep,
             guidedHyperEnabled = if (isHyperPrep) prefs.getBoolean("guided_hyper_enabled", false) else false,
             guidedRelaxedExhaleSec = prefs.getInt("guided_relaxed_exhale_sec", 0),
@@ -241,11 +257,27 @@ class FreeHoldActiveViewModel @Inject constructor(
         initialValue = FreeHoldActiveUiState(
             showTimer = savedStateHandle.get<Boolean>("showTimer") ?: true,
             isMusicMode = isMusicMode,
+            isGuidedMode = isGuidedMode,
             isHyperPrep = isHyperPrep
         )
     )
 
     init {
+        // Collect guided audio library from DB
+        viewModelScope.launch {
+            guidedAudioManager.allAudios.collect { audios ->
+                _uiState.update { it.copy(guidedAudios = audios) }
+            }
+        }
+        // Load the selected guided audio name from DB
+        viewModelScope.launch {
+            val name = guidedAudioManager.getSelectedName()
+            _uiState.update { it.copy(
+                guidedSelectedId = guidedAudioManager.selectedId,
+                guidedSelectedName = name
+            ) }
+        }
+
         // Check for a pending repeat song (set by "Repeat This Hold" on the detail screen).
         // If present, auto-select it so the song is pre-loaded and ready when the user taps Start.
         if (isMusicMode) {
@@ -354,8 +386,74 @@ class FreeHoldActiveViewModel @Inject constructor(
     fun updateAudio(aud: String) {
         audio = aud
         isMusicMode = aud == AudioSetting.MUSIC.name
+        isGuidedMode = aud == AudioSetting.GUIDED.name
         prefs.edit().putString("setting_audio", aud).apply()
-        _uiState.update { it.copy(currentAudio = aud, isMusicMode = isMusicMode) }
+        _uiState.update {
+            it.copy(
+                currentAudio = aud,
+                isMusicMode = isMusicMode,
+                isGuidedMode = isGuidedMode
+            )
+        }
+        if (isGuidedMode) {
+            viewModelScope.launch {
+                val name = guidedAudioManager.getSelectedName()
+                _uiState.update { it.copy(
+                    guidedSelectedId = guidedAudioManager.selectedId,
+                    guidedSelectedName = name
+                ) }
+            }
+        } else {
+            _uiState.update { it.copy(guidedSelectedName = "") }
+        }
+    }
+
+    // ── Guided audio library methods ─────────────────────────────────────────
+
+    fun selectGuidedAudio(audio: GuidedAudioEntity) {
+        guidedAudioManager.selectAudio(audio.audioId)
+        _uiState.update { it.copy(
+            guidedSelectedId = audio.audioId,
+            guidedSelectedName = audio.fileName
+        ) }
+    }
+
+    fun addGuidedAudio(uri: String, fileName: String, sourceUrl: String) {
+        viewModelScope.launch {
+            val id = guidedAudioManager.addAudio(fileName, uri, sourceUrl)
+            guidedAudioManager.selectAudio(id)
+            _uiState.update { it.copy(
+                guidedSelectedId = id,
+                guidedSelectedName = fileName
+            ) }
+        }
+    }
+
+    fun deleteGuidedAudio(audio: GuidedAudioEntity) {
+        viewModelScope.launch {
+            guidedAudioManager.deleteAudio(audio.audioId)
+            if (_uiState.value.guidedSelectedId == audio.audioId) {
+                _uiState.update { it.copy(guidedSelectedId = -1L, guidedSelectedName = "") }
+            }
+        }
+    }
+
+    fun loadGuidedCompletionStatuses() {
+        viewModelScope.launch {
+            val audios = _uiState.value.guidedAudios
+            val map = mutableMapOf<Long, GuidedCompletionStatus>()
+            for (audio in audios) {
+                val ever = apneaRepository.wasGuidedAudioUsedEver(audio.fileName)
+                val withSettings = apneaRepository.wasGuidedAudioUsedWithSettings(
+                    audio.fileName, lungVolume, prepType, timeOfDay, posture, this@FreeHoldActiveViewModel.audio
+                )
+                map[audio.audioId] = GuidedCompletionStatus(
+                    completedEver = ever,
+                    completedWithCurrentSettings = withSettings
+                )
+            }
+            _uiState.update { it.copy(guidedCompletionStatuses = map) }
+        }
     }
 
     private var freeHoldStartTime = 0L
@@ -417,6 +515,13 @@ class FreeHoldActiveViewModel @Inject constructor(
             // sendPlayCommand() resumes the paused track instantly.
             spotifyManager.sendPlayCommand()
         }
+        // Start guided audio if GUIDED is selected
+        if (audio == AudioSetting.GUIDED.name) {
+            viewModelScope.launch {
+                guidedAudioManager.preparePlayback()
+                guidedAudioManager.startPlayback()
+            }
+        }
     }
 
     fun cancelFreeHold() {
@@ -427,6 +532,10 @@ class FreeHoldActiveViewModel @Inject constructor(
         if (audio == AudioSetting.MUSIC.name) {
             spotifyManager.stopTracking()
             spotifyManager.sendPauseAndRewindCommand()
+        }
+        // Stop guided audio if GUIDED was selected
+        if (audio == AudioSetting.GUIDED.name) {
+            guidedAudioManager.stopPlayback()
         }
         _uiState.update { it.copy(freeHoldActive = false, freeHoldFirstContractionMs = null) }
     }
@@ -455,6 +564,10 @@ class FreeHoldActiveViewModel @Inject constructor(
             spotifyManager.sendPauseAndRewindCommand()
             tracks
         } else emptyList()
+        // Stop guided audio if GUIDED was selected
+        if (audio == AudioSetting.GUIDED.name) {
+            guidedAudioManager.stopPlayback()
+        }
         _uiState.update {
             it.copy(
                 freeHoldActive = false,
@@ -718,6 +831,7 @@ class FreeHoldActiveViewModel @Inject constructor(
                     tableType              = null,
                     firstContractionMs     = firstContractionMs,
                     hrDeviceId             = deviceLabel,
+                    guidedAudioName        = if (isGuidedMode) _uiState.value.guidedSelectedName else null,
                     guidedHyper            = wasGuided,
                     guidedRelaxedExhaleSec = if (wasGuided) guidedState.guidedRelaxedExhaleSec else null,
                     guidedPurgeExhaleSec   = if (wasGuided) guidedState.guidedPurgeExhaleSec else null,
@@ -963,6 +1077,29 @@ fun FreeHoldActiveScreen(
                         onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) }
                     )
                 }
+            }
+
+            // Guided audio picker — shown when GUIDED mode + hold not active
+            var showGuidedPicker by remember { mutableStateOf(false) }
+            if (!state.freeHoldActive && state.isGuidedMode) {
+                if (state.guidedSelectedName.isNotBlank()) {
+                    SelectedGuidedAudioBanner(name = state.guidedSelectedName)
+                }
+                GuidedAudioPickerButton(onClick = {
+                    showGuidedPicker = true
+                })
+            }
+            if (showGuidedPicker) {
+                LaunchedEffect(Unit) { viewModel.loadGuidedCompletionStatuses() }
+                GuidedAudioPickerDialog(
+                    audios = state.guidedAudios,
+                    selectedId = state.guidedSelectedId,
+                    completionStatuses = state.guidedCompletionStatuses,
+                    onSelect = { audio -> viewModel.selectGuidedAudio(audio) },
+                    onAddNew = { uri, name, url -> viewModel.addGuidedAudio(uri, name, url) },
+                    onDelete = { audio -> viewModel.deleteGuidedAudio(audio) },
+                    onDismiss = { showGuidedPicker = false }
+                )
             }
 
             // Guided hyperventilation section — shown when prep is HYPER and hold not active
