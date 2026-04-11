@@ -348,12 +348,11 @@ class FreeHoldActiveViewModel @Inject constructor(
 
     /**
      * Called when the user cancels the guided hyperventilation countdown via the back button.
-     * Skips the remaining countdown, marks it complete (so the next tap goes straight to hold),
-     * and immediately starts the hold — the guided hyper specifics are still recorded.
+     * Dismisses the countdown dialog and marks it complete so the Start button is shown,
+     * but does NOT auto-start the hold — the user must tap Start manually.
      */
     fun onGuidedCountdownCancelled() {
         _uiState.update { it.copy(showGuidedCountdown = false, guidedCountdownComplete = true) }
-        startFreeHold()
     }
 
     // ── Settings edit (from banner popup) ────────────────────────────────────

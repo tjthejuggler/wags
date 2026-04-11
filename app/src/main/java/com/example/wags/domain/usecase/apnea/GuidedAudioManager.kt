@@ -89,8 +89,8 @@ class GuidedAudioManager @Inject constructor(
     private var _cachedUri: String? = null
 
     fun startPlayback() {
-        stopPlayback()
         val uriStr = _cachedUri
+        stopPlayback()
         if (uriStr.isNullOrBlank()) return
         try {
             mediaPlayer = MediaPlayer().apply {

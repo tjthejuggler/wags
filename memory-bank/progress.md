@@ -1,6 +1,17 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-11 11:14 UTC-6*
+*Last updated: 2026-04-11 11:42 UTC-6*
+
+## Recent Changes (2026-04-11 11:42)
+- ✅ **Fix guided audio not playing during free hold:**
+  - Root cause: `startPlayback()` called `stopPlayback()` first, which cleared `_cachedUri = null` before it could be read
+  - Fix: Save `_cachedUri` to local var before calling `stopPlayback()`
+  - Modified: `GuidedAudioManager.kt`
+- ✅ **Fix guided hyperventilation back button auto-starting hold:**
+  - Root cause: `onGuidedCountdownCancelled()` called `startFreeHold()` after dismissing dialog
+  - Fix: Removed `startFreeHold()` call — back button now just dismisses dialog and shows Start button
+  - Modified: `FreeHoldActiveScreen.kt`
+- Build: ✅ Successful, installed on SM-S918U1
 
 ## Recent Changes (2026-04-11 11:14)
 - ✅ **Progressive O₂ — Spotify music integration + active session UI fixes:**

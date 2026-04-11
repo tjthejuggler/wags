@@ -1,6 +1,19 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-11 11:14 UTC-6*
+*Last updated: 2026-04-11 11:42 UTC-6*
+
+### 2026-04-11 11:42 (UTC-6)
+**Task:** Fix guided audio not playing during free hold + guided hyperventilation back button behavior
+
+**What was done:**
+- **Bug 1 — Guided audio not playing:** In `GuidedAudioManager.startPlayback()`, the method called `stopPlayback()` first (to clean up any prior player), but `stopPlayback()` also cleared `_cachedUri = null`. This meant the cached URI from `preparePlayback()` was wiped before it could be used, causing `startPlayback()` to return early with no audio. **Fix:** Save `_cachedUri` to a local variable before calling `stopPlayback()`, so the URI survives the cleanup.
+- **Bug 2 — Guided hyperventilation back button auto-starts hold:** `onGuidedCountdownCancelled()` was calling `startFreeHold()` after dismissing the countdown dialog. The user expected the back button to just dismiss the guided hyperventilation and show the Start button, not auto-start the hold. **Fix:** Removed the `startFreeHold()` call from `onGuidedCountdownCancelled()` — now it only marks the countdown complete and shows the Start button.
+
+**Files modified:**
+- `GuidedAudioManager.kt` — Reordered `startPlayback()` to save `_cachedUri` before calling `stopPlayback()`
+- `FreeHoldActiveScreen.kt` — Removed `startFreeHold()` from `onGuidedCountdownCancelled()`, updated doc comment
+
+**Current state:** Both bugs fixed. Build successful, installed on SM-S918U1.
 
 ### 2026-04-11 11:14 (UTC-6)
 **Task:** Fix Progressive O₂ — Spotify music integration + active session UI
