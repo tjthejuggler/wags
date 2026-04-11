@@ -1,6 +1,25 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-11 10:11 UTC-6*
+*Last updated: 2026-04-11 11:14 UTC-6*
+
+### 2026-04-11 11:14 (UTC-6)
+**Task:** Fix Progressive O₂ — Spotify music integration + active session UI
+
+**What was done:**
+- **Spotify music auto-start**: Added `spotifyManager.startTracking()` + `spotifyManager.sendPlayCommand()` in `startSession()` when audio=MUSIC
+- **Spotify music auto-stop**: Added `spotifyManager.stopTracking()` + `spotifyManager.sendPauseAndRewindCommand()` in `stopSession()` when audio=MUSIC
+- **Song names recorded**: Captured tracked songs from `spotifyManager.stopTracking()`, saved to `apnea_song_log` DB table via `apneaRepository.saveSongLog()`, and persisted to SharedPreferences via new `persistSongHistory()` method
+- **First Contraction button**: Replaced `CompletedRoundsList` during HOLD phase with a large 120dp "First Contraction" button. Target/round info stays at top, stop button stays small at bottom
+- **State machine**: Added `firstContractionMs: Long?` field to `ProgressiveO2State` and `signalFirstContraction()` method to `ProgressiveO2StateMachine`
+- **ViewModel**: Added `logFirstContraction()` method that delegates to state machine + haptic feedback
+- **onCleared cleanup**: Added Spotify stop in `onCleared()` to prevent music continuing if ViewModel is destroyed
+
+**Files modified:**
+- `ProgressiveO2ViewModel.kt` — Spotify start/stop/tracking, song saving, persistSongHistory, logFirstContraction, onCleared
+- `ProgressiveO2ActiveScreen.kt` — Large "First Contraction" button during HOLD, removed CompletedRoundsList from active view
+- `ProgressiveO2StateMachine.kt` — firstContractionMs field, signalFirstContraction() method
+
+**Current state:** All Progressive O₂ Spotify/music bugs fixed + First Contraction button added. Build successful, installed on SM-S918U1.
 
 ### 2026-04-11 10:11 (UTC-6)
 **Task:** Implement two-checkmark completion system for Guided Audio Picker dialog

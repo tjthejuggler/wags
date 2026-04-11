@@ -31,7 +31,9 @@ data class ProgressiveO2State(
     /** Cumulative time spent holding across all rounds (ms). */
     val totalHoldTimeMs: Long = 0L,
     /** Completed round data for serialisation into tableParamsJson. */
-    val roundResults: List<ProgressiveO2RoundResult> = emptyList()
+    val roundResults: List<ProgressiveO2RoundResult> = emptyList(),
+    /** Epoch ms when first contraction was logged (null if not yet). */
+    val firstContractionMs: Long? = null
 )
 
 // ── Per-round result ────────────────────────────────────────────────────────
@@ -102,6 +104,17 @@ class ProgressiveO2StateMachine @Inject constructor() {
                 _state.value = current.copy(phase = ProgressiveO2Phase.COMPLETE)
             }
         }
+    }
+
+    /**
+     * Called when the user taps "First Contraction" during a HOLD phase.
+     * Records the wall-clock timestamp (only once per session).
+     */
+    fun signalFirstContraction() {
+        val current = _state.value
+        if (current.firstContractionMs != null) return // already logged
+        if (current.phase != ProgressiveO2Phase.HOLD) return
+        _state.value = current.copy(firstContractionMs = System.currentTimeMillis())
     }
 
     // ── Private helpers ─────────────────────────────────────────────────────

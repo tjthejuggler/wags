@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -85,6 +86,7 @@ fun ProgressiveO2ActiveScreen(
             ProgressiveO2Phase.BREATHING -> ActiveContent(
                 modifier = Modifier.padding(padding),
                 state = state,
+                onFirstContraction = { viewModel.logFirstContraction() },
                 onStop = { viewModel.stopSession() }
             )
             ProgressiveO2Phase.COMPLETE -> CompleteContent(
@@ -124,6 +126,7 @@ private fun IdleContent(modifier: Modifier) {
 private fun ActiveContent(
     modifier: Modifier,
     state: ProgressiveO2UiState,
+    onFirstContraction: () -> Unit,
     onStop: () -> Unit
 ) {
     val session = state.sessionState
@@ -192,12 +195,34 @@ private fun ActiveContent(
         // ── Live HR / SpO₂ ──────────────────────────────────────────────
         LiveVitals(hr = state.liveHr, spo2 = state.liveSpO2)
 
-        Spacer(Modifier.height(12.dp))
-
-        // ── Completed rounds list ───────────────────────────────────────
-        CompletedRoundsList(rounds = session.roundResults)
-
         Spacer(Modifier.weight(1f))
+
+        // ── Large "First Contraction" button during HOLD phase ──────────
+        if (phase == ProgressiveO2Phase.HOLD) {
+            val alreadyLogged = state.sessionState.firstContractionMs != null
+            Button(
+                onClick = onFirstContraction,
+                enabled = !alreadyLogged,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp)
+                    .padding(horizontal = 8.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (alreadyLogged) SurfaceVariant else ButtonPrimary,
+                    disabledContainerColor = SurfaceVariant
+                )
+            ) {
+                Text(
+                    text = if (alreadyLogged) "✓ Contraction Logged" else "First Contraction",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (alreadyLogged) TextSecondary else TextPrimary
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
 
         // ── Stop button ─────────────────────────────────────────────────
         OutlinedButton(

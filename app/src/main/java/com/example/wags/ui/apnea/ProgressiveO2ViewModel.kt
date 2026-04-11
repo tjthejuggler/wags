@@ -138,6 +138,9 @@ class ProgressiveO2ViewModel @Inject constructor(
     // Track previous phase for audio/haptic cues
     private var previousPhase: ProgressiveO2Phase = ProgressiveO2Phase.IDLE
 
+    // Spotify tracks played during the session (captured at stop time)
+    private var trackedSongs: List<SpotifySong> = emptyList()
+
     init {
         // Restore persisted breath period
         val savedBreathPeriod = prefs.getInt("prog_o2_breath_period_sec", 60)
@@ -392,6 +395,13 @@ class ProgressiveO2ViewModel @Inject constructor(
         sessionStartMs = System.currentTimeMillis()
         _uiState.update { it.copy(isSessionActive = true, completedRecordId = null) }
 
+        // Start Spotify if MUSIC is selected.
+        // Song was pre-loaded in selectSong() — just resume playback.
+        if (_uiState.value.isMusicMode) {
+            spotifyManager.startTracking()
+            spotifyManager.sendPlayCommand()
+        }
+
         // Start guided audio if GUIDED is selected
         if (_uiState.value.isGuidedMode) {
             viewModelScope.launch {
@@ -424,6 +434,15 @@ class ProgressiveO2ViewModel @Inject constructor(
         telemetryJob?.cancel()
         telemetryJob = null
 
+        // Stop Spotify if MUSIC was selected — capture tracked songs
+        trackedSongs = if (_uiState.value.isMusicMode) {
+            val tracks = spotifyManager.stopTracking()
+            spotifyManager.sendPauseAndRewindCommand()
+            tracks.map { t ->
+                SpotifySong(t.title, t.artist, null, t.spotifyUri, t.startedAtMs, t.endedAtMs ?: 0L)
+            }
+        } else emptyList()
+
         // Stop guided audio if GUIDED was selected
         if (_uiState.value.isGuidedMode) {
             guidedAudioManager.stopPlayback()
@@ -432,6 +451,11 @@ class ProgressiveO2ViewModel @Inject constructor(
         stateMachine.stop()
         val finalState = stateMachine.state.value
         _uiState.update { it.copy(isSessionActive = false) }
+
+        // Persist song history to SharedPreferences
+        if (trackedSongs.isNotEmpty()) {
+            persistSongHistory(trackedSongs)
+        }
 
         viewModelScope.launch {
             try {
@@ -451,6 +475,12 @@ class ProgressiveO2ViewModel @Inject constructor(
     /** Dismiss the PB celebration dialog. */
     fun dismissNewPersonalBest() {
         _uiState.update { it.copy(newPersonalBest = null) }
+    }
+
+    /** Log first contraction during a HOLD phase. */
+    fun logFirstContraction() {
+        stateMachine.signalFirstContraction()
+        audioHapticEngine.vibrateContractionLogged()
     }
 
     // ── Audio / haptic cues ─────────────────────────────────────────────────
@@ -568,6 +598,12 @@ class ProgressiveO2ViewModel @Inject constructor(
         // Fire Tail habit for every completed Progressive O2 session
         try { habitRepo.sendHabitIncrement(Slot.PROGRESSIVE_O2) } catch (_: Exception) {}
 
+        // 2b. Save song log (Spotify tracks played during session)
+        if (recordId > 0 && trackedSongs.isNotEmpty()) {
+            apneaRepository.saveSongLog(recordId, trackedSongs)
+            trackedSongs = emptyList()
+        }
+
         // 3. Save FreeHoldTelemetryEntity rows (linked to recordId)
         if (recordId > 0 && telemetrySnapshot.isNotEmpty()) {
             val freeHoldSamples = telemetrySnapshot.map { sample ->
@@ -658,8 +694,34 @@ class ProgressiveO2ViewModel @Inject constructor(
             .sortedBy { it.breathPeriodSec }
     }
 
+    // ── Song history persistence ─────────────────────────────────────────────
+
+    private fun persistSongHistory(songs: List<SpotifySong>) {
+        if (songs.isEmpty()) return
+        val existing = loadSongHistoryFromPrefs().toMutableList()
+        for (song in songs) {
+            val titleArtistKey = "${song.title.lowercase().trim()}|${song.artist.lowercase().trim()}"
+            val alreadyPresent = existing.any { s ->
+                "${s.title.lowercase().trim()}|${s.artist.lowercase().trim()}" == titleArtistKey
+            }
+            if (!alreadyPresent) existing.add(0, song)
+        }
+        val trimmed = existing.take(50)
+        val json = trimmed.joinToString(separator = "\n") { s ->
+            listOf(s.title, s.artist, s.spotifyUri ?: "").joinToString("|")
+        }
+        prefs.edit().putString("song_history", json).apply()
+    }
+
     override fun onCleared() {
         guidedAudioManager.stopPlayback()
+        // Also stop Spotify if still tracking
+        if (_uiState.value.isMusicMode) {
+            try {
+                spotifyManager.stopTracking()
+                spotifyManager.sendPauseAndRewindCommand()
+            } catch (_: Exception) {}
+        }
         super.onCleared()
     }
 

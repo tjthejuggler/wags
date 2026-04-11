@@ -1,6 +1,17 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-11 10:11 UTC-6*
+*Last updated: 2026-04-11 11:14 UTC-6*
+
+## Recent Changes (2026-04-11 11:14)
+- ✅ **Progressive O₂ — Spotify music integration + active session UI fixes:**
+  - **Music auto-start**: `startSession()` now calls `spotifyManager.startTracking()` + `sendPlayCommand()` when audio=MUSIC
+  - **Music auto-stop**: `stopSession()` now calls `spotifyManager.stopTracking()` + `sendPauseAndRewindCommand()` when audio=MUSIC
+  - **Song names recorded**: Tracked songs saved to `apnea_song_log` DB table via `apneaRepository.saveSongLog()` + SharedPreferences via `persistSongHistory()`
+  - **First Contraction button**: Large 120dp button during HOLD phase replaces CompletedRoundsList; shows "✓ Contraction Logged" after tap; target/round info at top, stop button at bottom
+  - **State machine**: Added `firstContractionMs: Long?` to `ProgressiveO2State`, `signalFirstContraction()` to `ProgressiveO2StateMachine`
+  - **ViewModel**: Added `logFirstContraction()` with haptic feedback, `persistSongHistory()`, Spotify cleanup in `onCleared()`
+  - Modified: `ProgressiveO2ViewModel.kt`, `ProgressiveO2ActiveScreen.kt`, `ProgressiveO2StateMachine.kt`
+  - Build: ✅ Successful, installed on SM-S918U1
 
 ## Recent Changes (2026-04-11 10:11)
 - Implemented two-checkmark completion system for Guided Audio Picker dialog
