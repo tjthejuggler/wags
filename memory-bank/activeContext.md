@@ -1,6 +1,22 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-11 11:42 UTC-6*
+*Last updated: 2026-04-11 12:25 UTC-6*
+
+### 2026-04-11 12:25 (UTC-6)
+**Task:** Per-guided-MP3 hyper settings + "Start MP3 with Hyper" checkbox
+
+**What was done:**
+- **Per-MP3 hyper settings storage:** Added `PerMp3HyperSettings` data class and per-MP3 SharedPreferences storage to `GuidedAudioManager` — each guided MP3 now remembers its own relaxedExhaleSec, purgeExhaleSec, transitionSec, and startMp3WithHyper flag (keyed by audioId).
+- **Auto-restore on MP3 selection:** When selecting a guided MP3 in the picker, if that MP3 has previously saved hyper settings, they are automatically restored to the UI (overriding the global defaults). This includes the three phase durations and the startMp3WithHyper checkbox.
+- **Auto-save on change:** When the user changes any hyper phase duration while in guided mode, the new value is saved both globally (SharedPreferences) and per-MP3 (keyed by audioId).
+- **"Start MP3 with Hyper" checkbox:** New checkbox shown in the GuidedHyperSection when audio=GUIDED and prep=HYPER and guided hyper is enabled. When checked, the guided MP3 starts playing at the beginning of the hyper countdown (not at hold start).
+- **Playback logic:** `showGuidedCountdown()` now starts guided audio if `startMp3WithHyper` is true. `startFreeHold()` skips starting guided audio if it's already playing (from the hyper countdown). `onGuidedCountdownCancelled()` stops the audio if it was started with hyper.
+
+**Files modified:**
+- `GuidedAudioManager.kt` — Added `PerMp3HyperSettings` data class, per-MP3 pref key constants, getter/setter/has methods for per-MP3 settings
+- `FreeHoldActiveScreen.kt` — Added `startMp3WithHyper` to `FreeHoldActiveUiState`, updated ViewModel init to restore per-MP3 settings, updated `selectGuidedAudio()` to restore per-MP3 settings, updated hyper setters to save per-MP3, added `setStartMp3WithHyper()`, updated `showGuidedCountdown()` to start audio, updated `onGuidedCountdownCancelled()` to stop audio, updated `startFreeHold()` to skip if already playing, updated `GuidedHyperSection` composable with new checkbox
+
+**Current state:** Both features implemented. Build successful, installed on SM-S918U1.
 
 ### 2026-04-11 11:42 (UTC-6)
 **Task:** Fix guided audio not playing during free hold + guided hyperventilation back button behavior

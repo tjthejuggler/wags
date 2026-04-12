@@ -174,6 +174,8 @@ data class FreeHoldActiveUiState(
     val showGuidedCountdown: Boolean = false,
     /** True after the guided countdown has completed — button reverts to plain START. */
     val guidedCountdownComplete: Boolean = false,
+    /** True when the user wants the guided MP3 to start playing during the hyper countdown. */
+    val startMp3WithHyper: Boolean = false,
     // ── Editable settings (mirrored from ViewModel for banner display) ───────
     val currentLungVolume: String = "FULL",
     val currentPrepType: String = "NO_PREP",
@@ -214,22 +216,30 @@ class FreeHoldActiveViewModel @Inject constructor(
     private var isHyperPrep = prepType == PrepType.HYPER.name
 
     private val _uiState = MutableStateFlow(
-        FreeHoldActiveUiState(
-            showTimer = savedStateHandle.get<Boolean>("showTimer") ?: true,
-            isMusicMode = isMusicMode,
-            isGuidedMode = isGuidedMode,
-            guidedSelectedId = guidedAudioManager.selectedId,
-            isHyperPrep = isHyperPrep,
-            guidedHyperEnabled = if (isHyperPrep) prefs.getBoolean("guided_hyper_enabled", false) else false,
-            guidedRelaxedExhaleSec = prefs.getInt("guided_relaxed_exhale_sec", 0),
-            guidedPurgeExhaleSec = prefs.getInt("guided_purge_exhale_sec", 0),
-            guidedTransitionSec = prefs.getInt("guided_transition_sec", 0),
-            currentLungVolume = lungVolume,
-            currentPrepType = prepType,
-            currentTimeOfDay = timeOfDay,
-            currentPosture = posture,
-            currentAudio = audio
-        )
+        run {
+            val selId = guidedAudioManager.selectedId
+            // Restore per-MP3 hyper settings if this MP3 has them saved
+            val perMp3 = if (isGuidedMode && isHyperPrep && selId > 0 && guidedAudioManager.hasPerMp3HyperSettings(selId)) {
+                guidedAudioManager.getPerMp3HyperSettings(selId)
+            } else null
+            FreeHoldActiveUiState(
+                showTimer = savedStateHandle.get<Boolean>("showTimer") ?: true,
+                isMusicMode = isMusicMode,
+                isGuidedMode = isGuidedMode,
+                guidedSelectedId = selId,
+                isHyperPrep = isHyperPrep,
+                guidedHyperEnabled = if (isHyperPrep) prefs.getBoolean("guided_hyper_enabled", false) else false,
+                guidedRelaxedExhaleSec = perMp3?.relaxedExhaleSec ?: prefs.getInt("guided_relaxed_exhale_sec", 0),
+                guidedPurgeExhaleSec = perMp3?.purgeExhaleSec ?: prefs.getInt("guided_purge_exhale_sec", 0),
+                guidedTransitionSec = perMp3?.transitionSec ?: prefs.getInt("guided_transition_sec", 0),
+                startMp3WithHyper = perMp3?.startMp3WithHyper ?: false,
+                currentLungVolume = lungVolume,
+                currentPrepType = prepType,
+                currentTimeOfDay = timeOfDay,
+                currentPosture = posture,
+                currentAudio = audio
+            )
+        }
     )
 
     val uiState: StateFlow<FreeHoldActiveUiState> = combine(
@@ -326,20 +336,41 @@ class FreeHoldActiveViewModel @Inject constructor(
     fun setGuidedRelaxedExhaleSec(sec: Int) {
         _uiState.update { it.copy(guidedRelaxedExhaleSec = sec) }
         prefs.edit().putInt("guided_relaxed_exhale_sec", sec).apply()
+        // Also save per-MP3 when in guided mode
+        val id = _uiState.value.guidedSelectedId
+        if (isGuidedMode && id > 0) guidedAudioManager.saveRelaxedExhale(id, sec)
     }
 
     fun setGuidedPurgeExhaleSec(sec: Int) {
         _uiState.update { it.copy(guidedPurgeExhaleSec = sec) }
         prefs.edit().putInt("guided_purge_exhale_sec", sec).apply()
+        val id = _uiState.value.guidedSelectedId
+        if (isGuidedMode && id > 0) guidedAudioManager.savePurgeExhale(id, sec)
     }
 
     fun setGuidedTransitionSec(sec: Int) {
         _uiState.update { it.copy(guidedTransitionSec = sec) }
         prefs.edit().putInt("guided_transition_sec", sec).apply()
+        val id = _uiState.value.guidedSelectedId
+        if (isGuidedMode && id > 0) guidedAudioManager.saveTransitionSec(id, sec)
+    }
+
+    fun setStartMp3WithHyper(enabled: Boolean) {
+        _uiState.update { it.copy(startMp3WithHyper = enabled) }
+        val id = _uiState.value.guidedSelectedId
+        if (id > 0) guidedAudioManager.saveStartMp3WithHyper(id, enabled)
     }
 
     fun showGuidedCountdown() {
         _uiState.update { it.copy(showGuidedCountdown = true) }
+        // If "Start MP3 with Hyper" is checked and we're in guided mode, start audio now
+        val state = _uiState.value
+        if (isGuidedMode && state.startMp3WithHyper) {
+            viewModelScope.launch {
+                guidedAudioManager.preparePlayback()
+                guidedAudioManager.startPlayback()
+            }
+        }
     }
 
     fun onGuidedCountdownComplete() {
@@ -353,6 +384,10 @@ class FreeHoldActiveViewModel @Inject constructor(
      */
     fun onGuidedCountdownCancelled() {
         _uiState.update { it.copy(showGuidedCountdown = false, guidedCountdownComplete = true) }
+        // Stop guided audio if it was started with hyper
+        if (isGuidedMode && _uiState.value.startMp3WithHyper) {
+            guidedAudioManager.stopPlayback()
+        }
     }
 
     // ── Settings edit (from banner popup) ────────────────────────────────────
@@ -411,10 +446,33 @@ class FreeHoldActiveViewModel @Inject constructor(
 
     fun selectGuidedAudio(audio: GuidedAudioEntity) {
         guidedAudioManager.selectAudio(audio.audioId)
-        _uiState.update { it.copy(
-            guidedSelectedId = audio.audioId,
-            guidedSelectedName = audio.fileName
-        ) }
+        // Restore per-MP3 hyper settings if they exist for this MP3
+        val perMp3 = if (guidedAudioManager.hasPerMp3HyperSettings(audio.audioId)) {
+            guidedAudioManager.getPerMp3HyperSettings(audio.audioId)
+        } else null
+        _uiState.update {
+            if (perMp3 != null) {
+                // Restore per-MP3 settings and also update the global prefs
+                prefs.edit()
+                    .putInt("guided_relaxed_exhale_sec", perMp3.relaxedExhaleSec)
+                    .putInt("guided_purge_exhale_sec", perMp3.purgeExhaleSec)
+                    .putInt("guided_transition_sec", perMp3.transitionSec)
+                    .apply()
+                it.copy(
+                    guidedSelectedId = audio.audioId,
+                    guidedSelectedName = audio.fileName,
+                    guidedRelaxedExhaleSec = perMp3.relaxedExhaleSec,
+                    guidedPurgeExhaleSec = perMp3.purgeExhaleSec,
+                    guidedTransitionSec = perMp3.transitionSec,
+                    startMp3WithHyper = perMp3.startMp3WithHyper
+                )
+            } else {
+                it.copy(
+                    guidedSelectedId = audio.audioId,
+                    guidedSelectedName = audio.fileName
+                )
+            }
+        }
     }
 
     fun addGuidedAudio(uri: String, fileName: String, sourceUrl: String) {
@@ -514,8 +572,9 @@ class FreeHoldActiveViewModel @Inject constructor(
             // sendPlayCommand() resumes the paused track instantly.
             spotifyManager.sendPlayCommand()
         }
-        // Start guided audio if GUIDED is selected
-        if (audio == AudioSetting.GUIDED.name) {
+        // Start guided audio if GUIDED is selected — but skip if it was already
+        // started during the hyper countdown (startMp3WithHyper == true)
+        if (audio == AudioSetting.GUIDED.name && !guidedAudioManager.isPlaying) {
             viewModelScope.launch {
                 guidedAudioManager.preparePlayback()
                 guidedAudioManager.startPlayback()
@@ -1109,7 +1168,10 @@ fun FreeHoldActiveScreen(
                     relaxedExhaleSec = state.guidedRelaxedExhaleSec,
                     purgeExhaleSec = state.guidedPurgeExhaleSec,
                     transitionSec = state.guidedTransitionSec,
+                    showStartMp3WithHyper = state.isGuidedMode,
+                    startMp3WithHyper = state.startMp3WithHyper,
                     onEnabledChange = { viewModel.setGuidedHyperEnabled(it) },
+                    onStartMp3WithHyperChange = { viewModel.setStartMp3WithHyper(it) },
                     onEditClick = { showGuidedHyperEditSheet = true }
                 )
             }
@@ -1400,7 +1462,10 @@ private fun GuidedHyperSection(
     relaxedExhaleSec: Int,
     purgeExhaleSec: Int,
     transitionSec: Int,
+    showStartMp3WithHyper: Boolean = false,
+    startMp3WithHyper: Boolean = false,
     onEnabledChange: (Boolean) -> Unit,
+    onStartMp3WithHyperChange: (Boolean) -> Unit = {},
     onEditClick: () -> Unit = {}
 ) {
     Column(
@@ -1460,6 +1525,33 @@ private fun GuidedHyperSection(
                     color = TextSecondary,
                     modifier = Modifier.padding(start = 36.dp, bottom = 2.dp)
                 )
+            }
+
+            // "Start MP3 with Hyper" checkbox — only shown when audio is GUIDED
+            if (showStartMp3WithHyper) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .padding(start = 32.dp)
+                        .clickable { onStartMp3WithHyperChange(!startMp3WithHyper) }
+                ) {
+                    Checkbox(
+                        checked = startMp3WithHyper,
+                        onCheckedChange = onStartMp3WithHyperChange,
+                        modifier = Modifier.size(28.dp),
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = TextPrimary,
+                            uncheckedColor = TextSecondary,
+                            checkmarkColor = BackgroundDark
+                        )
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Start MP3 with Hyper",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                }
             }
         }
     }

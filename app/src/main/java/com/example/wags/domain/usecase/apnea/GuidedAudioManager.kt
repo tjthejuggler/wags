@@ -28,6 +28,11 @@ class GuidedAudioManager @Inject constructor(
 
     companion object {
         private const val PREF_SELECTED_ID = "guided_audio_selected_id"
+        // Per-MP3 setting key prefixes (keyed by audioId)
+        private const val PREF_PREFIX_RELAXED  = "guided_mp3_relaxed_"
+        private const val PREF_PREFIX_PURGE    = "guided_mp3_purge_"
+        private const val PREF_PREFIX_TRANS    = "guided_mp3_trans_"
+        private const val PREF_PREFIX_START_MP3 = "guided_mp3_start_with_hyper_"
     }
 
     private var mediaPlayer: MediaPlayer? = null
@@ -117,4 +122,65 @@ class GuidedAudioManager @Inject constructor(
 
     /** Returns true if audio is currently playing. */
     val isPlaying: Boolean get() = mediaPlayer?.isPlaying == true
+
+    // ── Per-MP3 hyper settings ───────────────────────────────────────────────
+
+    /**
+     * Settings remembered per guided MP3 for the guided hyperventilation feature.
+     */
+    data class PerMp3HyperSettings(
+        val relaxedExhaleSec: Int = 0,
+        val purgeExhaleSec: Int = 0,
+        val transitionSec: Int = 0,
+        val startMp3WithHyper: Boolean = false
+    )
+
+    /** Load the per-MP3 hyper settings for the given audio ID. */
+    fun getPerMp3HyperSettings(audioId: Long): PerMp3HyperSettings {
+        if (audioId <= 0) return PerMp3HyperSettings()
+        return PerMp3HyperSettings(
+            relaxedExhaleSec = prefs.getInt("$PREF_PREFIX_RELAXED$audioId", -1),
+            purgeExhaleSec   = prefs.getInt("$PREF_PREFIX_PURGE$audioId", -1),
+            transitionSec    = prefs.getInt("$PREF_PREFIX_TRANS$audioId", -1),
+            startMp3WithHyper = prefs.getBoolean("$PREF_PREFIX_START_MP3$audioId", false)
+        ).let { raw ->
+            // -1 means "never saved for this MP3" — return defaults
+            if (raw.relaxedExhaleSec < 0 && raw.purgeExhaleSec < 0 && raw.transitionSec < 0) {
+                PerMp3HyperSettings()
+            } else {
+                raw.copy(
+                    relaxedExhaleSec = raw.relaxedExhaleSec.coerceAtLeast(0),
+                    purgeExhaleSec   = raw.purgeExhaleSec.coerceAtLeast(0),
+                    transitionSec    = raw.transitionSec.coerceAtLeast(0)
+                )
+            }
+        }
+    }
+
+    /** Check whether this MP3 has ever had per-MP3 hyper settings saved. */
+    fun hasPerMp3HyperSettings(audioId: Long): Boolean {
+        if (audioId <= 0) return false
+        return prefs.contains("$PREF_PREFIX_RELAXED$audioId")
+    }
+
+    /** Save a single per-MP3 hyper setting. */
+    fun saveRelaxedExhale(audioId: Long, sec: Int) {
+        if (audioId <= 0) return
+        prefs.edit().putInt("$PREF_PREFIX_RELAXED$audioId", sec).apply()
+    }
+
+    fun savePurgeExhale(audioId: Long, sec: Int) {
+        if (audioId <= 0) return
+        prefs.edit().putInt("$PREF_PREFIX_PURGE$audioId", sec).apply()
+    }
+
+    fun saveTransitionSec(audioId: Long, sec: Int) {
+        if (audioId <= 0) return
+        prefs.edit().putInt("$PREF_PREFIX_TRANS$audioId", sec).apply()
+    }
+
+    fun saveStartMp3WithHyper(audioId: Long, enabled: Boolean) {
+        if (audioId <= 0) return
+        prefs.edit().putBoolean("$PREF_PREFIX_START_MP3$audioId", enabled).apply()
+    }
 }

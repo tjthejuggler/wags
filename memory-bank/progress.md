@@ -1,6 +1,16 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-11 11:42 UTC-6*
+*Last updated: 2026-04-11 12:25 UTC-6*
+
+## Recent Changes (2026-04-11 12:25)
+- ✅ **Per-guided-MP3 hyper settings + "Start MP3 with Hyper" checkbox:**
+  - **Per-MP3 settings storage**: `GuidedAudioManager` now stores per-MP3 hyper settings (relaxedExhaleSec, purgeExhaleSec, transitionSec, startMp3WithHyper) in SharedPreferences keyed by audioId
+  - **Auto-restore on selection**: `selectGuidedAudio()` restores per-MP3 hyper settings when selecting a guided MP3 that has previously saved settings
+  - **Auto-save on change**: Hyper phase duration setters now also save per-MP3 when in guided mode
+  - **"Start MP3 with Hyper" checkbox**: New checkbox in `GuidedHyperSection` (visible when audio=GUIDED + prep=HYPER + guided hyper enabled). When checked, guided MP3 starts playing at the beginning of the hyper countdown
+  - **Playback logic**: `showGuidedCountdown()` starts audio if startMp3WithHyper=true; `startFreeHold()` skips if already playing; `onGuidedCountdownCancelled()` stops audio if started with hyper
+  - Modified: `GuidedAudioManager.kt`, `FreeHoldActiveScreen.kt`
+  - Build: ✅ Successful, installed on SM-S918U1
 
 ## Recent Changes (2026-04-11 11:42)
 - ✅ **Fix guided audio not playing during free hold:**
