@@ -19,9 +19,15 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
@@ -781,6 +787,7 @@ private fun RecordDetailContent(
                         LineChart(
                             samples = hrValues,
                             lineColor = TextPrimary,
+                            unit = "bpm",
                             durationMs = chartDurationMs,
                             firstContractionMs = record.firstContractionMs,
                             showYLabels = true,
@@ -880,6 +887,7 @@ private fun RecordDetailContent(
                         LineChart(
                             samples = spO2Values,
                             lineColor = SpO2Blue,
+                            unit = "%",
                             yMin = 70f,
                             yMax = 100f,
                             durationMs = spO2ChartDurationMs,
@@ -984,6 +992,7 @@ private fun RecordDetailContent(
 private fun LineChart(
     samples: List<Float>,
     lineColor: Color,
+    unit: String,
     modifier: Modifier = Modifier,
     yMin: Float = samples.minOrNull() ?: 0f,
     yMax: Float = samples.maxOrNull() ?: 1f,
@@ -1009,19 +1018,38 @@ private fun LineChart(
 
     val yRange = (yMax - yMin).coerceAtLeast(1f)
 
-    Canvas(modifier = modifier) {
-        val totalW = size.width
-        val totalH = size.height
+    var tappedIndex by remember { mutableStateOf<Int?>(null) }
+    var chartWidthPx by remember { mutableFloatStateOf(0f) }
 
-        // Plot area bounds
-        val plotLeft   = leftPadPx
-        val plotRight  = totalW - rightPadPx
-        val plotTop    = topPadPx
-        val plotBottom = totalH - bottomPadPx
-        val plotW      = (plotRight - plotLeft).coerceAtLeast(1f)
-        val plotH      = (plotBottom - plotTop).coerceAtLeast(1f)
+    Box(modifier = modifier) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(samples) {
+                    detectTapGestures { offset ->
+                        val totalW = size.width.toFloat()
+                        val plotLeft = leftPadPx
+                        val plotRight = totalW - rightPadPx
+                        val plotW = (plotRight - plotLeft).coerceAtLeast(1f)
+                        val frac = ((offset.x - plotLeft) / plotW).coerceIn(0f, 1f)
+                        val idx = (frac * (samples.size - 1)).toInt().coerceIn(0, samples.size - 1)
+                        tappedIndex = if (tappedIndex == idx) null else idx
+                        chartWidthPx = totalW
+                    }
+                }
+        ) {
+            val totalW = size.width
+            val totalH = size.height
 
-        val stepX = plotW / (samples.size - 1).toFloat()
+            // Plot area bounds
+            val plotLeft   = leftPadPx
+            val plotRight  = totalW - rightPadPx
+            val plotTop    = topPadPx
+            val plotBottom = totalH - bottomPadPx
+            val plotW      = (plotRight - plotLeft).coerceAtLeast(1f)
+            val plotH      = (plotBottom - plotTop).coerceAtLeast(1f)
+
+            val stepX = plotW / (samples.size - 1).toFloat()
 
         // ── Subtle horizontal grid lines ──────────────────────────────────
         listOf(0.25f, 0.5f, 0.75f).forEach { frac ->
@@ -1064,6 +1092,20 @@ private fun LineChart(
         val lastY  = plotTop + plotH * (1f - ((samples.last()  - yMin) / yRange).coerceIn(0f, 1f))
         drawCircle(color = lineColor, radius = 5f, center = Offset(plotLeft,  firstY))
         drawCircle(color = lineColor, radius = 5f, center = Offset(plotRight, lastY))
+
+        // Tapped point indicator
+        tappedIndex?.let { idx ->
+            val cx = plotLeft + idx * stepX
+            val cy = plotTop + plotH * (1f - ((samples[idx] - yMin) / yRange).coerceIn(0f, 1f))
+            drawLine(
+                TextSecondary.copy(alpha = 0.4f),
+                Offset(cx, plotTop),
+                Offset(cx, plotBottom),
+                strokeWidth = 1f
+            )
+            drawCircle(lineColor, radius = 6f, center = Offset(cx, cy))
+            drawCircle(SurfaceVariant, radius = 3f, center = Offset(cx, cy))
+        }
 
         // ── Y-axis labels (HR only) ───────────────────────────────────────
         if (showYLabels) {
@@ -1113,6 +1155,56 @@ private fun LineChart(
                     totalH - with(density) { 1.dp.toPx() },
                     paint
                 )
+            }
+        }
+    }
+
+        // ── Info popup ─────────────────────────────────────────────────────
+        tappedIndex?.let { idx ->
+            val dataFrac = idx.toFloat() / (samples.size - 1).coerceAtLeast(1).toFloat()
+            val timeMs   = (dataFrac * durationMs).toLong()
+            val timeSec  = timeMs / 1_000L
+            val mm       = timeSec / 60L
+            val ss       = timeSec % 60L
+            val timeStr  = "${mm}m ${ss}s"
+            val valStr   = "${samples[idx].toInt()} $unit"
+
+            val popupOffsetX = with(density) {
+                val plotLeft  = leftPadPx
+                val plotRight = chartWidthPx - rightPadPx
+                val plotW     = (plotRight - plotLeft).coerceAtLeast(1f)
+                val px        = plotLeft + dataFrac * plotW
+                (px - 50.dp.toPx()).toInt()
+            }
+
+            Popup(
+                alignment = Alignment.TopStart,
+                offset    = IntOffset(popupOffsetX, with(density) { (-4).dp.roundToPx() }),
+                onDismissRequest = { tappedIndex = null },
+                properties = PopupProperties(focusable = false)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = SurfaceDark,
+                    shadowElevation = 4.dp
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            valStr,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = lineColor,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            timeStr,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextSecondary
+                        )
+                    }
+                }
             }
         }
     }

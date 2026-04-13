@@ -19,9 +19,15 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -160,8 +166,9 @@ private fun ChartCard(
             Text(title, style = MaterialTheme.typography.titleMedium,
                 color = TextPrimary, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
+            val unit = if (title.contains("SpO")) "%" else "bpm"
             TelemetryLineChart(
-                samples = samples, lineColor = lineColor,
+                samples = samples, lineColor = lineColor, unit = unit,
                 yMin = yMin, yMax = yMax, durationMs = durationMs, showYLabels = true,
                 modifier = Modifier.fillMaxWidth().height(200.dp)
                     .background(SurfaceVariant.copy(alpha = 0.3f))
@@ -216,7 +223,7 @@ private fun RoundsBreakdownCard(rounds: List<RoundDisplayData>) {
 // Canvas line chart — follows ApneaRecordDetailScreen.LineChart pattern
 @Composable
 private fun TelemetryLineChart(
-    samples: List<Float>, lineColor: Color, modifier: Modifier = Modifier,
+    samples: List<Float>, lineColor: Color, unit: String, modifier: Modifier = Modifier,
     yMin: Float = samples.minOrNull() ?: 0f, yMax: Float = samples.maxOrNull() ?: 1f,
     durationMs: Long = 0L, showYLabels: Boolean = false
 ) {
@@ -231,11 +238,30 @@ private fun TelemetryLineChart(
     val lblArgb  = lblColor.toArgb()
     val yRange   = (yMax - yMin).coerceAtLeast(1f)
 
-    Canvas(modifier = modifier) {
-        val pL = leftPad; val pR = size.width - rightPad
-        val pT = topPad;  val pB = size.height - botPad
-        val pW = (pR - pL).coerceAtLeast(1f); val pH = (pB - pT).coerceAtLeast(1f)
-        val stepX = pW / (samples.size - 1).toFloat()
+    var tappedIndex by remember { mutableStateOf<Int?>(null) }
+    var chartWidthPx by remember { mutableFloatStateOf(0f) }
+
+    Box(modifier = modifier) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(samples) {
+                    detectTapGestures { offset ->
+                        val totalW = size.width.toFloat()
+                        val pL = leftPad
+                        val pR = totalW - rightPad
+                        val pW = (pR - pL).coerceAtLeast(1f)
+                        val frac = ((offset.x - pL) / pW).coerceIn(0f, 1f)
+                        val idx = (frac * (samples.size - 1)).toInt().coerceIn(0, samples.size - 1)
+                        tappedIndex = if (tappedIndex == idx) null else idx
+                        chartWidthPx = totalW
+                    }
+                }
+        ) {
+            val pL = leftPad; val pR = size.width - rightPad
+            val pT = topPad;  val pB = size.height - botPad
+            val pW = (pR - pL).coerceAtLeast(1f); val pH = (pB - pT).coerceAtLeast(1f)
+            val stepX = pW / (samples.size - 1).toFloat()
 
         // Grid lines
         listOf(0.25f, 0.5f, 0.75f).forEach { f ->
@@ -254,6 +280,21 @@ private fun TelemetryLineChart(
         val fY = pT + pH * (1f - ((samples.first() - yMin) / yRange).coerceIn(0f, 1f))
         val lY = pT + pH * (1f - ((samples.last()  - yMin) / yRange).coerceIn(0f, 1f))
         drawCircle(lineColor, 5f, Offset(pL, fY)); drawCircle(lineColor, 5f, Offset(pR, lY))
+
+        // Tapped point indicator
+        tappedIndex?.let { idx ->
+            val cx = pL + idx * stepX
+            val cy = pT + pH * (1f - ((samples[idx] - yMin) / yRange).coerceIn(0f, 1f))
+            drawLine(
+                TextSecondary.copy(alpha = 0.4f),
+                Offset(cx, pT),
+                Offset(cx, pB),
+                strokeWidth = 1f
+            )
+            drawCircle(lineColor, radius = 6f, center = Offset(cx, cy))
+            drawCircle(SurfaceVariant, radius = 3f, center = Offset(cx, cy))
+        }
+
         // Y labels
         if (showYLabels) {
             val paint = Paint().apply {
@@ -280,6 +321,56 @@ private fun TelemetryLineChart(
                 drawContext.canvas.nativeCanvas.drawText(
                     "${m}m", x, size.height - with(density) { 1.dp.toPx() }, paint
                 )
+            }
+        }
+    }
+
+        // ── Info popup ─────────────────────────────────────────────────────
+        tappedIndex?.let { idx ->
+            val dataFrac = idx.toFloat() / (samples.size - 1).coerceAtLeast(1).toFloat()
+            val timeMs   = (dataFrac * durationMs).toLong()
+            val timeSec  = timeMs / 1_000L
+            val mm       = timeSec / 60L
+            val ss       = timeSec % 60L
+            val timeStr  = "${mm}m ${ss}s"
+            val valStr   = "${samples[idx].toInt()} $unit"
+
+            val popupOffsetX = with(density) {
+                val pL = leftPad
+                val pR = chartWidthPx - rightPad
+                val pW = (pR - pL).coerceAtLeast(1f)
+                val px = pL + dataFrac * pW
+                (px - 50.dp.toPx()).toInt()
+            }
+
+            Popup(
+                alignment = Alignment.TopStart,
+                offset    = IntOffset(popupOffsetX, with(density) { (-4).dp.roundToPx() }),
+                onDismissRequest = { tappedIndex = null },
+                properties = PopupProperties(focusable = false)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = SurfaceDark,
+                    shadowElevation = 4.dp
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            valStr,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = lineColor,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            timeStr,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextSecondary
+                        )
+                    }
+                }
             }
         }
     }

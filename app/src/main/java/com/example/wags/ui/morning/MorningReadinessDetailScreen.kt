@@ -16,9 +16,15 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -552,6 +558,7 @@ private fun TelemetryChartCard(
                 yMin              = yMin,
                 yMax              = yMax,
                 lineColor         = lineColor,
+                unit              = unit,
                 standFraction     = standFraction,
                 showStandingLabel = showStandingLabel,
                 modifier          = Modifier
@@ -736,6 +743,7 @@ private fun TelemetryLineChart(
     yMin: Float,
     yMax: Float,
     lineColor: Color,
+    unit: String,
     standFraction: Float?,
     showStandingLabel: Boolean = true,
     modifier: Modifier = Modifier
@@ -759,17 +767,36 @@ private fun TelemetryLineChart(
     val labelArgb      = TextSecondary.copy(alpha = 0.7f).toArgb()
     val standColor     = ReadinessOrange
 
-    Canvas(modifier = modifier) {
-        val totalW   = size.width
-        val totalH   = size.height
-        val plotLeft  = leftPadPx
-        val plotRight = totalW - rightPadPx
-        val plotTop   = topPadPx
-        val plotBot   = totalH - bottomPadPx
-        val plotW     = (plotRight - plotLeft).coerceAtLeast(1f)
-        val plotH     = (plotBot - plotTop).coerceAtLeast(1f)
+    var tappedIndex by remember { mutableStateOf<Int?>(null) }
+    var chartWidthPx by remember { mutableFloatStateOf(0f) }
 
-        fun xOf(i: Int)   = plotLeft + i.toFloat() / (values.size - 1).toFloat() * plotW
+    Box(modifier = modifier) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(values) {
+                    detectTapGestures { offset ->
+                        val totalW = size.width.toFloat()
+                        val plotLeft = leftPadPx
+                        val plotRight = totalW - rightPadPx
+                        val plotW = (plotRight - plotLeft).coerceAtLeast(1f)
+                        val frac = ((offset.x - plotLeft) / plotW).coerceIn(0f, 1f)
+                        val idx = (frac * (values.size - 1)).toInt().coerceIn(0, values.size - 1)
+                        tappedIndex = if (tappedIndex == idx) null else idx
+                        chartWidthPx = totalW
+                    }
+                }
+        ) {
+            val totalW   = size.width
+            val totalH   = size.height
+            val plotLeft  = leftPadPx
+            val plotRight = totalW - rightPadPx
+            val plotTop   = topPadPx
+            val plotBot   = totalH - bottomPadPx
+            val plotW     = (plotRight - plotLeft).coerceAtLeast(1f)
+            val plotH     = (plotBot - plotTop).coerceAtLeast(1f)
+
+            fun xOf(i: Int)   = plotLeft + i.toFloat() / (values.size - 1).toFloat() * plotW
         fun yOf(v: Float) = plotTop + plotH * (1f - ((v - yMin) / yRange).coerceIn(0f, 1f))
 
         // ── Horizontal grid lines ─────────────────────────────────────────────
@@ -830,6 +857,20 @@ private fun TelemetryLineChart(
         drawCircle(lineColor, radius = 4.5f, center = Offset(xOf(0), yOf(values.first())))
         drawCircle(lineColor, radius = 4.5f, center = Offset(xOf(values.size - 1), yOf(values.last())))
 
+        // Tapped point indicator
+        tappedIndex?.let { idx ->
+            val cx = xOf(idx)
+            val cy = yOf(values[idx])
+            drawLine(
+                TextSecondary.copy(alpha = 0.4f),
+                Offset(cx, plotTop),
+                Offset(cx, plotBot),
+                strokeWidth = 1f
+            )
+            drawCircle(lineColor, radius = 6f, center = Offset(cx, cy))
+            drawCircle(SurfaceVariant, radius = 3f, center = Offset(cx, cy))
+        }
+
         // ── Y-axis labels ─────────────────────────────────────────────────────
         val yPaint = Paint().apply {
             isAntiAlias = true
@@ -870,6 +911,46 @@ private fun TelemetryLineChart(
                 totalH - with(density) { 2.dp.toPx() },
                 xPaint
             )
+        }
+    }
+
+        // ── Info popup ─────────────────────────────────────────────────────
+        tappedIndex?.let { idx ->
+            val dataFrac = idx.toFloat() / (values.size - 1).coerceAtLeast(1).toFloat()
+            val valStr   = "${values[idx].toInt()} $unit"
+
+            val popupOffsetX = with(density) {
+                val plotLeft  = leftPadPx
+                val plotRight = chartWidthPx - rightPadPx
+                val plotW     = (plotRight - plotLeft).coerceAtLeast(1f)
+                val px        = plotLeft + dataFrac * plotW
+                (px - 50.dp.toPx()).toInt()
+            }
+
+            Popup(
+                alignment = Alignment.TopStart,
+                offset    = IntOffset(popupOffsetX, with(density) { (-4).dp.roundToPx() }),
+                onDismissRequest = { tappedIndex = null },
+                properties = PopupProperties(focusable = false)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = SurfaceDark,
+                    shadowElevation = 4.dp
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            valStr,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = lineColor,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
         }
     }
 }

@@ -573,10 +573,17 @@ class MeditationViewModel @Inject constructor(
                 // Analytics failure — still save the session
             }
 
+            // Persist timer duration if a timer was active for this session
+            val timerMs = if (_uiState.value.timerEnabled) {
+                val totalSec = _uiState.value.timerTotalSeconds
+                if (totalSec > 0L) totalSec * 1_000L else null
+            } else null
+
             val entity = MeditationSessionEntity(
                 audioId          = audioId,
                 timestamp        = sessionStartMs,
                 durationMs       = durationMs,
+                timerDurationMs  = timerMs,
                 monitorId        = monitorId,
                 avgHrBpm         = avgHr,
                 hrSlopeBpmPerMin = hrSlope,

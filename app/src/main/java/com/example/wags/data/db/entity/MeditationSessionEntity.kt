@@ -12,6 +12,7 @@ import androidx.room.PrimaryKey
  * [audioId]          – FK to [MeditationAudioEntity]; references the "None" row when no audio.
  * [timestamp]        – epoch-ms when the session was started.
  * [durationMs]       – total session length in milliseconds.
+ * [timerDurationMs]  – optional countdown timer duration in ms; null if no timer was set.
  * [monitorId]        – BLE device label used for HR, null if no monitor was connected.
  * [avgHrBpm]         – mean heart rate over the session, null if no HR data.
  * [hrSlopeBpmPerMin] – linear trend of HR (positive = rising), null if no HR data.
@@ -37,6 +38,9 @@ data class MeditationSessionEntity(
     val audioId: Long?,
     val timestamp: Long,
     val durationMs: Long,
+    /** Countdown timer duration in ms; null if no timer was set for this session. */
+    @ColumnInfo(defaultValue = "NULL")
+    val timerDurationMs: Long? = null,
     val monitorId: String? = null,
     val avgHrBpm: Float? = null,
     val hrSlopeBpmPerMin: Float? = null,

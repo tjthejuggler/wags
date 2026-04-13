@@ -15,9 +15,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -370,13 +376,29 @@ private fun CoherenceHistoryChart(values: List<Float>, modifier: Modifier = Modi
     val max = (values.maxOrNull() ?: 1f).coerceAtLeast(min + 0.1f)
     val yPad = (max - min) * 0.1f
 
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val yMin = min - yPad
-        val yMax = max + yPad
-        val yRange = (yMax - yMin).coerceAtLeast(0.001f)
-        val xStep = w / (values.size - 1).toFloat()
+    var tappedIndex by remember { mutableStateOf<Int?>(null) }
+    var chartWidthPx by remember { mutableFloatStateOf(0f) }
+
+    Box(modifier = modifier) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(values) {
+                    detectTapGestures { offset ->
+                        val w = size.width.toFloat()
+                        val frac = (offset.x / w).coerceIn(0f, 1f)
+                        val idx = (frac * (values.size - 1)).toInt().coerceIn(0, values.size - 1)
+                        tappedIndex = if (tappedIndex == idx) null else idx
+                        chartWidthPx = w
+                    }
+                }
+        ) {
+            val w = size.width
+            val h = size.height
+            val yMin = min - yPad
+            val yMax = max + yPad
+            val yRange = (yMax - yMin).coerceAtLeast(0.001f)
+            val xStep = w / (values.size - 1).toFloat()
 
         fun xOf(i: Int) = i * xStep
         fun yOf(v: Float) = h - ((v - yMin) / yRange * h).coerceIn(0f, h)
@@ -408,6 +430,57 @@ private fun CoherenceHistoryChart(values: List<Float>, modifier: Modifier = Modi
         val lastY = yOf(values.last())
         drawCircle(color = lineColor, radius = 5f, center = Offset(lastX, lastY))
         drawCircle(color = BackgroundDark, radius = 2.5f, center = Offset(lastX, lastY))
+
+        // Tapped point indicator
+        tappedIndex?.let { idx ->
+            val cx = xOf(idx)
+            val cy = yOf(values[idx])
+            drawLine(
+                DetailAsh.copy(alpha = 0.4f),
+                Offset(cx, 0f),
+                Offset(cx, h),
+                strokeWidth = 1f
+            )
+            drawCircle(lineColor, radius = 6f, center = Offset(cx, cy))
+            drawCircle(BackgroundDark, radius = 3f, center = Offset(cx, cy))
+        }
+    }
+
+        // ── Info popup ─────────────────────────────────────────────────────
+        tappedIndex?.let { idx ->
+            val dataFrac = idx.toFloat() / (values.size - 1).coerceAtLeast(1).toFloat()
+            val valStr   = "%.2f".format(values[idx])
+
+            val popupOffsetX = with(LocalDensity.current) {
+                val px = dataFrac * chartWidthPx
+                (px - 30.dp.toPx()).toInt()
+            }
+
+            Popup(
+                alignment = Alignment.TopStart,
+                offset    = IntOffset(popupOffsetX, with(LocalDensity.current) { (-4).dp.roundToPx() }),
+                onDismissRequest = { tappedIndex = null },
+                properties = PopupProperties(focusable = false)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = SurfaceDark,
+                    shadowElevation = 4.dp
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            valStr,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = lineColor,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

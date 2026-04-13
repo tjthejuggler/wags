@@ -1,6 +1,13 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-11 12:25 UTC-6*
+*Last updated: 2026-04-12 04:29 UTC-6*
+
+## Recent Changes (2026-04-12 04:29)
+- ✅ **Tap-to-inspect popup on ALL detail screen graphs:**
+  - Extended the meditation detail screen's tap-to-inspect chart feature to every detail screen with graphs
+  - Modified 6 files: `ApneaRecordDetailScreen.kt`, `ProgressiveO2DetailScreen.kt`, `MorningReadinessDetailScreen.kt`, `ResonanceSessionDetailScreen.kt`, `RapidHrDetailScreen.kt`, `MinBreathDetailContent.kt`
+  - Each chart now wraps Canvas in Box, adds pointerInput tap detection, draws crosshair+dot indicator, shows Popup with value/time
+  - Build: ✅ Successful, installed on SM-S918U1
 
 ## Recent Changes (2026-04-11 12:25)
 - ✅ **Per-guided-MP3 hyper settings + "Start MP3 with Hyper" checkbox:**

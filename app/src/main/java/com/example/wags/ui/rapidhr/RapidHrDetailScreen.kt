@@ -14,9 +14,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -295,11 +301,27 @@ private fun HrSessionChart(
     val yHigh = yMax + yPad
     val yRange = yHigh - yLow
 
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val n = telemetry.size
-        val xStep = if (n > 1) w / (n - 1) else w
+    var tappedIndex by remember { mutableStateOf<Int?>(null) }
+    var chartWidthPx by remember { mutableFloatStateOf(0f) }
+
+    Box(modifier = modifier) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(telemetry) {
+                    detectTapGestures { offset ->
+                        val w = size.width.toFloat()
+                        val frac = (offset.x / w).coerceIn(0f, 1f)
+                        val idx = (frac * (telemetry.size - 1)).toInt().coerceIn(0, telemetry.size - 1)
+                        tappedIndex = if (tappedIndex == idx) null else idx
+                        chartWidthPx = w
+                    }
+                }
+        ) {
+            val w = size.width
+            val h = size.height
+            val n = telemetry.size
+            val xStep = if (n > 1) w / (n - 1) else w
 
         fun xOf(i: Int) = i * xStep
         fun yOf(v: Float) = h - ((v - yLow) / yRange * h)
@@ -352,5 +374,56 @@ private fun HrSessionChart(
             }
         }
         drawPath(linePath, color = Color(0xFFD0D0D0), style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
+
+        // Tapped point indicator
+        tappedIndex?.let { idx ->
+            val cx = xOf(idx)
+            val cy = yOf(telemetry[idx].hrBpm.toFloat())
+            drawLine(
+                TextSecondary.copy(alpha = 0.4f),
+                Offset(cx, 0f),
+                Offset(cx, h),
+                strokeWidth = 1f
+            )
+            drawCircle(Color(0xFFD0D0D0), radius = 6f, center = Offset(cx, cy))
+            drawCircle(SurfaceVariant, radius = 3f, center = Offset(cx, cy))
+        }
+    }
+
+        // ── Info popup ─────────────────────────────────────────────────────
+        tappedIndex?.let { idx ->
+            val dataFrac = idx.toFloat() / (telemetry.size - 1).coerceAtLeast(1).toFloat()
+            val valStr   = "${telemetry[idx].hrBpm} bpm"
+
+            val popupOffsetX = with(LocalDensity.current) {
+                val px = dataFrac * chartWidthPx
+                (px - 30.dp.toPx()).toInt()
+            }
+
+            Popup(
+                alignment = Alignment.TopStart,
+                offset    = IntOffset(popupOffsetX, with(LocalDensity.current) { (-4).dp.roundToPx() }),
+                onDismissRequest = { tappedIndex = null },
+                properties = PopupProperties(focusable = false)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = SurfaceDark,
+                    shadowElevation = 4.dp
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            valStr,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color(0xFFD0D0D0),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
     }
 }

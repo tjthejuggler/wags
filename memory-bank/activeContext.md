@@ -1,6 +1,31 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-11 12:25 UTC-6*
+*Last updated: 2026-04-12 04:29 UTC-6*
+
+### 2026-04-12 04:29 (UTC-6)
+**Task:** Add tap-to-inspect popup to all detail screen graphs
+
+**What was done:**
+- Extended the tap-to-inspect chart popup feature (originally only in MeditationSessionDetailScreen) to ALL detail screens with graphs across the app
+- Each chart now shows a crosshair + dot on tap, with a small popup displaying the value and time at that point
+- Tapping the same point again dismisses the popup; tapping a different point moves it
+
+**Screens modified:**
+- `ApneaRecordDetailScreen.kt` — `LineChart` composable (HR + SpO₂ charts): added `unit` param, `Box` wrapper, `pointerInput` tap detection, crosshair indicator, `Popup` with value+time
+- `ProgressiveO2DetailScreen.kt` — `TelemetryLineChart` composable (HR + SpO₂ charts): added `unit` param, `Box` wrapper, tap detection, crosshair, popup
+- `MorningReadinessDetailScreen.kt` — `TelemetryLineChart` composable (HR + RMSSD charts): added `unit` param, `Box` wrapper, tap detection, crosshair, popup (value only, no time since it's phase-based)
+- `ResonanceSessionDetailScreen.kt` — `CoherenceHistoryChart` composable: added `Box` wrapper, tap detection, crosshair, popup showing coherence value (2 decimal places)
+- `RapidHrDetailScreen.kt` — `HrSessionChart` composable: added `Box` wrapper, tap detection, crosshair, popup showing HR bpm
+- `MinBreathDetailContent.kt` — `MinBreathSessionChart` composable: added `Box` wrapper, tap detection using timestamp-based positioning, crosshair, popup with value+time
+
+**Pattern used (same as meditation):**
+1. Wrap `Canvas` in a `Box(modifier = modifier)`
+2. Add `pointerInput` with `detectTapGestures` to the Canvas
+3. Track `tappedIndex` + `chartWidthPx` state
+4. Draw vertical crosshair + dot indicator on Canvas for tapped point
+5. Show `Popup` with value/time info, positioned near the tapped point
+
+**Current state:** All detail screen graphs now have tap-to-inspect. Build successful, installed on SM-S918U1.
 
 ### 2026-04-11 12:25 (UTC-6)
 **Task:** Per-guided-MP3 hyper settings + "Start MP3 with Hyper" checkbox

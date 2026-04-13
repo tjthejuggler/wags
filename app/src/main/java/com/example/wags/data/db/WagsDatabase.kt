@@ -30,7 +30,7 @@ import com.example.wags.data.db.entity.*
         RapidHrTelemetryEntity::class,
         GuidedAudioEntity::class
     ],
-    version = 32,
+    version = 33,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -909,6 +909,15 @@ abstract class WagsDatabase : RoomDatabase() {
                             sourceUrl TEXT NOT NULL DEFAULT ''
                         )
                     """.trimIndent())
+                }
+            }
+
+            /**
+             * v32 → v33: Add timerDurationMs column to meditation_sessions.
+             */
+            val MIGRATION_32_33 = object : Migration(32, 33) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE meditation_sessions ADD COLUMN timerDurationMs INTEGER DEFAULT NULL")
                 }
             }
         }
