@@ -375,6 +375,13 @@ class FreeHoldActiveViewModel @Inject constructor(
 
     fun onGuidedCountdownComplete() {
         _uiState.update { it.copy(showGuidedCountdown = false, guidedCountdownComplete = true) }
+        // Auto-start the breath hold when audio is GUIDED and prep is HYPER —
+        // the guided hyperventilation is part of the same audio flow, so the
+        // user shouldn't need to tap START again. For all other audio settings
+        // the user must manually tap START after the countdown finishes.
+        if (isGuidedMode && isHyperPrep) {
+            startFreeHold()
+        }
     }
 
     /**
