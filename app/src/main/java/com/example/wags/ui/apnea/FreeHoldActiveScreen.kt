@@ -45,8 +45,11 @@ import com.example.wags.data.spotify.SpotifyTrackDetail
 import com.example.wags.data.spotify.TrackInfo
 import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.OximeterReading
+import com.example.wags.domain.model.PersonalBestCategory
 import com.example.wags.domain.model.PersonalBestResult
+import com.example.wags.domain.model.PbThresholds
 import com.example.wags.domain.model.PrepType
+import com.example.wags.domain.model.trophyEmojis
 import com.example.wags.domain.model.SpotifySong
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
@@ -54,6 +57,7 @@ import com.example.wags.domain.usecase.apnea.GuidedAudioManager
 import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.KeepScreenOn
+import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.navigation.WagsRoutes
@@ -181,7 +185,16 @@ data class FreeHoldActiveUiState(
     val currentPrepType: String = "NO_PREP",
     val currentTimeOfDay: String = "DAY",
     val currentPosture: String = "LAYING",
-    val currentAudio: String = AudioSetting.SILENCE.name
+    val currentAudio: String = AudioSetting.SILENCE.name,
+    // ── Real-time PB indication ────────────────────────────────────────────
+    /** Master toggle: indicate new records during the hold. */
+    val pbIndicationEnabled: Boolean = false,
+    /** Play sound when a PB threshold is crossed during a hold. */
+    val pbIndicationSound: Boolean = true,
+    /** Vibrate when a PB threshold is crossed during a hold. */
+    val pbIndicationVibration: Boolean = true,
+    /** The broadest PB category broken so far during the current hold (for UI display). */
+    val currentPbCategory: PersonalBestCategory? = null
 )
 
 @HiltViewModel
@@ -237,7 +250,10 @@ class FreeHoldActiveViewModel @Inject constructor(
                 currentPrepType = prepType,
                 currentTimeOfDay = timeOfDay,
                 currentPosture = posture,
-                currentAudio = audio
+                currentAudio = audio,
+                pbIndicationEnabled = audioHapticEngine.pbIndicationEnabled,
+                pbIndicationSound = audioHapticEngine.pbIndicationSound,
+                pbIndicationVibration = audioHapticEngine.pbIndicationVibration
             )
         }
     )
@@ -537,6 +553,29 @@ class FreeHoldActiveViewModel @Inject constructor(
      */
     private var holdStartDeviceLabel: String? = null
 
+    // ── Real-time PB indication ────────────────────────────────────────────
+    /** Pre-computed PB thresholds loaded at hold-start for real-time checking. */
+    private var pbThresholds: PbThresholds? = null
+    /** Job for the 1-second PB monitoring loop during a hold. */
+    private var pbMonitorJob: Job? = null
+    /** Tracks the broadest category already indicated so we don't re-fire. */
+    private var lastIndicatedCategory: PersonalBestCategory? = null
+
+    fun setPbIndicationEnabled(enabled: Boolean) {
+        audioHapticEngine.pbIndicationEnabled = enabled
+        _uiState.update { it.copy(pbIndicationEnabled = enabled) }
+    }
+
+    fun setPbIndicationSound(enabled: Boolean) {
+        audioHapticEngine.pbIndicationSound = enabled
+        _uiState.update { it.copy(pbIndicationSound = enabled) }
+    }
+
+    fun setPbIndicationVibration(enabled: Boolean) {
+        audioHapticEngine.pbIndicationVibration = enabled
+        _uiState.update { it.copy(pbIndicationVibration = enabled) }
+    }
+
     fun startFreeHold() {
         // Use the actual connected Polar device ID for the RR stream — the old
         // placeholder caused startRrStream to silently fail, which could leave
@@ -587,12 +626,51 @@ class FreeHoldActiveViewModel @Inject constructor(
                 guidedAudioManager.startPlayback()
             }
         }
+
+        // ── Real-time PB indication ────────────────────────────────────────
+        // Load PB thresholds and start monitoring loop if the feature is enabled.
+        lastIndicatedCategory = null
+        pbMonitorJob?.cancel()
+        if (_uiState.value.pbIndicationEnabled) {
+            pbMonitorJob = viewModelScope.launch {
+                // Load thresholds asynchronously (DB queries)
+                pbThresholds = apneaRepository.getPbThresholds(
+                    lungVolume = lungVolume,
+                    prepType   = prepType,
+                    timeOfDay  = timeOfDay,
+                    posture    = posture,
+                    audio      = audio
+                )
+                // Monitor every second
+                while (true) {
+                    delay(1_000L)
+                    val thresholds = pbThresholds ?: continue
+                    val elapsed = System.currentTimeMillis() - freeHoldStartTime
+                    val broadest = thresholds.broadestBroken(elapsed) ?: continue
+
+                    // Only fire if this is a broader category than what we've already indicated
+                    val lastOrdinal = lastIndicatedCategory?.ordinal ?: -1
+                    if (broadest.ordinal > lastOrdinal) {
+                        lastIndicatedCategory = broadest
+                        _uiState.update { it.copy(currentPbCategory = broadest) }
+                        audioHapticEngine.playPbIndicationSound(broadest)
+                        audioHapticEngine.vibratePbIndication(broadest)
+                    }
+                }
+            }
+        }
     }
 
     fun cancelFreeHold() {
         oximeterCollectionJob?.cancel()
         oximeterCollectionJob = null
         oximeterSamples.clear()
+        // Stop PB monitoring
+        pbMonitorJob?.cancel()
+        pbMonitorJob = null
+        pbThresholds = null
+        lastIndicatedCategory = null
+        audioHapticEngine.releasePbIndicationPlayers()
         // Pause Spotify and rewind to start of song if MUSIC was selected
         if (audio == AudioSetting.MUSIC.name) {
             spotifyManager.stopTracking()
@@ -602,7 +680,7 @@ class FreeHoldActiveViewModel @Inject constructor(
         if (audio == AudioSetting.GUIDED.name) {
             guidedAudioManager.stopPlayback()
         }
-        _uiState.update { it.copy(freeHoldActive = false, freeHoldFirstContractionMs = null) }
+        _uiState.update { it.copy(freeHoldActive = false, freeHoldFirstContractionMs = null, currentPbCategory = null) }
     }
 
     fun recordFreeHoldFirstContraction() {
@@ -616,6 +694,12 @@ class FreeHoldActiveViewModel @Inject constructor(
         val duration = System.currentTimeMillis() - freeHoldStartTime
         oximeterCollectionJob?.cancel()
         oximeterCollectionJob = null
+        // Stop PB monitoring
+        pbMonitorJob?.cancel()
+        pbMonitorJob = null
+        pbThresholds = null
+        lastIndicatedCategory = null
+        audioHapticEngine.releasePbIndicationPlayers()
         val firstContractionMs = _uiState.value.freeHoldFirstContractionMs
         // Capture device label at hold-end as well — use whichever is non-null,
         // preferring the hold-start label (guaranteed to reflect the device that
@@ -637,6 +721,7 @@ class FreeHoldActiveViewModel @Inject constructor(
             it.copy(
                 freeHoldActive = false,
                 freeHoldFirstContractionMs = null,
+                currentPbCategory = null,
                 pbCheckPending = true          // prevent navigation until PB check completes
             )
         }
@@ -1198,6 +1283,18 @@ fun FreeHoldActiveScreen(
                 )
             }
 
+            // ── New Record Indication settings ─────────────────────────────────
+            if (!state.freeHoldActive) {
+                PbIndicationSection(
+                    enabled = state.pbIndicationEnabled,
+                    soundEnabled = state.pbIndicationSound,
+                    vibrationEnabled = state.pbIndicationVibration,
+                    onEnabledChange = { viewModel.setPbIndicationEnabled(it) },
+                    onSoundChange = { viewModel.setPbIndicationSound(it) },
+                    onVibrationChange = { viewModel.setPbIndicationVibration(it) }
+                )
+            }
+
             // Determine whether the start button should trigger guided countdown
             val useGuidedStart = state.isHyperPrep
                 && state.guidedHyperEnabled
@@ -1207,6 +1304,7 @@ fun FreeHoldActiveScreen(
                 freeHoldActive = state.freeHoldActive,
                 showTimer = state.showTimer,
                 firstContractionMs = state.freeHoldFirstContractionMs,
+                currentPbCategory = state.currentPbCategory,
                 guidedHyperActive = state.isHyperPrep && state.guidedHyperEnabled,
                 guidedCountdownComplete = state.guidedCountdownComplete,
                 modifier = Modifier.fillMaxSize(),
@@ -1237,6 +1335,7 @@ private fun FreeHoldActiveContent(
     freeHoldActive: Boolean,
     showTimer: Boolean,
     firstContractionMs: Long?,
+    currentPbCategory: PersonalBestCategory? = null,
     guidedHyperActive: Boolean = false,
     guidedCountdownComplete: Boolean = false,
     modifier: Modifier = Modifier,
@@ -1306,6 +1405,16 @@ private fun FreeHoldActiveContent(
             Spacer(modifier = Modifier.height(16.dp))
         } else {
             Spacer(modifier = Modifier.height(24.dp))
+        }
+
+        // ── PB trophy display during hold ────────────────────────────────────
+        if (freeHoldActive && currentPbCategory != null) {
+            Text(
+                text = currentPbCategory.trophyEmojis(),
+                style = MaterialTheme.typography.headlineMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.grayscale()
+            )
         }
 
         // ── Main button area ──────────────────────────────────────────────────
@@ -1675,6 +1784,103 @@ private fun GuidedHyperPhaseRow(
                 singleLine = true,
                 cursorBrush = SolidColor(TextPrimary)
             )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// New Record Indication Section
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Checkbox + sub-options for real-time PB indication during free holds.
+ * When the master toggle is on, sound and vibration sub-options become available.
+ */
+@Composable
+private fun PbIndicationSection(
+    enabled: Boolean,
+    soundEnabled: Boolean,
+    vibrationEnabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+    onSoundChange: (Boolean) -> Unit,
+    onVibrationChange: (Boolean) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onEnabledChange(!enabled) }
+        ) {
+            Checkbox(
+                checked = enabled,
+                onCheckedChange = onEnabledChange,
+                modifier = Modifier.size(32.dp),
+                colors = CheckboxDefaults.colors(
+                    checkedColor = TextPrimary,
+                    uncheckedColor = TextSecondary,
+                    checkmarkColor = BackgroundDark
+                )
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = "New Record Indication",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextPrimary
+            )
+        }
+
+        if (enabled) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .padding(start = 32.dp)
+                    .clickable { onSoundChange(!soundEnabled) }
+            ) {
+                Checkbox(
+                    checked = soundEnabled,
+                    onCheckedChange = onSoundChange,
+                    modifier = Modifier.size(28.dp),
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = TextPrimary,
+                        uncheckedColor = TextSecondary,
+                        checkmarkColor = BackgroundDark
+                    )
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "Sound",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .padding(start = 32.dp)
+                    .clickable { onVibrationChange(!vibrationEnabled) }
+            ) {
+                Checkbox(
+                    checked = vibrationEnabled,
+                    onCheckedChange = onVibrationChange,
+                    modifier = Modifier.size(28.dp),
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = TextPrimary,
+                        uncheckedColor = TextSecondary,
+                        checkmarkColor = BackgroundDark
+                    )
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "Vibration",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
         }
     }
 }

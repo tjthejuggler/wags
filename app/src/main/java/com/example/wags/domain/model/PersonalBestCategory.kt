@@ -94,6 +94,44 @@ fun PersonalBestCategory.trophyEmojis(): String = "🏆".repeat(trophyCount())
  * @property durationMs   Duration of the best record, or null.
  * @property timestamp    Epoch-ms timestamp of the best record, or null.
  */
+/**
+ * Pre-computed PB duration thresholds for each category level.
+ * Used for real-time PB indication during a free hold — loaded once at
+ * hold-start so the real-time check doesn't need DB queries every second.
+ *
+ * A null value means no records exist for that category — any duration is a PB.
+ */
+data class PbThresholds(
+    val exactBestMs: Long?,
+    val fourSettingsBestMs: Long?,
+    val threeSettingsBestMs: Long?,
+    val twoSettingsBestMs: Long?,
+    val oneSettingBestMs: Long?,
+    val globalBestMs: Long?
+) {
+    /**
+     * Returns the broadest [PersonalBestCategory] whose threshold is exceeded
+     * by [elapsedMs], or null if the exact PB threshold hasn't been crossed yet.
+     *
+     * Follows the same logic as `ApneaRepository.checkBroaderPersonalBest`:
+     * checks from broadest to narrowest, and requires the exact PB to be
+     * broken first.
+     */
+    fun broadestBroken(elapsedMs: Long): PersonalBestCategory? {
+        // Must break exact first
+        val exactBroken = exactBestMs == null || elapsedMs > exactBestMs
+        if (!exactBroken) return null
+
+        // Check from broadest to narrowest
+        if (globalBestMs == null || elapsedMs > globalBestMs) return PersonalBestCategory.GLOBAL
+        if (oneSettingBestMs == null || elapsedMs > oneSettingBestMs) return PersonalBestCategory.ONE_SETTING
+        if (twoSettingsBestMs == null || elapsedMs > twoSettingsBestMs) return PersonalBestCategory.TWO_SETTINGS
+        if (threeSettingsBestMs == null || elapsedMs > threeSettingsBestMs) return PersonalBestCategory.THREE_SETTINGS
+        if (fourSettingsBestMs == null || elapsedMs > fourSettingsBestMs) return PersonalBestCategory.FOUR_SETTINGS
+        return PersonalBestCategory.EXACT
+    }
+}
+
 data class PersonalBestEntry(
     val trophyCount: Int,
     val label: String,

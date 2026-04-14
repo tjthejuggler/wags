@@ -1,6 +1,19 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-14 14:35 UTC-4*
+*Last updated: 2026-04-14 17:37 UTC-4*
+
+## Recent Changes (2026-04-14 17:37)
+- ✅ **Real-time personal best indication during apnea free holds:**
+  - New "New Record Indication" feature: as a free hold progresses, sound and vibration indicate when PB thresholds are broken
+  - Uses the same 6-level trophy system (EXACT → GLOBAL) and same sound files (apnea_pb1–pb6.mp3) as the end-of-hold celebration
+  - Settings: master toggle "New Record Indication" + sub-toggles "Sound" and "Vibration" (only visible when master is on)
+  - All settings persisted in SharedPreferences via `ApneaAudioHapticEngine`
+  - `PbThresholds` data class pre-computes all PB thresholds at hold-start (one DB query), then `broadestBroken()` does pure in-memory checks every second
+  - Vibration duration scales with trophy count: 1 trophy = 100ms, 6 trophies = 600ms
+  - Trophy emojis displayed below timer during hold when PB is broken
+  - Only affects free holds during active hold — no changes to other drill types or post-hold PB celebration
+  - Modified: `PersonalBestCategory.kt`, `ApneaRepository.kt`, `ApneaAudioHapticEngine.kt`, `FreeHoldActiveScreen.kt`
+  - Build: ✅ Successful, installed on SM-S918U1
 
 ## Recent Changes (2026-04-14 14:35)
 - ✅ **Fix morning readiness / HRV readiness allowing sessions when connected but no HR data streaming:**

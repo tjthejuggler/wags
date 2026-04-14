@@ -1,6 +1,44 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-14 14:34 UTC-4*
+*Last updated: 2026-04-14 17:37 UTC-4*
+
+### 2026-04-14 17:37 (UTC-4)
+**Task:** Add real-time personal best indication during apnea free holds
+
+**What was done:**
+
+Added a "New Record Indication" feature for apnea free holds that provides real-time sound and vibration feedback as the user breaks personal best records during a hold. The feature uses the same trophy system (6 levels: EXACT → GLOBAL) and same sound effects (apnea_pb1.mp3 → apnea_pb6.mp3) as the end-of-hold PB celebration.
+
+**Settings:**
+- Master toggle: "New Record Indication" checkbox (off by default)
+- Sub-settings (only visible when master is on): "Sound" and "Vibration" checkboxes
+- All three settings persisted in SharedPreferences via `ApneaAudioHapticEngine`
+- Settings only shown on the FreeHoldActiveScreen before the hold starts
+
+**Real-time PB monitoring:**
+- At hold-start, `ApneaRepository.getPbThresholds()` pre-computes the best duration for each PB category level (exact, 4-settings, 3-settings, 2-settings, 1-setting, global) using the same DB queries as `checkBroaderPersonalBest()`
+- A 1-second monitoring loop checks `PbThresholds.broadestBroken(elapsedMs)` — a pure in-memory comparison, no DB queries during the hold
+- Only fires indication when a **broader** category is broken (tracks `lastIndicatedCategory` to avoid re-firing)
+- Sound: same `MediaPlayer`-based playback as `ApneaPbSoundPlayer`, with `activePbPlayers` set for GC safety
+- Vibration: duration scales with trophy count (1 trophy = 100ms, 6 trophies = 600ms)
+
+**UI during hold:**
+- Trophy emojis displayed below the timer when a PB is broken (using `grayscale()` modifier, same as PB dialog)
+- `currentPbCategory` in `FreeHoldActiveUiState` tracks the broadest broken category
+
+**Cleanup:**
+- PB monitoring job cancelled and players released in `cancelFreeHold()`, `stopFreeHold()`, and `onCleared()`
+- `currentPbCategory` reset to null when hold ends
+
+**Files modified:**
+- `PersonalBestCategory.kt` — Added `PbThresholds` data class with `broadestBroken()` method
+- `ApneaRepository.kt` — Added `getPbThresholds()` method + import for `PbThresholds`
+- `ApneaAudioHapticEngine.kt` — Added `pbIndicationEnabled/Sound/Vibration` settings, `playPbIndicationSound()`, `vibratePbIndication()`, `releasePbIndicationPlayers()`, `soundResId()` extension, `activePbPlayers` set
+- `FreeHoldActiveScreen.kt` — Added `pbIndicationEnabled/Sound/Vibration` + `currentPbCategory` to `FreeHoldActiveUiState`, added `setPbIndicationEnabled/Sound/Vibration()` to ViewModel, added PB monitoring in `startFreeHold()`, cleanup in `cancelFreeHold()`/`stopFreeHold()`, added `PbIndicationSection` composable, added trophy display during hold, added imports
+
+**Scope:** Only affects apnea free holds during the active hold. No changes to other drill types, table sessions, or post-hold PB celebration.
+
+**Current state:** Build successful, installed on SM-S918U1.
 
 ### 2026-04-14 14:34 (UTC-4)
 **Task:** Fix morning readiness / HRV readiness allowing sessions when connected but no HR data streaming

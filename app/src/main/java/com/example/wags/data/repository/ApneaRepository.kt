@@ -22,6 +22,7 @@ import com.example.wags.domain.model.PersonalBestCategory
 import com.example.wags.domain.model.DrillContext
 import com.example.wags.domain.model.PersonalBestEntry
 import com.example.wags.domain.model.PersonalBestResult
+import com.example.wags.domain.model.PbThresholds
 import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.RecordPbBadge
@@ -260,6 +261,148 @@ class ApneaRepository @Inject constructor(
             durationMs  = durationMs,
             category    = PersonalBestCategory.EXACT,
             description = "${fmt(timeOfDay)} · ${fmt(lungVolume)} · ${fmt(prepType)} · ${fmt(posture)} · ${fmt(audio)}"
+        )
+    }
+
+    /**
+     * Pre-computes PB duration thresholds for every category level, used for
+     * real-time PB indication during a free hold.  Loaded once at hold-start
+     * so the per-second check doesn't need DB queries.
+     *
+     * For each category level the threshold is the **minimum** best duration
+     * across all combinations at that level — because beating *any* combination
+     * at a level means that level's PB is broken.
+     *
+     * A null value means no records exist for that level — any duration is a PB.
+     */
+    suspend fun getPbThresholds(
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        posture: String,
+        audio: String
+    ): PbThresholds = withContext(ioDispatcher) {
+        // ── Exact (5 constraints) ─────────────────────────────────────────
+        val exactBest = dao.getBestFreeHoldOnce(lungVolume, prepType, timeOfDay, posture, audio)
+
+        // ── Global (0 constraints) ────────────────────────────────────────
+        val globalBest = dao.getBestFreeHoldGlobal()
+
+        // ── Single-setting (1 constraint, 4 relaxed) ──────────────────────
+        val settings = mapOf(
+            "timeOfDay"  to timeOfDay,
+            "lungVolume" to lungVolume,
+            "prepType"   to prepType,
+            "posture"    to posture,
+            "audio"      to audio
+        )
+        var oneSettingBest: Long? = null
+        for ((key, value) in settings) {
+            val best = dao.getBestFreeHoldDynamic(
+                buildBestFreeHoldQuery(
+                    timeOfDay  = if (key == "timeOfDay")  value else null,
+                    lungVolume = if (key == "lungVolume") value else null,
+                    prepType   = if (key == "prepType")   value else null,
+                    posture    = if (key == "posture")    value else null,
+                    audio      = if (key == "audio")      value else null
+                )
+            )
+            if (best != null) {
+                if (oneSettingBest == null || best < oneSettingBest) oneSettingBest = best
+            } else {
+                oneSettingBest = null  // null means no records → any duration is a PB
+                break
+            }
+        }
+
+        // ── Two-setting (2 constraints, 3 relaxed) ────────────────────────
+        val settingsList = settings.entries.toList()
+        var twoSettingsBest: Long? = null
+        run {
+            for (i in settingsList.indices) {
+                for (j in i + 1 until settingsList.size) {
+                    val a = settingsList[i]; val b = settingsList[j]
+                    val best = dao.getBestFreeHoldDynamic(
+                        buildBestFreeHoldQuery(
+                            timeOfDay  = if (a.key == "timeOfDay"  || b.key == "timeOfDay")  timeOfDay  else null,
+                            lungVolume = if (a.key == "lungVolume" || b.key == "lungVolume") lungVolume else null,
+                            prepType   = if (a.key == "prepType"   || b.key == "prepType")   prepType   else null,
+                            posture    = if (a.key == "posture"    || b.key == "posture")    posture    else null,
+                            audio      = if (a.key == "audio"      || b.key == "audio")      audio      else null
+                        )
+                    )
+                    if (best != null) {
+                        if (twoSettingsBest == null || best < twoSettingsBest) twoSettingsBest = best
+                    } else {
+                        twoSettingsBest = null
+                        break
+                    }
+                }
+                if (twoSettingsBest == null) break
+            }
+        }
+
+        // ── Three-setting (3 constraints, 2 relaxed) ──────────────────────
+        var threeSettingsBest: Long? = null
+        run {
+            for (i in settingsList.indices) {
+                for (j in i + 1 until settingsList.size) {
+                    for (k in j + 1 until settingsList.size) {
+                        val a = settingsList[i]; val b = settingsList[j]; val c = settingsList[k]
+                        val keys = setOf(a.key, b.key, c.key)
+                        val best = dao.getBestFreeHoldDynamic(
+                            buildBestFreeHoldQuery(
+                                timeOfDay  = if ("timeOfDay"  in keys) timeOfDay  else null,
+                                lungVolume = if ("lungVolume" in keys) lungVolume else null,
+                                prepType   = if ("prepType"   in keys) prepType   else null,
+                                posture    = if ("posture"    in keys) posture    else null,
+                                audio      = if ("audio"      in keys) audio      else null
+                            )
+                        )
+                        if (best != null) {
+                            if (threeSettingsBest == null || best < threeSettingsBest) threeSettingsBest = best
+                        } else {
+                            threeSettingsBest = null
+                            break
+                        }
+                    }
+                    if (threeSettingsBest == null) break
+                }
+                if (threeSettingsBest == null) break
+            }
+        }
+
+        // ── Four-setting (4 constraints, 1 relaxed) ───────────────────────
+        var fourSettingsBest: Long? = null
+        run {
+            for (i in settingsList.indices) {
+                val relaxed = settingsList[i]
+                val keys = settings.keys - relaxed.key
+                val best = dao.getBestFreeHoldDynamic(
+                    buildBestFreeHoldQuery(
+                        timeOfDay  = if ("timeOfDay"  in keys) timeOfDay  else null,
+                        lungVolume = if ("lungVolume" in keys) lungVolume else null,
+                        prepType   = if ("prepType"   in keys) prepType   else null,
+                        posture    = if ("posture"    in keys) posture    else null,
+                        audio      = if ("audio"      in keys) audio      else null
+                    )
+                )
+                if (best != null) {
+                    if (fourSettingsBest == null || best < fourSettingsBest) fourSettingsBest = best
+                } else {
+                    fourSettingsBest = null
+                    break
+                }
+            }
+        }
+
+        PbThresholds(
+            exactBestMs        = exactBest,
+            fourSettingsBestMs = fourSettingsBest,
+            threeSettingsBestMs = threeSettingsBest,
+            twoSettingsBestMs  = twoSettingsBest,
+            oneSettingBestMs   = oneSettingBest,
+            globalBestMs       = globalBest
         )
     }
 
