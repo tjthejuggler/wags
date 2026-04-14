@@ -50,7 +50,12 @@ data class ApneaRecordDetailUiState(
     /** All device labels ever used, for the edit dropdown. */
     val deviceLabelOptions: List<String> = emptyList(),
     /** Matching session entity for table records (null for free holds). */
-    val tableSession: ApneaSessionEntity? = null
+    val tableSession: ApneaSessionEntity? = null,
+    /** All record IDs ordered oldest-first, for swipe navigation.
+     *  Swipe right (lower index) = newer; swipe left (higher index) = older. */
+    val allRecordIds: List<Long> = emptyList(),
+    /** Index of the currently displayed record in [allRecordIds]. */
+    val currentIndex: Int = 0
 )
 
 @HiltViewModel
@@ -68,31 +73,71 @@ class ApneaRecordDetailViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ApneaRecordDetailUiState())
     val uiState: StateFlow<ApneaRecordDetailUiState> = _uiState.asStateFlow()
 
-    /** Emits Unit when the record has been deleted — the screen should pop back. */
+    /** Emits Unit when the last record has been deleted — the screen should pop back. */
     private val _deleted = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val deleted: SharedFlow<Unit> = _deleted.asSharedFlow()
 
     init {
         viewModelScope.launch {
+            // Oldest-first: swipe right = newer (lower index), swipe left = older (higher index)
+            // getAllRecordsOnce() returns ASC (oldest first) — no reversal needed
+            val allRecords = apneaRepository.getAllRecordsOnce()
+            val allIds = allRecords.map { it.recordId }
+            val startIndex = allIds.indexOf(recordId).coerceAtLeast(0)
+
             val record = apneaRepository.getById(recordId)
             if (record == null) {
-                _uiState.update { it.copy(isLoading = false, notFound = true) }
+                _uiState.update { it.copy(isLoading = false, notFound = true, allRecordIds = allIds, currentIndex = startIndex) }
             } else {
                 val telemetry = apneaRepository.getTelemetryForRecord(recordId)
                 val badges = apneaRepository.getRecordPbBadges(recordId)
                 val songLog = apneaRepository.getSongLogForRecord(recordId)
-                // For table records, find the matching session entity
                 val tableSession = if (record.tableType != null) {
                     sessionRepository.getSessionByTimestampAndType(record.timestamp, record.tableType)
                 } else null
                 _uiState.update {
                     it.copy(
-                        record = record,
-                        telemetry = telemetry,
-                        pbBadges = badges,
-                        songLog = songLog,
+                        record       = record,
+                        telemetry    = telemetry,
+                        pbBadges     = badges,
+                        songLog      = songLog,
                         tableSession = tableSession,
-                        isLoading = false
+                        isLoading    = false,
+                        allRecordIds = allIds,
+                        currentIndex = startIndex
+                    )
+                }
+            }
+        }
+    }
+
+    /** Called when the user swipes to a different page index. */
+    fun navigateToIndex(index: Int) {
+        val ids = _uiState.value.allRecordIds
+        if (index < 0 || index >= ids.size) return
+        if (index == _uiState.value.currentIndex) return
+
+        _uiState.update { it.copy(isLoading = true, currentIndex = index) }
+        viewModelScope.launch {
+            val id = ids[index]
+            val record = apneaRepository.getById(id)
+            if (record == null) {
+                _uiState.update { it.copy(isLoading = false, notFound = true) }
+            } else {
+                val telemetry = apneaRepository.getTelemetryForRecord(id)
+                val badges = apneaRepository.getRecordPbBadges(id)
+                val songLog = apneaRepository.getSongLogForRecord(id)
+                val tableSession = if (record.tableType != null) {
+                    sessionRepository.getSessionByTimestampAndType(record.timestamp, record.tableType)
+                } else null
+                _uiState.update {
+                    it.copy(
+                        record       = record,
+                        telemetry    = telemetry,
+                        pbBadges     = badges,
+                        songLog      = songLog,
+                        tableSession = tableSession,
+                        isLoading    = false
                     )
                 }
             }
@@ -100,9 +145,44 @@ class ApneaRecordDetailViewModel @Inject constructor(
     }
 
     fun deleteRecord() {
+        val id = _uiState.value.record?.recordId ?: recordId
+        val currentIds = _uiState.value.allRecordIds
+        val currentIdx = _uiState.value.currentIndex
+
         viewModelScope.launch {
-            apneaRepository.deleteRecord(recordId)
-            _deleted.emit(Unit)
+            apneaRepository.deleteRecord(id)
+
+            val newIds = currentIds.filter { it != id }
+            if (newIds.isEmpty()) {
+                _deleted.emit(Unit)
+                return@launch
+            }
+
+            val newIndex = currentIdx.coerceAtMost(newIds.size - 1)
+            val nextId = newIds[newIndex]
+            val record = apneaRepository.getById(nextId)
+            if (record == null) {
+                _uiState.update { it.copy(isLoading = false, notFound = true, allRecordIds = newIds, currentIndex = newIndex) }
+            } else {
+                val telemetry = apneaRepository.getTelemetryForRecord(nextId)
+                val badges = apneaRepository.getRecordPbBadges(nextId)
+                val songLog = apneaRepository.getSongLogForRecord(nextId)
+                val tableSession = if (record.tableType != null) {
+                    sessionRepository.getSessionByTimestampAndType(record.timestamp, record.tableType)
+                } else null
+                _uiState.update {
+                    it.copy(
+                        record       = record,
+                        telemetry    = telemetry,
+                        pbBadges     = badges,
+                        songLog      = songLog,
+                        tableSession = tableSession,
+                        isLoading    = false,
+                        allRecordIds = newIds,
+                        currentIndex = newIndex
+                    )
+                }
+            }
         }
     }
 
@@ -115,8 +195,6 @@ class ApneaRecordDetailViewModel @Inject constructor(
         val timeOfDay = runCatching { TimeOfDay.valueOf(record.timeOfDay) }.getOrDefault(TimeOfDay.DAY)
         val posture = runCatching { Posture.valueOf(record.posture) }.getOrDefault(Posture.LAYING)
         val audio = runCatching { AudioSetting.valueOf(record.audio) }.getOrDefault(AudioSetting.SILENCE)
-        // Build the device label options: all labels from history, plus the
-        // record's current label if it's not already in the list.
         val historyLabels = devicePrefs.deviceLabelHistory.toMutableList()
         record.hrDeviceId?.let { current ->
             if (current !in historyLabels) historyLabels.add(current)
@@ -177,23 +255,13 @@ class ApneaRecordDetailViewModel @Inject constructor(
                 hrDeviceId = state.editHrDeviceId
             )
             apneaRepository.updateRecord(updated)
-            val badges = apneaRepository.getRecordPbBadges(recordId)
+            val badges = apneaRepository.getRecordPbBadges(record.recordId)
             _uiState.update { it.copy(record = updated, pbBadges = badges, showEditSheet = false) }
         }
     }
 
     // ── Repeat hold ───────────────────────────────────────────────────────────
 
-    /**
-     * Writes the current record's settings into SharedPreferences so the
-     * FreeHoldActiveScreen picks them up. Also persists the settings so the
-     * ApneaScreen stays in sync on future visits.
-     * Time of Day is NOT written — it stays based on the current clock time.
-     * If the record used MUSIC audio and has a song log, the first song's
-     * Spotify URI / title / artist are stored as a "pending repeat song"
-     * for the FreeHoldActiveViewModel to auto-load.
-     * If the record used guided hyperventilation, those settings are also written.
-     */
     fun prepareRepeatHold() {
         val record = _uiState.value.record ?: return
         val songLog = _uiState.value.songLog
@@ -202,14 +270,12 @@ class ApneaRecordDetailViewModel @Inject constructor(
             putString("setting_prep_type", record.prepType)
             putString("setting_posture", record.posture)
             putString("setting_audio", record.audio)
-            // Guided hyperventilation settings
             if (record.guidedHyper) {
                 putBoolean("guided_hyper_enabled", true)
                 record.guidedRelaxedExhaleSec?.let { putInt("guided_relaxed_exhale_sec", it) }
                 record.guidedPurgeExhaleSec?.let { putInt("guided_purge_exhale_sec", it) }
                 record.guidedTransitionSec?.let { putInt("guided_transition_sec", it) }
             }
-            // Store pending repeat song when audio was MUSIC and a song was logged
             if (record.audio == AudioSetting.MUSIC.name && songLog.isNotEmpty()) {
                 val song = songLog.first()
                 putString("pending_repeat_song_uri", song.spotifyUri ?: "")
@@ -224,11 +290,6 @@ class ApneaRecordDetailViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Returns the navigation route parameters for the FreeHoldActiveScreen
-     * based on the current record's settings. Time of Day uses the current
-     * clock time instead of the record's value.
-     */
     fun repeatHoldRoute(): String? {
         val record = _uiState.value.record ?: return null
         val showTimer = prefs.getBoolean("setting_show_timer", true)
@@ -238,19 +299,10 @@ class ApneaRecordDetailViewModel @Inject constructor(
 
     // ── Recalculate song times ──────────────────────────────────────────────
 
-    /**
-     * Recalculates song start times for this record using actual Spotify
-     * track durations. For each song that has a non-null endedAtMs and a
-     * Spotify URI, looks up the real duration from the Spotify API and sets
-     * startedAtMs = endedAtMs - realDurationMs. This fixes records where
-     * startedAtMs was incorrectly set to the song pre-load time instead of
-     * the hold start time.
-     *
-     * After updating the DB, refreshes the UI state's songLog.
-     */
     fun recalculateSongTimes() {
         viewModelScope.launch {
-            val entities = apneaRepository.getSongLogEntitiesForRecord(recordId)
+            val currentRecordId = _uiState.value.record?.recordId ?: recordId
+            val entities = apneaRepository.getSongLogEntitiesForRecord(currentRecordId)
             if (entities.isEmpty()) return@launch
 
             var anyUpdated = false
@@ -266,8 +318,6 @@ class ApneaRecordDetailViewModel @Inject constructor(
                 }
 
                 val correctedStart = endMs - detail.durationMs
-                // Only update if the corrected start is meaningfully different
-                // (more than 2 seconds off) to avoid unnecessary writes
                 if (kotlin.math.abs(correctedStart - entity.startedAtMs) > 2_000L) {
                     apneaRepository.updateSongLogStartedAt(entity.songLogId, correctedStart)
                     anyUpdated = true
@@ -278,8 +328,7 @@ class ApneaRecordDetailViewModel @Inject constructor(
             }
 
             if (anyUpdated) {
-                // Refresh the song log from DB
-                val refreshed = apneaRepository.getSongLogForRecord(recordId)
+                val refreshed = apneaRepository.getSongLogForRecord(currentRecordId)
                 _uiState.update { it.copy(songLog = refreshed) }
             }
         }

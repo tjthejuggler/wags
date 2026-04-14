@@ -4,6 +4,8 @@ import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -42,7 +44,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun MeditationSessionDetailScreen(
     navController: NavController,
@@ -53,6 +55,25 @@ fun MeditationSessionDetailScreen(
     // Pop back automatically once the session has been deleted
     LaunchedEffect(state.deleted) {
         if (state.deleted) navController.popBackStack(WagsRoutes.MEDITATION_HISTORY, inclusive = false)
+    }
+
+    // Pager state — initialised once allSessionIds is populated
+    val pageCount = state.allSessionIds.size.coerceAtLeast(1)
+    val pagerState = rememberPagerState(
+        initialPage = state.currentIndex,
+        pageCount   = { pageCount }
+    )
+
+    // Sync pager → ViewModel when user swipes
+    LaunchedEffect(pagerState.currentPage) {
+        viewModel.navigateToIndex(pagerState.currentPage)
+    }
+
+    // Sync ViewModel → pager (e.g. after a delete moves to adjacent session)
+    LaunchedEffect(state.currentIndex) {
+        if (pagerState.currentPage != state.currentIndex) {
+            pagerState.scrollToPage(state.currentIndex)
+        }
     }
 
     // Delete confirmation dialog
@@ -92,11 +113,20 @@ fun MeditationSessionDetailScreen(
         containerColor = BackgroundDark,
         topBar = {
             TopAppBar(
-                title = { Text("Session Detail") },
+                title = {
+                    Column {
+                        Text("Session Detail")
+                        if (state.allSessionIds.size > 1) {
+                            Text(
+                                "${state.currentIndex + 1} / ${state.allSessionIds.size}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextDisabled
+                            )
+                        }
+                    }
+                },
                 navigationIcon = {
-                    IconButton(onClick = {
-                        navController.popBackStack()
-                    }) {
+                    IconButton(onClick = { navController.popBackStack() }) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
@@ -119,46 +149,49 @@ fun MeditationSessionDetailScreen(
             )
         }
     ) { padding ->
-        when {
-            state.isLoading -> {
-                Box(
-                    modifier = Modifier.fillMaxSize().padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = TextSecondary)
+        HorizontalPager(
+            state    = pagerState,
+            modifier = Modifier.fillMaxSize().padding(padding)
+        ) { _ ->
+            when {
+                state.isLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = TextSecondary)
+                    }
                 }
-            }
-            state.session == null -> {
-                Box(
-                    modifier = Modifier.fillMaxSize().padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Session not found.", color = TextSecondary)
+                state.session == null -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Session not found.", color = TextSecondary)
+                    }
                 }
-            }
-            else -> {
-                val session   = state.session!!
-                val audio     = state.audio
-                val telemetry = state.telemetry
-                val zone      = ZoneId.systemDefault()
-                val dateLabel = Instant.ofEpochMilli(session.timestamp).atZone(zone)
-                    .format(DateTimeFormatter.ofPattern("EEEE, MMMM d yyyy"))
-                val timeLabel = Instant.ofEpochMilli(session.timestamp).atZone(zone)
-                    .format(DateTimeFormatter.ofPattern("h:mm a"))
-                val durationMin = session.durationMs / 60_000L
-                val durationSec = (session.durationMs % 60_000L) / 1_000L
-                val audioName = audio?.let {
-                    if (it.isNone) "Silent Meditation" else it.displayName
-                } ?: "Unknown"
+                else -> {
+                    val session   = state.session!!
+                    val audio     = state.audio
+                    val telemetry = state.telemetry
+                    val zone      = ZoneId.systemDefault()
+                    val dateLabel = Instant.ofEpochMilli(session.timestamp).atZone(zone)
+                        .format(DateTimeFormatter.ofPattern("EEEE, MMMM d yyyy"))
+                    val timeLabel = Instant.ofEpochMilli(session.timestamp).atZone(zone)
+                        .format(DateTimeFormatter.ofPattern("h:mm a"))
+                    val durationMin = session.durationMs / 60_000L
+                    val durationSec = (session.durationMs % 60_000L) / 1_000L
+                    val audioName = audio?.let {
+                        if (it.isNone) "Silent Meditation" else it.displayName
+                    } ?: "Unknown"
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
 
                     // ── Header card ────────────────────────────────────────────
                     Card(
@@ -390,7 +423,8 @@ fun MeditationSessionDetailScreen(
                         }
                     }
 
-                    Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.height(16.dp))
+                    }
                 }
             }
         }

@@ -24,6 +24,9 @@ interface RapidHrSessionDao {
     @Query("SELECT * FROM rapid_hr_sessions ORDER BY timestamp DESC")
     fun observeAll(): Flow<List<RapidHrSessionEntity>>
 
+    @Query("SELECT * FROM rapid_hr_sessions ORDER BY timestamp DESC")
+    suspend fun getAll(): List<RapidHrSessionEntity>
+
     @Query("SELECT * FROM rapid_hr_sessions WHERE direction = :direction ORDER BY timestamp DESC")
     fun observeByDirection(direction: String): Flow<List<RapidHrSessionEntity>>
 

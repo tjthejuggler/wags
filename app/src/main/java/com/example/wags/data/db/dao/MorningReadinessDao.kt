@@ -27,6 +27,9 @@ interface MorningReadinessDao {
     @Query("SELECT * FROM morning_readiness ORDER BY timestamp DESC")
     fun observeAll(): Flow<List<MorningReadinessEntity>>
 
+    @Query("SELECT * FROM morning_readiness ORDER BY timestamp DESC")
+    suspend fun getAll(): List<MorningReadinessEntity>
+
     // For 90-day rolling baseline queries
     @Query("SELECT supineRmssdMs FROM morning_readiness WHERE timestamp >= :sinceMs ORDER BY timestamp DESC")
     suspend fun getSupineRmssdSince(sinceMs: Long): List<Double>

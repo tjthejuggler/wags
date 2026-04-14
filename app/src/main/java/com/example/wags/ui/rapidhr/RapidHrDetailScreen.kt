@@ -51,7 +51,7 @@ private val detailDateFmt = DateTimeFormatter.ofPattern("MMMM d, yyyy  h:mm a")
 
 // ── Screen ─────────────────────────────────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun RapidHrDetailScreen(
     navController: NavController,
@@ -59,11 +59,41 @@ fun RapidHrDetailScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // Pager state
+    val pageCount = state.allSessionIds.size.coerceAtLeast(1)
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState(
+        initialPage = state.currentIndex,
+        pageCount   = { pageCount }
+    )
+
+    // Sync pager → ViewModel when user swipes
+    LaunchedEffect(pagerState.currentPage) {
+        viewModel.navigateToIndex(pagerState.currentPage)
+    }
+
+    // Sync ViewModel → pager (e.g. after a delete moves to adjacent session)
+    LaunchedEffect(state.currentIndex) {
+        if (pagerState.currentPage != state.currentIndex) {
+            pagerState.scrollToPage(state.currentIndex)
+        }
+    }
+
     Scaffold(
         containerColor = BackgroundDark,
         topBar = {
             TopAppBar(
-                title = { Text("Session Detail", style = MaterialTheme.typography.titleMedium) },
+                title = {
+                    Column {
+                        Text("Session Detail", style = MaterialTheme.typography.titleMedium)
+                        if (state.allSessionIds.size > 1) {
+                            Text(
+                                "${state.currentIndex + 1} / ${state.allSessionIds.size}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextDisabled
+                            )
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(
@@ -77,33 +107,34 @@ fun RapidHrDetailScreen(
             )
         }
     ) { padding ->
-        when {
-            state.isLoading -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = TextSecondary)
+        androidx.compose.foundation.pager.HorizontalPager(
+            state    = pagerState,
+            modifier = Modifier.fillMaxSize().padding(padding)
+        ) { _ ->
+            when {
+                state.isLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = TextSecondary)
+                    }
                 }
-            }
-            state.session == null -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Session not found", color = TextSecondary)
+                state.session == null -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Session not found", color = TextSecondary)
+                    }
                 }
-            }
-            else -> {
-                DetailContent(
-                    session = state.session!!,
-                    telemetry = state.telemetry,
-                    modifier = Modifier.padding(padding)
-                )
+                else -> {
+                    DetailContent(
+                        session = state.session!!,
+                        telemetry = state.telemetry,
+                        modifier = Modifier
+                    )
+                }
             }
         }
     }

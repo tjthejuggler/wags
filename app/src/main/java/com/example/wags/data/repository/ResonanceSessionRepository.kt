@@ -14,6 +14,8 @@ class ResonanceSessionRepository @Inject constructor(
 
     fun observeAll(): Flow<List<ResonanceSessionEntity>> = dao.observeAll()
 
+    suspend fun getAll(): List<ResonanceSessionEntity> = dao.getAll()
+
     suspend fun getSince(sinceMs: Long): List<ResonanceSessionEntity> = dao.getSince(sinceMs)
 
     suspend fun getByTimestamp(timestamp: Long): ResonanceSessionEntity? = dao.getByTimestamp(timestamp)

@@ -1,6 +1,8 @@
 package com.example.wags.ui.readiness
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -65,7 +67,7 @@ private const val HELP_RHR_TEXT =
     "• Endurance athletes may have RHR as low as 35–45 bpm.\n" +
     "• Used as a secondary signal: if today's RHR is significantly elevated, the readiness score may be capped."
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun HrvReadinessDetailScreen(
     onNavigateBack: () -> Unit,
@@ -77,6 +79,25 @@ fun HrvReadinessDetailScreen(
     // Navigate back automatically once the record has been deleted
     LaunchedEffect(uiState.isDeleted) {
         if (uiState.isDeleted) onNavigateBack()
+    }
+
+    // Pager state
+    val pageCount = uiState.allReadingIds.size.coerceAtLeast(1)
+    val pagerState = rememberPagerState(
+        initialPage = uiState.currentIndex,
+        pageCount   = { pageCount }
+    )
+
+    // Sync pager → ViewModel when user swipes
+    LaunchedEffect(pagerState.currentPage) {
+        viewModel.navigateToIndex(pagerState.currentPage)
+    }
+
+    // Sync ViewModel → pager (e.g. after a delete moves to adjacent session)
+    LaunchedEffect(uiState.currentIndex) {
+        if (pagerState.currentPage != uiState.currentIndex) {
+            pagerState.scrollToPage(uiState.currentIndex)
+        }
     }
 
     // ── Delete confirmation dialog ─────────────────────────────────────────────
@@ -118,7 +139,18 @@ fun HrvReadinessDetailScreen(
         containerColor = BackgroundDark,
         topBar = {
             TopAppBar(
-                title = { Text("HRV Readiness Detail") },
+                title = {
+                    Column {
+                        Text("HRV Readiness Detail")
+                        if (uiState.allReadingIds.size > 1) {
+                            Text(
+                                "${uiState.currentIndex + 1} / ${uiState.allReadingIds.size}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextDisabled
+                            )
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
@@ -128,10 +160,10 @@ fun HrvReadinessDetailScreen(
                     if (uiState.reading != null) {
                         IconButton(onClick = { showDeleteDialog = true }) {
                             Text(
-                                    "🗑",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = TextSecondary
-                                )
+                                "🗑",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = TextSecondary
+                            )
                         }
                     }
                 },
@@ -139,41 +171,38 @@ fun HrvReadinessDetailScreen(
             )
         }
     ) { padding ->
-        when {
-            uiState.isDeleted -> {
-                // Brief blank while LaunchedEffect fires the back navigation
-                Box(modifier = Modifier.fillMaxSize().padding(padding))
-            }
-            uiState.isLoading -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = TextSecondary)
+        HorizontalPager(
+            state    = pagerState,
+            modifier = Modifier.fillMaxSize().padding(padding)
+        ) { _ ->
+            when {
+                uiState.isDeleted -> {
+                    Box(modifier = Modifier.fillMaxSize())
                 }
-            }
-            uiState.reading == null -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "Session not found",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = TextDisabled,
-                        textAlign = TextAlign.Center
-                    )
+                uiState.isLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = TextSecondary)
+                    }
                 }
-            }
-            else -> {
-                HrvDetailContent(
-                    reading = uiState.reading!!,
-                    modifier = Modifier.padding(padding)
-                )
+                uiState.reading == null -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "Session not found",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = TextDisabled,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+                else -> {
+                    HrvDetailContent(reading = uiState.reading!!)
+                }
             }
         }
     }

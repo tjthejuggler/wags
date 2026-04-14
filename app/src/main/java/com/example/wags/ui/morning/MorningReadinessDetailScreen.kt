@@ -145,7 +145,7 @@ private const val HELP_STAND_MARKER_TEXT =
     "The orthostatic response — the HR spike and subsequent recovery — is the key signal in the standing window."
 
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun MorningReadinessDetailScreen(
     onNavigateBack: () -> Unit,
@@ -156,6 +156,25 @@ fun MorningReadinessDetailScreen(
     // Pop back automatically once the record has been deleted
     LaunchedEffect(uiState.deleted) {
         if (uiState.deleted) onNavigateBack()
+    }
+
+    // Pager state
+    val pageCount = uiState.allReadingIds.size.coerceAtLeast(1)
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState(
+        initialPage = uiState.currentIndex,
+        pageCount   = { pageCount }
+    )
+
+    // Sync pager → ViewModel when user swipes
+    LaunchedEffect(pagerState.currentPage) {
+        viewModel.navigateToIndex(pagerState.currentPage)
+    }
+
+    // Sync ViewModel → pager (e.g. after a delete moves to adjacent session)
+    LaunchedEffect(uiState.currentIndex) {
+        if (pagerState.currentPage != uiState.currentIndex) {
+            pagerState.scrollToPage(uiState.currentIndex)
+        }
     }
 
     // Delete confirmation dialog
@@ -195,7 +214,18 @@ fun MorningReadinessDetailScreen(
         containerColor = BackgroundDark,
         topBar = {
             TopAppBar(
-                title = { Text("Morning Readiness Detail") },
+                title = {
+                    Column {
+                        Text("Morning Readiness Detail")
+                        if (uiState.allReadingIds.size > 1) {
+                            Text(
+                                "${uiState.currentIndex + 1} / ${uiState.allReadingIds.size}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextDisabled
+                            )
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = EcgCyan)
@@ -217,34 +247,34 @@ fun MorningReadinessDetailScreen(
             )
         }
     ) { padding ->
-        val reading = uiState.reading
-        when {
-            uiState.isLoading -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = EcgCyan)
+        androidx.compose.foundation.pager.HorizontalPager(
+            state    = pagerState,
+            modifier = Modifier.fillMaxSize().padding(padding)
+        ) { _ ->
+            when {
+                uiState.isLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = EcgCyan)
+                    }
                 }
-            }
-            uiState.notFound || reading == null -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Reading not found.", color = TextSecondary)
+                uiState.notFound || uiState.reading == null -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Reading not found.", color = TextSecondary)
+                    }
                 }
-            }
-            else -> {
-                MorningReadinessDetailContent(
-                    reading   = reading,
-                    telemetry = uiState.telemetry,
-                    modifier  = Modifier.padding(padding)
-                )
+                else -> {
+                    MorningReadinessDetailContent(
+                        reading   = uiState.reading!!,
+                        telemetry = uiState.telemetry,
+                        modifier  = Modifier
+                    )
+                }
             }
         }
     }

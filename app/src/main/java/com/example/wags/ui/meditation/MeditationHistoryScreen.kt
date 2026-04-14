@@ -89,28 +89,18 @@ fun MeditationHistoryScreen(
     val selectedTab = uiState.selectedTab
     var displayedMonth by remember { mutableStateOf(YearMonth.now()) }
 
-    // Track the session ID we last auto-navigated to, so we don't re-trigger
-    // the navigation when the user presses back and the screen is resumed with
-    // the same single-session selection still in state.
-    var lastAutoNavigatedId by remember { mutableStateOf<Long?>(null) }
-
-    // Single-session auto-navigate
+    // Single-session auto-navigate: when exactly 1 session on the selected day,
+    // navigate immediately and clear the selection so back doesn't re-trigger.
     val selectedDaySessions = uiState.selectedDaySessions
     LaunchedEffect(selectedDaySessions) {
         if (selectedDaySessions.size == 1) {
             val sessionId = selectedDaySessions.first().sessionId
-            if (sessionId != lastAutoNavigatedId) {
-                lastAutoNavigatedId = sessionId
-                // Persist Calendar tab so system back returns to it
-                viewModel.selectTab(MeditationHistoryTabSelection.CALENDAR)
-                navController.navigate(WagsRoutes.meditationSessionDetail(sessionId))
-                // Selection is intentionally NOT cleared here so that pressing
-                // back returns to the calendar with the selected date's list open.
-            }
-        } else {
-            // Reset guard when selection changes (e.g. user taps a different date
-            // or clears the selection).
-            lastAutoNavigatedId = null
+            // Persist Calendar tab so system back returns to it
+            viewModel.selectTab(MeditationHistoryTabSelection.CALENDAR)
+            navController.navigate(WagsRoutes.meditationSessionDetail(sessionId))
+            // Clear selection so that when we return, the LaunchedEffect
+            // doesn't re-fire and navigate again.
+            viewModel.clearSelection()
         }
     }
 
@@ -183,11 +173,10 @@ fun MeditationHistoryScreen(
                         onNextMonth = { displayedMonth = displayedMonth.plusMonths(1) },
                         onDismissMultiList = { viewModel.clearSelection() },
                         onNavigateToDetail = { id ->
-                            // Do NOT clear selection here — preserve it so back navigation
-                            // returns to the calendar with the selected date's list still open.
-                            // Persist Calendar tab so system back returns to it.
                             viewModel.selectTab(MeditationHistoryTabSelection.CALENDAR)
                             navController.navigate(WagsRoutes.meditationSessionDetail(id))
+                            // Clear selection so back doesn't re-trigger auto-navigate
+                            viewModel.clearSelection()
                         }
                     )
                 }

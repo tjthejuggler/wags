@@ -26,6 +26,9 @@ class RapidHrRepository @Inject constructor(
     fun observeByDirection(direction: String): Flow<List<RapidHrSessionEntity>> =
         sessionDao.observeByDirection(direction)
 
+    suspend fun getAllSessions(): List<RapidHrSessionEntity> =
+        sessionDao.getAll()
+
     suspend fun getSessionById(id: Long): RapidHrSessionEntity? =
         sessionDao.getById(id)
 

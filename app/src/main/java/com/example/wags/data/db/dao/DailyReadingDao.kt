@@ -18,6 +18,9 @@ interface DailyReadingDao {
     @Query("SELECT * FROM daily_readings ORDER BY timestamp DESC")
     fun observeAll(): Flow<List<DailyReadingEntity>>
 
+    @Query("SELECT * FROM daily_readings ORDER BY timestamp DESC")
+    suspend fun getAll(): List<DailyReadingEntity>
+
     @Query("SELECT * FROM daily_readings ORDER BY timestamp DESC LIMIT 14")
     suspend fun getLast14(): List<DailyReadingEntity>
 

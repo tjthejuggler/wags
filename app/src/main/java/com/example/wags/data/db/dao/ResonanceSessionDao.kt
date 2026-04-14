@@ -12,6 +12,9 @@ interface ResonanceSessionDao {
     @Query("SELECT * FROM resonance_sessions ORDER BY timestamp DESC")
     fun observeAll(): Flow<List<ResonanceSessionEntity>>
 
+    @Query("SELECT * FROM resonance_sessions ORDER BY timestamp DESC")
+    suspend fun getAll(): List<ResonanceSessionEntity>
+
     @Query("SELECT * FROM resonance_sessions WHERE timestamp >= :sinceMs ORDER BY timestamp DESC")
     suspend fun getSince(sinceMs: Long): List<ResonanceSessionEntity>
 

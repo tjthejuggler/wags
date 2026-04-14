@@ -60,7 +60,7 @@ private const val DISPLAY_HR_MAX   = 250f
 private const val DISPLAY_SPO2_MIN = 1f
 private const val DISPLAY_SPO2_MAX = 100f
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun ApneaRecordDetailScreen(
     navController: NavController,
@@ -82,19 +82,45 @@ fun ApneaRecordDetailScreen(
         }
     }
 
+    // Pager state
+    val pageCount = state.allRecordIds.size.coerceAtLeast(1)
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState(
+        initialPage = state.currentIndex,
+        pageCount   = { pageCount }
+    )
+
+    // Sync pager → ViewModel when user swipes
+    LaunchedEffect(pagerState.currentPage) {
+        viewModel.navigateToIndex(pagerState.currentPage)
+    }
+
+    // Sync ViewModel → pager (e.g. after a delete moves to adjacent session)
+    LaunchedEffect(state.currentIndex) {
+        if (pagerState.currentPage != state.currentIndex) {
+            pagerState.scrollToPage(state.currentIndex)
+        }
+    }
+
     Scaffold(
         containerColor = BackgroundDark,
         topBar = {
             TopAppBar(
                 title = {
                     val record = state.record
-                    if (record?.tableType == "MIN_BREATH") {
-                        Column {
+                    Column {
+                        if (record?.tableType == "MIN_BREATH") {
                             Text("Session Details", style = MaterialTheme.typography.titleMedium)
                             Text("Min Breath", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                        } else {
+                            Text("Hold Detail")
                         }
-                    } else {
-                        Text("Hold Detail")
+                        if (state.allRecordIds.size > 1) {
+                            Text(
+                                "${state.currentIndex + 1} / ${state.allRecordIds.size}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextDisabled
+                            )
+                        }
                     }
                 },
                 navigationIcon = {
@@ -126,42 +152,47 @@ fun ApneaRecordDetailScreen(
             )
         }
     ) { padding ->
-        when {
-            state.isLoading -> {
-                Box(
-                    modifier = Modifier.fillMaxSize().padding(padding),
-                    contentAlignment = Alignment.Center
-                ) { CircularProgressIndicator(color = TextSecondary) }
-            }
-            state.notFound -> {
-                Box(
-                    modifier = Modifier.fillMaxSize().padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "Record not found.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = TextSecondary
+        androidx.compose.foundation.pager.HorizontalPager(
+            state    = pagerState,
+            modifier = Modifier.fillMaxSize().padding(padding)
+        ) { _ ->
+            when {
+                state.isLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) { CircularProgressIndicator(color = TextSecondary) }
+                }
+                state.notFound -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "Record not found.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = TextSecondary
+                        )
+                    }
+                }
+                state.record != null -> {
+                    RecordDetailContent(
+                        record = state.record!!,
+                        telemetry = state.telemetry,
+                        pbBadges = state.pbBadges,
+                        songLog = state.songLog,
+                        tableSession = state.tableSession,
+                        onRepeatHold = {
+                            viewModel.prepareRepeatHold()
+                            val route = viewModel.repeatHoldRoute()
+                            if (route != null) {
+                                navController.navigate(route)
+                            }
+                        },
+                        onRecalculateSongs = { viewModel.recalculateSongTimes() },
+                        modifier = Modifier
                     )
                 }
-            }
-            state.record != null -> {
-                RecordDetailContent(
-                    record = state.record!!,
-                    telemetry = state.telemetry,
-                    pbBadges = state.pbBadges,
-                    songLog = state.songLog,
-                    tableSession = state.tableSession,
-                    onRepeatHold = {
-                        viewModel.prepareRepeatHold()
-                        val route = viewModel.repeatHoldRoute()
-                        if (route != null) {
-                            navController.navigate(route)
-                        }
-                    },
-                    onRecalculateSongs = { viewModel.recalculateSongTimes() },
-                    modifier = Modifier.padding(padding)
-                )
             }
         }
     }

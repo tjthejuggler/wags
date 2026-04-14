@@ -25,6 +25,9 @@ class ReadinessRepository @Inject constructor(
         return dao.observeTodayLatest(startOfDay)
     }
 
+    suspend fun getAll(): List<DailyReadingEntity> =
+        dao.getAll()
+
     suspend fun getLast14ForBaseline(): List<DailyReadingEntity> =
         dao.getLast14()
 

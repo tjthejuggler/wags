@@ -40,6 +40,8 @@ class MorningReadinessRepository @Inject constructor(
 
     fun observeAll(): Flow<List<MorningReadinessEntity>> = dao.observeAll()
 
+    suspend fun getAll(): List<MorningReadinessEntity> = dao.getAll()
+
     /** Emits the most recent morning readiness reading taken today, or null if none. */
     fun observeTodayReading(): Flow<MorningReadinessEntity?> {
         val startOfDay = LocalDate.now()

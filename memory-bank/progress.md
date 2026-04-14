@@ -1,6 +1,25 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-14 17:37 UTC-4*
+*Last updated: 2026-04-14 23:44 UTC-4*
+
+## Recent Changes (2026-04-14 23:44)
+- ✅ **Fix swipe direction + delete behavior on all session detail screens:**
+  - **Swipe direction**: Changed to oldest-first ordering so swipe-right = newer, swipe-left = older (matches natural timeline expectation)
+  - **Delete behavior**: Deleting a session now stays on the detail screen and shows the adjacent session. Only pops back to history when the last session is deleted.
+  - Added `LaunchedEffect(state.currentIndex)` to all 6 screens to sync ViewModel→pager after delete
+  - Modified all 6 ViewModels and all 6 screens
+  - Build: ✅ Successful, installed on SM-S918U1
+
+## Recent Changes (2026-04-14 23:33)
+- ✅ **Fix app back button bug on meditation detail screen + swipe navigation on ALL session detail screens:**
+  - **Back button fix**: `MeditationHistoryScreen` now calls `viewModel.clearSelection()` after navigating to detail, preventing `LaunchedEffect(selectedDaySessions)` from re-firing on return
+  - **Swipe navigation**: Added `HorizontalPager` to all 6 session detail screens. Swiping left/right navigates through session history (newest-first). Top bar shows "X / Y" counter when multiple sessions exist.
+  - **DAOs**: Added `getAll()` to `DailyReadingDao`, `RapidHrSessionDao`, `ResonanceSessionDao`, `MorningReadinessDao`
+  - **Repositories**: Added `getAll()` to `ReadinessRepository`, `RapidHrRepository` (`getAllSessions()`), `ResonanceSessionRepository`, `MorningReadinessRepository`
+  - **ViewModels updated**: `MeditationSessionDetailViewModel`, `HrvReadinessDetailViewModel`, `ResonanceSessionDetailViewModel`, `RapidHrDetailViewModel`, `MorningReadinessDetailViewModel`, `ApneaRecordDetailViewModel`
+  - **Screens updated**: `MeditationHistoryScreen` (back fix), `MeditationSessionDetailScreen`, `HrvReadinessDetailScreen`, `ResonanceSessionDetailScreen`, `RapidHrDetailScreen`, `MorningReadinessDetailScreen`, `ApneaRecordDetailScreen`
+  - Key notes: `MorningReadinessEntity` PK is `id` (not `readingId`); `RapidHrSessionEntity` PK is `id`; `ApneaRepository.getAllRecordsOnce()` returns ASC so reversed for newest-first
+  - Build: ✅ Successful, installed on SM-S918U1
 
 ## Recent Changes (2026-04-14 17:37)
 - ✅ **Real-time personal best indication during apnea free holds:**

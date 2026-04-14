@@ -46,7 +46,7 @@ private val ZoneRed      = Color(0xFF606060)
 
 // ── Screen ─────────────────────────────────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun ResonanceSessionDetailScreen(
     onNavigateBack: () -> Unit,
@@ -58,6 +58,25 @@ fun ResonanceSessionDetailScreen(
     // Pop back when deleted
     LaunchedEffect(Unit) {
         viewModel.deleted.collect { onNavigateBack() }
+    }
+
+    // Pager state
+    val pageCount = uiState.allSessionIds.size.coerceAtLeast(1)
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState(
+        initialPage = uiState.currentIndex,
+        pageCount   = { pageCount }
+    )
+
+    // Sync pager → ViewModel when user swipes
+    LaunchedEffect(pagerState.currentPage) {
+        viewModel.navigateToIndex(pagerState.currentPage)
+    }
+
+    // Sync ViewModel → pager (e.g. after a delete moves to adjacent session)
+    LaunchedEffect(uiState.currentIndex) {
+        if (pagerState.currentPage != uiState.currentIndex) {
+            pagerState.scrollToPage(uiState.currentIndex)
+        }
     }
 
     if (showDeleteDialog) {
@@ -96,7 +115,18 @@ fun ResonanceSessionDetailScreen(
         containerColor = BackgroundDark,
         topBar = {
             TopAppBar(
-                title = { Text("Session Details") },
+                title = {
+                    Column {
+                        Text("Session Details")
+                        if (uiState.allSessionIds.size > 1) {
+                            Text(
+                                "${uiState.currentIndex + 1} / ${uiState.allSessionIds.size}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextDisabled
+                            )
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
@@ -115,32 +145,36 @@ fun ResonanceSessionDetailScreen(
             )
         }
     ) { padding ->
-        when {
-            uiState.isLoading -> {
-                Box(
-                    modifier = Modifier.fillMaxSize().padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = EcgCyan)
+        androidx.compose.foundation.pager.HorizontalPager(
+            state    = pagerState,
+            modifier = Modifier.fillMaxSize().padding(padding)
+        ) { _ ->
+            when {
+                uiState.isLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = EcgCyan)
+                    }
                 }
-            }
-            uiState.session == null -> {
-                Box(
-                    modifier = Modifier.fillMaxSize().padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Session not found.", color = TextSecondary)
+                uiState.session == null -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Session not found.", color = TextSecondary)
+                    }
                 }
-            }
-            else -> {
-                SessionDetailContent(
-                    session = uiState.session!!,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp)
-                )
+                else -> {
+                    SessionDetailContent(
+                        session = uiState.session!!,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(16.dp)
+                    )
+                }
             }
         }
     }

@@ -1,5 +1,69 @@
 # WAGS — Active Context
 
+*Last updated: 2026-04-14 23:44 UTC-4*
+
+### 2026-04-14 23:44 (UTC-4)
+**Task:** Fix swipe direction + fix delete behavior on all session detail screens
+
+**Swipe direction fix:**
+- Changed all 6 ViewModels from newest-first to **oldest-first** ordering
+- `HorizontalPager`: swipe LEFT = higher index = older; swipe RIGHT = lower index = newer
+- With oldest-first: swipe right = newer session, swipe left = older session ✓
+- `ApneaRecordDetailViewModel`: `getAllRecordsOnce()` already returns ASC (oldest-first) — removed the `.reversed()` call
+- All others: `repository.getAll().reversed()` → now just `repository.getAll()` (DAO returns DESC, so reversed = oldest-first)
+
+**Delete behavior fix:**
+- All 6 ViewModels now handle delete without popping back to history
+- After deleting: removes ID from `allSessionIds`, navigates to adjacent session at same index (clamped to last)
+- Only pops back to history screen when the last session is deleted
+- All 6 screens: added `LaunchedEffect(state.currentIndex)` to sync ViewModel→pager after delete moves to adjacent session
+
+**Files modified:**
+- `MeditationSessionDetailViewModel.kt`, `HrvReadinessDetailViewModel.kt`, `ResonanceSessionDetailViewModel.kt`, `RapidHrDetailViewModel.kt`, `MorningReadinessDetailViewModel.kt`, `ApneaRecordDetailViewModel.kt`
+- `MeditationSessionDetailScreen.kt`, `HrvReadinessDetailScreen.kt`, `ResonanceSessionDetailScreen.kt`, `RapidHrDetailScreen.kt`, `MorningReadinessDetailScreen.kt`, `ApneaRecordDetailScreen.kt`
+
+**Build:** Successful, installed on SM-S918U1.
+
+*Last updated: 2026-04-14 23:33 UTC-4*
+
+### 2026-04-14 23:33 (UTC-4)
+**Task:** Fix app back button bug on meditation detail screen + add swipe left/right navigation through session history on ALL session detail screens
+
+**What was done:**
+
+**Back button fix:**
+- Root cause: `LaunchedEffect(selectedDaySessions)` in `MeditationHistoryScreen` re-fired when screen resumed because `SharingStarted.WhileSubscribed(5_000)` restarted the flow, emitting a new list with the same 1-item content. The `lastAutoNavigatedId` guard using `remember` was broken because `remember` resets on recomposition after navigation.
+- Fix: Call `viewModel.clearSelection()` after navigating in `MeditationHistoryScreen`, matching the pattern already used by `ApneaHistoryScreen`.
+
+**Swipe navigation (HorizontalPager) added to ALL session detail screens:**
+- Pattern: each ViewModel loads all session IDs ordered newest-first, tracks `currentIndex`, has `navigateToIndex()`. Screen uses `HorizontalPager` with `LaunchedEffect(pagerState.currentPage)` to sync pager → ViewModel. Top bar shows "X / Y" counter when multiple sessions exist.
+- `@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)` on all updated screens.
+
+**DAOs updated (added `getAll()`):**
+- `DailyReadingDao.kt`, `RapidHrSessionDao.kt`, `ResonanceSessionDao.kt`, `MorningReadinessDao.kt`
+
+**Repositories updated (added `getAll()`):**
+- `ReadinessRepository.kt`, `RapidHrRepository.kt` (`getAllSessions()`), `ResonanceSessionRepository.kt`, `MorningReadinessRepository.kt`
+
+**ViewModels updated with swipe navigation:**
+- `MeditationSessionDetailViewModel.kt` — `allSessionIds`, `currentIndex`, `navigateToIndex()`
+- `HrvReadinessDetailViewModel.kt` — `allReadingIds`, `currentIndex`, `navigateToIndex()`
+- `ResonanceSessionDetailViewModel.kt` — `allSessionIds`, `currentIndex`, `navigateToIndex()`
+- `RapidHrDetailViewModel.kt` — `allSessionIds`, `currentIndex`, `navigateToIndex()` (uses `it.id` for `RapidHrSessionEntity`)
+- `MorningReadinessDetailViewModel.kt` — `allReadingIds`, `currentIndex`, `navigateToIndex()` (entity PK is `id`, not `readingId`)
+- `ApneaRecordDetailViewModel.kt` — `allRecordIds`, `currentIndex`, `navigateToIndex()` (uses `getAllRecordsOnce().reversed()` for newest-first)
+
+**Screens updated with HorizontalPager:**
+- `MeditationHistoryScreen.kt` — back button fix (clearSelection after navigate)
+- `MeditationSessionDetailScreen.kt` — HorizontalPager
+- `HrvReadinessDetailScreen.kt` — HorizontalPager
+- `ResonanceSessionDetailScreen.kt` — HorizontalPager
+- `RapidHrDetailScreen.kt` — HorizontalPager
+- `MorningReadinessDetailScreen.kt` — HorizontalPager
+- `ApneaRecordDetailScreen.kt` — HorizontalPager (also fixed missing `}` for Scaffold lambda)
+
+**Build:** Successful, installed on SM-S918U1.
+
 *Last updated: 2026-04-14 17:37 UTC-4*
 
 ### 2026-04-14 17:37 (UTC-4)
