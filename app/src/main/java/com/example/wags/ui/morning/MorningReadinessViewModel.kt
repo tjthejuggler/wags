@@ -51,7 +51,8 @@ data class MorningReadinessUiState(
     val hooperStress: Float = 50f,
     val result: MorningReadinessResult? = null,
     val errorMessage: String? = null,
-    val noHrmDialogVisible: Boolean = false,
+    /** Non-null when an HR-related dialog should be shown (no device, or no data streaming). */
+    val hrDialogMessage: String? = null,
     val isCalculating: Boolean = false,
     val triggerStandAlert: Boolean = false,
     val liveHr: Int? = null,
@@ -142,7 +143,16 @@ class MorningReadinessViewModel @Inject constructor(
         // Any HR-capable device can be used for morning readiness.
         // If no device is connected at all, show the dialog.
         if (!hrDataSource.isAnyHrDeviceConnected.value) {
-            _uiState.update { it.copy(noHrmDialogVisible = true) }
+            _uiState.update { it.copy(hrDialogMessage = "Please connect a heart rate monitor before starting the Morning Readiness test.") }
+            return
+        }
+
+        // Device is connected, but we also need live HR data streaming in.
+        // It's possible to be connected (e.g. H10) but not receiving data
+        // (strap not moist, sensor glitch, etc.). Without data the session
+        // is useless, so block it with a clear message.
+        if (hrDataSource.liveHr.value == null) {
+            _uiState.update { it.copy(hrDialogMessage = "Heart rate monitor is connected but not receiving data. Make sure the strap is snug and moist, then try again.") }
             return
         }
 
@@ -162,8 +172,8 @@ class MorningReadinessViewModel @Inject constructor(
         startRrPolling()
     }
 
-    fun dismissNoHrmDialog() {
-        _uiState.update { it.copy(noHrmDialogVisible = false) }
+    fun dismissHrDialog() {
+        _uiState.update { it.copy(hrDialogMessage = null) }
     }
 
     private fun startRrPolling() {

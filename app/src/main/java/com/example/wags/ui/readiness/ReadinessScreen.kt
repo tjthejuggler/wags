@@ -71,6 +71,26 @@ fun ReadinessScreen(
     SessionBackHandler(enabled = isActive) { navController.popBackStack() }
     KeepScreenOn(enabled = keepScreenOn)
 
+    // HR-related dialog (no device connected, or connected but no data streaming)
+    if (state.hrDialogMessage != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissHrDialog() },
+            title = { Text("Heart Rate Monitor Required", color = TextPrimary) },
+            text = {
+                Text(
+                    state.hrDialogMessage!!,
+                    color = TextSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.dismissHrDialog() }) {
+                    Text("OK", color = TextSecondary)
+                }
+            },
+            containerColor = SurfaceDark
+        )
+    }
+
     // Session-complete feedback: chime + vibration when recording finishes.
     LaunchedEffect(state.sessionState) {
         if (state.sessionState == ReadinessSessionState.COMPLETE) {

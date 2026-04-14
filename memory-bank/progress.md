@@ -1,6 +1,18 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-14 14:04 UTC-4*
+*Last updated: 2026-04-14 14:35 UTC-4*
+
+## Recent Changes (2026-04-14 14:35)
+- ✅ **Fix morning readiness / HRV readiness allowing sessions when connected but no HR data streaming:**
+  - **Bug**: Both Morning Readiness and HRV Readiness sessions could start when a BLE device was connected but not streaming HR data (e.g. dry strap, sensor glitch)
+  - **Root cause**: Session guards only checked `isAnyHrDeviceConnected` (BLE connection state), not `liveHr` (actual data flowing). ReadinessViewModel had NO device check at all.
+  - **Fix**: Added `hrDataSource.liveHr.value == null` guard in both ViewModels' `startSession()` methods
+  - Replaced `noHrmDialogVisible: Boolean` with `hrDialogMessage: String?` in `MorningReadinessUiState` — handles both "no device" and "no data" cases with distinct messages
+  - Added `hrDialogMessage: String?` to `ReadinessUiState` + both connection and data-streaming guards (previously had NO device check)
+  - Added `dismissHrDialog()` to both ViewModels
+  - Updated both screens to show the contextual dialog
+  - Modified: `MorningReadinessViewModel.kt`, `MorningReadinessScreen.kt`, `ReadinessViewModel.kt`, `ReadinessScreen.kt`
+  - Build: ✅ Successful, installed on SM-S918U1
 
 ## Recent Changes (2026-04-14 14:04)
 - ✅ **Apnea Min Breath drill fixes — Spotify music, tail increments, back arrow cancel:**

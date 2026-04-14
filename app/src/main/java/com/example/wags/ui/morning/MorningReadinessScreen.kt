@@ -74,19 +74,19 @@ fun MorningReadinessScreen(
     SessionBackHandler(enabled = isActive, onConfirm = onNavigateBack)
     KeepScreenOn(enabled = keepScreenOn)
 
-    // No HRM dialog
-    if (uiState.noHrmDialogVisible) {
+    // HR-related dialog (no device connected, or connected but no data streaming)
+    if (uiState.hrDialogMessage != null) {
         AlertDialog(
-            onDismissRequest = { viewModel.dismissNoHrmDialog() },
+            onDismissRequest = { viewModel.dismissHrDialog() },
             title = { Text("Heart Rate Monitor Required", color = TextPrimary) },
             text = {
                 Text(
-                    "Please connect a heart rate monitor before starting the Morning Readiness test.",
+                    uiState.hrDialogMessage!!,
                     color = TextSecondary
                 )
             },
             confirmButton = {
-                TextButton(onClick = { viewModel.dismissNoHrmDialog() }) {
+                TextButton(onClick = { viewModel.dismissHrDialog() }) {
                     Text("OK", color = TextSecondary)
                 }
             },

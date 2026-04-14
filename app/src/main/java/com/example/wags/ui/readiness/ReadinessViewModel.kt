@@ -54,6 +54,8 @@ data class ReadinessUiState(
     val hrvMetrics: HrvMetrics? = null,
     val readinessScore: ReadinessScore? = null,
     val errorMessage: String? = null,
+    /** Non-null when an HR-related dialog should be shown (no device, or no data streaming). */
+    val hrDialogMessage: String? = null,
     val liveHr: Int? = null,
     val liveSpO2: Int? = null,
     /** Recent RR intervals (ms) for the scrolling chart — last ~30 s worth. */
@@ -103,6 +105,19 @@ class ReadinessViewModel @Inject constructor(
     fun startSession(deviceId: String) {
         val state = _uiState.value
         if (state.sessionState != ReadinessSessionState.IDLE) return
+
+        // Guard: no HR device connected
+        if (!hrDataSource.isAnyHrDeviceConnected.value) {
+            _uiState.update { it.copy(hrDialogMessage = "Please connect a heart rate monitor before starting the HRV Readiness test.") }
+            return
+        }
+
+        // Guard: device connected but not streaming HR data
+        if (hrDataSource.liveHr.value == null) {
+            _uiState.update { it.copy(hrDialogMessage = "Heart rate monitor is connected but not receiving data. Make sure the strap is snug and moist, then try again.") }
+            return
+        }
+
         val durationSeconds = state.selectedDuration.seconds
 
         collectedRr.clear()
@@ -238,6 +253,10 @@ class ReadinessViewModel @Inject constructor(
     fun cancelSession() {
         sessionJob?.cancel()
         _uiState.update { it.copy(sessionState = ReadinessSessionState.IDLE, preparingSecondsRemaining = 20) }
+    }
+
+    fun dismissHrDialog() {
+        _uiState.update { it.copy(hrDialogMessage = null) }
     }
 
     fun reset() {

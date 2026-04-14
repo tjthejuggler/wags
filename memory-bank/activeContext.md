@@ -1,6 +1,37 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-14 14:03 UTC-4*
+*Last updated: 2026-04-14 14:34 UTC-4*
+
+### 2026-04-14 14:34 (UTC-4)
+**Task:** Fix morning readiness / HRV readiness allowing sessions when connected but no HR data streaming
+
+**What was done:**
+
+**Bug:** Both Morning Readiness and HRV Readiness sessions could start when a BLE device (e.g. H10) was connected but not actually streaming HR data. This resulted in useless sessions with no data.
+
+**Root cause:** The session start guards only checked `isAnyHrDeviceConnected` (BLE connection state), not whether `liveHr` was non-null (actual data flowing). The ReadinessViewModel had NO guard at all.
+
+**Fix — MorningReadinessViewModel:**
+- Replaced `noHrmDialogVisible: Boolean` with `hrDialogMessage: String?` in `MorningReadinessUiState` — handles both "no device" and "no data" cases with distinct messages
+- Added `hrDataSource.liveHr.value == null` check in `startSession()` — blocks session when connected but no data, with message: "Heart rate monitor is connected but not receiving data. Make sure the strap is snug and moist, then try again."
+- Renamed `dismissNoHrmDialog()` → `dismissHrDialog()`
+
+**Fix — ReadinessViewModel:**
+- Added `hrDialogMessage: String?` to `ReadinessUiState`
+- Added both `isAnyHrDeviceConnected` and `liveHr == null` guards in `startSession()` (previously had NO device check at all)
+- Added `dismissHrDialog()` method
+
+**Fix — Screens:**
+- `MorningReadinessScreen.kt` — Updated dialog to use `hrDialogMessage` instead of `noHrmDialogVisible`
+- `ReadinessScreen.kt` — Added HR dialog (previously had none)
+
+**Files modified:**
+- `MorningReadinessViewModel.kt` — `hrDialogMessage` field, `liveHr == null` guard, `dismissHrDialog()`
+- `MorningReadinessScreen.kt` — Updated dialog to use `hrDialogMessage`
+- `ReadinessViewModel.kt` — `hrDialogMessage` field, both guards in `startSession()`, `dismissHrDialog()`
+- `ReadinessScreen.kt` — Added HR dialog
+
+**Current state:** Build successful, installed on SM-S918U1.
 
 ### 2026-04-14 14:03 (UTC-4)
 **Task:** Fix apnea min breath drill — Spotify music, tail increments, back arrow cancel
