@@ -89,6 +89,12 @@ fun BreathingScreen(
     val prefs = remember { context.getSharedPreferences("apnea_prefs", android.content.Context.MODE_PRIVATE) }
     var vibrationEnabled by remember { mutableStateOf(prefs.getBoolean("breathing_vibration", false)) }
 
+    // Restore last-used session duration from prefs so it survives app restarts
+    LaunchedEffect(Unit) {
+        val saved = prefs.getInt("breathing_duration_minutes", -1)
+        if (saved > 0) viewModel.setSessionDuration(saved)
+    }
+
     val isActive = state.sessionPhase != BreathingSessionPhase.IDLE &&
             state.sessionPhase != BreathingSessionPhase.COMPLETE
 
@@ -183,7 +189,10 @@ fun BreathingScreen(
             DurationControls(
                 durationMinutes = state.sessionDurationMinutes,
                 infinityMode = state.infinityMode,
-                onDurationChange = { viewModel.setSessionDuration(it) },
+                onDurationChange = {
+                    viewModel.setSessionDuration(it)
+                    prefs.edit().putInt("breathing_duration_minutes", it).apply()
+                },
                 onInfinityToggle = { viewModel.setInfinityMode(it) }
             )
 
