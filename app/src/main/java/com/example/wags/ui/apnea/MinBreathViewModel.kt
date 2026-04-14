@@ -132,6 +132,9 @@ class MinBreathViewModel @Inject constructor(
     // Per-breath-period duration tracking (indexed by hold number that preceded the breath)
     private val breathDurations = mutableMapOf<Int, Long>()
 
+    // Spotify tracks played during the session (captured at stop time)
+    private var trackedSongs: List<SpotifySong> = emptyList()
+
     init {
         // Restore persisted session duration
         val savedDuration = prefs.getInt("min_breath_session_duration_sec", 300)
@@ -179,8 +182,24 @@ class MinBreathViewModel @Inject constructor(
                     audioHapticEngine.announceSessionComplete()
                     // Auto-save when session completes naturally (timer ran out)
                     if (_uiState.value.isSessionActive) {
-                        val recordId = saveSession(state)
+                        // Stop Spotify if MUSIC was selected — capture tracked songs
+                        trackedSongs = if (_uiState.value.isMusicMode) {
+                            val tracks = spotifyManager.stopTracking()
+                            spotifyManager.sendPauseAndRewindCommand()
+                            tracks.map { t ->
+                                SpotifySong(t.title, t.artist, null, t.spotifyUri, t.startedAtMs, t.endedAtMs)
+                            }
+                        } else emptyList()
+                        // Stop guided audio if GUIDED was selected
+                        if (_uiState.value.isGuidedMode) {
+                            guidedAudioManager.stopPlayback()
+                        }
                         telemetryJob?.cancel()
+                        // Persist song history to SharedPreferences
+                        if (trackedSongs.isNotEmpty()) {
+                            persistSongHistory(trackedSongs)
+                        }
+                        val recordId = saveSession(state)
                         _uiState.update { it.copy(
                             isSessionActive = false,
                             completedRecordId = recordId
@@ -389,6 +408,13 @@ class MinBreathViewModel @Inject constructor(
         breathDurations.clear()
         _uiState.update { it.copy(isSessionActive = true, completedRecordId = null) }
 
+        // Start Spotify if MUSIC is selected.
+        // Song was pre-loaded in selectSong() — just resume playback.
+        if (_uiState.value.isMusicMode) {
+            spotifyManager.startTracking()
+            spotifyManager.sendPlayCommand()
+        }
+
         // Start guided audio if GUIDED is selected
         if (_uiState.value.isGuidedMode) {
             viewModelScope.launch {
@@ -414,18 +440,41 @@ class MinBreathViewModel @Inject constructor(
         stateMachine.start(durationMs, viewModelScope)
     }
 
+    /**
+     * Stops the session and saves the record.
+     * Called when the user explicitly stops the session via the Stop button
+     * or when the session completes naturally (timer runs out).
+     */
     fun stopSession() {
+        if (!_uiState.value.isSessionActive) return // Already stopped/saved
+
         telemetryJob?.cancel()
         telemetryJob = null
+
+        // Stop Spotify if MUSIC was selected — capture tracked songs
+        trackedSongs = if (_uiState.value.isMusicMode) {
+            val tracks = spotifyManager.stopTracking()
+            spotifyManager.sendPauseAndRewindCommand()
+            tracks.map { t ->
+                SpotifySong(t.title, t.artist, null, t.spotifyUri, t.startedAtMs, t.endedAtMs)
+            }
+        } else emptyList()
 
         // Stop guided audio if GUIDED was selected
         if (_uiState.value.isGuidedMode) {
             guidedAudioManager.stopPlayback()
         }
 
+        // Mark inactive BEFORE stopping the state machine to prevent the
+        // init-block observer from also saving when it sees COMPLETE.
+        _uiState.update { it.copy(isSessionActive = false) }
         stateMachine.stop()
         val finalState = stateMachine.state.value
-        _uiState.update { it.copy(isSessionActive = false) }
+
+        // Persist song history to SharedPreferences
+        if (trackedSongs.isNotEmpty()) {
+            persistSongHistory(trackedSongs)
+        }
 
         viewModelScope.launch {
             try {
@@ -435,6 +484,34 @@ class MinBreathViewModel @Inject constructor(
                 Log.e(TAG, "Failed to save session", e)
             }
         }
+    }
+
+    /**
+     * Cancels an in-progress session without saving any record.
+     * Called when the user taps the back arrow while the session is running.
+     */
+    fun cancelSession() {
+        if (!_uiState.value.isSessionActive) return // Already stopped
+
+        telemetryJob?.cancel()
+        telemetryJob = null
+
+        // Stop Spotify if MUSIC was selected (no tracking save since we're cancelling)
+        if (_uiState.value.isMusicMode) {
+            spotifyManager.stopTracking()
+            spotifyManager.sendPauseAndRewindCommand()
+        }
+
+        // Stop guided audio if GUIDED was selected
+        if (_uiState.value.isGuidedMode) {
+            guidedAudioManager.stopPlayback()
+        }
+
+        // Mark inactive BEFORE stopping the state machine to prevent the
+        // init-block observer from saving when it sees COMPLETE.
+        _uiState.update { it.copy(isSessionActive = false) }
+        stateMachine.stop()
+        // Do NOT save the session or fire tail increments
     }
 
     fun markContraction() {
@@ -546,6 +623,12 @@ class MinBreathViewModel @Inject constructor(
         // Fire Tail habit for every completed Min Breath session
         try { habitRepo.sendHabitIncrement(Slot.MIN_BREATH) } catch (_: Exception) {}
 
+        // 2b. Save song log (Spotify tracks played during session)
+        if (recordId > 0 && trackedSongs.isNotEmpty()) {
+            apneaRepository.saveSongLog(recordId, trackedSongs)
+            trackedSongs = emptyList()
+        }
+
         // 3. Save FreeHoldTelemetryEntity rows (linked to recordId)
         if (recordId > 0 && telemetrySnapshot.isNotEmpty()) {
             val freeHoldSamples = telemetrySnapshot.map { sample ->
@@ -574,6 +657,25 @@ class MinBreathViewModel @Inject constructor(
         }
 
         return recordId
+    }
+
+    // ── Song history persistence ─────────────────────────────────────────────
+
+    private fun persistSongHistory(songs: List<SpotifySong>) {
+        if (songs.isEmpty()) return
+        val existing = loadSongHistoryFromPrefs().toMutableList()
+        for (song in songs) {
+            val titleArtistKey = "${song.title.lowercase().trim()}|${song.artist.lowercase().trim()}"
+            val alreadyPresent = existing.any { s ->
+                "${s.title.lowercase().trim()}|${s.artist.lowercase().trim()}" == titleArtistKey
+            }
+            if (!alreadyPresent) existing.add(0, song)
+        }
+        val trimmed = existing.take(50)
+        val json = trimmed.joinToString(separator = "\n") { s ->
+            listOf(s.title, s.artist, s.spotifyUri ?: "").joinToString("|")
+        }
+        prefs.edit().putString("song_history", json).apply()
     }
 
     // ── JSON helpers ────────────────────────────────────────────────────────
@@ -643,6 +745,13 @@ class MinBreathViewModel @Inject constructor(
 
     override fun onCleared() {
         guidedAudioManager.stopPlayback()
+        // Also stop Spotify if still tracking
+        if (_uiState.value.isMusicMode) {
+            try {
+                spotifyManager.stopTracking()
+                spotifyManager.sendPauseAndRewindCommand()
+            } catch (_: Exception) {}
+        }
         super.onCleared()
     }
 

@@ -1,6 +1,14 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-12 04:29 UTC-6*
+*Last updated: 2026-04-14 14:04 UTC-4*
+
+## Recent Changes (2026-04-14 14:04)
+- ✅ **Apnea Min Breath drill fixes — Spotify music, tail increments, back arrow cancel:**
+  - **Spotify music auto-trigger**: Added `spotifyManager.startTracking()` + `sendPlayCommand()` in `MinBreathViewModel.startSession()` when audio=MUSIC; stop/tracking/save in `stopSession()`, `cancelSession()`, init-block COMPLETE observer, and `onCleared()`
+  - **Tail increment double-fire fix**: Root cause was `stopSession()` calling `stateMachine.stop()` which set phase=COMPLETE, then the init-block observer also saw COMPLETE and called `saveSession()` again. Fix: set `isSessionActive = false` BEFORE `stateMachine.stop()` so the init-block guard prevents double-save. Same fix in ProgressiveO2ViewModel.
+  - **Back arrow cancels without saving**: Added `cancelSession()` to MinBreathViewModel, ProgressiveO2ViewModel, AdvancedApneaViewModel; added `cancelTableSession()` to ApneaViewModel. All active screens now call cancel from both SessionBackHandler and navigation icon. Fixed FreeHoldActiveScreen SessionBackHandler to call `cancelFreeHold()`.
+  - Modified: `MinBreathViewModel.kt`, `MinBreathActiveScreen.kt`, `ProgressiveO2ViewModel.kt`, `ProgressiveO2ActiveScreen.kt`, `AdvancedApneaViewModel.kt`, `AdvancedApneaScreen.kt`, `ApneaViewModel.kt`, `ApneaTableScreen.kt`, `FreeHoldActiveScreen.kt`
+  - Build: ✅ Compiled successfully. No device connected for install.
 
 ## Recent Changes (2026-04-12 04:29)
 - ✅ **Tap-to-inspect popup on ALL detail screen graphs:**

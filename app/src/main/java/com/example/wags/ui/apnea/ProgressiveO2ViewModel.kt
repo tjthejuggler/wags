@@ -429,7 +429,14 @@ class ProgressiveO2ViewModel @Inject constructor(
         stateMachine.start(breathPeriodMs, viewModelScope)
     }
 
+    /**
+     * Stops the session and saves the record.
+     * Called when the user explicitly stops the session via the Stop button
+     * or when the session completes naturally.
+     */
     fun stopSession() {
+        if (!_uiState.value.isSessionActive) return // Already stopped/saved
+
         // Stop telemetry collection first for a stable snapshot
         telemetryJob?.cancel()
         telemetryJob = null
@@ -448,9 +455,11 @@ class ProgressiveO2ViewModel @Inject constructor(
             guidedAudioManager.stopPlayback()
         }
 
+        // Mark inactive BEFORE stopping the state machine to prevent the
+        // init-block observer from also saving when it sees COMPLETE.
+        _uiState.update { it.copy(isSessionActive = false) }
         stateMachine.stop()
         val finalState = stateMachine.state.value
-        _uiState.update { it.copy(isSessionActive = false) }
 
         // Persist song history to SharedPreferences
         if (trackedSongs.isNotEmpty()) {
@@ -465,6 +474,32 @@ class ProgressiveO2ViewModel @Inject constructor(
                 Log.e(TAG, "Failed to save session", e)
             }
         }
+    }
+
+    /**
+     * Cancels an in-progress session without saving any record.
+     * Called when the user taps the back arrow while the session is running.
+     */
+    fun cancelSession() {
+        if (!_uiState.value.isSessionActive) return // Already stopped
+
+        telemetryJob?.cancel()
+        telemetryJob = null
+
+        // Stop Spotify if MUSIC was selected (no tracking save since we're cancelling)
+        if (_uiState.value.isMusicMode) {
+            spotifyManager.stopTracking()
+            spotifyManager.sendPauseAndRewindCommand()
+        }
+
+        // Stop guided audio if GUIDED was selected
+        if (_uiState.value.isGuidedMode) {
+            guidedAudioManager.stopPlayback()
+        }
+
+        _uiState.update { it.copy(isSessionActive = false) }
+        stateMachine.stop()
+        // Do NOT save the session or fire tail increments
     }
 
     /** Clears completedRecordId after the UI has navigated to the detail screen. */

@@ -523,9 +523,12 @@ class ApneaViewModel @Inject constructor(
             }
             ApneaState.COMPLETE -> {
                 audioHapticEngine.announceSessionComplete()
-                saveCompletedSession()
-                // Signal the Habit app that a full O2/CO2 table session was completed
-                habitRepo.sendHabitIncrement(Slot.TABLE_TRAINING)
+                if (!tableSessionCancelled) {
+                    saveCompletedSession()
+                    // Signal the Habit app that a full O2/CO2 table session was completed
+                    habitRepo.sendHabitIncrement(Slot.TABLE_TRAINING)
+                }
+                tableSessionCancelled = false
             }
             else -> Unit
         }
@@ -763,6 +766,7 @@ class ApneaViewModel @Inject constructor(
     }
 
     fun startTableSession() {
+        tableSessionCancelled = false
         val polarDeviceId = hrDataSource.connectedPolarDeviceId()
         if (polarDeviceId != null) {
             deviceManager.startRrStream(polarDeviceId)
@@ -798,6 +802,9 @@ class ApneaViewModel @Inject constructor(
         }
     }
 
+    /** Flag to prevent auto-save when the user cancels a table session via back arrow. */
+    private var tableSessionCancelled = false
+
     fun stopTableSession() {
         oximeterCollectionJob?.cancel()
         oximeterCollectionJob = null
@@ -815,6 +822,28 @@ class ApneaViewModel @Inject constructor(
         if (tracksPlayed.isNotEmpty()) {
             persistSongHistory(tracksPlayed.map { SpotifySong(it.title, it.artist, null, it.spotifyUri, it.startedAtMs, it.endedAtMs) })
         }
+    }
+
+    /**
+     * Cancels an in-progress table session without saving any record.
+     * Called when the user taps the back arrow while the session is running.
+     */
+    fun cancelTableSession() {
+        tableSessionCancelled = true
+        oximeterCollectionJob?.cancel()
+        oximeterCollectionJob = null
+        oximeterSamples.clear()
+        // Stop Spotify if MUSIC was selected (no tracking save since we're cancelling)
+        if (_audio.value == AudioSetting.MUSIC) {
+            spotifyManager.stopTracking()
+            spotifyManager.sendPauseAndRewindCommand()
+        }
+        // Stop guided audio if GUIDED was selected
+        if (_audio.value == AudioSetting.GUIDED) {
+            guidedAudioManager.stopPlayback()
+        }
+        stateMachine.stop()
+        // Do NOT save the session or fire tail increments
     }
 
     private fun onWarning(remainingSeconds: Long) {

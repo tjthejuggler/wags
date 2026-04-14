@@ -999,7 +999,10 @@ fun FreeHoldActiveScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    SessionBackHandler(enabled = state.freeHoldActive) { navController.popBackStack() }
+    SessionBackHandler(enabled = state.freeHoldActive) {
+        viewModel.cancelFreeHold()
+        navController.popBackStack()
+    }
     // Keep screen on while hold is active OR while reviewing PB results / waiting to navigate
     KeepScreenOn(enabled = state.freeHoldActive || state.pbCheckPending || state.newPersonalBest != null)
 

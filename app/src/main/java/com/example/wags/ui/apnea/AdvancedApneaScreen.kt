@@ -44,7 +44,7 @@ fun AdvancedApneaScreen(
     val keepScreenOn = isActive || state.phase == AdvancedApneaPhase.COMPLETE
 
     SessionBackHandler(enabled = isActive) {
-        viewModel.stopSession()
+        viewModel.cancelSession()
         navController.popBackStack()
     }
     KeepScreenOn(enabled = keepScreenOn)
@@ -62,7 +62,7 @@ fun AdvancedApneaScreen(
                 title = { Text(modality.displayName()) },
                 navigationIcon = {
                     IconButton(onClick = {
-                        viewModel.stopSession()
+                        viewModel.cancelSession()
                         navController.popBackStack()
                     }) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)

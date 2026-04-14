@@ -1,6 +1,44 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-12 04:29 UTC-6*
+*Last updated: 2026-04-14 14:03 UTC-4*
+
+### 2026-04-14 14:03 (UTC-4)
+**Task:** Fix apnea min breath drill — Spotify music, tail increments, back arrow cancel
+
+**What was done:**
+
+**Fix 1 — Spotify music auto-trigger in Min Breath drill:**
+- Added `spotifyManager.startTracking()` + `spotifyManager.sendPlayCommand()` in `MinBreathViewModel.startSession()` when audio=MUSIC
+- Added `spotifyManager.stopTracking()` + `spotifyManager.sendPauseAndRewindCommand()` in `stopSession()` and `cancelSession()` when audio=MUSIC
+- Added Spotify stop + song capture in the init-block COMPLETE observer (natural session end)
+- Added `trackedSongs` field, `persistSongHistory()`, and `saveSongLog()` in `saveSession()` — matching ProgressiveO2 pattern
+- Added Spotify cleanup in `onCleared()`
+
+**Fix 2 — Tail increment double-fire (only 1 increment per min breath session):**
+- Root cause: `stopSession()` called `stateMachine.stop()` which set phase to COMPLETE, then the init-block observer also saw COMPLETE and called `saveSession()` again — causing multiple `habitRepo.sendHabitIncrement(Slot.MIN_BREATH)` calls
+- Fix: Set `isSessionActive = false` BEFORE calling `stateMachine.stop()` in `stopSession()`, so the init-block observer's guard (`if (_uiState.value.isSessionActive)`) prevents the double-save
+- Same fix applied to `ProgressiveO2ViewModel.stopSession()`
+
+**Fix 3 — Back arrow during drill cancels without saving:**
+- Added `cancelSession()` to `MinBreathViewModel` — stops state machine + Spotify/guided audio but does NOT save or fire tail increments
+- Added `cancelSession()` to `ProgressiveO2ViewModel` — same pattern
+- Added `cancelSession()` to `AdvancedApneaViewModel` — uses `sessionCancelled` flag to prevent init-block auto-save
+- Added `cancelTableSession()` to `ApneaViewModel` — uses `tableSessionCancelled` flag to prevent `onStateChanged` auto-save
+- Updated all 4 active screens to call `cancelSession()`/`cancelTableSession()` from both `SessionBackHandler` and navigation icon back arrow
+- Fixed `FreeHoldActiveScreen` `SessionBackHandler` to call `viewModel.cancelFreeHold()` (was missing)
+
+**Files modified:**
+- `MinBreathViewModel.kt` — Spotify start/stop/tracking/save, cancelSession(), double-save fix, persistSongHistory(), onCleared()
+- `MinBreathActiveScreen.kt` — Back arrow uses cancelSession()
+- `ProgressiveO2ViewModel.kt` — cancelSession(), double-save fix
+- `ProgressiveO2ActiveScreen.kt` — Back arrow uses cancelSession()
+- `AdvancedApneaViewModel.kt` — cancelSession(), sessionCancelled flag
+- `AdvancedApneaScreen.kt` — Back arrow uses cancelSession()
+- `ApneaViewModel.kt` — cancelTableSession(), tableSessionCancelled flag
+- `ApneaTableScreen.kt` — Back arrow uses cancelTableSession()
+- `FreeHoldActiveScreen.kt` — SessionBackHandler now calls cancelFreeHold()
+
+**Current state:** Build compiled successfully. No device connected for install — user needs to connect device/emulator.
 
 ### 2026-04-12 04:29 (UTC-6)
 **Task:** Add tap-to-inspect popup to all detail screen graphs

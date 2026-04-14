@@ -38,7 +38,7 @@ fun ProgressiveO2ActiveScreen(
 
     // ── Guards ───────────────────────────────────────────────────────────
     SessionBackHandler(enabled = isActive) {
-        viewModel.stopSession()
+        viewModel.cancelSession()
         navController.popBackStack()
     }
     KeepScreenOn(enabled = isActive || phase == ProgressiveO2Phase.COMPLETE)
@@ -70,7 +70,7 @@ fun ProgressiveO2ActiveScreen(
                 title = { Text("Progressive O₂") },
                 navigationIcon = {
                     IconButton(onClick = {
-                        if (isActive) viewModel.stopSession()
+                        if (isActive) viewModel.cancelSession()
                         navController.popBackStack()
                     }) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)

@@ -137,7 +137,10 @@ class AdvancedApneaViewModel @Inject constructor(
         viewModelScope.launch {
             stateMachine.state.collect { advancedState ->
                 if (advancedState.phase == AdvancedApneaPhase.COMPLETE) {
-                    saveCompletedSession(advancedState)
+                    if (!sessionCancelled) {
+                        saveCompletedSession(advancedState)
+                    }
+                    sessionCancelled = false
                 }
             }
         }
@@ -148,6 +151,7 @@ class AdvancedApneaViewModel @Inject constructor(
         length: TableLength,
         wonkaConfig: WonkaConfig = WonkaConfig()
     ) {
+        sessionCancelled = false
         this.modality = modality
         this.length = length
         this.wonkaConfig = wonkaConfig
@@ -179,6 +183,9 @@ class AdvancedApneaViewModel @Inject constructor(
         audioHapticEngine.vibrateContractionLogged()
     }
 
+    /** Flag to prevent auto-save when the user cancels via back arrow. */
+    private var sessionCancelled = false
+
     fun stopSession() {
         val tracksPlayed = if (audioSetting == AudioSetting.MUSIC) {
             val tracks = spotifyManager.stopTracking()
@@ -196,6 +203,25 @@ class AdvancedApneaViewModel @Inject constructor(
             }
             persistSongHistory(songs)
         }
+    }
+
+    /**
+     * Cancels an in-progress session without saving any record.
+     * Called when the user taps the back arrow while the session is running.
+     */
+    fun cancelSession() {
+        sessionCancelled = true
+        // Stop Spotify if MUSIC was selected (no tracking save since we're cancelling)
+        if (audioSetting == AudioSetting.MUSIC) {
+            spotifyManager.stopTracking()
+            spotifyManager.sendPauseAndRewindCommand()
+        }
+        // Stop guided audio if GUIDED was selected
+        if (audioSetting == AudioSetting.GUIDED) {
+            guidedAudioManager.stopPlayback()
+        }
+        stateMachine.stop()
+        // Do NOT save the session or fire tail increments
     }
 
     // ── Guided audio library methods ─────────────────────────────────────────

@@ -34,7 +34,7 @@ fun MinBreathActiveScreen(
     val isActive = phase == MinBreathPhase.HOLD || phase == MinBreathPhase.BREATHING
 
     SessionBackHandler(enabled = isActive) {
-        viewModel.stopSession()
+        viewModel.cancelSession()
         navController.popBackStack()
     }
     KeepScreenOn(enabled = isActive || phase == MinBreathPhase.COMPLETE)
@@ -60,7 +60,7 @@ fun MinBreathActiveScreen(
                 title = { Text("Min Breath") },
                 navigationIcon = {
                     IconButton(onClick = {
-                        if (isActive) viewModel.stopSession()
+                        if (isActive) viewModel.cancelSession()
                         navController.popBackStack()
                     }) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)

@@ -42,7 +42,10 @@ fun ApneaTableScreen(
     // Keep screen on during COMPLETE too so the user can review results
     val keepScreenOn = isActive || state.apneaState == ApneaState.COMPLETE
 
-    SessionBackHandler(enabled = isActive) { navController.popBackStack() }
+    SessionBackHandler(enabled = isActive) {
+        viewModel.cancelTableSession()
+        navController.popBackStack()
+    }
     KeepScreenOn(enabled = keepScreenOn)
 
     // Load table when screen enters with a valid personal best
@@ -58,7 +61,10 @@ fun ApneaTableScreen(
             TopAppBar(
                 title = { Text("${parsedType.name} Table") },
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
+                    IconButton(onClick = {
+                        if (isActive) viewModel.cancelTableSession()
+                        navController.popBackStack()
+                    }) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
                 },
