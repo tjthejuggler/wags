@@ -624,6 +624,14 @@ private fun RecordDetailContent(
                         valueBold = true
                     )
                 }
+                if (record.newRecordIndication) {
+                    DetailRow(
+                        label = "Record Indication",
+                        value = "On",
+                        valueColor = TextPrimary,
+                        valueBold = true
+                    )
+                }
 
                 // ── Personal Best badges ────────────────────────────────────
                 if (pbBadges.isNotEmpty()) {

@@ -57,5 +57,8 @@ data class ApneaRecordEntity(
     val drillParamValue: Int? = null,
     /** Display name of the guided audio file used during this hold (null when audio != GUIDED). */
     @ColumnInfo(defaultValue = "NULL")
-    val guidedAudioName: String? = null
+    val guidedAudioName: String? = null,
+    /** Whether the "New Record Indication" feature was enabled during this hold. */
+    @ColumnInfo(defaultValue = "0")
+    val newRecordIndication: Boolean = false
 )

@@ -130,7 +130,52 @@ data class PbThresholds(
         if (fourSettingsBestMs == null || elapsedMs > fourSettingsBestMs) return PersonalBestCategory.FOUR_SETTINGS
         return PersonalBestCategory.EXACT
     }
+
+    /**
+     * Returns the next PB target — the closest unbroken category threshold
+     * that would earn more trophies than the current [broadestBroken] result.
+     *
+     * Returns null when all categories are already broken (or no thresholds exist),
+     * meaning there are no more records to beat.
+     */
+    fun nextPbTarget(elapsedMs: Long): NextPbTarget? {
+        // If exact PB hasn't been broken yet, countdown to it
+        if (exactBestMs != null && elapsedMs <= exactBestMs) {
+            return NextPbTarget(PersonalBestCategory.EXACT, exactBestMs - elapsedMs)
+        }
+
+        // Exact is broken (or null = any duration is a PB). Find next unbroken broader category.
+        if (fourSettingsBestMs != null && elapsedMs <= fourSettingsBestMs) {
+            return NextPbTarget(PersonalBestCategory.FOUR_SETTINGS, fourSettingsBestMs - elapsedMs)
+        }
+        if (threeSettingsBestMs != null && elapsedMs <= threeSettingsBestMs) {
+            return NextPbTarget(PersonalBestCategory.THREE_SETTINGS, threeSettingsBestMs - elapsedMs)
+        }
+        if (twoSettingsBestMs != null && elapsedMs <= twoSettingsBestMs) {
+            return NextPbTarget(PersonalBestCategory.TWO_SETTINGS, twoSettingsBestMs - elapsedMs)
+        }
+        if (oneSettingBestMs != null && elapsedMs <= oneSettingBestMs) {
+            return NextPbTarget(PersonalBestCategory.ONE_SETTING, oneSettingBestMs - elapsedMs)
+        }
+        if (globalBestMs != null && elapsedMs <= globalBestMs) {
+            return NextPbTarget(PersonalBestCategory.GLOBAL, globalBestMs - elapsedMs)
+        }
+
+        // All categories broken — no more records to beat
+        return null
+    }
 }
+
+/**
+ * Represents the next personal-best milestone the user is counting down toward.
+ *
+ * @property category    The [PersonalBestCategory] that will be broken when the countdown reaches zero.
+ * @property remainingMs Milliseconds remaining until that category's threshold is reached.
+ */
+data class NextPbTarget(
+    val category: PersonalBestCategory,
+    val remainingMs: Long
+)
 
 data class PersonalBestEntry(
     val trophyCount: Int,

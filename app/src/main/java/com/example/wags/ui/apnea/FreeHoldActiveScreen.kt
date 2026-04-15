@@ -46,9 +46,11 @@ import com.example.wags.data.spotify.TrackInfo
 import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.OximeterReading
 import com.example.wags.domain.model.PersonalBestCategory
+import com.example.wags.domain.model.NextPbTarget
 import com.example.wags.domain.model.PersonalBestResult
 import com.example.wags.domain.model.PbThresholds
 import com.example.wags.domain.model.PrepType
+import com.example.wags.domain.model.trophyCount
 import com.example.wags.domain.model.trophyEmojis
 import com.example.wags.domain.model.SpotifySong
 import com.example.wags.domain.model.TimeOfDay
@@ -194,7 +196,9 @@ data class FreeHoldActiveUiState(
     /** Vibrate when a PB threshold is crossed during a hold. */
     val pbIndicationVibration: Boolean = true,
     /** The broadest PB category broken so far during the current hold (for UI display). */
-    val currentPbCategory: PersonalBestCategory? = null
+    val currentPbCategory: PersonalBestCategory? = null,
+    /** Countdown to the next PB milestone that would earn more trophies. Null when PB indication is off or no target remains. */
+    val nextPbTarget: NextPbTarget? = null
 )
 
 @HiltViewModel
@@ -646,7 +650,13 @@ class FreeHoldActiveViewModel @Inject constructor(
                     delay(1_000L)
                     val thresholds = pbThresholds ?: continue
                     val elapsed = System.currentTimeMillis() - freeHoldStartTime
-                    val broadest = thresholds.broadestBroken(elapsed) ?: continue
+                    val broadest = thresholds.broadestBroken(elapsed)
+                    val nextTarget = thresholds.nextPbTarget(elapsed)
+
+                    // Update next PB countdown
+                    _uiState.update { it.copy(nextPbTarget = nextTarget) }
+
+                    if (broadest == null) continue
 
                     // Only fire if this is a broader category than what we've already indicated
                     val lastOrdinal = lastIndicatedCategory?.ordinal ?: -1
@@ -680,7 +690,7 @@ class FreeHoldActiveViewModel @Inject constructor(
         if (audio == AudioSetting.GUIDED.name) {
             guidedAudioManager.stopPlayback()
         }
-        _uiState.update { it.copy(freeHoldActive = false, freeHoldFirstContractionMs = null, currentPbCategory = null) }
+        _uiState.update { it.copy(freeHoldActive = false, freeHoldFirstContractionMs = null, currentPbCategory = null, nextPbTarget = null) }
     }
 
     fun recordFreeHoldFirstContraction() {
@@ -722,6 +732,7 @@ class FreeHoldActiveViewModel @Inject constructor(
                 freeHoldActive = false,
                 freeHoldFirstContractionMs = null,
                 currentPbCategory = null,
+                nextPbTarget = null,
                 pbCheckPending = true          // prevent navigation until PB check completes
             )
         }
@@ -966,6 +977,9 @@ class FreeHoldActiveViewModel @Inject constructor(
             val wasGuided = guidedState.guidedHyperEnabled && isHyperPrep
 
             // Use the settings that were baked in at navigation time — guaranteed correct
+            // Capture PB indication state at save time
+            val wasPbIndicationOn = audioHapticEngine.pbIndicationEnabled
+
             val recordId = apneaRepository.saveRecord(
                 ApneaRecordEntity(
                     timestamp              = now,
@@ -985,7 +999,8 @@ class FreeHoldActiveViewModel @Inject constructor(
                     guidedHyper            = wasGuided,
                     guidedRelaxedExhaleSec = if (wasGuided) guidedState.guidedRelaxedExhaleSec else null,
                     guidedPurgeExhaleSec   = if (wasGuided) guidedState.guidedPurgeExhaleSec else null,
-                    guidedTransitionSec    = if (wasGuided) guidedState.guidedTransitionSec else null
+                    guidedTransitionSec    = if (wasGuided) guidedState.guidedTransitionSec else null,
+                    newRecordIndication    = wasPbIndicationOn
                 )
             )
 
@@ -1305,6 +1320,7 @@ fun FreeHoldActiveScreen(
                 showTimer = state.showTimer,
                 firstContractionMs = state.freeHoldFirstContractionMs,
                 currentPbCategory = state.currentPbCategory,
+                nextPbTarget = state.nextPbTarget,
                 guidedHyperActive = state.isHyperPrep && state.guidedHyperEnabled,
                 guidedCountdownComplete = state.guidedCountdownComplete,
                 modifier = Modifier.fillMaxSize(),
@@ -1336,6 +1352,7 @@ private fun FreeHoldActiveContent(
     showTimer: Boolean,
     firstContractionMs: Long?,
     currentPbCategory: PersonalBestCategory? = null,
+    nextPbTarget: NextPbTarget? = null,
     guidedHyperActive: Boolean = false,
     guidedCountdownComplete: Boolean = false,
     modifier: Modifier = Modifier,
@@ -1414,6 +1431,18 @@ private fun FreeHoldActiveContent(
                 style = MaterialTheme.typography.headlineMedium,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.grayscale()
+            )
+        }
+
+        // ── Next PB countdown during hold ────────────────────────────────────
+        if (freeHoldActive && nextPbTarget != null) {
+            val countdownText = formatCountdownMs(nextPbTarget.remainingMs)
+            val trophyPreview = "🏆".repeat(nextPbTarget.category.trophyCount())
+            Text(
+                text = "$trophyPreview in $countdownText",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary,
+                textAlign = TextAlign.Center
             )
         }
 
@@ -1564,6 +1593,17 @@ private fun formatElapsedMs(ms: Long): String {
         "${minutes}m ${seconds}s"
     else
         "${seconds}.${centis.toString().padStart(2, '0')}s"
+}
+
+/** Formats a countdown duration for the next-PB indicator (e.g. "1m 23s" or "45s"). */
+private fun formatCountdownMs(ms: Long): String {
+    val totalSeconds = ms / 1000L
+    val minutes = totalSeconds / 60L
+    val seconds = totalSeconds % 60L
+    return if (minutes > 0)
+        "${minutes}m ${seconds}s"
+    else
+        "${seconds}s"
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -30,7 +30,7 @@ import com.example.wags.data.db.entity.*
         RapidHrTelemetryEntity::class,
         GuidedAudioEntity::class
     ],
-    version = 33,
+    version = 34,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -918,6 +918,16 @@ abstract class WagsDatabase : RoomDatabase() {
             val MIGRATION_32_33 = object : Migration(32, 33) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE meditation_sessions ADD COLUMN timerDurationMs INTEGER DEFAULT NULL")
+                }
+            }
+
+            /**
+             * v33 → v34: Add newRecordIndication column to apnea_records.
+             * Tracks whether the "New Record Indication" feature was enabled during the hold.
+             */
+            val MIGRATION_33_34 = object : Migration(33, 34) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE apnea_records ADD COLUMN newRecordIndication INTEGER NOT NULL DEFAULT 0")
                 }
             }
         }

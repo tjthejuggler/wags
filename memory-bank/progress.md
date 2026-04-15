@@ -1,5 +1,17 @@
 # WAGS — Progress
 
+*Last updated: 2026-04-15 13:17 UTC-4*
+
+## Recent Changes (2026-04-15 13:17)
+- ✅ **Countdown timer to next PB record + store newRecordIndication in DB:**
+  - When "New Record Indication" is enabled during a free hold, a countdown is displayed below the trophy emojis showing time remaining to the next PB milestone (e.g. "🏆🏆 in 1m 23s")
+  - Added `NextPbTarget` data class and `PbThresholds.nextPbTarget()` method to compute the closest unbroken category threshold
+  - Added `newRecordIndication: Boolean` column to `apnea_records` table (DB migration v33→v34, default `0`)
+  - Free hold save now captures `audioHapticEngine.pbIndicationEnabled` at save time
+  - Apnea record detail screen shows "Record Indication: On" when the feature was enabled during that hold
+  - Modified: `PersonalBestCategory.kt`, `FreeHoldActiveScreen.kt`, `ApneaRecordEntity.kt`, `WagsDatabase.kt`, `DatabaseModule.kt`, `ApneaRecordDetailScreen.kt`
+  - Build: ✅ Successful, installed on SM-S918U1
+
 *Last updated: 2026-04-14 20:02 UTC-4*
 
 ## Recent Changes (2026-04-14 20:02)
