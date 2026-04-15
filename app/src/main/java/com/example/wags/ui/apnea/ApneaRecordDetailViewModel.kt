@@ -117,12 +117,12 @@ class ApneaRecordDetailViewModel @Inject constructor(
         if (index < 0 || index >= ids.size) return
         if (index == _uiState.value.currentIndex) return
 
-        _uiState.update { it.copy(isLoading = true, currentIndex = index) }
+        _uiState.update { it.copy(currentIndex = index) }
         viewModelScope.launch {
             val id = ids[index]
             val record = apneaRepository.getById(id)
             if (record == null) {
-                _uiState.update { it.copy(isLoading = false, notFound = true) }
+                _uiState.update { it.copy(notFound = true) }
             } else {
                 val telemetry = apneaRepository.getTelemetryForRecord(id)
                 val badges = apneaRepository.getRecordPbBadges(id)
@@ -136,8 +136,7 @@ class ApneaRecordDetailViewModel @Inject constructor(
                         telemetry    = telemetry,
                         pbBadges     = badges,
                         songLog      = songLog,
-                        tableSession = tableSession,
-                        isLoading    = false
+                        tableSession = tableSession
                     )
                 }
             }

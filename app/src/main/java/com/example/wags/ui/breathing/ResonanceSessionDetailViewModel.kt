@@ -63,10 +63,10 @@ class ResonanceSessionDetailViewModel @Inject constructor(
         if (index < 0 || index >= ids.size) return
         if (index == _uiState.value.currentIndex) return
 
-        _uiState.update { it.copy(isLoading = true, currentIndex = index) }
+        _uiState.update { it.copy(currentIndex = index) }
         viewModelScope.launch {
             val session = repository.getById(ids[index])
-            _uiState.update { it.copy(session = session, isLoading = false) }
+            _uiState.update { it.copy(session = session) }
         }
     }
 

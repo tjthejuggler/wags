@@ -70,7 +70,7 @@ class MeditationSessionDetailViewModel @Inject constructor(
         if (index < 0 || index >= ids.size) return
         if (index == _uiState.value.currentIndex) return
 
-        _uiState.update { it.copy(isLoading = true, currentIndex = index) }
+        _uiState.update { it.copy(currentIndex = index) }
         viewModelScope.launch {
             val sessionId = ids[index]
             val session   = repository.getSessionById(sessionId)

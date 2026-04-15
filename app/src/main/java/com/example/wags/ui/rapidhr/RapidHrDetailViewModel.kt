@@ -60,12 +60,12 @@ class RapidHrDetailViewModel @Inject constructor(
         if (index < 0 || index >= ids.size) return
         if (index == _state.value.currentIndex) return
 
-        _state.update { it.copy(isLoading = true, currentIndex = index) }
+        _state.update { it.copy(currentIndex = index) }
         viewModelScope.launch {
             val sessionId = ids[index]
             val session = repository.getSessionById(sessionId)
             val telemetry = repository.getTelemetryForSession(sessionId)
-            _state.update { it.copy(session = session, telemetry = telemetry, isLoading = false) }
+            _state.update { it.copy(session = session, telemetry = telemetry) }
         }
     }
 }

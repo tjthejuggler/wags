@@ -75,15 +75,15 @@ class MorningReadinessDetailViewModel @Inject constructor(
         if (index < 0 || index >= ids.size) return
         if (index == _uiState.value.currentIndex) return
 
-        _uiState.update { it.copy(isLoading = true, currentIndex = index) }
+        _uiState.update { it.copy(currentIndex = index) }
         viewModelScope.launch {
             val readingId = ids[index]
             val entity = repository.getById(readingId)
             if (entity == null) {
-                _uiState.update { it.copy(isLoading = false, notFound = true) }
+                _uiState.update { it.copy(notFound = true) }
             } else {
                 val telemetry = repository.getTelemetry(readingId)
-                _uiState.update { it.copy(reading = entity, telemetry = telemetry, isLoading = false) }
+                _uiState.update { it.copy(reading = entity, telemetry = telemetry) }
             }
         }
     }

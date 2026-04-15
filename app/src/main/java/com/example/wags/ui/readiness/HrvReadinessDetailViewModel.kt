@@ -57,10 +57,10 @@ class HrvReadinessDetailViewModel @Inject constructor(
         if (index < 0 || index >= ids.size) return
         if (index == _uiState.value.currentIndex) return
 
-        _uiState.update { it.copy(isLoading = true, currentIndex = index) }
+        _uiState.update { it.copy(currentIndex = index) }
         viewModelScope.launch {
             val reading = repository.getById(ids[index])
-            _uiState.update { it.copy(reading = reading, isLoading = false) }
+            _uiState.update { it.copy(reading = reading) }
         }
     }
 

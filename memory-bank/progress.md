@@ -1,5 +1,14 @@
 # WAGS — Progress
 
+*Last updated: 2026-04-14 20:02 UTC-4*
+
+## Recent Changes (2026-04-14 20:02)
+- ✅ **Fix black flash during swipe transitions on all session detail screens:**
+  - **Root cause**: `navigateToIndex()` in all 6 detail ViewModels set `isLoading = true` immediately, causing the pager page to render a loading spinner on a dark background (black flash) mid-swipe
+  - **Fix**: Removed `isLoading = true` (and the corresponding `isLoading = false`) from `navigateToIndex()` in all 6 ViewModels. Previous content stays visible while SQLite loads the next record, then swaps in seamlessly.
+  - Modified: `ApneaRecordDetailViewModel`, `MeditationSessionDetailViewModel`, `ResonanceSessionDetailViewModel`, `HrvReadinessDetailViewModel`, `RapidHrDetailViewModel`, `MorningReadinessDetailViewModel`
+  - Build: ✅ Successful, installed on SM-S918U1
+
 *Last updated: 2026-04-14 23:44 UTC-4*
 
 ## Recent Changes (2026-04-14 23:44)

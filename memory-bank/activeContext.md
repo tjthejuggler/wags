@@ -1,5 +1,24 @@
 # WAGS — Active Context
 
+*Last updated: 2026-04-14 20:02 UTC-4*
+
+### 2026-04-14 20:02 (UTC-4)
+**Task:** Fix black flash during swipe transitions on all session detail screens
+
+**Root cause:** In all 6 detail ViewModels, `navigateToIndex()` immediately set `isLoading = true` before the DB query ran. This caused the `HorizontalPager` page to render a `CircularProgressIndicator` on a dark background — appearing as a black flash mid-swipe.
+
+**Fix:** Removed `isLoading = true` from `navigateToIndex()` in all 6 ViewModels. The previous record's content stays visible while the SQLite query completes (milliseconds), then swaps in — no black flash. `isLoading` is still set correctly during the initial screen load.
+
+**Files modified:**
+- `ApneaRecordDetailViewModel.kt` — removed `isLoading = true` + `isLoading = false` from `navigateToIndex()`
+- `MeditationSessionDetailViewModel.kt` — same
+- `ResonanceSessionDetailViewModel.kt` — same
+- `HrvReadinessDetailViewModel.kt` — same
+- `RapidHrDetailViewModel.kt` — same
+- `MorningReadinessDetailViewModel.kt` — same
+
+**Build:** Successful, installed on SM-S918U1.
+
 *Last updated: 2026-04-14 23:44 UTC-4*
 
 ### 2026-04-14 23:44 (UTC-4)
