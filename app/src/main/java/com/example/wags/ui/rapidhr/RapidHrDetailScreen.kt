@@ -31,6 +31,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.db.entity.RapidHrSessionEntity
 import com.example.wags.data.db.entity.RapidHrTelemetryEntity
+import com.example.wags.ui.common.LiveSensorActionsNav
 import com.example.wags.ui.theme.*
 import java.time.Instant
 import java.time.ZoneId
@@ -102,6 +103,9 @@ fun RapidHrDetailScreen(
                             tint = TextSecondary
                         )
                     }
+                },
+                actions = {
+                    LiveSensorActionsNav(navController)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )

@@ -28,6 +28,7 @@ import androidx.navigation.NavController
 import com.example.wags.data.db.entity.MeditationAudioEntity
 import com.example.wags.data.db.entity.MeditationSessionEntity
 import com.example.wags.ui.navigation.WagsRoutes
+import com.example.wags.ui.common.LiveSensorActionsNav
 import com.example.wags.ui.theme.*
 import java.time.Instant
 import java.time.LocalDate
@@ -117,6 +118,9 @@ fun MeditationHistoryScreen(
                             tint = TextSecondary
                         )
                     }
+                },
+                actions = {
+                    LiveSensorActionsNav(navController)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )

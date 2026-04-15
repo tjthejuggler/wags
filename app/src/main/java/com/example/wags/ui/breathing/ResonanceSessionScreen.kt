@@ -30,6 +30,8 @@ import com.example.wags.ui.common.RmssdChart
 import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.common.StripChartColors
 import com.example.wags.ui.common.WagsFeedback
+import com.example.wags.ui.common.LiveSensorActionsCallback
+import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.theme.*
 
 // ── Monochrome palette ────────────────────────────────────────────────────────
@@ -77,6 +79,7 @@ private fun rsCoherenceZoneLabel(ratio: Float): String = when {
 @Composable
 fun ResonanceSessionScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToSettings: () -> Unit = {},
     vibrationEnabled: Boolean = false,
     durationMinutes: Int = 5,
     infinityMode: Boolean = false,
@@ -150,6 +153,9 @@ fun ResonanceSessionScreen(
                             tint = EcgCyan
                         )
                     }
+                },
+                actions = {
+                    LiveSensorActionsCallback(onNavigateToSettings)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )

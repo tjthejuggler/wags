@@ -19,6 +19,7 @@ import androidx.navigation.NavController
 import com.example.wags.domain.model.PersonalBestEntry
 import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.navigation.WagsRoutes
+import com.example.wags.ui.common.LiveSensorActionsNav
 import com.example.wags.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -49,6 +50,9 @@ fun PersonalBestsScreen(
                     IconButton(onClick = { navController.popBackStack() }) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
+                },
+                actions = {
+                    LiveSensorActionsNav(navController)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )

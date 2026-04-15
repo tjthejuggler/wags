@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.wags.ui.common.LiveSensorActionsCallback
+import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -58,6 +60,7 @@ private val Ash          = Color(0xFF707070)
 fun AssessmentResultScreen(
     sessionTimestamp: Long,
     onNavigateBack: () -> Unit,
+    onNavigateToSettings: () -> Unit = {},
     onRunAgain: () -> Unit,
     viewModel: AssessmentResultViewModel = hiltViewModel()
 ) {
@@ -110,6 +113,7 @@ fun AssessmentResultScreen(
                     }
                 },
                 actions = {
+                    LiveSensorActionsCallback(onNavigateToSettings)
                     if (!state.isLoading) {
                         IconButton(onClick = { showDeleteDialog = true }) {
                             Icon(

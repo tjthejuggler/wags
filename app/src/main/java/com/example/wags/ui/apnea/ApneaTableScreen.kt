@@ -23,6 +23,7 @@ import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.InfoHelpBubble
 import com.example.wags.ui.common.KeepScreenOn
+import com.example.wags.ui.common.LiveSensorActionsNav
 import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
@@ -67,6 +68,9 @@ fun ApneaTableScreen(
                     }) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
+                },
+                actions = {
+                    LiveSensorActionsNav(navController)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )

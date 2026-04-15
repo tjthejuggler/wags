@@ -15,6 +15,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.ui.common.InfoHelpBubble
+import com.example.wags.ui.common.LiveSensorActionsNav
+import com.example.wags.ui.common.LiveSensorActionsNav
 import com.example.wags.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -82,6 +84,9 @@ fun SessionAnalyticsScreen(
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
                 },
+                actions = {
+                    LiveSensorActionsNav(navController)
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )
         }
@@ -134,6 +139,9 @@ fun SessionAnalyticsHistoryScreen(
                     IconButton(onClick = { navController.popBackStack() }) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
+                },
+                actions = {
+                    LiveSensorActionsNav(navController)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )

@@ -23,6 +23,7 @@ import com.example.wags.domain.usecase.apnea.AdvancedApneaState
 import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.KeepScreenOn
+import com.example.wags.ui.common.LiveSensorActionsNav
 import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
@@ -69,6 +70,7 @@ fun AdvancedApneaScreen(
                     }
                 },
                 actions = {
+                    LiveSensorActionsNav(navController)
                     ModalityHelpIcon(modality = modality)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)

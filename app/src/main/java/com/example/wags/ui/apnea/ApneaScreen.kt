@@ -94,7 +94,7 @@ fun ApneaScreen(
                     }
                 },
                 actions = {
-                    LiveSensorActions(liveHr = state.liveHr, liveSpO2 = state.liveSpO2)
+                    LiveSensorActions(liveHr = state.liveHr, liveSpO2 = state.liveSpO2, onClick = { navController.navigate(WagsRoutes.SETTINGS) })
                     TextButton(onClick = {
                         navController.navigate(
                             WagsRoutes.apneaHistory(

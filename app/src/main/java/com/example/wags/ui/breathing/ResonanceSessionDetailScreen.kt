@@ -30,6 +30,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wags.data.db.entity.ResonanceSessionEntity
+import com.example.wags.ui.common.LiveSensorActionsCallback
+import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.theme.*
 import org.json.JSONArray
 import java.time.Instant
@@ -50,6 +52,7 @@ private val ZoneRed      = Color(0xFF606060)
 @Composable
 fun ResonanceSessionDetailScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToSettings: () -> Unit = {},
     viewModel: ResonanceSessionDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -133,6 +136,7 @@ fun ResonanceSessionDetailScreen(
                     }
                 },
                 actions = {
+                    LiveSensorActionsCallback(onNavigateToSettings)
                     IconButton(onClick = { showDeleteDialog = true }) {
                         Icon(
                             Icons.Filled.Delete,

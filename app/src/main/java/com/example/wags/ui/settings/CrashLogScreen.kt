@@ -20,6 +20,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.wags.data.crash.CrashLogWriter
+import com.example.wags.ui.common.LiveSensorActionsCallback
+import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.theme.*
 import java.io.File
 
@@ -29,7 +31,7 @@ import java.io.File
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CrashLogScreen(onNavigateBack: () -> Unit) {
+fun CrashLogScreen(onNavigateBack: () -> Unit, onNavigateToSettings: () -> Unit = {}) {
     val context = LocalContext.current
     var logs by remember { mutableStateOf(CrashLogWriter.listLogs(context)) }
     var selectedLog by remember { mutableStateOf<File?>(null) }
@@ -52,6 +54,7 @@ fun CrashLogScreen(onNavigateBack: () -> Unit) {
                     }
                 },
                 actions = {
+                    LiveSensorActionsCallback(onNavigateToSettings)
                     if (logs.isNotEmpty() && selectedLog == null) {
                         IconButton(onClick = { showClearDialog = true }) {
                             Icon(

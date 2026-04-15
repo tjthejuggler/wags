@@ -33,6 +33,7 @@ import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.LiveSensorActions
+import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.common.RrIntervalChart
 import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.common.WagsFeedback
@@ -109,7 +110,7 @@ fun ReadinessScreen(
                     }
                 },
                 actions = {
-                    LiveSensorActions(liveHr = state.liveHr, liveSpO2 = state.liveSpO2)
+                    LiveSensorActions(liveHr = state.liveHr, liveSpO2 = state.liveSpO2, onClick = { navController.navigate(WagsRoutes.SETTINGS) })
                     TextButton(onClick = onNavigateToHistory) {
                         Text("History", color = TextSecondary)
                     }

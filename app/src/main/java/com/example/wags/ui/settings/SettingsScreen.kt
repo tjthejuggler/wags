@@ -32,6 +32,7 @@ import com.example.wags.domain.model.ScannedDevice
 import com.example.wags.ui.common.AdviceDialog
 import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.AdviceViewModel
+import com.example.wags.ui.common.LiveSensorActionsNav
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 
@@ -128,6 +129,9 @@ fun SettingsScreen(
                             contentDescription = "Back"
                         )
                     }
+                },
+                actions = {
+                    LiveSensorActionsNav(navController)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )

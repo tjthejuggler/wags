@@ -19,6 +19,7 @@ import androidx.navigation.NavController
 import com.example.wags.domain.usecase.apnea.MinBreathHoldResult
 import com.example.wags.domain.usecase.apnea.MinBreathPhase
 import com.example.wags.ui.common.KeepScreenOn
+import com.example.wags.ui.common.LiveSensorActionsNav
 import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
@@ -65,6 +66,9 @@ fun MinBreathActiveScreen(
                     }) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
+                },
+                actions = {
+                    LiveSensorActionsNav(navController)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )

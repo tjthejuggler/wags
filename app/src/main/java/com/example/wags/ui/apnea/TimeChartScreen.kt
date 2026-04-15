@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.wags.ui.common.LiveSensorActionsCallback
+import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.theme.*
 import java.time.format.DateTimeFormatter
 
@@ -30,6 +32,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun TimeChartScreen(
     onBack: () -> Unit,
+    onNavigateToSettings: () -> Unit = {},
     viewModel: TimeChartViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -64,6 +67,7 @@ fun TimeChartScreen(
                     }
                 },
                 actions = {
+                    LiveSensorActionsCallback(onNavigateToSettings)
                     // Toggle between bar and cumulative line
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Daily", style = MaterialTheme.typography.labelSmall, color = TextSecondary)

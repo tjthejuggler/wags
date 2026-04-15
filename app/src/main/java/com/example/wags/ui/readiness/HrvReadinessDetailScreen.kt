@@ -16,6 +16,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wags.data.db.entity.DailyReadingEntity
 import com.example.wags.ui.common.InfoHelpBubble
+import com.example.wags.ui.common.LiveSensorActionsCallback
+import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.theme.*
 import java.time.Instant
 import java.time.ZoneId
@@ -71,6 +73,7 @@ private const val HELP_RHR_TEXT =
 @Composable
 fun HrvReadinessDetailScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToSettings: () -> Unit = {},
     viewModel: HrvReadinessDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -157,6 +160,7 @@ fun HrvReadinessDetailScreen(
                     }
                 },
                 actions = {
+                    LiveSensorActionsCallback(onNavigateToSettings)
                     if (uiState.reading != null) {
                         IconButton(onClick = { showDeleteDialog = true }) {
                             Text(

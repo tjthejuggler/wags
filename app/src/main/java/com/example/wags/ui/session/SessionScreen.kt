@@ -15,6 +15,7 @@ import androidx.navigation.NavController
 import com.example.wags.domain.model.SessionType
 import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.LiveSensorActions
+import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.theme.*
 
@@ -57,7 +58,7 @@ fun SessionScreen(
                     }
                 },
                 actions = {
-                    LiveSensorActions(liveHr = state.liveHr, liveSpO2 = state.liveSpO2)
+                    LiveSensorActions(liveHr = state.liveHr, liveSpO2 = state.liveSpO2, onClick = { navController.navigate(WagsRoutes.SETTINGS) })
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )

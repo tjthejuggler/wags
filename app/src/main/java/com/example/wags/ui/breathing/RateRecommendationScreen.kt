@@ -23,6 +23,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wags.domain.usecase.breathing.DataPointSource
 import com.example.wags.domain.usecase.breathing.RateBucket
 import com.example.wags.domain.usecase.breathing.RateRecommendation
+import com.example.wags.ui.common.LiveSensorActionsCallback
+import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.theme.*
 import java.time.Instant
 import java.time.ZoneId
@@ -43,6 +45,7 @@ private val dateFmt = DateTimeFormatter.ofPattern("MMM d, h:mm a")
 @Composable
 fun RateRecommendationScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToSettings: () -> Unit = {},
     viewModel: RateRecommendationViewModel = hiltViewModel()
 ) {
     val recommendation by viewModel.recommendation.collectAsStateWithLifecycle()
@@ -57,6 +60,9 @@ fun RateRecommendationScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = EcgCyan)
                     }
+                },
+                actions = {
+                    LiveSensorActionsCallback(onNavigateToSettings)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )

@@ -75,7 +75,7 @@ fun RapidHrScreen(
                     }
                 },
                 actions = {
-                    LiveSensorActions(liveHr = state.liveHr, liveSpO2 = state.liveSpO2)
+                    LiveSensorActions(liveHr = state.liveHr, liveSpO2 = state.liveSpO2, onClick = { navController.navigate(WagsRoutes.SETTINGS) })
                     IconButton(onClick = { navController.navigate(WagsRoutes.RAPID_HR_HISTORY) }) {
                         Text("📊", style = MaterialTheme.typography.titleMedium)
                     }

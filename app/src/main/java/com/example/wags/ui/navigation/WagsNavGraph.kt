@@ -193,6 +193,7 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
         composable(WagsRoutes.READINESS_HISTORY) {
             HrvReadinessHistoryScreen(
                 onNavigateBack = { navController.popBackStack() },
+                onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) },
                 onNavigateToDetail = { readingId ->
                     navController.navigate(WagsRoutes.hrvReadinessDetail(readingId))
                 }
@@ -202,7 +203,10 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             route = WagsRoutes.HRV_READINESS_DETAIL,
             arguments = listOf(navArgument("readingId") { type = NavType.LongType })
         ) {
-            HrvReadinessDetailScreen(onNavigateBack = { navController.popBackStack() })
+            HrvReadinessDetailScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) }
+            )
         }
         composable(WagsRoutes.BREATHING) {
             BreathingScreen(
@@ -216,7 +220,10 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             )
         }
         composable(WagsRoutes.RATE_RECOMMENDATION) {
-            RateRecommendationScreen(onNavigateBack = { navController.popBackStack() })
+            RateRecommendationScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) }
+            )
         }
         composable(
             route = WagsRoutes.RESONANCE_SESSION,
@@ -233,6 +240,7 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             val rate = backStackEntry.arguments?.getFloat("rate") ?: 5.5f
             ResonanceSessionScreen(
                 onNavigateBack = { navController.popBackStack() },
+                onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) },
                 vibrationEnabled = vibration,
                 durationMinutes = duration,
                 infinityMode = infinity,
@@ -242,6 +250,7 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
         composable(WagsRoutes.RF_ASSESSMENT_HISTORY) {
             RfAssessmentHistoryScreen(
                 onNavigateBack = { navController.popBackStack() },
+                onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) },
                 onNavigateToDetail = { sessionTimestamp ->
                     navController.navigate(WagsRoutes.rfAssessmentResult(sessionTimestamp))
                 },
@@ -254,7 +263,10 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             route = WagsRoutes.RESONANCE_SESSION_DETAIL,
             arguments = listOf(navArgument("sessionId") { type = NavType.LongType })
         ) {
-            ResonanceSessionDetailScreen(onNavigateBack = { navController.popBackStack() })
+            ResonanceSessionDetailScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) }
+            )
         }
         composable(WagsRoutes.APNEA_FREE) {
             ApneaScreen(navController = navController)
@@ -325,12 +337,14 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
         composable(WagsRoutes.MORNING_READINESS) {
             MorningReadinessScreen(
                 onNavigateBack = { navController.popBackStack() },
+                onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) },
                 onNavigateToHistory = { navController.navigate(WagsRoutes.MORNING_READINESS_HISTORY) }
             )
         }
         composable(WagsRoutes.MORNING_READINESS_HISTORY) {
             MorningReadinessHistoryScreen(
                 onNavigateBack = { navController.popBackStack() },
+                onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) },
                 onNavigateToDetail = { readingId ->
                     navController.navigate(WagsRoutes.morningReadinessDetail(readingId))
                 }
@@ -340,7 +354,10 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             route = WagsRoutes.MORNING_READINESS_DETAIL,
             arguments = listOf(navArgument("readingId") { type = NavType.LongType })
         ) {
-            MorningReadinessDetailScreen(onNavigateBack = { navController.popBackStack() })
+            MorningReadinessDetailScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) }
+            )
         }
         composable(
             route = WagsRoutes.SESSION_ANALYTICS,
@@ -409,6 +426,7 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
         composable(WagsRoutes.RF_ASSESSMENT_PICKER) {
             AssessmentPickerScreen(
                 onNavigateBack = { navController.popBackStack() },
+                onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) },
                 onStartAssessment = { protocol, vibration ->
                     navController.navigate(WagsRoutes.rfAssessmentRun(protocol.name, vibration))
                 }
@@ -428,6 +446,7 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             AssessmentRunScreen(
                 protocol = protocol,
                 onNavigateBack = { navController.popBackStack() },
+                onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) },
                 onSessionComplete = { sessionTimestamp ->
                     navController.navigate(WagsRoutes.rfAssessmentResult(sessionTimestamp)) {
                         popUpTo(WagsRoutes.RF_ASSESSMENT_RUN) { inclusive = true }
@@ -446,6 +465,7 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
                 onNavigateBack = {
                     navController.popBackStack()
                 },
+                onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) },
                 onRunAgain = {
                     navController.navigate(WagsRoutes.RF_ASSESSMENT_PICKER) {
                         popUpTo(WagsRoutes.RF_ASSESSMENT_RESULT) { inclusive = true }
@@ -488,17 +508,26 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
                 navArgument("title")      { type = NavType.StringType; defaultValue = "Time Chart" }
             )
         ) {
-            TimeChartScreen(onBack = { navController.popBackStack() })
+            TimeChartScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) }
+            )
         }
         // ── Garmin Watch ────────────────────────────────────────────────────
         composable(WagsRoutes.GARMIN) {
             GarminScreen(navController = navController)
         }
         composable(WagsRoutes.CRASH_LOGS) {
-            CrashLogScreen(onNavigateBack = { navController.popBackStack() })
+            CrashLogScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) }
+            )
         }
         composable(WagsRoutes.ABOUT) {
-            AboutScreen(onNavigateBack = { navController.popBackStack() })
+            AboutScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) }
+            )
         }
     }
 }

@@ -33,6 +33,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wags.data.db.entity.MorningReadinessEntity
 import com.example.wags.data.db.entity.MorningReadinessTelemetryEntity
 import com.example.wags.ui.common.InfoHelpBubble
+import com.example.wags.ui.common.LiveSensorActionsCallback
+import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.theme.*
 import java.time.Instant
 import java.time.ZoneId
@@ -149,6 +151,7 @@ private const val HELP_STAND_MARKER_TEXT =
 @Composable
 fun MorningReadinessDetailScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToSettings: () -> Unit = {},
     viewModel: MorningReadinessDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -232,6 +235,7 @@ fun MorningReadinessDetailScreen(
                     }
                 },
                 actions = {
+                    LiveSensorActionsCallback(onNavigateToSettings)
                     // Only show delete when a reading is loaded
                     if (uiState.reading != null) {
                         IconButton(onClick = { viewModel.requestDelete() }) {

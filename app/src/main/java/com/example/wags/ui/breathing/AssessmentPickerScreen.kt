@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wags.domain.usecase.breathing.RfProtocol
+import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.theme.SurfaceDark
 import com.example.wags.ui.theme.SurfaceVariant
 import com.example.wags.ui.theme.TextDisabled
@@ -82,6 +83,7 @@ private val PROTOCOL_LIST = listOf(
 @Composable
 fun AssessmentPickerScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToSettings: () -> Unit = {},
     onStartAssessment: (RfProtocol, Boolean) -> Unit,
     viewModel: AssessmentPickerViewModel = hiltViewModel()
 ) {
@@ -104,6 +106,9 @@ fun AssessmentPickerScreen(
                             contentDescription = "Back"
                         )
                     }
+                },
+                actions = {
+                    LiveSensorActionsCallback(onNavigateToSettings)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )

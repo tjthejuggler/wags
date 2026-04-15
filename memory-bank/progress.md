@@ -1,8 +1,21 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-15 13:17 UTC-4*
+*Last updated: 2026-04-15 14:27 UTC-4*
 
-## Recent Changes (2026-04-15 13:17)
+## Recent Changes (2026-04-15 14:27)
+- ✅ **Live HR/SpO₂ feed on ALL screens + click-to-navigate-to-settings:**
+  - Created `LiveSensorViewModel` (injects `HrDataSource`) so any screen can show live sensor data
+  - Added `onClick` parameter to `LiveSensorActions` — clicking HR/SpO₂ navigates to Settings
+  - Created `LiveSensorActionsNav` (NavController-based) and `LiveSensorActionsCallback` (callback-based) composables
+  - Updated all 10 existing `LiveSensorActions` calls to include onClick navigation
+  - Added `LiveSensorActionsNav` to 15+ screens with NavController
+  - Added `LiveSensorActionsCallback` to 10+ callback-based screens (with `onNavigateToSettings` param)
+  - Replaced DashboardScreen inline HR code with `LiveSensorActionsNav`
+  - Added TopAppBar to `AllApneaRecordsScreen` (was missing)
+  - Updated `WagsNavGraph` to pass `onNavigateToSettings` to all callback-based screens
+  - Modified: `LiveSensorTopBar.kt`, `DashboardScreen.kt`, `WagsNavGraph.kt`, 25+ screen files
+  - Build: ✅ Successful, installed on SM-S918U1
+
 - ✅ **Countdown timer to next PB record + store newRecordIndication in DB:**
   - When "New Record Indication" is enabled during a free hold, a countdown is displayed below the trophy emojis showing time remaining to the next PB milestone (e.g. "🏆🏆 in 1m 23s")
   - Added `NextPbTarget` data class and `PbThresholds.nextPbTarget()` method to compute the closest unbroken category threshold

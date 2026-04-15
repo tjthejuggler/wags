@@ -18,6 +18,7 @@ import com.example.wags.data.db.entity.DailyReadingEntity
 import com.example.wags.data.db.entity.MorningReadinessEntity
 import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
+import com.example.wags.ui.common.LiveSensorActionsNav
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 
@@ -35,54 +36,7 @@ fun DashboardScreen(
             TopAppBar(
                 title = { Text("WAGS", style = MaterialTheme.typography.headlineMedium) },
                 actions = {
-                    // Live sensor readings row — shown whenever any value is available
-                    if (state.liveHr != null || state.liveSpO2 != null) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.padding(end = 8.dp)
-                        ) {
-                            // Heart rate
-                            state.liveHr?.let { bpm ->
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Favorite,
-                                        contentDescription = "Heart rate",
-                                        tint = TextSecondary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Text(
-                                        text = "$bpm",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = TextPrimary
-                                    )
-                                }
-                            }
-                            // SpO₂
-                            state.liveSpO2?.let { spo2 ->
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                                ) {
-                                    Text(
-                                        text = "SpO₂",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = TextSecondary
-                                    )
-                                    Text(
-                                        text = "$spo2%",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = TextPrimary
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    LiveSensorActionsNav(navController)
                     IconButton(onClick = { navController.navigate(WagsRoutes.SETTINGS) }) {
                         Icon(
                             imageVector = Icons.Default.Settings,

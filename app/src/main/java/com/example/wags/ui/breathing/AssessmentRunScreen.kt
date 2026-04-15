@@ -30,6 +30,8 @@ import com.example.wags.ui.common.RmssdChart
 import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.common.StripChartColors
 import com.example.wags.ui.common.WagsFeedback
+import com.example.wags.ui.common.LiveSensorActionsCallback
+import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.theme.*
 
 private val AsmRmssdColors = StripChartColors(
@@ -63,6 +65,7 @@ private fun RfProtocol.isStepped(): Boolean = this != RfProtocol.SLIDING_WINDOW
 fun AssessmentRunScreen(
     protocol: RfProtocol,
     onNavigateBack: () -> Unit,
+    onNavigateToSettings: () -> Unit = {},
     onSessionComplete: (sessionId: Long) -> Unit,
     vibrationEnabled: Boolean = false,
     viewModel: AssessmentRunViewModel = hiltViewModel()
@@ -109,6 +112,9 @@ fun AssessmentRunScreen(
                             contentDescription = "Cancel"
                         )
                     }
+                },
+                actions = {
+                    LiveSensorActionsCallback(onNavigateToSettings)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )

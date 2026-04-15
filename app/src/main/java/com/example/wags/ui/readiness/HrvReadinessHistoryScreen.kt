@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wags.data.db.entity.DailyReadingEntity
+import com.example.wags.ui.common.LiveSensorActionsCallback
+import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.theme.*
 import java.time.Instant
 import java.time.LocalDate
@@ -43,6 +45,7 @@ private enum class HrvHistoryTab(val label: String) {
 @Composable
 fun HrvReadinessHistoryScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToSettings: () -> Unit = {},
     onNavigateToDetail: (readingId: Long) -> Unit,
     viewModel: HrvReadinessHistoryViewModel = hiltViewModel()
 ) {
@@ -68,6 +71,9 @@ fun HrvReadinessHistoryScreen(
                     IconButton(onClick = onNavigateBack) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
+                },
+                actions = {
+                    LiveSensorActionsCallback(onNavigateToSettings)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )

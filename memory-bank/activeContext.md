@@ -1,8 +1,30 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-15 13:16 UTC-4*
+*Last updated: 2026-04-15 14:27 UTC-4*
 
-### 2026-04-15 13:16 (UTC-4)
+### 2026-04-15 14:27 (UTC-4)
+**Task:** Add live HR/SpO₂ feed to top bar on ALL screens + click-to-navigate-to-settings
+
+**What was done:**
+
+1. **Created `LiveSensorViewModel`** — lightweight HiltViewModel that injects `HrDataSource` so any screen can get live HR/SpO₂ without modifying its own ViewModel
+2. **Added `onClick` parameter to `LiveSensorActions`** — the entire HR/SpO₂ row is now clickable
+3. **Created `LiveSensorActionsNav`** — self-contained composable for screens with `NavController`; pulls data from `LiveSensorViewModel` and navigates to Settings on click
+4. **Created `LiveSensorActionsCallback`** — callback-based version for screens that use `onNavigateBack`-style navigation instead of `NavController`
+5. **Updated all 10 existing `LiveSensorActions` calls** to include `onClick = { navController.navigate(WagsRoutes.SETTINGS) }`
+6. **Added `LiveSensorActionsNav` to 15 screens with `navController`**: SettingsScreen, MinBreathActiveScreen, ProgressiveO2ActiveScreen, AdvancedApneaScreen, ApneaTableScreen, ApneaHistoryScreen, AllApneaRecordsScreen (added TopAppBar), GarminScreen, MeditationHistoryScreen, MeditationSessionDetailScreen, RapidHrDetailScreen, RapidHrHistoryScreen, ProgressiveO2DetailScreen, PersonalBestsScreen, SessionAnalyticsScreen (both), PbChartScreen, ApneaRecordDetailScreen
+7. **Added `LiveSensorActionsCallback` to 10 callback-based screens**: RateRecommendationScreen, AssessmentPickerScreen, AssessmentRunScreen, AssessmentResultScreen, RfAssessmentHistoryScreen, ResonanceSessionDetailScreen, ResonanceSessionScreen, HrvReadinessDetailScreen, HrvReadinessHistoryScreen, MorningReadinessHistoryScreen, MorningReadinessDetailScreen, MorningReadinessScreen, CrashLogScreen, AboutScreen, TimeChartScreen
+8. **Replaced DashboardScreen inline HR code** with `LiveSensorActionsNav`
+9. **Updated `WagsNavGraph`** to pass `onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) }` to all callback-based screens
+
+**Files modified:**
+- `LiveSensorTopBar.kt` — Added `LiveSensorViewModel`, `onClick` param, `LiveSensorActionsNav`, `LiveSensorActionsCallback`
+- `DashboardScreen.kt` — Replaced inline HR code with `LiveSensorActionsNav`
+- `WagsNavGraph.kt` — Added `onNavigateToSettings` to all callback-based screen calls
+- 25+ screen files — Added `LiveSensorActionsNav` or `LiveSensorActionsCallback` to TopAppBar actions
+
+**Build:** Successful, installed on SM-S918U1.
+
 **Task:** Add countdown timer to next PB record during free hold + store newRecordIndication in DB
 
 **What was done:**

@@ -47,6 +47,8 @@ import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.model.trophyEmojis
 import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.navigation.WagsRoutes
+import com.example.wags.ui.common.LiveSensorActionsNav
+import com.example.wags.ui.common.LiveSensorActionsNav
 import com.example.wags.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -129,6 +131,7 @@ fun ApneaRecordDetailScreen(
                     }
                 },
                 actions = {
+                    LiveSensorActionsNav(navController)
                     if (!state.isLoading && !state.notFound) {
                         // Edit button
                         IconButton(onClick = { viewModel.openEditSheet() }) {

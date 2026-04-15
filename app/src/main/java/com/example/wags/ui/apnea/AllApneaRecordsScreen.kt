@@ -34,6 +34,8 @@ import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TimeOfDay
+import com.example.wags.ui.common.LiveSensorActionsNav
+import com.example.wags.ui.common.LiveSensorActionsNav
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 import java.text.SimpleDateFormat
@@ -68,6 +70,20 @@ fun AllApneaRecordsScreen(
 
     Scaffold(
         containerColor = BackgroundDark,
+        topBar = {
+            TopAppBar(
+                title = { Text("All Records", style = MaterialTheme.typography.titleMedium) },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
+                    }
+                },
+                actions = {
+                    LiveSensorActionsNav(navController)
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
+            )
+        }
     ) { padding ->
         LazyColumn(
             state = listState,

@@ -30,6 +30,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wags.data.db.entity.ResonanceSessionEntity
 import com.example.wags.data.db.entity.RfAssessmentEntity
+import com.example.wags.ui.common.LiveSensorActionsCallback
+import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.theme.*
 import java.time.Instant
 import java.time.LocalDate
@@ -50,6 +52,7 @@ private enum class RfHistoryTab(val label: String) {
 @Composable
 fun RfAssessmentHistoryScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToSettings: () -> Unit = {},
     onNavigateToDetail: (sessionTimestamp: Long) -> Unit,
     onNavigateToSessionDetail: (sessionId: Long) -> Unit = {},
     viewModel: RfAssessmentHistoryViewModel = hiltViewModel()
@@ -83,6 +86,9 @@ fun RfAssessmentHistoryScreen(
                     IconButton(onClick = onNavigateBack) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
+                },
+                actions = {
+                    LiveSensorActionsCallback(onNavigateToSettings)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )

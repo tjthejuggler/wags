@@ -39,6 +39,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.db.entity.MeditationTelemetryEntity
 import com.example.wags.ui.navigation.WagsRoutes
+import com.example.wags.ui.common.LiveSensorActionsNav
 import com.example.wags.ui.theme.*
 import java.time.Instant
 import java.time.ZoneId
@@ -135,6 +136,7 @@ fun MeditationSessionDetailScreen(
                     }
                 },
                 actions = {
+                    LiveSensorActionsNav(navController)
                     if (state.session != null) {
                         IconButton(onClick = { viewModel.requestDelete() }) {
                             Icon(

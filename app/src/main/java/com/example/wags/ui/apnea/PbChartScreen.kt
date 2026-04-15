@@ -27,6 +27,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.ui.navigation.WagsRoutes
+import com.example.wags.ui.common.LiveSensorActionsNav
+import com.example.wags.ui.common.LiveSensorActionsNav
 import com.example.wags.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -75,6 +77,7 @@ fun PbChartScreen(
                     }
                 },
                 actions = {
+                    LiveSensorActionsNav(navController)
                     PbToggleChip(
                         showPbOnly = state.showPbOnly,
                         onToggle = { viewModel.togglePbOnly() }

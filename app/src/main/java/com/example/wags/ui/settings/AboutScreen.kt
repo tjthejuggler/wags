@@ -14,6 +14,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.wags.ui.common.LiveSensorActionsCallback
+import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.theme.*
 
 private val defaultAcronymLines = listOf(
@@ -23,7 +25,7 @@ private val defaultAcronymLines = listOf(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AboutScreen(onNavigateBack: () -> Unit) {
+fun AboutScreen(onNavigateBack: () -> Unit, onNavigateToSettings: () -> Unit = {}) {
     var acronymLines by remember { mutableStateOf(defaultAcronymLines) }
     var showEditDialog by remember { mutableStateOf(false) }
 
@@ -41,6 +43,7 @@ fun AboutScreen(onNavigateBack: () -> Unit) {
                     }
                 },
                 actions = {
+                    LiveSensorActionsCallback(onNavigateToSettings)
                     IconButton(onClick = { showEditDialog = true }) {
                         Icon(
                             imageVector = Icons.Default.Edit,
