@@ -65,6 +65,11 @@ class ApneaRepository @Inject constructor(
     /** One-shot: all records ever, oldest first — used for time charts. */
     suspend fun getAllRecordsOnce(): List<ApneaRecordEntity> = withContext(ioDispatcher) { dao.getAllOnce() }
 
+    /** One-shot: all free-hold records (tableType IS NULL), oldest first — used for forecast model. */
+    suspend fun getAllFreeHoldsOnce(): List<ApneaRecordEntity> = withContext(ioDispatcher) {
+        dao.getAllOnce().filter { it.tableType == null }
+    }
+
     /** The [limit] most recent records for a given 5-setting combination, across ALL event types. */
     fun getRecentBySettings(
         lungVolume: String,

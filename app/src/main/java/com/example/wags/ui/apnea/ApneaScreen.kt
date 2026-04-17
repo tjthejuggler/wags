@@ -36,6 +36,8 @@ import com.example.wags.data.spotify.TrackInfo
 import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.PersonalBestCategory
 import com.example.wags.domain.model.trophyEmojis
+import com.example.wags.domain.usecase.apnea.forecast.RecordForecast
+import com.example.wags.ui.apnea.forecast.RecordForecastSummary
 import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TimeOfDay
@@ -183,6 +185,7 @@ fun ApneaScreen(
                         bestTimeRecordId   = state.bestTimeForSettingsRecordId,
                         lastTimeRecordId   = state.lastFreeHoldForSettingsRecordId,
                         bestTimeTrophyCategory = state.bestTimeTrophyCategory,
+                        recordForecast      = state.recordForecast,
                         onStartHold = {
                             navController.navigate(
                                 WagsRoutes.freeHoldActive(
@@ -721,6 +724,7 @@ private fun FreeHoldContent(
     bestTimeRecordId: Long?,
     lastTimeRecordId: Long?,
     bestTimeTrophyCategory: PersonalBestCategory?,
+    recordForecast: RecordForecast? = null,
     onStartHold: () -> Unit,
     onBestTimeClick: (Long) -> Unit = {},
     onLastTimeClick: (Long) -> Unit = {},
@@ -790,6 +794,9 @@ private fun FreeHoldContent(
                 )
             }
         }
+
+        // ── Record-breaking forecast ──────────────────────────────────────────
+        RecordForecastSummary(forecast = recordForecast)
 
         Button(
             onClick = onStartHold,

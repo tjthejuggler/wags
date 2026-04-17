@@ -1,6 +1,19 @@
 # WAGS — Progress
 
-*Last updated: 2026-04-15 14:27 UTC-4*
+*Last updated: 2026-04-17 09:19 UTC-4*
+
+## Recent Changes (2026-04-17 09:19)
+- ✅ **Record-breaking forecast feature (Tier C) for free holds:**
+  - Log-linear OLS regression model predicting P(next hold > PB) for all 32 sub-combinations of 5 settings
+  - 5 domain files in `domain/usecase/apnea/forecast/`: RecordForecast, NormalCdf, OlsRegression, FreeHoldFeatureExtractor, RecordForecastCalculator
+  - Empirical-Bayes shrinkage for exact-cell predictions; 100% when no prior record exists
+  - Forecast calibration DB table (forecast_calibration) for tracking prediction accuracy over time
+  - DB migration v34→v35
+  - One-line "Chance to beat PB: X%" in Free Hold card, tappable to open full 32-row popup
+  - Popup sorted by probability descending with confidence pills (🟢🟡🔴)
+  - Minimum 5 free holds to produce forecast; 150ms debounce on settings changes
+  - Plan doc: `plans/record_forecast_plan.md`
+  - Build: ✅ Successful
 
 ## Recent Changes (2026-04-15 14:27)
 - ✅ **Live HR/SpO₂ feed on ALL screens + click-to-navigate-to-settings:**

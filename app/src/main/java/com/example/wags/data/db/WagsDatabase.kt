@@ -28,9 +28,10 @@ import com.example.wags.data.db.entity.*
         ResonanceSessionEntity::class,
         RapidHrSessionEntity::class,
         RapidHrTelemetryEntity::class,
-        GuidedAudioEntity::class
+        GuidedAudioEntity::class,
+        ForecastCalibrationEntity::class
     ],
-    version = 34,
+    version = 35,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -54,6 +55,7 @@ abstract class WagsDatabase : RoomDatabase() {
     abstract fun rapidHrSessionDao(): RapidHrSessionDao
     abstract fun rapidHrTelemetryDao(): RapidHrTelemetryDao
     abstract fun guidedAudioDao(): GuidedAudioDao
+    abstract fun forecastCalibrationDao(): ForecastCalibrationDao
 
     companion object {
         /**
@@ -930,5 +932,31 @@ abstract class WagsDatabase : RoomDatabase() {
                     db.execSQL("ALTER TABLE apnea_records ADD COLUMN newRecordIndication INTEGER NOT NULL DEFAULT 0")
                 }
             }
+
+            /**
+             * v34 → v35: Add forecast_calibration table for record-breaking
+             * forecast calibration tracking.
+             */
+            val MIGRATION_34_35 = object : Migration(34, 35) {
+                    override fun migrate(db: SupportSQLiteDatabase) {
+                        db.execSQL("""
+                            CREATE TABLE IF NOT EXISTS forecast_calibration (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                timestamp INTEGER NOT NULL,
+                                lungVolume TEXT NOT NULL,
+                                prepType TEXT NOT NULL,
+                                timeOfDay TEXT NOT NULL,
+                                posture TEXT NOT NULL,
+                                audio TEXT NOT NULL,
+                                totalFreeHolds INTEGER NOT NULL,
+                                confidence TEXT NOT NULL,
+                                predictions TEXT NOT NULL,
+                                actualDurationMs INTEGER DEFAULT NULL,
+                                actualBroken TEXT DEFAULT NULL,
+                                actualTimestamp INTEGER DEFAULT NULL
+                            )
+                        """.trimIndent())
+                    }
+                }
         }
     }

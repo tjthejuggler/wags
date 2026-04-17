@@ -1,6 +1,51 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-16 17:55 UTC-4*
+*Last updated: 2026-04-17 09:18 UTC-4*
+
+### 2026-04-17 09:18 (UTC-4)
+**Task:** Implement record-breaking forecast feature (Tier C) for free holds
+
+**What was done:**
+1. Created 5 domain model files in `domain/usecase/apnea/forecast/`:
+   - `RecordForecast.kt` — data classes: RecordForecast, CategoryForecast, ForecastConfidence, ForecastStatus, ForecastSettings
+   - `NormalCdf.kt` — standard-normal CDF approximation (Abramowitz-Stegun 26.2.17)
+   - `OlsRegression.kt` — OLS with ridge penalty, Gaussian elimination solver, predict method
+   - `FreeHoldFeatureExtractor.kt` — dummy-codes 5 settings + training-trend term into 12-feature vector
+   - `RecordForecastCalculator.kt` — orchestrator: fits model, computes P(next > PB) for all 32 sub-combinations, empirical-Bayes shrinkage for exact cell, 100% when no prior record exists
+2. Created `ForecastCalibrationEntity` + `ForecastCalibrationDao` — DB table tracking predictions vs. actual outcomes for future calibration analysis
+3. DB migration v34→v35: CREATE TABLE forecast_calibration
+4. Added `getAllFreeHoldsOnce()` to `ApneaRepository`
+5. Wired `ApneaViewModel`: added `recordForecast` to UI state, debounced (150ms) recompute on settings change, calibration logging at hold start + actual outcome at hold stop
+6. Created `RecordForecastDialog.kt` — popup showing all 32 categories sorted by probability descending, with confidence pills and record times
+7. Created `RecordForecastSummary.kt` — one-line row in Free Hold card showing exact-combo %, tappable to open dialog
+8. Integrated into `ApneaScreen.kt` — added `recordForecast` parameter to `FreeHoldContent`, passed from state
+
+**Key design decisions:**
+- Minimum 5 free holds to produce a forecast (user preference, lower than default 20)
+- Log-linear regression on 5 settings (dummy-coded) + days_since_first_hold trend
+- Popup sorted by probability descending (most-likely-to-break first)
+- Calibration log table for future model accuracy analysis (Tier D/E hook)
+- No cross-drill data (Tier C only uses free holds)
+
+**Files created:**
+- `domain/usecase/apnea/forecast/RecordForecast.kt`
+- `domain/usecase/apnea/forecast/NormalCdf.kt`
+- `domain/usecase/apnea/forecast/OlsRegression.kt`
+- `domain/usecase/apnea/forecast/FreeHoldFeatureExtractor.kt`
+- `domain/usecase/apnea/forecast/RecordForecastCalculator.kt`
+- `data/db/entity/ForecastCalibrationEntity.kt`
+- `data/db/dao/ForecastCalibrationDao.kt`
+- `ui/apnea/forecast/RecordForecastDialog.kt`
+- `ui/apnea/forecast/RecordForecastSummary.kt`
+
+**Files modified:**
+- `data/db/WagsDatabase.kt` — added entity, DAO, MIGRATION_34_35, bumped to v35
+- `di/DatabaseModule.kt` — added MIGRATION_34_35, ForecastCalibrationDao provider
+- `data/repository/ApneaRepository.kt` — added getAllFreeHoldsOnce()
+- `ui/apnea/ApneaViewModel.kt` — added forecast state, debounced recompute, calibration logging
+- `ui/apnea/ApneaScreen.kt` — added recordForecast param to FreeHoldContent, RecordForecastSummary
+
+**Build:** Successful (assembleDebug)
 
 ### 2026-04-16 17:55 (UTC-4)
 **Task:** Change splash screen background from white to black

@@ -6,7 +6,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.HrDataSource
 import com.example.wags.data.ble.UnifiedDeviceManager
+import com.example.wags.data.db.dao.ForecastCalibrationDao
 import com.example.wags.data.db.entity.ApneaRecordEntity
+import com.example.wags.data.db.entity.ForecastCalibrationEntity
 import com.example.wags.data.db.entity.GuidedAudioEntity
 import com.example.wags.data.db.entity.ApneaSessionEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
@@ -43,8 +45,13 @@ import com.example.wags.domain.usecase.apnea.ApneaState
 import com.example.wags.domain.usecase.apnea.ApneaStateMachine
 import com.example.wags.domain.usecase.apnea.ApneaTableGenerator
 import com.example.wags.domain.usecase.apnea.GuidedAudioManager
+import com.example.wags.domain.usecase.apnea.forecast.ForecastSettings
+import com.example.wags.domain.usecase.apnea.forecast.RecordForecast
+import com.example.wags.domain.usecase.apnea.forecast.RecordForecastCalculator
+import com.example.wags.domain.usecase.apnea.forecast.ForecastStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -197,6 +204,9 @@ data class ApneaUiState(
     val guidedSelectedName: String = "",
     /** Guided audio completion status keyed by audioId. */
     val guidedCompletionStatuses: Map<Long, GuidedCompletionStatus> = emptyMap(),
+    // ── Record-breaking forecast ──────────────────────────────────────────────
+    /** Forecast for the current settings combination. Null when insufficient data. */
+    val recordForecast: RecordForecast? = null,
 )
 
 @HiltViewModel
@@ -214,6 +224,7 @@ class ApneaViewModel @Inject constructor(
     private val spotifyApiClient: SpotifyApiClient,
     private val spotifyAuthManager: SpotifyAuthManager,
     private val guidedAudioManager: GuidedAudioManager,
+    private val forecastCalibrationDao: ForecastCalibrationDao,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
@@ -501,7 +512,30 @@ class ApneaViewModel @Inject constructor(
                     }
                 }
         }
+
+        // ── Record-breaking forecast: recompute with 150 ms debounce when settings change ──
+        viewModelScope.launch {
+            combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud ->
+                ForecastSettings(lv, pt.name, tod.name, pos.name, aud.name)
+            }.collectLatest { settings ->
+                delay(150) // debounce
+                try {
+                    val records = apneaRepository.getAllFreeHoldsOnce()
+                    val forecast = RecordForecastCalculator.compute(
+                        records = records,
+                        settings = settings,
+                        nowEpochMs = System.currentTimeMillis()
+                    )
+                    _uiState.update { it.copy(recordForecast = if (forecast.status == ForecastStatus.Ready) forecast else null) }
+                } catch (e: Exception) {
+                    Log.w("ApneaVM", "Forecast computation failed", e)
+                }
+            }
+        }
     }
+
+    /** ID of the most recent forecast calibration row (for updating after hold completes). */
+    private var pendingForecastCalibrationId: Long? = null
 
     private fun onStateChanged(state: ApneaState) {
         when (state) {
@@ -907,6 +941,31 @@ class ApneaViewModel @Inject constructor(
                 guidedAudioManager.startPlayback()
             }
         }
+
+        // ── Log forecast calibration (predictions before hold) ────────────────
+        val forecast = _uiState.value.recordForecast
+        if (forecast != null) {
+            val state = _uiState.value
+            val predictions = forecast.categories.joinToString(",") { c ->
+                "${c.category.name}=${"%.4f".format(c.probability)}"
+            }
+            viewModelScope.launch {
+                val id = forecastCalibrationDao.insert(
+                    ForecastCalibrationEntity(
+                        timestamp = System.currentTimeMillis(),
+                        lungVolume = state.selectedLungVolume,
+                        prepType = state.prepType.name,
+                        timeOfDay = state.timeOfDay.name,
+                        posture = state.posture.name,
+                        audio = state.audio.name,
+                        totalFreeHolds = forecast.totalFreeHolds,
+                        confidence = forecast.confidence.name,
+                        predictions = predictions
+                    )
+                )
+                pendingForecastCalibrationId = id
+            }
+        }
     }
 
     /**
@@ -984,6 +1043,26 @@ class ApneaViewModel @Inject constructor(
             if (pbResult != null) {
                 _uiState.update { it.copy(newPersonalBest = pbResult) }
                 habitRepo.sendHabitIncrement(Slot.APNEA_NEW_RECORD)
+            }
+
+            // ── Update forecast calibration with actual outcome ───────────────
+            val calId = pendingForecastCalibrationId
+            if (calId != null) {
+                pendingForecastCalibrationId = null
+                val brokenCategories = mutableListOf<String>()
+                val forecast = _uiState.value.recordForecast
+                if (forecast != null) {
+                    for (cat in forecast.categories) {
+                        if (cat.recordMs != null && duration > cat.recordMs) {
+                            brokenCategories.add(cat.category.name)
+                        } else if (cat.recordMs == null) {
+                            // No prior record → any hold breaks it
+                            brokenCategories.add(cat.category.name)
+                        }
+                    }
+                }
+                val brokenStr = brokenCategories.joinToString(",")
+                forecastCalibrationDao.updateActual(calId, duration, brokenStr, System.currentTimeMillis())
             }
         }
     }
