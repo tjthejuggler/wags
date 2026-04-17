@@ -186,6 +186,7 @@ fun ApneaScreen(
                         lastTimeRecordId   = state.lastFreeHoldForSettingsRecordId,
                         bestTimeTrophyCategory = state.bestTimeTrophyCategory,
                         recordForecast      = state.recordForecast,
+                        onAutoSet           = { viewModel.autoSetBestSettings() },
                         onStartHold = {
                             navController.navigate(
                                 WagsRoutes.freeHoldActive(
@@ -725,6 +726,7 @@ private fun FreeHoldContent(
     lastTimeRecordId: Long?,
     bestTimeTrophyCategory: PersonalBestCategory?,
     recordForecast: RecordForecast? = null,
+    onAutoSet: () -> Unit = {},
     onStartHold: () -> Unit,
     onBestTimeClick: (Long) -> Unit = {},
     onLastTimeClick: (Long) -> Unit = {},
@@ -796,7 +798,7 @@ private fun FreeHoldContent(
         }
 
         // ── Record-breaking forecast ──────────────────────────────────────────
-        RecordForecastSummary(forecast = recordForecast)
+        RecordForecastSummary(forecast = recordForecast, onAutoSet = onAutoSet)
 
         Button(
             onClick = onStartHold,

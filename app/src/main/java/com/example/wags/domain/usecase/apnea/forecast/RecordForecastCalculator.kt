@@ -154,6 +154,81 @@ object RecordForecastCalculator {
         )
     }
 
+    /**
+     * Compute the exact-combo probability for every setting combination
+     * (with time-of-day fixed), returning them sorted by probability descending.
+     * Used by the "auto set" feature to find the best settings to use.
+     *
+     * @param records  All free-hold records (tableType == null).
+     * @param fixedTimeOfDay  Time-of-day to keep fixed (cannot be changed by auto-set).
+     * @param nowEpochMs  Current epoch-ms.
+     * @return List of [SettingsWithProbability] sorted by probability descending.
+     */
+    fun computeBestSettings(
+        records: List<ApneaRecordEntity>,
+        fixedTimeOfDay: String,
+        nowEpochMs: Long
+    ): List<SettingsWithProbability> {
+        val filtered = records.filter { it.durationMs >= MIN_DURATION_MS }
+        if (filtered.size < MIN_TOTAL_HOLDS) return emptyList()
+
+        val firstTs = filtered.minOf { it.timestamp }
+        val daysSinceFirst = max(0.0, (nowEpochMs - firstTs) / 86_400_000.0)
+
+        val designResult = FreeHoldFeatureExtractor.buildDesignMatrix(filtered, firstTs)
+            ?: return emptyList()
+
+        val (X, y) = designResult
+        val fit = OlsRegression.fit(X, y) ?: return emptyList()
+
+        val lungVolumes = listOf("FULL", "EMPTY", "PARTIAL")
+        val prepTypes = listOf("NO_PREP", "RESONANCE", "HYPER")
+        val postures = listOf("SITTING", "LAYING")
+        val audios = listOf("SILENCE", "MUSIC", "MOVIE", "GUIDED")
+
+        val results = mutableListOf<SettingsWithProbability>()
+
+        for (lv in lungVolumes) {
+            for (pt in prepTypes) {
+                for (pos in postures) {
+                    for (aud in audios) {
+                        val settings = ForecastSettings(
+                            lungVolume = lv,
+                            prepType = pt,
+                            timeOfDay = fixedTimeOfDay,
+                            posture = pos,
+                            audio = aud
+                        )
+                        val xRow = FreeHoldFeatureExtractor.encodePendingHold(settings, daysSinceFirst)
+                        val (muLogSec, predVariance) = OlsRegression.predict(xRow, fit)
+                        val sigmaPred = sqrt(max(1e-6, predVariance))
+
+                        // Find the exact-combo PB
+                        val bestMs = findBestForSubCombo(
+                            filtered,
+                            setOf(0, 1, 2, 3, 4),
+                            listOf(lv, pt, fixedTimeOfDay, pos, aud)
+                        )
+
+                        val probability = if (bestMs == null) {
+                            1.0f
+                        } else {
+                            val recordLogSec = ln(bestMs / 1000.0)
+                            val z = (recordLogSec - muLogSec) / sigmaPred
+                            NormalCdf.upperTail(z).coerceIn(0.0, 1.0).toFloat()
+                        }
+
+                        results.add(SettingsWithProbability(settings, probability))
+                    }
+                }
+            }
+        }
+
+        // Sort by probability descending
+        results.sortByDescending { it.probability }
+        return results
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Internal helpers
     // ─────────────────────────────────────────────────────────────────────────

@@ -1176,6 +1176,45 @@ class ApneaViewModel @Inject constructor(
         }
     }
 
+    // ── Auto-set best settings ─────────────────────────────────────────────────
+    /** Cached list of best settings combos, sorted by probability descending. */
+    private var bestSettingsList: List<com.example.wags.domain.usecase.apnea.forecast.SettingsWithProbability> = emptyList()
+    /** Index into the top-probability group for cycling through ties. */
+    private var autoSetCycleIndex: Int = 0
+
+    /**
+     * Auto-set the 4 changeable settings (lung volume, prep type, posture, audio)
+     * to the combination with the highest predicted record-breaking probability.
+     * Time-of-day is NOT changed. Repeated calls cycle through tied combinations.
+     */
+    fun autoSetBestSettings() {
+        viewModelScope.launch {
+            val records = apneaRepository.getAllFreeHoldsOnce()
+            val tod = _timeOfDay.value.name
+            val best = RecordForecastCalculator.computeBestSettings(records, tod, System.currentTimeMillis())
+            if (best.isEmpty()) return@launch
+
+            val topProb = best.first().probability
+            val topGroup = best.filter { it.probability == topProb }
+
+            // If we don't have a cached list or the list changed, reset
+            if (bestSettingsList != topGroup) {
+                bestSettingsList = topGroup
+                autoSetCycleIndex = 0
+            }
+
+            // Pick the next one in the cycle
+            val chosen = bestSettingsList[autoSetCycleIndex % bestSettingsList.size]
+            autoSetCycleIndex = (autoSetCycleIndex + 1) % bestSettingsList.size
+
+            // Apply the settings
+            setLungVolume(chosen.settings.lungVolume)
+            setPrepType(PrepType.valueOf(chosen.settings.prepType))
+            setPosture(Posture.valueOf(chosen.settings.posture))
+            setAudio(AudioSetting.valueOf(chosen.settings.audio))
+        }
+    }
+
     fun setLungVolume(volume: String) {
         _lungVolume.value = volume
         _uiState.update { it.copy(selectedLungVolume = volume) }

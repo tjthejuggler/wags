@@ -69,3 +69,12 @@ data class RecordForecast(
     val totalFreeHolds: Int,
     val confidence: ForecastConfidence
 )
+
+/**
+ * A settings combination with its predicted record-breaking probability.
+ * Used by the "auto set" feature to find and cycle through the best settings.
+ */
+data class SettingsWithProbability(
+    val settings: ForecastSettings,
+    val probability: Float
+)
