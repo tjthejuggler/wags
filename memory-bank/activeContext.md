@@ -1,6 +1,17 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-15 14:27 UTC-4*
+*Last updated: 2026-04-16 17:55 UTC-4*
+
+### 2026-04-16 17:55 (UTC-4)
+**Task:** Change splash screen background from white to black
+
+**What was done:**
+1. Added `android:windowBackground` set to `@color/black` in `Theme.Wags` style in `themes.xml`. The parent theme `android:Theme.Material.Light.NoActionBar` has a white window background by default, which caused the bright white splash screen before Compose rendered.
+
+**Files modified:**
+- `app/src/main/res/values/themes.xml` — Added `<item name="android:windowBackground">@color/black</item>` to `Theme.Wags`
+
+**Build:** Compiled successfully. Install failed — no device connected.
 
 ### 2026-04-15 14:27 (UTC-4)
 **Task:** Add live HR/SpO₂ feed to top bar on ALL screens + click-to-navigate-to-settings
