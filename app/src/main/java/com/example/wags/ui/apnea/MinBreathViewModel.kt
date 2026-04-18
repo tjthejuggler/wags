@@ -313,8 +313,15 @@ class MinBreathViewModel @Inject constructor(
     // ── Song picker ─────────────────────────────────────────────────────────
 
     fun loadPreviousSongs() {
-        viewModelScope.launch {
+        // If we have a cached song list, show it instantly
+        val cached = spotifyManager.songPickerCache.value
+        if (cached != null) {
+            _uiState.update { it.copy(previousSongs = cached, loadingSongs = false) }
+        } else {
             _uiState.update { it.copy(loadingSongs = true) }
+        }
+
+        viewModelScope.launch {
             val dbSongs = apneaRepository.getDistinctSongs()
             val prefsSongs = loadSongHistoryFromPrefs()
             val merged = mergeSongs(dbSongs, prefsSongs)
@@ -335,7 +342,9 @@ class MinBreathViewModel @Inject constructor(
                     )
                 }
             }
-            _uiState.update { it.copy(previousSongs = deduplicateTracks(details), loadingSongs = false) }
+            val deduped = deduplicateTracks(details)
+            spotifyManager.updateSongPickerCache(deduped)
+            _uiState.update { it.copy(previousSongs = deduped, loadingSongs = false) }
         }
     }
 

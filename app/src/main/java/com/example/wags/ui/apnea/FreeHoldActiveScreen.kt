@@ -770,8 +770,15 @@ class FreeHoldActiveViewModel @Inject constructor(
      * For each song with a spotifyUri, fetches track details (duration, art) from the API.
      */
     fun loadPreviousSongs() {
-        viewModelScope.launch {
+        // If we have a cached song list, show it instantly
+        val cached = spotifyManager.songPickerCache.value
+        if (cached != null) {
+            _uiState.update { it.copy(previousSongs = cached, loadingSongs = false) }
+        } else {
             _uiState.update { it.copy(loadingSongs = true) }
+        }
+
+        viewModelScope.launch {
             // Load from DB (free holds with saved records)
             val dbSongs = apneaRepository.getDistinctSongs()
             // Load from prefs (all session types, persisted across restarts)
@@ -808,6 +815,9 @@ class FreeHoldActiveViewModel @Inject constructor(
             // Final dedup by title+artist after API enrichment (same track may
             // have been stored with different URIs or one with/without URI)
             val dedupedSongs = deduplicateTracks(details)
+
+            // Update the shared cache
+            spotifyManager.updateSongPickerCache(dedupedSongs)
 
             // Compute completion status for each song.
             // When durationMs is 0 (API unavailable), the SQL query still detects

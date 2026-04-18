@@ -2,12 +2,12 @@
 
 *Last updated: 2026-04-18 08:24 UTC-4*
 
-## Recent Changes (2026-04-18 08:24)
-- ✅ **Fix Spotify song picker UX — app loses focus + song doesn't load on first click:**
-  - `SpotifyManager.ensureSpotifyActive()` now brings our app back to foreground after launching Spotify (500ms delay, then `FLAG_ACTIVITY_REORDER_TO_FRONT`)
-  - New `SpotifyManager.preloadTrack()` method: ensures Spotify active → retries `startPlayback()` up to 4 times (handles 404 after fresh launch) → pause & rewind
-  - New `SpotifyManager.bringAppToForeground()` private helper
-  - Updated all 5 ViewModels' `selectSong()` to use `spotifyManager.preloadTrack()` instead of manual ensure+play+delay+pause
+## Recent Changes (2026-04-18 08:53)
+- ✅ **Fix Spotify song picker UX — three issues fixed:**
+  - **App loses focus**: `ensureSpotifyActive()` now brings our app back to foreground after launching Spotify (`FLAG_ACTIVITY_REORDER_TO_FRONT`)
+  - **Song doesn't load on first click**: New `preloadTrack()` method detects fresh Spotify launch, sends media key "play" to wake player (registers Web API device), then retries `startPlayback()` up to 6 times with 1.5s delays
+  - **7-8s delay opening picker**: Added `songPickerCache` (in-memory `StateFlow`) on `SpotifyManager` singleton. First open loads from API; subsequent opens show cached data instantly. Cache invalidated in `stopTracking()` when new songs may have been played.
+  - Updated all 5 ViewModels' `selectSong()` to use `preloadTrack()` and `loadPreviousSongs()` to use cache
   - Modified: `SpotifyManager.kt`, `FreeHoldActiveScreen.kt`, `ApneaViewModel.kt`, `AdvancedApneaViewModel.kt`, `MinBreathViewModel.kt`, `ProgressiveO2ViewModel.kt`
   - Build: ✅ Successful, installed on SM-S918U1
 

@@ -80,6 +80,18 @@ class SpotifyManager @Inject constructor(
     private val _sessionSongs = MutableStateFlow<List<TrackInfo>>(emptyList())
     val sessionSongs: StateFlow<List<TrackInfo>> = _sessionSongs.asStateFlow()
 
+    // ── Song picker cache ─────────────────────────────────────────────────────
+    // Enriched song list cached after the first load so the picker dialog
+    // can open instantly on subsequent visits. Invalidated when a session ends
+    // (new songs may have been played).
+    private val _songPickerCache = MutableStateFlow<List<SpotifyTrackDetail>?>(null)
+    val songPickerCache: StateFlow<List<SpotifyTrackDetail>?> = _songPickerCache.asStateFlow()
+
+    /** Update the song picker cache with freshly enriched data. */
+    fun updateSongPickerCache(songs: List<SpotifyTrackDetail>) {
+        _songPickerCache.value = songs
+    }
+
     private var isTracking = false
     private var sessionStartMs: Long = 0L
     private var metadataPollJob: Job? = null
@@ -305,6 +317,9 @@ class SpotifyManager @Inject constructor(
         isTracking = false
         metadataPollJob?.cancel()
         metadataPollJob = null
+
+        // Invalidate song picker cache — new songs may have been played
+        _songPickerCache.value = null
 
         // Unregister the broadcast receiver
         unregisterSpotifyReceiver()
