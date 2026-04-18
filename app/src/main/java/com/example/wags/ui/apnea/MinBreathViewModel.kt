@@ -343,12 +343,7 @@ class MinBreathViewModel @Inject constructor(
         _uiState.update { it.copy(selectedSong = track, loadingSelectedSong = true) }
         if (track.spotifyUri.isNotBlank() && spotifyAuthManager.isConnected.value) {
             viewModelScope.launch {
-                spotifyManager.ensureSpotifyActive()
-                val success = spotifyApiClient.startPlayback(track.spotifyUri)
-                if (success) {
-                    delay(1_200L)
-                    spotifyManager.sendPauseAndRewindCommand()
-                }
+                spotifyManager.preloadTrack(track.spotifyUri)
                 _uiState.update { it.copy(loadingSelectedSong = false) }
             }
         } else {

@@ -1,6 +1,29 @@
 # WAGS — Active Context
 
-*Last updated: 2026-04-17 09:18 UTC-4*
+*Last updated: 2026-04-18 08:24 UTC-4*
+
+### 2026-04-18 08:30 (UTC-4)
+**Task:** Fix Spotify song picker UX — app loses focus + song doesn't load on first click when Spotify is not active
+
+**What was done:**
+1. Modified [`SpotifyManager.ensureSpotifyActive()`](app/src/main/java/com/example/wags/data/spotify/SpotifyManager.kt:417) — after launching Spotify, immediately brings our app back to foreground via `FLAG_ACTIVITY_REORDER_TO_FRONT` so user stays in our app
+2. Added [`SpotifyManager.preloadTrack()`](app/src/main/java/com/example/wags/data/spotify/SpotifyManager.kt:470) — new method that handles the full pre-load sequence: ensure Spotify active → wake player via media key (if just launched) → retry `startPlayback()` up to 6 times → pause & rewind
+3. Added [`SpotifyManager.bringAppToForeground()`](app/src/main/java/com/example/wags/data/spotify/SpotifyManager.kt:508) — private helper using launch intent with `FLAG_ACTIVITY_REORDER_TO_FRONT`
+4. Updated all 5 ViewModels' `selectSong()` to use `spotifyManager.preloadTrack()` instead of manually calling `ensureSpotifyActive()` + `startPlayback()` + delay + pause:
+   - `FreeHoldActiveScreen.kt` (line 900)
+   - `ApneaViewModel.kt` (line 1479)
+   - `AdvancedApneaViewModel.kt` (line 309)
+   - `MinBreathViewModel.kt` (line 342)
+   - `ProgressiveO2ViewModel.kt` (line 325)
+
+**Key design decisions:**
+- `ensureSpotifyActive()` now calls `bringAppToForeground()` after launching Spotify (500ms delay to let Spotify render first)
+- `preloadTrack()` detects when Spotify was just launched (`wasActive` flag) and sends a media key "play" to wake Spotify's player — this triggers Spotify to register itself as a Web API device on its servers, which is required before `startPlayback()` can work
+- After waking the player, waits 2s then pauses before retrying `startPlayback()` with the chosen track
+- Retries `startPlayback()` up to 6 times with 1.5s delay between attempts — handles the common case where Spotify's Web API returns 404 right after Spotify was launched
+- `bringAppToForeground()` uses `FLAG_ACTIVITY_REORDER_TO_FRONT` to avoid recreating the activity
+
+**Build:** Successful, installed on SM-S918U1
 
 ### 2026-04-17 09:18 (UTC-4)
 **Task:** Implement record-breaking forecast feature (Tier C) for free holds

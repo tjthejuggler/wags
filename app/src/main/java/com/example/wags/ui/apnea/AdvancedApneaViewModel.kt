@@ -310,14 +310,8 @@ class AdvancedApneaViewModel @Inject constructor(
         _uiState.update { it.copy(selectedSong = track, loadingSelectedSong = true) }
         if (track.spotifyUri.isNotBlank() && spotifyAuthManager.isConnected.value) {
             viewModelScope.launch {
-                // Ensure Spotify is running before attempting playback
-                spotifyManager.ensureSpotifyActive()
-                val success = spotifyApiClient.startPlayback(track.spotifyUri)
+                val success = spotifyManager.preloadTrack(track.spotifyUri)
                 Log.d("AdvancedApnea", "selectSong pre-load: success=$success for ${track.spotifyUri}")
-                if (success) {
-                    kotlinx.coroutines.delay(1_200L)
-                    spotifyManager.sendPauseAndRewindCommand()
-                }
                 _uiState.update { it.copy(loadingSelectedSong = false) }
             }
         } else {

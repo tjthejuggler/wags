@@ -53,6 +53,16 @@ class SpotifyManager @Inject constructor(
         private const val METADATA_POLL_TIMEOUT_MS = 2_000L
         /** Interval (ms) between metadata poll attempts. */
         private const val METADATA_POLL_INTERVAL_MS = 250L
+        /** Max attempts to retry startPlayback when Spotify was just launched. */
+        private const val PRELOAD_MAX_ATTEMPTS = 6
+        /** Delay (ms) between startPlayback retry attempts. */
+        private const val PRELOAD_RETRY_DELAY_MS = 1_500L
+        /** Delay (ms) after startPlayback succeeds before pausing (lets Spotify buffer). */
+        private const val PRELOAD_PAUSE_DELAY_MS = 1_200L
+        /** Delay (ms) after launching Spotify before bringing our app back to foreground. */
+        private const val BRING_APP_BACK_DELAY_MS = 500L
+        /** Delay (ms) after waking Spotify's player (via media key) before retrying Web API. */
+        private const val WAKE_PLAYER_DELAY_MS = 2_000L
 
         // Spotify legacy broadcast actions (no permissions required)
         private const val SPOTIFY_METADATA_CHANGED = "com.spotify.music.metadatachanged"
@@ -394,16 +404,19 @@ class SpotifyManager @Inject constructor(
         context.packageManager.getLaunchIntentForPackage(SPOTIFY_PACKAGE) != null
 
     /**
-     * Ensure Spotify is running in the background before attempting playback.
+     * Ensure Spotify is running before attempting playback.
      *
      * Checks whether Spotify has an active MediaSession (meaning it's alive
      * and ready to accept commands). If not, launches Spotify via its package
      * launch intent and waits up to [timeoutMs] for it to become active.
      *
+     * After launching Spotify, immediately brings our app back to the
+     * foreground so the user stays in our app.
+     *
      * This is a suspend function — call it from a coroutine before
      * [SpotifyApiClient.startPlayback] to guarantee Spotify is ready.
      */
-    suspend fun ensureSpotifyActive(timeoutMs: Long = 3_000L) {
+    suspend fun ensureSpotifyActive(timeoutMs: Long = 4_000L) {
         // Quick check: if we already have a MediaController for Spotify, it's active
         if (spotifyController != null) return
 
@@ -411,13 +424,13 @@ class SpotifyManager @Inject constructor(
         refreshSpotifyController()
         if (spotifyController != null) return
 
-        // Spotify is not active — launch it in the background
+        // Spotify is not active — launch it
         val launchIntent = context.packageManager.getLaunchIntentForPackage(SPOTIFY_PACKAGE)
         if (launchIntent != null) {
             launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             try {
                 context.startActivity(launchIntent)
-                Log.d("SpotifyMgr", "Launched Spotify to bring it to background")
+                Log.d("SpotifyMgr", "Launched Spotify to activate it")
             } catch (e: Exception) {
                 Log.w("SpotifyMgr", "Failed to launch Spotify", e)
                 return
@@ -426,6 +439,10 @@ class SpotifyManager @Inject constructor(
             Log.w("SpotifyMgr", "Spotify not installed — cannot ensure active")
             return
         }
+
+        // Give Spotify a moment to display, then bring our app back to foreground
+        delay(BRING_APP_BACK_DELAY_MS)
+        bringAppToForeground()
 
         // Poll until Spotify's MediaSession appears or timeout
         val deadline = System.currentTimeMillis() + timeoutMs
@@ -438,6 +455,73 @@ class SpotifyManager @Inject constructor(
             }
         }
         Log.w("SpotifyMgr", "Spotify did not become active within ${timeoutMs}ms — proceeding anyway")
+    }
+
+    /**
+     * Pre-load a track into Spotify playback, then pause it so it's ready
+     * to resume instantly when the user starts a session.
+     *
+     * Handles:
+     *  - Ensuring Spotify is active (and bringing our app back to foreground)
+     *  - Waking Spotify's player via media key so it registers as a Web API device
+     *  - Retrying [SpotifyApiClient.startPlayback] when it fails due to
+     *    Spotify not having registered its device yet (common after fresh launch)
+     *  - Pausing and rewinding after successful load
+     *
+     * @return true if the track was successfully loaded and paused.
+     */
+    suspend fun preloadTrack(trackUri: String): Boolean {
+        val wasActive = spotifyController != null
+        ensureSpotifyActive()
+
+        // If Spotify was just launched, its Web API device won't be registered yet.
+        // Send a media key "play" to wake up Spotify's player — this triggers
+        // Spotify to register itself as an active device on its servers.
+        if (!wasActive) {
+            Log.d("SpotifyMgr", "preloadTrack: Spotify was just launched, waking player via media key")
+            sendPlayCommand()
+            delay(WAKE_PLAYER_DELAY_MS)
+            // Pause whatever Spotify started playing — we'll replace it with the
+            // chosen track via the Web API below.
+            sendPauseAndRewindCommand()
+        }
+
+        // Retry startPlayback — Spotify may need a moment to register its
+        // device after being launched, especially on first play.
+        var success = false
+        for (attempt in 1..PRELOAD_MAX_ATTEMPTS) {
+            success = spotifyApiClient.startPlayback(trackUri)
+            if (success) break
+            Log.d("SpotifyMgr", "preloadTrack: startPlayback attempt $attempt failed, retrying in ${PRELOAD_RETRY_DELAY_MS}ms...")
+            delay(PRELOAD_RETRY_DELAY_MS.toLong())
+        }
+
+        if (success) {
+            delay(PRELOAD_PAUSE_DELAY_MS)
+            sendPauseAndRewindCommand()
+        } else {
+            Log.w("SpotifyMgr", "preloadTrack: failed after $PRELOAD_MAX_ATTEMPTS attempts for $trackUri")
+        }
+
+        return success
+    }
+
+    /**
+     * Bring our app back to the foreground after another app (e.g. Spotify)
+     * was launched and stole focus. Uses the package launch intent with
+     * FLAG_ACTIVITY_REORDER_TO_FRONT to avoid recreating the activity.
+     */
+    private fun bringAppToForeground() {
+        val appIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        if (appIntent != null) {
+            appIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+            try {
+                context.startActivity(appIntent)
+                Log.d("SpotifyMgr", "Brought app back to foreground")
+            } catch (e: Exception) {
+                Log.w("SpotifyMgr", "Failed to bring app to foreground", e)
+            }
+        }
     }
 
     // ── Internal helpers ─────────────────────────────────────────────────────

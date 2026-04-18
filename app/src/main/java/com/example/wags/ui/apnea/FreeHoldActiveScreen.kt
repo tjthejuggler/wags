@@ -901,16 +901,8 @@ class FreeHoldActiveViewModel @Inject constructor(
         _uiState.update { it.copy(selectedSong = track, loadingSelectedSong = true) }
         if (track.spotifyUri.isNotBlank() && spotifyAuthManager.isConnected.value) {
             viewModelScope.launch {
-                // Ensure Spotify is running before attempting playback
-                spotifyManager.ensureSpotifyActive()
-                val success = spotifyApiClient.startPlayback(track.spotifyUri)
+                val success = spotifyManager.preloadTrack(track.spotifyUri)
                 Log.d("FreeHold", "selectSong pre-load: success=$success for ${track.spotifyUri}")
-                if (success) {
-                    // Give Spotify a moment to start, then pause — the track is now
-                    // buffered and will resume instantly on the next play command.
-                    kotlinx.coroutines.delay(1_200L)
-                    spotifyManager.sendPauseAndRewindCommand()
-                }
                 _uiState.update { it.copy(loadingSelectedSong = false) }
             }
         } else {
