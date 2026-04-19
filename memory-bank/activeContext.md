@@ -1,5 +1,31 @@
 # WAGS — Active Context
 
+### 2026-04-18 09:31 (UTC-4)
+**Task**: Three apnea section features/fixes
+
+**Feature 1 — Trophy Chart (new screen)**
+- Created `TrophyChartViewModel.kt`: `TrophyChartDay`, `TrophyChartUiState`, `TrophyChartViewModel` with `computeDays()` that collects PB entries across selected drills, maps recordId → highest trophyCount, groups by date.
+- Created `TrophyChartScreen.kt`: full-screen landscape bar chart, toggle (Total/Max trophies per day), settings popup (include Progressive O₂ / Min Breath), Canvas-based bar chart with zoom/pan via `detectTransformGestures`.
+- Added `const val TROPHY_CHART = "trophy_chart"` to `WagsRoutes` in `WagsNavGraph.kt`.
+- Added `import com.example.wags.ui.apnea.TrophyChartScreen` to `WagsNavGraph.kt`.
+- Added `composable(WagsRoutes.TROPHY_CHART) { TrophyChartScreen(navController = navController) }` after the PB_CHART composable in `WagsNavGraph.kt`.
+- Added 📊 `IconButton` to `PersonalBestsScreen.kt` top bar `actions` that navigates to `WagsRoutes.TROPHY_CHART`.
+
+**Feature 2 — Forecast Auto-Update Bug Fix**
+- Added `private val _forecastRefreshTrigger = MutableStateFlow(0)` to `ApneaViewModel.kt`.
+- Modified forecast `combine` to include `_forecastRefreshTrigger` so it recomputes when bumped.
+- Added `_forecastRefreshTrigger.value++` at end of `saveFreeHoldRecord` coroutine.
+
+**Feature 3 — Total Trophies in Stats**
+- Added `totalTrophiesWon: Int = 0` to `ApneaHistoryUiState`.
+- Added `private val _totalTrophiesWon = MutableStateFlow(0)` to `ApneaHistoryViewModel`.
+- Added `init` block that sums trophyCount across FREE_HOLD, PROGRESSIVE_O2_ANY, MIN_BREATH_ANY.
+- Added `_totalTrophiesWon` to the outer `combine` in `uiState`.
+- Added trophy display row at top of `ApneaStatsContent` in `ApneaHistoryScreen.kt`.
+
+**Build**: SUCCESS — installed on 2 devices (SM-S918U1 via USB + WiFi ADB).
+
+
 *Last updated: 2026-04-18 08:24 UTC-4*
 
 ### 2026-04-18 08:53 (UTC-4)

@@ -52,6 +52,9 @@ fun PersonalBestsScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { navController.navigate(WagsRoutes.TROPHY_CHART) }) {
+                        Text("📊", style = MaterialTheme.typography.titleMedium)
+                    }
                     LiveSensorActionsNav(navController)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)

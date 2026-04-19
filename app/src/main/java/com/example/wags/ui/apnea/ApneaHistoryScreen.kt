@@ -169,6 +169,7 @@ private fun StatsTabContent(
     onSetAudio: (String) -> Unit
 ) {
     val stats = if (state.showAllStats) state.allStats else state.filteredStats
+    val totalTrophies = state.totalTrophiesWon
     var showSettingsDialog by remember { mutableStateOf(false) }
 
     if (showSettingsDialog) {
@@ -234,7 +235,12 @@ private fun StatsTabContent(
 
         HorizontalDivider(color = SurfaceVariant)
 
-        ApneaStatsContent(stats = stats, onRecordClick = onRecordClick, onTimeChartClick = onTimeChartClick)
+        ApneaStatsContent(
+            stats = stats,
+            totalTrophiesWon = totalTrophies,
+            onRecordClick = onRecordClick,
+            onTimeChartClick = onTimeChartClick
+        )
     }
 }
 
@@ -636,10 +642,34 @@ private fun ApneaSessionSummaryCard(
 @Composable
 private fun ApneaStatsContent(
     stats: ApneaStats,
+    totalTrophiesWon: Int = 0,
     onRecordClick: (Long) -> Unit,
     onTimeChartClick: (metricType: String, drillType: String, title: String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Total trophies won
+        if (totalTrophiesWon > 0) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Total Trophies Won",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextPrimary
+                )
+                Text(
+                    "🏆 $totalTrophiesWon",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+            }
+            HorizontalDivider(color = SurfaceVariant)
+        }
+
         // Activity counts
         Text(
             "Activity Counts",

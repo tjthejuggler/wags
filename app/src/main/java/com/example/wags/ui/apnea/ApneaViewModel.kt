@@ -279,6 +279,9 @@ class ApneaViewModel @Inject constructor(
     private val _progO2BreathPeriodSec = MutableStateFlow(60)
     private val _minBreathSessionDurationSec = MutableStateFlow(300)
 
+    /** Bumped after a free hold record is saved — triggers forecast recompute with fresh data. */
+    private val _forecastRefreshTrigger = MutableStateFlow(0)
+
     init {
         // ── Restore persisted settings (except Time of Day which is always smart-set) ──
         val savedPb = prefs.getLong("pb_ms", 0L)
@@ -514,10 +517,15 @@ class ApneaViewModel @Inject constructor(
         }
 
         // ── Record-breaking forecast: recompute with 150 ms debounce when settings change ──
+        // Also recomputes when _forecastRefreshTrigger is bumped (e.g. after a new record is saved).
         viewModelScope.launch {
-            combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud ->
-                ForecastSettings(lv, pt.name, tod.name, pos.name, aud.name)
-            }.collectLatest { settings ->
+            combine(
+                combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud ->
+                    ForecastSettings(lv, pt.name, tod.name, pos.name, aud.name)
+                },
+                _forecastRefreshTrigger
+            ) { settings, _ -> settings }
+            .collectLatest { settings ->
                 delay(150) // debounce
                 try {
                     val records = apneaRepository.getAllFreeHoldsOnce()
@@ -1173,6 +1181,9 @@ class ApneaViewModel @Inject constructor(
                 }
                 apneaRepository.saveSongLog(recordId, songs)
             }
+
+            // ── Trigger forecast recompute with fresh data ────────────────────
+            _forecastRefreshTrigger.value++
         }
     }
 

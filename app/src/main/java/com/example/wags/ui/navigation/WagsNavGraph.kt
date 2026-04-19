@@ -21,6 +21,7 @@ import com.example.wags.ui.apnea.ApneaTableScreen
 import com.example.wags.ui.apnea.FreeHoldActiveScreen
 import com.example.wags.ui.apnea.PbChartScreen
 import com.example.wags.ui.apnea.TimeChartScreen
+import com.example.wags.ui.apnea.TrophyChartScreen
 import com.example.wags.ui.apnea.PersonalBestsScreen
 import com.example.wags.ui.apnea.MinBreathActiveScreen
 import com.example.wags.ui.apnea.MinBreathScreen
@@ -101,6 +102,9 @@ object WagsRoutes {
     // ── Min Breath ──
     const val MIN_BREATH = "min_breath"
     const val MIN_BREATH_ACTIVE = "min_breath_active"
+
+    // ── Trophy Chart ──────────────────────────────────────────────────────────
+    const val TROPHY_CHART = "trophy_chart"
 
     // ── Time Chart (stats drill-down) ─────────────────────────────────────────
     const val TIME_CHART = "time_chart?metricType={metricType}&drillType={drillType}&title={title}"
@@ -422,6 +426,9 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             )
         ) {
             PbChartScreen(navController = navController)
+        }
+        composable(WagsRoutes.TROPHY_CHART) {
+            TrophyChartScreen(navController = navController)
         }
         composable(WagsRoutes.RF_ASSESSMENT_PICKER) {
             AssessmentPickerScreen(

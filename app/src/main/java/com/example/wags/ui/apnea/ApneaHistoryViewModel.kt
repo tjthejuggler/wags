@@ -8,6 +8,7 @@ import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.data.repository.ApneaSessionRepository
 import com.example.wags.domain.model.ApneaStats
 import com.example.wags.domain.model.AudioSetting
+import com.example.wags.domain.model.DrillContext
 import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TimeOfDay
@@ -19,6 +20,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -38,6 +41,8 @@ data class ApneaHistoryUiState(
     val filteredStats: ApneaStats = ApneaStats(),
     val allStats: ApneaStats = ApneaStats(),
     val showAllStats: Boolean = false,
+    /** Total trophies won across all drill types (sum of trophyCount for all current PB entries). */
+    val totalTrophiesWon: Int = 0,
     // Calendar tab — ALL records (not filtered by settings)
     /** Set of dates that have at least one apnea record of any kind. */
     val allDatesWithRecords: Set<LocalDate> = emptySet(),
@@ -92,6 +97,8 @@ class ApneaHistoryViewModel @Inject constructor(
         apneaRepository.getStats(lv, pt, tod, pos, aud)
     }
 
+    private val _totalTrophiesWon = MutableStateFlow(0)
+
     val uiState: StateFlow<ApneaHistoryUiState> = combine(
         combine(
             settingsFlow,
@@ -102,8 +109,9 @@ class ApneaHistoryViewModel @Inject constructor(
             apneaRepository.getStatsAll(),
             apneaRepository.getAllRecords(),
             combine(_selectedDate, MutableStateFlow(Unit)) { d, _ -> d }
-        ) { allStats, allRecords, selectedDate -> Triple(allStats, allRecords, selectedDate) }
-    ) { (settings, filteredStats, showAll), (allStats, allRecords, selectedDate) ->
+        ) { allStats, allRecords, selectedDate -> Triple(allStats, allRecords, selectedDate) },
+        _totalTrophiesWon
+    ) { (settings, filteredStats, showAll), (allStats, allRecords, selectedDate), totalTrophies ->
         val (lv, pt, tod, pos, aud) = settings
         val zone = ZoneId.systemDefault()
 
@@ -125,6 +133,7 @@ class ApneaHistoryViewModel @Inject constructor(
             filteredStats       = filteredStats,
             allStats            = allStats,
             showAllStats        = showAll,
+            totalTrophiesWon    = totalTrophies,
             allDatesWithRecords = byDate.keys,
             allRecordsByDate    = byDate,
             selectedDate        = selectedDate,
@@ -135,6 +144,23 @@ class ApneaHistoryViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = ApneaHistoryUiState()
     )
+
+    init {
+        // Load total trophies won across all drill types (one-shot, runs in background)
+        viewModelScope.launch {
+            val drills = listOf(
+                DrillContext.FREE_HOLD,
+                DrillContext.PROGRESSIVE_O2_ANY,
+                DrillContext.MIN_BREATH_ANY
+            )
+            var total = 0
+            for (drill in drills) {
+                val entries = apneaRepository.getAllPersonalBests(drill)
+                total += entries.filter { it.recordId != null }.sumOf { it.trophyCount }
+            }
+            _totalTrophiesWon.value = total
+        }
+    }
 
     // ── Settings setters (for Stats tab popup) ────────────────────────────────
     fun setLungVolume(v: String)   { _lungVolume.value = v }

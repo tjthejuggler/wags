@@ -1,5 +1,12 @@
 # WAGS — Progress
 
+## Recent Changes (2026-04-18 09:31 UTC-4)
+- **Trophy Chart**: New `TrophyChartViewModel.kt` + `TrophyChartScreen.kt` — full-screen landscape bar chart showing trophies per day, with Total/Max toggle and drill-include settings popup (Progressive O₂, Min Breath). Route `trophy_chart` added to `WagsNavGraph`. 📊 button added to `PersonalBestsScreen` top bar.
+- **Forecast Auto-Update Fix**: Added `_forecastRefreshTrigger: MutableStateFlow<Int>` to `ApneaViewModel`; included in forecast `combine`; bumped after `saveFreeHoldRecord` completes. Forecast now auto-updates after breaking a record.
+- **Total Trophies in Stats**: Added `totalTrophiesWon` to `ApneaHistoryUiState` + `ApneaHistoryViewModel` (summed across all drill types in `init`). Displayed at top of `ApneaStatsContent` in `ApneaHistoryScreen`.
+- Build: SUCCESS, installed on 2 devices.
+
+
 *Last updated: 2026-04-18 08:24 UTC-4*
 
 ## Recent Changes (2026-04-18 08:53)
