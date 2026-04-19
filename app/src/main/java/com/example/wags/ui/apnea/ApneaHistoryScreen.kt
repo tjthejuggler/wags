@@ -30,6 +30,7 @@ import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.common.LiveSensorActionsNav
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
+import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDate
@@ -169,7 +170,6 @@ private fun StatsTabContent(
     onSetAudio: (String) -> Unit
 ) {
     val stats = if (state.showAllStats) state.allStats else state.filteredStats
-    val totalTrophies = state.totalTrophiesWon
     var showSettingsDialog by remember { mutableStateOf(false) }
 
     if (showSettingsDialog) {
@@ -237,7 +237,7 @@ private fun StatsTabContent(
 
         ApneaStatsContent(
             stats = stats,
-            totalTrophiesWon = totalTrophies,
+            trophyStats = state.trophyStats,
             onRecordClick = onRecordClick,
             onTimeChartClick = onTimeChartClick
         )
@@ -642,34 +642,11 @@ private fun ApneaSessionSummaryCard(
 @Composable
 private fun ApneaStatsContent(
     stats: ApneaStats,
-    totalTrophiesWon: Int = 0,
+    trophyStats: TrophyStats = TrophyStats(),
     onRecordClick: (Long) -> Unit,
     onTimeChartClick: (metricType: String, drillType: String, title: String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        // Total trophies won
-        if (totalTrophiesWon > 0) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "Total Trophies Won",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = TextPrimary
-                )
-                Text(
-                    "🏆 $totalTrophiesWon",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
-            }
-            HorizontalDivider(color = SurfaceVariant)
-        }
-
         // Activity counts
         Text(
             "Activity Counts",
@@ -693,6 +670,12 @@ private fun ApneaStatsContent(
         }
 
         HorizontalDivider(color = SurfaceVariant)
+
+        // Trophy stats section (after Activity Counts)
+        if (trophyStats.total.total > 0) {
+            TrophyStatsSection(trophyStats = trophyStats)
+            HorizontalDivider(color = SurfaceVariant)
+        }
 
         // ── Total Times section ────────────────────────────────────────────
         Text(
@@ -793,6 +776,124 @@ private fun ApneaStatsContent(
             HistoryExtremeRow("Lowest HR at end",    stats.minEndHr?.let { "$it bpm" } ?: "—",   stats.minEndHrRecordId, onRecordClick)
             HistoryExtremeRow("Highest SpO₂ at end", stats.maxEndSpO2?.let { "$it%" } ?: "—",    stats.maxEndSpO2RecordId, onRecordClick)
             HistoryExtremeRow("Lowest SpO₂ at end",  stats.minEndSpO2?.let { "$it%" } ?: "—",    stats.minEndSpO2RecordId, onRecordClick)
+        }
+    }
+}
+
+// ── Trophy stats section ───────────────────────────────────────────────────────
+
+/** Formats an integer with comma separators (e.g. 1234567 → "1,234,567"). */
+private fun Int.formatWithCommas(): String =
+    NumberFormat.getNumberInstance(java.util.Locale.US).format(this)
+
+/** Formats a Double average to 1 decimal place with comma separators. */
+private fun Double.formatAvg(): String {
+    val nf = NumberFormat.getNumberInstance(java.util.Locale.US)
+    nf.maximumFractionDigits = 1
+    nf.minimumFractionDigits = 1
+    return nf.format(this)
+}
+
+@Composable
+private fun TrophyStatsSection(trophyStats: TrophyStats) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            "🏆 Trophy Stats",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = TextPrimary
+        )
+
+        val drills = listOf(
+            "Free Hold"      to trophyStats.freeHold,
+            "Progressive O₂" to trophyStats.progressiveO2,
+            "Min Breath"     to trophyStats.minBreath,
+            "Total"          to trophyStats.total
+        )
+
+        drills.forEach { (label, drill) ->
+            if (drill.total > 0) {
+                // Total is expanded by default; others start collapsed
+                TrophyDrillBlock(
+                    label = label,
+                    drill = drill,
+                    isTotal = label == "Total",
+                    initiallyExpanded = label == "Total"
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrophyDrillBlock(
+    label: String,
+    drill: DrillTrophyStats,
+    isTotal: Boolean,
+    initiallyExpanded: Boolean = false
+) {
+    var expanded by remember { mutableStateOf(initiallyExpanded) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+        // Tappable header row — toggles expand/collapse
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (isTotal) FontWeight.Bold else FontWeight.SemiBold,
+                color = if (isTotal) TextPrimary else TextSecondary
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    drill.total.formatWithCommas(),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = if (isTotal) FontWeight.Bold else FontWeight.Medium,
+                    color = TextPrimary
+                )
+                Text(
+                    if (expanded) "▲" else "▼",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextDisabled
+                )
+            }
+        }
+
+        if (expanded) {
+            Column(
+                modifier = Modifier.padding(start = 8.dp, bottom = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                // Current period counts
+                HistoryStatsRow(label = "Today",        value = drill.todayCount.formatWithCommas())
+                HistoryStatsRow(label = "Last 7 days",  value = drill.currentWeekCount.formatWithCommas())
+                HistoryStatsRow(label = "Last 30 days", value = drill.currentMonthCount.formatWithCommas())
+
+                Spacer(Modifier.height(4.dp))
+                Text("Averages", style = MaterialTheme.typography.labelSmall, color = TextDisabled)
+                HistoryStatsRow(label = "Daily avg",   value = drill.dailyAvg.formatAvg())
+                HistoryStatsRow(label = "Weekly avg",  value = drill.weeklyAvg.formatAvg())
+                HistoryStatsRow(label = "Monthly avg", value = drill.monthlyAvg.formatAvg())
+
+                Spacer(Modifier.height(4.dp))
+                Text("Records", style = MaterialTheme.typography.labelSmall, color = TextDisabled)
+                HistoryStatsRow(label = "Best day",     value = drill.highestDay.formatWithCommas())
+                HistoryStatsRow(label = "Best 7 days",  value = drill.highestWeek.formatWithCommas())
+                HistoryStatsRow(label = "Best 30 days", value = drill.highestMonth.formatWithCommas())
+            }
+        }
+
+        if (!isTotal) {
+            HorizontalDivider(color = SurfaceVariant.copy(alpha = 0.4f))
         }
     }
 }

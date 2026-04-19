@@ -1,5 +1,39 @@
 # WAGS — Active Context
 
+### 2026-04-19 11:12 (UTC-4)
+**Task**: Apnea Stats trophy section improvements
+
+**What was done:**
+1. **Filter respect**: Trophy stats now recompute whenever settings or showAllStats changes (reactive `combine` in `init`). Free Hold trophies filtered by current settings; Prog O₂ and Min Breath always unfiltered.
+2. **Collapsible sections**: Each drill block (Free Hold, Progressive O₂, Min Breath, Total) is now collapsible via tap on header row. Only "Total" is expanded by default (`initiallyExpanded = label == "Total"`).
+3. **Position**: Trophy section moved below Activity Counts (was at top, now after Activity Counts + divider).
+4. **Filter logic**: `PersonalBestEntry.matchesFilter()` — entry field empty = "any" (always matches); filter = FILTER_ALL = always matches; otherwise exact match required.
+
+**Build**: SUCCESS — installed on SM-S918U1
+
+*Last updated: 2026-04-19 11:12 UTC-4*
+
+### 2026-04-19 10:36 (UTC-4)
+**Task**: Apnea Stats screen — expanded trophy stats
+
+**What was done:**
+1. Added `DrillTrophyStats` data class to `ApneaHistoryViewModel.kt` — holds per-drill: total, dailyAvg, weeklyAvg, monthlyAvg, todayCount, currentWeekCount, currentMonthCount, highestDay, highestWeek, highestMonth.
+2. Added `TrophyStats` data class — groups freeHold, progressiveO2, minBreath, total `DrillTrophyStats`.
+3. Replaced `totalTrophiesWon: Int` in `ApneaHistoryUiState` with `trophyStats: TrophyStats`.
+4. Added `computeTrophyStats()` suspend function in `ApneaHistoryViewModel` — uses same `recordId → trophyCount` pattern as `TrophyChartViewModel`, builds per-drill date maps, computes rolling 7-day and 30-day windows for highest week/month ever.
+5. Added `buildDrillStats()` helper — computes all stats from a `Map<LocalDate, Int>`.
+6. Updated `ApneaHistoryScreen.kt`:
+   - `StatsTabContent` now passes `state.trophyStats` to `ApneaStatsContent`
+   - `ApneaStatsContent` signature changed from `totalTrophiesWon: Int` to `trophyStats: TrophyStats`
+   - Added `TrophyStatsSection` composable — shows all 4 drill types (Free Hold, Progressive O₂, Min Breath, Total), each with: total count, today/7-day/30-day current counts, daily/weekly/monthly averages, best day/7-day/30-day records
+   - Added `TrophyDrillBlock` composable — renders one drill's stats block
+   - Added `Int.formatWithCommas()` and `Double.formatAvg()` helpers using `NumberFormat`
+   - Added `java.text.NumberFormat` import
+
+**Build**: SUCCESS (APK compiled; no device connected for install)
+
+*Last updated: 2026-04-19 10:36 UTC-4*
+
 ### 2026-04-18 09:31 (UTC-4)
 **Task**: Three apnea section features/fixes
 

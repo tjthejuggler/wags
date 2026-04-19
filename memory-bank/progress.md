@@ -1,5 +1,17 @@
 # WAGS — Progress
 
+## Recent Changes (2026-04-19 10:36 UTC-4)
+- ✅ **Expanded trophy stats in Apnea Stats screen:**
+  - Trophy counts now broken down by drill type: Free Hold, Progressive O₂, Min Breath, and Total
+  - Each drill shows: all-time total (with comma formatting), today / last 7 days / last 30 days counts, daily/weekly/monthly averages, best single day / best 7-day window / best 30-day window ever (rolling, not calendar-aligned)
+  - Numbers formatted with commas (e.g. 1,234,567) using `NumberFormat`
+  - New data classes: `DrillTrophyStats`, `TrophyStats` in `ApneaHistoryViewModel.kt`
+  - New composables: `TrophyStatsSection`, `TrophyDrillBlock` in `ApneaHistoryScreen.kt`
+  - Replaced `totalTrophiesWon: Int` in `ApneaHistoryUiState` with `trophyStats: TrophyStats`
+  - Build: ✅ APK compiled successfully (no device connected for install)
+
+*Last updated: 2026-04-19 10:36 UTC-4*
+
 ## Recent Changes (2026-04-18 09:31 UTC-4)
 - **Trophy Chart**: New `TrophyChartViewModel.kt` + `TrophyChartScreen.kt` — full-screen landscape bar chart showing trophies per day, with Total/Max toggle and drill-include settings popup (Progressive O₂, Min Breath). Route `trophy_chart` added to `WagsNavGraph`. 📊 button added to `PersonalBestsScreen` top bar.
 - **Forecast Auto-Update Fix**: Added `_forecastRefreshTrigger: MutableStateFlow<Int>` to `ApneaViewModel`; included in forecast `combine`; bumped after `saveFreeHoldRecord` completes. Forecast now auto-updates after breaking a record.
