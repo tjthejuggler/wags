@@ -50,6 +50,9 @@ class AssessmentRunViewModel @Inject constructor(
         savedStateHandle.get<String>("protocol") ?: RfProtocol.EXPRESS.name
     )
 
+    // Custom duration (minutes) — only used for CUSTOM protocol
+    private val customDurationMinutes: Int = savedStateHandle.get<Int>("customDuration") ?: 0
+
     data class UiState(
         val phase: String = "IDLE",
         val currentBpm: Float = 0f,
@@ -112,7 +115,11 @@ class AssessmentRunViewModel @Inject constructor(
                 )
             }
         } else {
-            orchestrator.start(protocol = protocol, scope = viewModelScope)
+            orchestrator.start(
+                protocol = protocol,
+                scope = viewModelScope,
+                customDurationMinutes = customDurationMinutes
+            )
         }
         collectOrchestratorState()
         startRrPolling()

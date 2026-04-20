@@ -1,5 +1,53 @@
 # WAGS — Active Context
 
+### 2026-04-19 12:10 (UTC-4)
+**Task**: Custom length RF Assessment protocol — refinements
+
+**What was done (refinements):**
+1. **2-min increments**: Slider now snaps to even minutes (6, 8, 10, … 60). Default changed from 10 → 12 min. `setCustomDuration()` snaps odd values up.
+2. **Breakdown scales across full range**: Fixed algorithm — removed early `break` when testSec ≥ 120. Now maximizes number of rates (3–7) that fit, with test blocks up to 5 min. This means:
+   - 6 min → 3 rates × 1 min
+   - 12 min → 3 rates × 3 min
+   - 20 min → 4 rates × 4 min
+   - 30 min → 5 rates × 5 min
+   - 40 min → 6 rates × 5 min
+   - 60 min → 7 rates × 5 min
+3. **HR device not required for picker**: Removed `enabled = state.isHrDeviceConnected` from "RF Assessment" button in `BreathingScreen.kt`. HR device still required to actually start an assessment (enforced in `AssessmentPickerScreen`).
+
+**Build**: SUCCESS — installed on SM-S918U1
+
+*Last updated: 2026-04-19 12:10 UTC-4*
+
+### 2026-04-19 12:01 (UTC-4)
+**Task**: Custom length RF Assessment protocol — initial implementation
+
+**What was done:**
+1. Added `CUSTOM` to `RfProtocol` enum in `RfAssessmentOrchestrator.kt`
+2. Added `customProtocolParams()` method to orchestrator — smart algorithm that determines number of breathing rates (3–7) and test-block duration based on user-specified total minutes, with 1-min baseline and 30s washout between blocks
+3. Added `customDurationMinutes` parameter to `orchestrator.start()` and `runSteppedProtocol()`
+4. Updated `AssessmentPickerScreen.kt`:
+   - Added "Custom" protocol card to `PROTOCOL_LIST`
+   - Added `CustomDurationSection` composable with Slider
+   - Added `estimateCustomBreakdown()` helper showing predicted session structure
+   - Changed `onStartAssessment` callback signature to `(RfProtocol, Boolean, Int)`
+5. Updated `AssessmentPickerViewModel.kt`:
+   - Added `customDurationMinutes: Int = 12` to `UiState`
+   - Added `setCustomDuration()` method with 2-min snap
+6. Updated `WagsNavGraph.kt`:
+   - Added `customDuration` query param to `RF_ASSESSMENT_RUN` route
+   - Updated `rfAssessmentRun()` helper to accept `customDuration`
+   - Updated composable to extract and pass `customDuration` to `AssessmentRunScreen`
+7. Updated `AssessmentRunScreen.kt`:
+   - Added `customDurationMinutes` parameter
+   - Added `RfProtocol.CUSTOM -> "Custom Assessment"` to `displayName()`
+8. Updated `AssessmentRunViewModel.kt`:
+   - Reads `customDuration` from `SavedStateHandle`
+   - Passes it to `orchestrator.start()` for non-TARGETED protocols
+
+**Build**: SUCCESS — installed on SM-S918U1
+
+*Last updated: 2026-04-19 12:01 UTC-4*
+
 ### 2026-04-19 11:12 (UTC-4)
 **Task**: Apnea Stats trophy section improvements
 

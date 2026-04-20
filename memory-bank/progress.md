@@ -1,5 +1,19 @@
 # WAGS — Progress
 
+## Recent Changes (2026-04-19 12:01 UTC-4)
+- ✅ **Custom length RF Assessment protocol:**
+  - New `CUSTOM` protocol in `RfProtocol` enum — user sets total duration (5–60 min) via slider
+  - Smart algorithm auto-determines number of breathing rates (3–7) and test-block duration (60–180s) based on available time
+  - Follows same randomized order (shuffled rates) and period offset (±0.9s) as other stepped protocols
+  - Uses `EXPRESS_POOL_BPM` (7 rates: 4.0–7.0) as the source pool, shuffled and subsetted
+  - 1-min baseline + 30s washout between test blocks
+  - `CustomDurationSection` composable with Slider + live breakdown preview
+  - `customDuration` passed through nav route → SavedStateHandle → orchestrator
+  - Modified: `RfAssessmentOrchestrator.kt`, `AssessmentPickerScreen.kt`, `AssessmentPickerViewModel.kt`, `WagsNavGraph.kt`, `AssessmentRunScreen.kt`, `AssessmentRunViewModel.kt`
+  - Build: ✅ Successful, installed on SM-S918U1
+
+*Last updated: 2026-04-19 12:01 UTC-4*
+
 ## Recent Changes (2026-04-19 10:36 UTC-4)
 - ✅ **Expanded trophy stats in Apnea Stats screen:**
   - Trophy counts now broken down by drill type: Free Hold, Progressive O₂, Min Breath, and Total

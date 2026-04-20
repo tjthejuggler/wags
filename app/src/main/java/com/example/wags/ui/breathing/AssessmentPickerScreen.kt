@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -72,6 +73,13 @@ private val PROTOCOL_LIST = listOf(
         duration    = "~16 min",
         subtitle    = "Chirp 6.75→4.5 BPM, continuous scan",
         description = "Continuous chirp scan. Finds resonance without stepping."
+    ),
+    ProtocolInfo(
+        protocol    = RfProtocol.CUSTOM,
+        label       = "Custom",
+        duration    = "5–60 min",
+        subtitle    = "Set your own duration",
+        description = "Choose a total duration and the assessment auto-generates the right number of breathing rates and test lengths. Follows the same randomized order and offset as other protocols."
     )
 )
 
@@ -84,7 +92,7 @@ private val PROTOCOL_LIST = listOf(
 fun AssessmentPickerScreen(
     onNavigateBack: () -> Unit,
     onNavigateToSettings: () -> Unit = {},
-    onStartAssessment: (RfProtocol, Boolean) -> Unit,
+    onStartAssessment: (RfProtocol, Boolean, Int) -> Unit,
     viewModel: AssessmentPickerViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -150,6 +158,14 @@ fun AssessmentPickerScreen(
                 )
             }
 
+            // ── Custom duration slider ──────────────────────────────────────
+            if (state.selectedProtocol == RfProtocol.CUSTOM) {
+                CustomDurationSection(
+                    durationMinutes = state.customDurationMinutes,
+                    onDurationChange = { viewModel.setCustomDuration(it) }
+                )
+            }
+
             Spacer(modifier = Modifier.height(4.dp))
 
             // Description card for selected protocol
@@ -169,7 +185,13 @@ fun AssessmentPickerScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Button(
-                    onClick = { onStartAssessment(state.selectedProtocol, vibrationEnabled) },
+                    onClick = {
+                        onStartAssessment(
+                            state.selectedProtocol,
+                            vibrationEnabled,
+                            state.customDurationMinutes
+                        )
+                    },
                     modifier = Modifier.weight(1f),
                     enabled = state.isHrDeviceConnected
                 ) {
@@ -191,6 +213,92 @@ fun AssessmentPickerScreen(
             }
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Custom duration section
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun CustomDurationSection(
+    durationMinutes: Int,
+    onDurationChange: (Int) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Duration",
+                    style = MaterialTheme.typography.titleSmall
+                )
+                Text(
+                    text = "$durationMinutes min",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Slider(
+                value = durationMinutes.toFloat(),
+                onValueChange = { onDurationChange(it.toInt()) },
+                valueRange = 6f..60f,
+                steps = 26,  // 2-min increments: 6,8,10,...,60
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("6 min", style = MaterialTheme.typography.labelSmall, color = TextDisabled)
+                Text("60 min", style = MaterialTheme.typography.labelSmall, color = TextDisabled)
+            }
+
+            // Show estimated session breakdown
+            val breakdown = estimateCustomBreakdown(durationMinutes)
+            Text(
+                text = breakdown,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+/**
+ * Estimates the session breakdown for a custom duration so the user
+ * knows what to expect before starting. Matches the algorithm in
+ * [RfAssessmentOrchestrator.customProtocolParams].
+ */
+private fun estimateCustomBreakdown(totalMinutes: Int): String {
+    val baselineSec = 60L
+    val washoutSec = 30L
+    val availableSec = totalMinutes * 60L - baselineSec
+
+    var bestN = 3
+    var bestTestSec = 60L
+    for (n in 3..7) {
+        val testSec = (availableSec - (n - 1) * washoutSec) / n
+        if (testSec < 60L) break
+        bestN = n
+        bestTestSec = testSec.coerceAtMost(300L)
+    }
+
+    val testMin = bestTestSec / 60
+    val testSecRem = bestTestSec % 60
+    val testLabel = if (testSecRem == 0L) "${testMin} min" else "${testMin}m ${testSecRem}s"
+
+    return "$bestN rates × $testLabel each + 1 min baseline + 30 s rest"
 }
 
 // ---------------------------------------------------------------------------

@@ -23,6 +23,7 @@ class AssessmentPickerViewModel @Inject constructor(
 
     data class UiState(
         val selectedProtocol: RfProtocol = RfProtocol.EXPRESS,
+        val customDurationMinutes: Int = 12,
         val targetedEnabled: Boolean = false,
         val isLoading: Boolean = true,
         val isHrDeviceConnected: Boolean = false
@@ -51,5 +52,11 @@ class AssessmentPickerViewModel @Inject constructor(
         // Guard: don't allow selecting TARGETED if not enabled
         if (protocol == RfProtocol.TARGETED && !_uiState.value.targetedEnabled) return
         _uiState.update { it.copy(selectedProtocol = protocol) }
+    }
+
+    fun setCustomDuration(minutes: Int) {
+        // Snap to even (2-min increments), range 6–60
+        val snapped = if (minutes % 2 != 0) minutes + 1 else minutes
+        _uiState.update { it.copy(customDurationMinutes = snapped.coerceIn(6, 60)) }
     }
 }

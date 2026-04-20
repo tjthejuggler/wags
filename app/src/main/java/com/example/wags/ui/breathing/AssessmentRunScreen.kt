@@ -52,6 +52,7 @@ private fun RfProtocol.displayName(): String = when (this) {
     RfProtocol.TARGETED      -> "Targeted Sweep"
     RfProtocol.CONTINUOUS    -> "Continuous Sweep"
     RfProtocol.SLIDING_WINDOW -> "Sliding Window"
+    RfProtocol.CUSTOM        -> "Custom Assessment"
 }
 
 private fun RfProtocol.isStepped(): Boolean = this != RfProtocol.SLIDING_WINDOW
@@ -68,6 +69,7 @@ fun AssessmentRunScreen(
     onNavigateToSettings: () -> Unit = {},
     onSessionComplete: (sessionId: Long) -> Unit,
     vibrationEnabled: Boolean = false,
+    customDurationMinutes: Int = 0,
     viewModel: AssessmentRunViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()

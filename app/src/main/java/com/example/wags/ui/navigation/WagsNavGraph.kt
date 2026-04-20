@@ -73,7 +73,7 @@ object WagsRoutes {
     const val SESSION_ANALYTICS = "session_analytics/{sessionId}"
     const val SESSION_ANALYTICS_HISTORY = "session_analytics_history"
     const val RF_ASSESSMENT_PICKER = "rf_assessment_picker"
-    const val RF_ASSESSMENT_RUN = "rf_assessment_run/{protocol}?vibration={vibration}"
+    const val RF_ASSESSMENT_RUN = "rf_assessment_run/{protocol}?vibration={vibration}&customDuration={customDuration}"
     const val RF_ASSESSMENT_RESULT = "rf_assessment_result/{sessionTimestamp}"
     const val RF_ASSESSMENT_HISTORY = "rf_assessment_history"
     const val RESONANCE_SESSION = "resonance_session?vibration={vibration}&duration={duration}&infinity={infinity}&rate={rate}"
@@ -120,8 +120,8 @@ object WagsRoutes {
     fun advancedApnea(modality: String, length: String) = "advanced_apnea/$modality/$length"
     fun session(type: String) = "session/$type"
     fun sessionAnalytics(sessionId: Long) = "session_analytics/$sessionId"
-    fun rfAssessmentRun(protocol: String, vibration: Boolean = false) =
-        "rf_assessment_run/$protocol?vibration=$vibration"
+    fun rfAssessmentRun(protocol: String, vibration: Boolean = false, customDuration: Int = 0) =
+        "rf_assessment_run/$protocol?vibration=$vibration&customDuration=$customDuration"
     fun rfAssessmentResult(sessionTimestamp: Long) = "rf_assessment_result/$sessionTimestamp"
     fun apneaHistory(
         lungVolume: String,
@@ -434,8 +434,8 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             AssessmentPickerScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) },
-                onStartAssessment = { protocol, vibration ->
-                    navController.navigate(WagsRoutes.rfAssessmentRun(protocol.name, vibration))
+                onStartAssessment = { protocol, vibration, customDuration ->
+                    navController.navigate(WagsRoutes.rfAssessmentRun(protocol.name, vibration, customDuration))
                 }
             )
         }
@@ -443,15 +443,18 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             route = WagsRoutes.RF_ASSESSMENT_RUN,
             arguments = listOf(
                 navArgument("protocol") { type = NavType.StringType },
-                navArgument("vibration") { type = NavType.BoolType; defaultValue = false }
+                navArgument("vibration") { type = NavType.BoolType; defaultValue = false },
+                navArgument("customDuration") { type = NavType.IntType; defaultValue = 0 }
             )
         ) { backStackEntry ->
             val protocolStr = backStackEntry.arguments?.getString("protocol") ?: RfProtocol.EXPRESS.name
             val protocol = runCatching { RfProtocol.valueOf(protocolStr) }
                 .getOrDefault(RfProtocol.EXPRESS)
             val vibration = backStackEntry.arguments?.getBoolean("vibration") ?: false
+            val customDuration = backStackEntry.arguments?.getInt("customDuration") ?: 0
             AssessmentRunScreen(
                 protocol = protocol,
+                customDurationMinutes = customDuration,
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) },
                 onSessionComplete = { sessionTimestamp ->

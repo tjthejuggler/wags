@@ -234,8 +234,7 @@ fun BreathingScreen(
 
             Button(
                 onClick = onNavigateToRfAssessment,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = state.isHrDeviceConnected
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Text("RF Assessment")
             }

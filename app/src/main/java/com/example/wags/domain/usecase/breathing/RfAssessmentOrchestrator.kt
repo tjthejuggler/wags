@@ -18,7 +18,7 @@ import kotlin.math.roundToInt
 // Enums
 // ---------------------------------------------------------------------------
 
-enum class RfProtocol { EXPRESS, STANDARD, DEEP, CONTINUOUS, TARGETED, SLIDING_WINDOW }
+enum class RfProtocol { EXPRESS, STANDARD, DEEP, CONTINUOUS, TARGETED, SLIDING_WINDOW, CUSTOM }
 enum class RfPhase    { IDLE, BASELINE, TEST_BLOCK, WASHOUT, COMPLETE }
 
 // ---------------------------------------------------------------------------
@@ -191,6 +191,7 @@ class RfAssessmentOrchestrator @Inject constructor(
         protocol: RfProtocol,
         scope: CoroutineScope,
         optimalBpm: Float = 5.5f,
+        customDurationMinutes: Int = 0,
         onEpochComplete: (RfEpochResult) -> Unit = {},
         onComplete: (List<RfEpochResult>) -> Unit = {}
     ) {
@@ -202,7 +203,7 @@ class RfAssessmentOrchestrator @Inject constructor(
                 runSlidingWindow(scope)
             }
             else -> scope.launch {
-                runSteppedProtocol(protocol, optimalBpm, onEpochComplete, onComplete)
+                runSteppedProtocol(protocol, optimalBpm, onEpochComplete, onComplete, customDurationMinutes)
             }
         }
 
@@ -238,9 +239,10 @@ class RfAssessmentOrchestrator @Inject constructor(
         protocol: RfProtocol,
         optimalBpm: Float,
         onEpochComplete: (RfEpochResult) -> Unit,
-        onComplete: (List<RfEpochResult>) -> Unit
+        onComplete: (List<RfEpochResult>) -> Unit,
+        customDurationMinutes: Int = 0
     ) {
-        val (grid, testDurationMs, washoutDurationMs) = protocolParams(protocol, optimalBpm)
+        val (grid, testDurationMs, washoutDurationMs) = protocolParams(protocol, optimalBpm, customDurationMinutes)
         val totalEpochs = grid.size
         val totalMs = BASELINE_DURATION_MS + totalEpochs * (testDurationMs + washoutDurationMs)
 
@@ -443,7 +445,8 @@ class RfAssessmentOrchestrator @Inject constructor(
      */
     private fun protocolParams(
         protocol: RfProtocol,
-        optimalBpm: Float
+        optimalBpm: Float,
+        customDurationMinutes: Int = 0
     ): Triple<List<Pair<Float, Float>>, Long, Long> {
         val offset = randomPeriodOffsetSec()
 
@@ -472,8 +475,44 @@ class RfAssessmentOrchestrator @Inject constructor(
                 STANDARD_RATES_BPM.shuffled().map { offsetBpm(it, offset) to 1.0f },
                 120_000L, 0L
             )
+            RfProtocol.CUSTOM -> customProtocolParams(offset, customDurationMinutes)
             RfProtocol.SLIDING_WINDOW -> Triple(emptyList(), 0L, 0L) // handled separately
         }
+    }
+
+    /**
+     * Computes CUSTOM protocol parameters based on user-specified total duration.
+     *
+     * Algorithm:
+     * 1. Subtract 1-min baseline from total time
+     * 2. Maximize the number of rates (3–7) that fit with test blocks ≥ 60 s
+     * 3. Pick n rates from [EXPRESS_POOL_BPM], shuffled, with period offset applied
+     * 4. Test duration capped at 300 s (5 min) for long sessions; minimum 60 s
+     * 5. 30 s washout between blocks
+     */
+    private fun customProtocolParams(
+        offset: Float,
+        totalMinutes: Int
+    ): Triple<List<Pair<Float, Float>>, Long, Long> {
+        val availableSec = (totalMinutes * 60L) - (BASELINE_DURATION_MS / 1000L)
+            .coerceAtLeast(0L)
+        val washoutSec = 30L
+
+        // Find the most rates that fit while keeping each test block ≥ 60 s
+        var bestN = 3
+        var bestTestSec = 60L
+
+        for (n in 3..7) {
+            val testSec = (availableSec - (n - 1) * washoutSec) / n
+            if (testSec < 60L) break          // can't fit n rates
+            bestN = n
+            bestTestSec = testSec.coerceAtMost(300L) // up to 5 min per block
+        }
+
+        val grid = EXPRESS_POOL_BPM.shuffled().take(bestN)
+            .map { offsetBpm(it, offset) to 1.0f }
+
+        return Triple(grid, bestTestSec * 1000L, washoutSec * 1000L)
     }
 
     // -----------------------------------------------------------------------
