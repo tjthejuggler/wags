@@ -1,5 +1,26 @@
 # WAGS — Active Context
 
+### 2026-04-20 10:21 (UTC-4)
+**Task**: Add "End Early & Save" button to Resonance Breathing Assessment
+
+**What was done:**
+1. Added `completedEpochCount: Int = 0` to `AssessmentRunViewModel.UiState` — tracks how many test epochs have finished.
+2. Updated `collectOrchestratorState()` → `Active` branch to set `completedEpochCount = orchestrator.epochResults.value.size` on every state update.
+3. Added `finishEarly()` public method to `AssessmentRunViewModel`:
+   - Reads `orchestrator.epochResults.value` (completed epochs so far)
+   - Cancels all jobs + stops orchestrator
+   - Calls `saveSteppedSession(epochs)` in a coroutine (same save path as normal completion)
+   - Sends `RESONANCE_BREATHING` habit increment
+   - `saveSteppedSession` sets `isComplete = true` + `sessionId`, triggering the existing `LaunchedEffect` to navigate to the result screen
+4. Updated `AssessmentRunScreen.kt` — replaced single "Cancel Assessment" button with two buttons:
+   - **"End Early & Save (N tests done)"** — green `Button`, enabled only when `completedEpochCount >= 1 && !isComplete`; label shows count and pluralizes "test/tests"
+   - **"Cancel Assessment"** — unchanged `OutlinedButton`, always available, discards everything
+
+**Build**: (pending)
+
+*Last updated: 2026-04-20 10:21 UTC-4*
+
+
 ### 2026-04-19 12:10 (UTC-4)
 **Task**: Custom length RF Assessment protocol — refinements
 

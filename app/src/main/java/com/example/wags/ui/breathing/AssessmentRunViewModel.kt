@@ -78,7 +78,9 @@ class AssessmentRunViewModel @Inject constructor(
         /** Live RMSSD (ms) computed from recent RR intervals. */
         val liveRmssd: Float? = null,
         /** Live SDNN (ms) computed from recent RR intervals. */
-        val liveSdnn: Float? = null
+        val liveSdnn: Float? = null,
+        /** Number of test epochs completed so far (enables "End Early & Save"). */
+        val completedEpochCount: Int = 0
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -158,12 +160,13 @@ class AssessmentRunViewModel @Inject constructor(
                         }
 
                         _uiState.value = _uiState.value.copy(
-                            phase             = phaseLabel,
-                            currentBpm        = orchState.rateBpm,
-                            remainingSeconds  = orchState.remainingSeconds.toInt(),
-                            progress          = orchState.progress,
-                            latestEpochScore  = orchState.latestEpoch,
-                            qualityWarning    = warning
+                            phase               = phaseLabel,
+                            currentBpm          = orchState.rateBpm,
+                            remainingSeconds    = orchState.remainingSeconds.toInt(),
+                            progress            = orchState.progress,
+                            latestEpochScore    = orchState.latestEpoch,
+                            qualityWarning      = warning,
+                            completedEpochCount = orchestrator.epochResults.value.size
                         )
                     }
 
@@ -473,6 +476,23 @@ class AssessmentRunViewModel @Inject constructor(
         pacerJob?.cancel()
         coherenceJob?.cancel()
         orchestrator.stop()
+    }
+
+    /**
+     * Stops the assessment early and saves whatever epochs have been completed so far.
+     * Only callable when at least 1 epoch has finished (completedEpochCount >= 1).
+     */
+    fun finishEarly() {
+        val epochs = orchestrator.epochResults.value
+        if (epochs.isEmpty()) return   // nothing to save — shouldn't happen if UI guards correctly
+        rrPollingJob?.cancel()
+        pacerJob?.cancel()
+        coherenceJob?.cancel()
+        orchestrator.stop()
+        viewModelScope.launch {
+            saveSteppedSession(epochs)
+            habitRepo.sendHabitIncrement(Slot.RESONANCE_BREATHING)
+        }
     }
 
     override fun onCleared() {

@@ -1,5 +1,16 @@
 # WAGS — Progress
 
+## Recent Changes (2026-04-20 10:21 UTC-4)
+- ✅ **"End Early & Save" button on Resonance Breathing Assessment:**
+  - New green `Button` above the Cancel button — enabled once ≥1 test epoch has completed
+  - Label shows live count: "End Early & Save (2 tests done)"
+  - Calls `viewModel.finishEarly()` → stops orchestrator, saves partial epochs via same `saveSteppedSession()` path as normal completion → navigates to result screen
+  - Cancel button unchanged — still discards everything
+  - Modified: `AssessmentRunViewModel.kt`, `AssessmentRunScreen.kt`
+  - Build: (pending)
+
+*Last updated: 2026-04-20 10:21 UTC-4*
+
 ## Recent Changes (2026-04-19 12:01 UTC-4)
 - ✅ **Custom length RF Assessment protocol:**
   - New `CUSTOM` protocol in `RfProtocol` enum — user sets total duration (5–60 min) via slider

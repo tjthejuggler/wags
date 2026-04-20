@@ -210,7 +210,27 @@ fun AssessmentRunScreen(
                     .height(100.dp)
             )
 
-            // Cancel button
+            // End Early & Save button — only enabled once at least 1 epoch is done
+            val canFinishEarly = uiState.completedEpochCount >= 1 && !uiState.isComplete
+            Button(
+                onClick = { viewModel.finishEarly() },
+                enabled = canFinishEarly,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF2E7D32),
+                    contentColor   = Color.White,
+                    disabledContainerColor = SurfaceVariant,
+                    disabledContentColor   = TextSecondary
+                )
+            ) {
+                val epochLabel = if (uiState.completedEpochCount > 0)
+                    "End Early & Save (${uiState.completedEpochCount} test${if (uiState.completedEpochCount == 1) "" else "s"} done)"
+                else
+                    "End Early & Save (complete a test first)"
+                Text(epochLabel)
+            }
+
+            // Cancel button — discards everything
             OutlinedButton(
                 onClick = {
                     viewModel.cancel()
