@@ -516,6 +516,17 @@ class ProgressiveO2ViewModel @Inject constructor(
         _uiState.update { it.copy(newPersonalBest = null) }
     }
 
+    /**
+     * Restarts the same Progressive O₂ session from scratch without navigating away.
+     * Cancels any running session, resets result state, then calls [startSession] again.
+     * Called by [ProgressiveO2PipContent] when the user taps "Again" inside PiP.
+     */
+    fun restartSameSession() {
+        cancelSession()
+        _uiState.update { it.copy(completedRecordId = null, newPersonalBest = null) }
+        startSession()
+    }
+
     /** Log first contraction during a HOLD phase. */
     fun logFirstContraction() {
         stateMachine.signalFirstContraction()

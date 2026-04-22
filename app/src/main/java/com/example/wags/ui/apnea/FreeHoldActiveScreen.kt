@@ -56,12 +56,14 @@ import com.example.wags.domain.model.SpotifySong
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
 import com.example.wags.domain.usecase.apnea.GuidedAudioManager
+import com.example.wags.ui.apnea.pip.FreeHoldPipContent
 import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.common.SessionBackHandler
+import com.example.wags.ui.common.pip.PipSessionHost
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -762,6 +764,29 @@ class FreeHoldActiveViewModel @Inject constructor(
         _uiState.update { it.copy(newPersonalBest = null) }
     }
 
+    /**
+     * Restarts the same Free Hold drill from scratch without navigating away.
+     * Clears any PB dialog and result state, then returns to the pre-start state.
+     * Called by [FreeHoldPipContent] when the user taps "Again" inside PiP.
+     */
+    fun restartSameSession() {
+        // Cancel any in-progress hold first
+        if (_uiState.value.freeHoldActive) {
+            cancelFreeHold()
+        }
+        // Clear result / PB state — returns screen to pre-start
+        _uiState.update {
+            it.copy(
+                newPersonalBest = null,
+                pbCheckPending = false,
+                freeHoldActive = false,
+                freeHoldFirstContractionMs = null,
+                currentPbCategory = null,
+                nextPbTarget = null
+            )
+        }
+    }
+
     // ── Song picker ──────────────────────────────────────────────────────────
 
     /**
@@ -1088,7 +1113,6 @@ class FreeHoldActiveViewModel @Inject constructor(
  * arguments so the correct values are always saved — regardless of which
  * ViewModel instance is alive.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FreeHoldActiveScreen(
     navController: NavController,
@@ -1101,6 +1125,21 @@ fun FreeHoldActiveScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    PipSessionHost(
+        pipEnabled = true, // always eligible: covers pre-start, active, and result phases
+        pipContent = { FreeHoldPipContent(viewModel = viewModel) },
+        fullContent = { FreeHoldActiveScreenContent(navController, showTimer, state, viewModel) }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FreeHoldActiveScreenContent(
+    navController: NavController,
+    showTimer: Boolean,
+    state: FreeHoldActiveUiState,
+    viewModel: FreeHoldActiveViewModel
+) {
     SessionBackHandler(enabled = state.freeHoldActive) {
         viewModel.cancelFreeHold()
         navController.popBackStack()

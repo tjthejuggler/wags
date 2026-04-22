@@ -547,6 +547,17 @@ class MinBreathViewModel @Inject constructor(
         _uiState.update { it.copy(newPersonalBest = null) }
     }
 
+    /**
+     * Restarts the same Min Breath session from scratch without navigating away.
+     * Cancels any running session, resets result state, then calls [startSession] again.
+     * Called by [MinBreathPipContent] when the user taps "Again" inside PiP.
+     */
+    fun restartSameSession() {
+        cancelSession()
+        _uiState.update { it.copy(completedRecordId = null, newPersonalBest = null) }
+        startSession()
+    }
+
     // ── Session saving ──────────────────────────────────────────────────────
 
     private suspend fun saveSession(finalState: MinBreathState): Long {

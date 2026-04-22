@@ -1668,3 +1668,79 @@ The project is in an **advanced implementation stage**. All major architecture p
 - **Progressive O₂ Drill (complete)** — All screens + ViewModel + StateMachine created. Detail screen uses shared `ApneaRecordDetailScreen`.
 - **HRV pipeline** — Multiple HRV use case files open (RrPreFilter, Phase1/2, TimeDomain, PchipResampler)
 - **BLE layer** — BlePermissionManager, AccRespirationEngine open
+
+### 2026-04-20 15:15 (UTC-4)
+
+**Feature: Picture-in-Picture (PiP) mode for apnea drills — COMPLETE**
+
+Implemented native Android PiP for all 3 apnea drill screens (Free Hold, Progressive O2, Min Breath). When the user presses Home or switches apps during an active session, the app shrinks into a floating PiP window showing context-appropriate controls.
+
+**Files created:**
+- `app/src/main/res/drawable/ic_pip_*.xml` — 5 PiP icon drawables (play, stop, contraction, breath, repeat)
+- `ui/common/pip/PipAction.kt` — PipAction data class, PipActionIds constants, PipActionReceiver BroadcastReceiver
+- `ui/common/pip/PipController.kt` — singleton coordinator with isInPipMode: StateFlow<Boolean>, actionFlow: SharedFlow<String>
+- `ui/common/pip/PipSessionHost.kt` — reusable Composable wrapper that switches between pip/full layouts
+- `ui/common/pip/MiniSessionLayout.kt` — PipRoot, PipTimerText, PipLabel, PipButton, PipButtonRow, PipResultCard
+- `ui/apnea/pip/FreeHoldPipContent.kt` — 4-state PiP for Free Hold
+- `ui/apnea/pip/ProgressiveO2PipContent.kt` — 4-state PiP for Progressive O2
+- `ui/apnea/pip/MinBreathPipContent.kt` — 4-state PiP for Min Breath
+
+**Files modified:**
+- `AndroidManifest.xml` — android:supportsPictureInPicture="true", android:resizeableActivity="true", configChanges flags
+- `MainActivity.kt` — onResume/onPause receiver registration, onUserLeaveHint(), onPictureInPictureModeChanged()
+- `FreeHoldActiveScreen.kt` — wrapped with PipSessionHost; added restartSameSession() to ViewModel
+- `ProgressiveO2ActiveScreen.kt` — wrapped with PipSessionHost; added restartSameSession() to ViewModel
+- `MinBreathActiveScreen.kt` — wrapped with PipSessionHost; added restartSameSession() to ViewModel
+
+**PiP button states per drill:**
+- Free Hold: pre-start -> Start; active+no-contraction -> 1st Contraction + Stop; active+contraction -> Stop; result -> Again
+- Progressive O2: HOLD+no-contraction -> 1st Contraction + Stop; HOLD+contraction -> Stop; BREATHING -> Stop; COMPLETE -> Again
+- Min Breath: HOLD+no-contraction -> 1st Contraction + Breath; HOLD+contraction -> Breath; BREATHING -> Hold + Stop; COMPLETE -> Again
+
+**Build:** Kotlin compilation succeeded (42 tasks). Install skipped — ADB device offline at time of build.
+
+### 2026-04-21 07:34 (UTC-4)
+
+**PiP Bug Fix — Built & Installed Successfully**
+
+Applied PiP bug fixes from previous session and built/installed to device (SM-S918U1).
+
+**Root causes fixed (from previous session):**
+1. `setPipEligible()` now takes `Activity` param and immediately calls `setPictureInPictureParams()` — OS now knows eligibility before Home press
+2. `buildParams()` now includes `setAutoEnterEnabled(pipEligible)` on API 31+ — reliable PiP trigger on gesture-nav Android 12+
+3. `notifyPipModeChanged()` no longer clears `pipEligible` — was incorrectly resetting eligibility on every PiP mode change
+4. `setActions()` always calls `setPictureInPictureParams()` (not just when already in PiP) — auto-enter params stay up to date
+
+**Build result:** BUILD SUCCESSFUL in 29s — installed on SM-S918U1 (2 devices)
+
+**Status:** Awaiting user test to confirm PiP window appears when pressing Home during a Free Hold session.
+
+### 2026-04-21 07:41 (UTC-4)
+
+**PiP Fix: Removed Compose buttons from PiP content (touch blocked by OS)**
+
+Root cause: In Android PiP mode, the OS intercepts all touch events on the PiP window. The first tap selects/focuses the window and shows system controls (full screen, close, etc.). Compose touch targets (Button, clickable) never receive events. Only OS RemoteAction buttons (icon buttons in the system overlay) work.
+
+**Fix applied to 4 files:**
+- `MiniSessionLayout.kt` — removed `PipButton` and `PipButtonRow` composables entirely; updated `PipResultCard` to remove the "Again" Button, replaced with a `PipLabel("↺ tap Again")` hint
+- `FreeHoldPipContent.kt` — replaced all `PipButton`/`PipButtonRow` with read-only `PipLabel` text; pre-start shows "Free Hold / ▶ tap Start"
+- `ProgressiveO2PipContent.kt` — replaced all `PipButton`/`PipButtonRow` with read-only labels; contraction time shown as `PipLabel` when logged
+- `MinBreathPipContent.kt` — replaced all `PipButton`/`PipButtonRow` with read-only labels; contraction time shown as `PipLabel` when logged
+
+**Pattern going forward:** PiP content composables are DISPLAY ONLY. All user interaction goes through OS RemoteAction buttons registered via `PipController.setActions()`. The `actionFlow` collector in each `*PipContent.kt` handles the resulting action IDs.
+
+**Build result:** BUILD SUCCESSFUL in 42s — installed on SM-S918U1 (2 devices)
+
+### 2026-04-21 07:45 (UTC-4)
+
+**PiP Fix: BroadcastReceiver was unregistered on onPause() — which fires when entering PiP**
+
+Root cause: `onPause()` fires when the Activity enters PiP mode. The original code unregistered `pipActionReceiver` in `onPause()`, so by the time the user tapped an OS overlay button, the receiver was gone and the broadcast was dropped silently.
+
+**Fix in `MainActivity.kt`:**
+- `onPause()` now only unregisters the receiver when NOT in PiP mode (`if (!isInPictureInPictureMode)`)
+- Added `onStop()` override that unregisters when the activity IS in PiP mode (i.e. when the PiP window itself is closed/stopped)
+
+This ensures the receiver stays alive for the entire duration of PiP mode.
+
+**Build result:** BUILD SUCCESSFUL in 1m — installed on SM-S918U1 (1 device)

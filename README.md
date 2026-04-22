@@ -1322,3 +1322,18 @@ Both guards are applied to all 10 active session/reading screens:
 | [`AdvancedApneaScreen`](app/src/main/java/com/example/wags/ui/apnea/AdvancedApneaScreen.kt) | Not `IDLE` or `COMPLETE` |
 | [`SessionScreen`](app/src/main/java/com/example/wags/ui/session/SessionScreen.kt) | `ACTIVE` or `PROCESSING` |
 | [`MeditationScreen`](app/src/main/java/com/example/wags/ui/meditation/MeditationScreen.kt) | `ACTIVE` or `PROCESSING` |
+
+## Picture-in-Picture (PiP) Mode — 2026-04-20
+
+When the user presses Home or switches apps during an active apnea session, the app automatically enters Android native PiP mode. A compact floating window appears showing the current drill state and context-appropriate action buttons.
+
+**Supported drills:** Free Hold, Progressive O2, Min Breath
+
+**PiP button states:**
+- Pre-start (Free Hold only): Start
+- Hold active, no contraction logged: 1st Contraction + Stop (or Breath for Min Breath)
+- Hold active, contraction logged: Stop (or Breath for Min Breath)
+- Breathing phase (Min Breath): Hold + Stop
+- Session complete: Again (restarts same drill silently inside PiP)
+
+**Architecture:** Reusable `PipSessionHost` composable wrapper in `ui/common/pip/`. Any future session type can opt in by wrapping its screen with `PipSessionHost` and providing a `*PipContent.kt` composable. See `memory-bank/systemPatterns.md` for the full pattern guide.

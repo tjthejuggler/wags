@@ -2,6 +2,7 @@ package com.example.wags
 
 import android.Manifest
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -18,6 +19,9 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.navigation.compose.rememberNavController
 import com.example.wags.data.ble.AutoConnectManager
 import com.example.wags.data.spotify.SpotifyAuthManager
+import com.example.wags.ui.common.pip.PIP_ACTION_BROADCAST
+import com.example.wags.ui.common.pip.PipActionReceiver
+import com.example.wags.ui.common.pip.PipController
 import com.example.wags.ui.navigation.WagsNavGraph
 import com.example.wags.ui.theme.WagsTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -48,6 +52,9 @@ class MainActivity : ComponentActivity() {
 
     /** Job for the 10-minute background shutdown timer. */
     private var backgroundShutdownJob: Job? = null
+
+    /** Receives taps on PiP overlay buttons and forwards them to PipController. */
+    private val pipActionReceiver = PipActionReceiver()
 
     private val blePermissions: Array<String> = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         arrayOf(
@@ -115,6 +122,50 @@ class MainActivity : ComponentActivity() {
 
         // Handle Spotify OAuth redirect if the activity was launched with one
         handleSpotifyRedirect(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(
+                pipActionReceiver,
+                IntentFilter(PIP_ACTION_BROADCAST),
+                RECEIVER_NOT_EXPORTED
+            )
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            registerReceiver(pipActionReceiver, IntentFilter(PIP_ACTION_BROADCAST))
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Do NOT unregister when entering PiP — onPause fires when PiP starts,
+        // but we still need the receiver to handle OS overlay button taps.
+        if (!isInPictureInPictureMode) {
+            try { unregisterReceiver(pipActionReceiver) } catch (_: IllegalArgumentException) { }
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Unregister when the activity is fully stopped (not just PiP).
+        if (isInPictureInPictureMode) {
+            try { unregisterReceiver(pipActionReceiver) } catch (_: IllegalArgumentException) { }
+        }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        PipController.requestEnterPip(this)
+    }
+
+    override fun onPictureInPictureModeChanged(
+        isInPictureInPictureMode: Boolean,
+        newConfig: android.content.res.Configuration
+    ) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        PipController.notifyPipModeChanged(isInPictureInPictureMode)
     }
 
     override fun onDestroy() {

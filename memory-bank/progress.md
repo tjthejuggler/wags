@@ -612,3 +612,12 @@
 
 ### 2026-04-02 20:12 (UTC-6)
 - ✅ Removed H10 restriction from Morning Readiness: any connected HR device (Polar H10, Verity Sense, oximeter, generic HR strap) can now start the test. ACC-based stand detection only activates when H10 is connected; other devices use FSM fallback timestamp. H10 behavior unchanged. Modified: `MorningReadinessViewModel.kt`, `MorningReadinessScreen.kt`.
+
+## Recent Changes (2026-04-20 15:15 UTC-4)
+- Added Picture-in-Picture (PiP) mode for all 3 apnea drill screens (Free Hold, Progressive O2, Min Breath)
+- Created reusable PiP layer: PipController (singleton), PipSessionHost (composable wrapper), MiniSessionLayout (primitives), PipAction + PipActionReceiver
+- Created drill-specific PiP composables: FreeHoldPipContent, ProgressiveO2PipContent, MinBreathPipContent
+- Added restartSameSession() to FreeHoldActiveViewModel, ProgressiveO2ViewModel, MinBreathViewModel
+- Updated MainActivity with onUserLeaveHint, onPictureInPictureModeChanged, PipActionReceiver registration
+- Updated AndroidManifest.xml with PiP attributes
+- Build: Kotlin compilation succeeded; install skipped (device offline)

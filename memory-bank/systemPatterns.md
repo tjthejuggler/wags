@@ -162,3 +162,79 @@ The trophy/personal-best system is generalized via `DrillContext` to work with a
 - Shown on setup screens for timer-driven drills (Progressive O₂, O₂/CO₂ tables)
 - NOT shown on user-driven drills (Min Breath — no countdowns)
 - Each ViewModel exposes `voiceEnabled`/`vibrationEnabled` in UI state + `setVoiceEnabled()`/`setVibrationEnabled()` setters
+
+## Picture-in-Picture (PiP) Pattern (2026-04-20 15:15 UTC-4)
+
+### Overview
+Native Android PiP (API 26+) — no SYSTEM_ALERT_WINDOW overlay needed.
+Auto-enters PiP when user presses Home/switches apps during an active session.
+
+### How to opt a session screen into PiP
+
+1. **Wrap the screen composable** with `PipSessionHost`:
+   ```kotlin
+   PipSessionHost(
+       pipEnabled = isActive || phase == COMPLETE,
+       pipContent = { MyDrillPipContent(viewModel = viewModel) },
+       fullContent = { MyDrillScreenContent(...) }
+   )
+   ```
+
+2. **Create a `*PipContent.kt`** in `ui/<feature>/pip/` that:
+   - Observes the ViewModel state
+   - Builds a `pipActions` list reactively (max 3 OS overlay buttons)
+   - Pushes actions via `LaunchedEffect(pipActions) { PipController.setActions(activity, pipActions) }`
+   - Collects `PipController.actionFlow` to handle OS button taps
+   - Renders `PipRoot { ... }` with `PipTimerText`, `PipButtonRow`, `PipResultCard` etc.
+
+3. **Add `restartSameSession()`** to the ViewModel — calls `cancelSession()` then `startSession()` with same params.
+
+### Key files
+- `ui/common/pip/PipController.kt` — singleton; `isInPipMode: StateFlow<Boolean>`, `actionFlow: SharedFlow<String>`
+- `ui/common/pip/PipAction.kt` — `PipAction` data class, `PipActionIds` constants, `PipActionReceiver`
+- `ui/common/pip/PipSessionHost.kt` — composable wrapper
+- `ui/common/pip/MiniSessionLayout.kt` — `PipRoot`, `PipTimerText`, `PipLabel`, `PipButton`, `PipButtonRow`, `PipResultCard`
+- `MainActivity.kt` — `onUserLeaveHint()`, `onPictureInPictureModeChanged()`, receiver registration
+
+### Constraints
+- OS allows max 3 RemoteAction buttons in the PiP overlay
+- `configChanges` flags in AndroidManifest prevent Activity recreation on PiP enter/exit
+- `PipController.setPipEligible(false)` is called automatically on composition disposal via `DisposableEffect`
+
+## Picture-in-Picture (PiP) Pattern (2026-04-20 15:15 UTC-4)
+
+### Overview
+Native Android PiP (API 26+) — no SYSTEM_ALERT_WINDOW overlay needed.
+Auto-enters PiP when user presses Home/switches apps during an active session.
+
+### How to opt a session screen into PiP
+
+1. **Wrap the screen composable** with `PipSessionHost`:
+   ```kotlin
+   PipSessionHost(
+       pipEnabled = isActive || phase == COMPLETE,
+       pipContent = { MyDrillPipContent(viewModel = viewModel) },
+       fullContent = { MyDrillScreenContent(...) }
+   )
+   ```
+
+2. **Create a `*PipContent.kt`** in `ui/<feature>/pip/` that:
+   - Observes the ViewModel state
+   - Builds a `pipActions` list reactively (max 3 OS overlay buttons)
+   - Pushes actions via `LaunchedEffect(pipActions) { PipController.setActions(activity, pipActions) }`
+   - Collects `PipController.actionFlow` to handle OS button taps
+   - Renders `PipRoot { ... }` with `PipTimerText`, `PipButtonRow`, `PipResultCard` etc.
+
+3. **Add `restartSameSession()`** to the ViewModel — calls `cancelSession()` then `startSession()` with same params.
+
+### Key files
+- `ui/common/pip/PipController.kt` — singleton; `isInPipMode: StateFlow<Boolean>`, `actionFlow: SharedFlow<String>`
+- `ui/common/pip/PipAction.kt` — `PipAction` data class, `PipActionIds` constants, `PipActionReceiver`
+- `ui/common/pip/PipSessionHost.kt` — composable wrapper
+- `ui/common/pip/MiniSessionLayout.kt` — `PipRoot`, `PipTimerText`, `PipLabel`, `PipButton`, `PipButtonRow`, `PipResultCard`
+- `MainActivity.kt` — `onUserLeaveHint()`, `onPictureInPictureModeChanged()`, receiver registration
+
+### Constraints
+- OS allows max 3 RemoteAction buttons in the PiP overlay
+- `configChanges` flags in AndroidManifest prevent Activity recreation on PiP enter/exit
+- `PipController.setPipEligible(false)` is called automatically on composition disposal via `DisposableEffect`

@@ -18,19 +18,37 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.domain.usecase.apnea.MinBreathHoldResult
 import com.example.wags.domain.usecase.apnea.MinBreathPhase
+import com.example.wags.ui.apnea.pip.MinBreathPipContent
 import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.LiveSensorActionsNav
 import com.example.wags.ui.common.SessionBackHandler
+import com.example.wags.ui.common.pip.PipSessionHost
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MinBreathActiveScreen(
     navController: NavController,
     viewModel: MinBreathViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val phase = state.sessionState.phase
+    val isActive = phase == MinBreathPhase.HOLD || phase == MinBreathPhase.BREATHING
+
+    PipSessionHost(
+        pipEnabled = isActive || phase == MinBreathPhase.COMPLETE,
+        pipContent = { MinBreathPipContent(viewModel = viewModel) },
+        fullContent = { MinBreathActiveScreenContent(navController, state, viewModel) }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MinBreathActiveScreenContent(
+    navController: NavController,
+    state: MinBreathUiState,
+    viewModel: MinBreathViewModel
+) {
     val phase = state.sessionState.phase
     val isActive = phase == MinBreathPhase.HOLD || phase == MinBreathPhase.BREATHING
 
