@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.AutoConnectManager
 import com.example.wags.data.ble.DevicePreferencesRepository
 import com.example.wags.data.ble.UnifiedDeviceManager
+import com.example.wags.data.debug.DebugPreferences
 import com.example.wags.data.garmin.GarminConnectionState
 import com.example.wags.data.garmin.GarminManager
 import com.example.wags.data.ipc.HabitIntegrationRepository
@@ -70,7 +71,10 @@ data class SettingsUiState(
     val isImporting: Boolean = false,
     val exportImportMessage: String? = null,
     val exportImportError: String? = null,
-    val exportFileName: String = ""
+    val exportFileName: String = "",
+    // ── Debug Mode ────────────────────────────────────────────────────────────
+    val debugModeEnabled: Boolean = false,
+    val debugFileDirUri: String = ""
 )
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
@@ -84,7 +88,8 @@ class SettingsViewModel @Inject constructor(
     private val meditationRepository: com.example.wags.data.repository.MeditationRepository,
     private val garminManager: GarminManager,
     private val dataExportImportRepo: DataExportImportRepository,
-    private val spotifyAuthManager: SpotifyAuthManager
+    private val spotifyAuthManager: SpotifyAuthManager,
+    private val debugPrefs: DebugPreferences
 ) : ViewModel() {
 
     private val _habitState = MutableStateFlow(buildInitialHabitState())
@@ -137,6 +142,11 @@ class SettingsViewModel @Inject constructor(
         )
     }.combine(spotifyAuthManager.isConnected) { state, spotifyConnected ->
         state.copy(spotifyConnected = spotifyConnected)
+    }.combine(debugPrefs.snapshot) { state, debugSnap ->
+        state.copy(
+            debugModeEnabled = debugSnap.debugModeEnabled,
+            debugFileDirUri  = debugSnap.debugFileDirUri
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -151,7 +161,9 @@ class SettingsViewModel @Inject constructor(
             meditationHabit         = slotSelection(Slot.MEDITATION),
             rapidHrChangeHabit      = slotSelection(Slot.RAPID_HR_CHANGE),
             progressiveO2Habit      = slotSelection(Slot.PROGRESSIVE_O2),
-            minBreathHabit          = slotSelection(Slot.MIN_BREATH)
+            minBreathHabit          = slotSelection(Slot.MIN_BREATH),
+            debugModeEnabled        = debugPrefs.debugModeEnabled,
+            debugFileDirUri         = debugPrefs.debugFileDirUri
         )
     )
 
@@ -271,6 +283,20 @@ class SettingsViewModel @Inject constructor(
 
     /** Disconnect the Spotify account — clears all stored tokens. */
     fun disconnectSpotify() = spotifyAuthManager.disconnect()
+
+    // ── Debug Mode ─────────────────────────────────────────────────────────────
+
+    fun setDebugModeEnabled(enabled: Boolean) {
+        debugPrefs.debugModeEnabled = enabled
+    }
+
+    fun setDebugFileDir(uriString: String) {
+        debugPrefs.debugFileDirUri = uriString
+    }
+
+    fun clearDebugFileDir() {
+        debugPrefs.debugFileDirUri = ""
+    }
 
     override fun onCleared() {
         stopScan()

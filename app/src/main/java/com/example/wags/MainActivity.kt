@@ -12,16 +12,23 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.wags.data.ble.AutoConnectManager
+import com.example.wags.data.debug.DebugNoteRepository
+import com.example.wags.data.debug.DebugPreferences
 import com.example.wags.data.spotify.SpotifyAuthManager
 import com.example.wags.ui.common.pip.PIP_ACTION_BROADCAST
 import com.example.wags.ui.common.pip.PipActionReceiver
 import com.example.wags.ui.common.pip.PipController
+import com.example.wags.ui.debug.DebugBubbleOverlay
 import com.example.wags.ui.navigation.WagsNavGraph
 import com.example.wags.ui.theme.WagsTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -41,6 +48,12 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var spotifyAuthManager: SpotifyAuthManager
+
+    @Inject
+    lateinit var debugPrefs: DebugPreferences
+
+    @Inject
+    lateinit var debugNoteRepo: DebugNoteRepository
 
     /** True while an apnea hold is active; set by ApneaTableScreen. */
     var isApneaHoldActive: Boolean = false
@@ -112,7 +125,17 @@ class MainActivity : ComponentActivity() {
         setContent {
             WagsTheme {
                 val navController = rememberNavController()
-                WagsNavGraph(navController = navController)
+                Box {
+                    WagsNavGraph(navController = navController)
+                    // Debug bubble overlay — reads current route from navController
+                    val navBackStackEntry by navController.currentBackStackEntryAsState()
+                    val currentRoute = navBackStackEntry?.destination?.route
+                    DebugBubbleOverlay(
+                        currentRoute = currentRoute,
+                        debugPrefs = debugPrefs,
+                        debugNoteRepo = debugNoteRepo
+                    )
+                }
             }
         }
 

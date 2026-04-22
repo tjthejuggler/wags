@@ -99,6 +99,9 @@ dependencies {
     // OkHttp – used for Spotify Web API calls (PKCE token exchange, playback control)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
+    // DocumentFile – SAF folder picker for debug notes output
+    implementation("androidx.documentfile:documentfile:1.0.1")
+
     // Coil – async image loading for album art in song picker
     implementation("io.coil-kt:coil-compose:2.6.0")
 

@@ -78,6 +78,19 @@ fun SettingsScreen(
         }
     }
 
+    val debugDirLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+            viewModel.setDebugFileDir(uri.toString())
+        }
+    }
+
     val blePermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         arrayOf(
             Manifest.permission.BLUETOOTH_SCAN,
@@ -340,6 +353,17 @@ fun SettingsScreen(
             item {
                 CrashLogsCard(
                     onViewLogs = { navController.navigate(WagsRoutes.CRASH_LOGS) }
+                )
+            }
+
+            // ── Debug Mode ───────────────────────────────────────────────
+            item {
+                DebugModeCard(
+                    debugModeEnabled = state.debugModeEnabled,
+                    debugFileDirUri = state.debugFileDirUri,
+                    onToggleDebugMode = { viewModel.setDebugModeEnabled(it) },
+                    onChooseDirectory = { debugDirLauncher.launch(null) },
+                    onClearDirectory = { viewModel.clearDebugFileDir() }
                 )
             }
 
@@ -1202,6 +1226,120 @@ private fun AdviceSettingsCard(
                             if (count > 0) "Manage" else "Add",
                             style = MaterialTheme.typography.bodySmall
                         )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Debug Mode card ──────────────────────────────────────────────────────────
+
+@Composable
+private fun DebugModeCard(
+    debugModeEnabled: Boolean,
+    debugFileDirUri: String,
+    onToggleDebugMode: (Boolean) -> Unit,
+    onChooseDirectory: () -> Unit,
+    onClearDirectory: () -> Unit
+) {
+    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("🐛 Debug Mode", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Show a floating bubble on every screen. Tap it to log bugs, features, or notes " +
+                    "that are saved with the current screen's source file info to debug_wags.json.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
+
+            HorizontalDivider(color = SurfaceVariant)
+
+            // Toggle
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Enable Debug Bubble", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        if (debugModeEnabled) "Bubble is visible" else "Bubble is hidden",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (debugModeEnabled) ReadinessGreen else TextSecondary
+                    )
+                }
+                Switch(
+                    checked = debugModeEnabled,
+                    onCheckedChange = onToggleDebugMode,
+                    colors = SwitchDefaults.colors(
+                        checkedTrackColor = EcgCyan,
+                        checkedThumbColor = TextPrimary
+                    )
+                )
+            }
+
+            // File directory (only shown when debug mode is on)
+            if (debugModeEnabled) {
+                HorizontalDivider(color = SurfaceVariant)
+
+                Text("Output File Location", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "Choose the folder where debug_wags.json will be written.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        if (debugFileDirUri.isNotBlank()) {
+                            val displayPath = try {
+                                Uri.parse(debugFileDirUri).lastPathSegment ?: debugFileDirUri
+                            } catch (_: Exception) { debugFileDirUri }
+                            Text(
+                                displayPath,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = ReadinessGreen
+                            )
+                        } else {
+                            Text(
+                                "Using app internal storage",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        if (debugFileDirUri.isNotBlank()) {
+                            IconButton(onClick = onClearDirectory, modifier = Modifier.size(32.dp)) {
+                                Icon(
+                                    Icons.Default.Clear,
+                                    contentDescription = "Clear directory",
+                                    tint = TextSecondary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        OutlinedButton(
+                            onClick = onChooseDirectory,
+                            modifier = Modifier.height(32.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
+                        ) {
+                            Text(
+                                if (debugFileDirUri.isNotBlank()) "Change" else "Choose Folder",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
                     }
                 }
             }
