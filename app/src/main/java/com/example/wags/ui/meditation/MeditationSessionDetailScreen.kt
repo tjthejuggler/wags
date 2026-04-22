@@ -1,7 +1,10 @@
 package com.example.wags.ui.meditation
 
+import android.content.Intent
 import android.graphics.Paint
+import android.net.Uri
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
@@ -26,6 +29,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -44,6 +48,7 @@ import com.example.wags.ui.theme.*
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -251,7 +256,7 @@ fun MeditationSessionDetailScreen(
                             .replaceFirstChar { it.uppercase() })
                         DetailRow("Monitor", session.monitorId ?: "None")
                         audio?.sourceUrl?.takeIf { it.isNotBlank() }?.let { url ->
-                            DetailRow("Source URL", url)
+                            ClickableUrlRow(label = "Source", url = url)
                         }
                         if (!audio?.youtubeChannel.isNullOrBlank()) {
                             DetailRow("Channel", audio!!.youtubeChannel!!)
@@ -280,7 +285,9 @@ fun MeditationSessionDetailScreen(
                             )
                         }
 
+                        // Skip first 20 samples where the 20-beat rolling window is incomplete
                         val rmssdValues = telemetry
+                            .drop(20)
                             .filter { it.rollingRmssdMs > 0.0 }
                             .map { it.rollingRmssdMs.toFloat() }
                         if (rmssdValues.size >= 2) {
@@ -301,20 +308,30 @@ fun MeditationSessionDetailScreen(
                         DetailSection(title = "Heart Rate Analytics") {
                             DetailRow("Avg HR", "${String.format("%.1f", session.avgHrBpm)} BPM")
                             session.hrSlopeBpmPerMin?.let { slope ->
+                                val isStable = abs(slope) < 0.05
                                 val sign  = if (slope >= 0) "+" else ""
-                                val color = if (slope <= 0) TextPrimary else TextSecondary
+                                val color = when {
+                                    isStable -> TextSecondary
+                                    slope <= 0 -> TextPrimary
+                                    else -> TextSecondary
+                                }
                                 DetailRowColored(
                                     label = "HR Trend",
-                                    value = "$sign${String.format("%.2f", slope)} BPM/min",
+                                    value = if (isStable) "Stable (~0 BPM/min)" else "$sign${String.format("%.2f", slope)} BPM/min",
                                     valueColor = color
                                 )
                                 Text(
-                                    if (slope <= 0)
-                                        "✓ Heart rate decreased during session — good relaxation response"
-                                    else
-                                        "Heart rate increased slightly during session",
+                                    when {
+                                        isStable -> "Heart rate remained stable during session"
+                                        slope <= 0 -> "✓ Heart rate decreased during session — good relaxation response"
+                                        else -> "Heart rate increased slightly during session"
+                                    },
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = if (slope <= 0) TextPrimary else TextDisabled,
+                                    color = when {
+                                        isStable -> TextDisabled
+                                        slope <= 0 -> TextPrimary
+                                        else -> TextDisabled
+                                    },
                                     modifier = Modifier.padding(top = 2.dp)
                                 )
                             }
@@ -419,7 +436,7 @@ fun MeditationSessionDetailScreen(
                             Instant.ofEpochMilli(session.timestamp).atZone(zone)
                                 .format(DateTimeFormatter.ofPattern("MMM d yyyy, h:mm a"))
                         )
-                        DetailRow("Duration (ms)", session.durationMs.toString())
+                        DetailRow("Duration", "${durationMin}m ${durationSec}s")
                         if (telemetry.isNotEmpty()) {
                             DetailRow("Telemetry samples", telemetry.size.toString())
                         }
@@ -542,6 +559,38 @@ private fun DetailRowColored(label: String, value: String, valueColor: Color) {
             color = valueColor,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1.5f)
+        )
+    }
+}
+
+// ── Clickable URL row ──────────────────────────────────────────────────────────
+
+@Composable
+private fun ClickableUrlRow(label: String, url: String) {
+    val context = LocalContext.current
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            url,
+            style = MaterialTheme.typography.bodyMedium.copy(
+                color = Color(0xFF64B5F6),
+                fontWeight = FontWeight.Bold
+            ),
+            modifier = Modifier
+                .weight(1.5f)
+                .clickable {
+                    val fullUrl = if (url.startsWith("http")) url else "https://$url"
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(fullUrl)))
+                }
         )
     }
 }
