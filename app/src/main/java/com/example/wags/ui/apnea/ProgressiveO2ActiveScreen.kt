@@ -275,7 +275,8 @@ private fun CompleteContent(
     val rounds = session.roundResults
     val completedRounds = rounds.count { it.completed }
     val maxCompletedHoldMs = rounds.filter { it.completed }.maxOfOrNull { it.targetHoldMs } ?: 0L
-    val totalSessionMs = System.currentTimeMillis() - sessionStartMs
+    val sessionEndMs = remember { System.currentTimeMillis() }
+    val totalSessionMs = sessionEndMs - sessionStartMs
 
     // Telemetry aggregates from the ViewModel's live values (last known)
     val hr = state.liveHr

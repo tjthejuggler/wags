@@ -1,5 +1,14 @@
 # WAGS — Progress
 
+## Recent Changes (2026-04-22 19:05 UTC-4)
+- ✅ **Fix Progressive O₂ timer continuing to tick in report after session ends:**
+  - Root cause: `totalSessionMs` in `CompleteContent` used `System.currentTimeMillis() - sessionStartMs`, which recalculates on every recomposition triggered by live HR/SpO₂ updates
+  - Fix: Capture end time once with `remember { System.currentTimeMillis() }` when CompleteContent first composes, then compute total from frozen end time
+  - Modified: `ProgressiveO2ActiveScreen.kt` (line 278)
+  - Build: ✅ Successful, installed on SM-S918U1
+
+*Last updated: 2026-04-22 19:05 UTC-4*
+
 ## Recent Changes (2026-04-20 10:21 UTC-4)
 - ✅ **"End Early & Save" button on Resonance Breathing Assessment:**
   - New green `Button` above the Cancel button — enabled once ≥1 test epoch has completed

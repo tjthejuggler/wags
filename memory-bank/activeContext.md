@@ -1,5 +1,16 @@
 # WAGS — Active Context
 
+### 2026-04-22 19:05 (UTC-4)
+**Task**: Fix Progressive O₂ timer continuing to tick in the report after session ends
+
+**What was done:**
+1. Identified root cause: In [`CompleteContent()`](app/src/main/java/com/example/wags/ui/apnea/ProgressiveO2ActiveScreen.kt:278), `totalSessionMs` was computed as `System.currentTimeMillis() - sessionStartMs` — this recalculates on every recomposition. Since `hrDataSource.liveHr`/`liveSpO2` keep emitting, the ViewModel's `combine` keeps producing new states, causing continuous recomposition and the timer keeps ticking even after the session is complete.
+2. Fixed by capturing the end time once with `remember { System.currentTimeMillis() }` when `CompleteContent` first enters composition, then computing `totalSessionMs` from that frozen end time. The value is now stable across recompositions.
+
+**Build**: SUCCESS — installed on SM-S918U1
+
+*Last updated: 2026-04-22 19:05 UTC-4*
+
 ### 2026-04-20 10:21 (UTC-4)
 **Task**: Add "End Early & Save" button to Resonance Breathing Assessment
 
