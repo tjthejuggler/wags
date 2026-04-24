@@ -1,6 +1,10 @@
 package com.example.wags.ui.debug
 
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -12,7 +16,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
@@ -31,8 +37,8 @@ import kotlin.math.roundToInt
  * A draggable floating bubble overlay for the debug mode.
  *
  * - Draggable around the screen
- * - Shows a badge with the count of notes on the current screen
- * - Tapping opens [DebugNoteDialog]
+ * - Shows a bright pulsing badge with the count of notes on the current screen
+ * - Tapping opens [DebugNoteDialog] with Save/Queue/Submit flow
  * - Only visible when debug mode is enabled in settings
  */
 @Composable
@@ -48,9 +54,16 @@ fun DebugBubbleOverlay(
         ScreenContextMapper.resolve(currentRoute)
     }
 
-    val notesByScreen by debugNoteRepo.notesByScreen.collectAsStateWithLifecycle()
-    val noteCount = notesByScreen[currentRoute]?.size ?: 0
-    val hasNotes = noteCount > 0
+    val queue by debugNoteRepo.queue.collectAsStateWithLifecycle()
+    val drafts by debugNoteRepo.drafts.collectAsStateWithLifecycle()
+    val savedNotesByScreen by debugNoteRepo.savedNotesByScreen.collectAsStateWithLifecycle()
+
+    val queuedCount = queue.count { it.screenRoute == currentRoute }
+    val savedCount = savedNotesByScreen[currentRoute]?.size ?: 0
+    val hasDraft = drafts.containsKey(currentRoute)
+    val hasQueued = queuedCount > 0
+    val hasSaved = savedCount > 0
+    val totalQueueSize = queue.size
 
     var showNoteDialog by remember { mutableStateOf(false) }
 
@@ -67,6 +80,18 @@ fun DebugBubbleOverlay(
 
     val scope = rememberCoroutineScope()
 
+    // Pulsing animation for the badge when notes exist
+    val infiniteTransition = rememberInfiniteTransition(label = "badgePulse")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.7f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(600),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseAlpha"
+    )
+
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -75,12 +100,15 @@ fun DebugBubbleOverlay(
             modifier = Modifier
                 .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
                 .size(bubbleSize)
-                .shadow(6.dp, CircleShape)
+                .shadow(8.dp, CircleShape)
                 .clip(CircleShape)
                 .background(
                     when {
-                        hasNotes -> ReadinessOrange
-                        else -> EcgCyan.copy(alpha = 0.8f)
+                        hasQueued -> ReadinessOrange.copy(alpha = pulseAlpha)
+                        hasDraft -> EcgCyan.copy(alpha = pulseAlpha)
+                        hasSaved -> ReadinessGreen.copy(alpha = 0.85f)
+                        totalQueueSize > 0 -> ReadinessOrange.copy(alpha = 0.6f)
+                        else -> EcgCyan.copy(alpha = 0.85f)
                     }
                 )
                 .pointerInput(Unit) {
@@ -97,47 +125,101 @@ fun DebugBubbleOverlay(
         ) {
             Text(
                 "🐛",
-                fontSize = 20.sp,
+                fontSize = 22.sp,
                 modifier = Modifier.align(Alignment.Center)
             )
 
-            // Badge showing note count on current screen
-            if (hasNotes) {
+            // Yellow badge = queued notes count on current screen
+            if (hasQueued) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .offset(x = 4.dp, y = (-4).dp)
-                        .size(16.dp)
+                        .offset(x = 2.dp, y = (-6).dp)
+                        .size(20.dp)
+                        .shadow(4.dp, CircleShape)
                         .clip(CircleShape)
-                        .background(ReadinessRed),
+                        .background(Color.Yellow),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = noteCount.toString(),
-                        color = Color.White,
-                        fontSize = 9.sp
+                        text = queuedCount.toString(),
+                        color = Color.Black,
+                        fontSize = 10.sp,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                     )
                 }
+            }
+
+            // Cyan dot = draft exists for this screen
+            if (hasDraft && !hasQueued) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 2.dp, y = (-6).dp)
+                        .size(14.dp)
+                        .shadow(3.dp, CircleShape)
+                        .clip(CircleShape)
+                        .background(EcgCyan)
+                )
+            }
+
+            // Green dot = saved/submitted notes exist for this screen
+            if (hasSaved && !hasQueued && !hasDraft) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 2.dp, y = (-6).dp)
+                        .size(14.dp)
+                        .shadow(3.dp, CircleShape)
+                        .clip(CircleShape)
+                        .background(ReadinessGreen)
+                )
+            }
+
+            // Small yellow dot for global queue items on other screens
+            if (totalQueueSize > 0 && !hasQueued && !hasDraft && !hasSaved) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 2.dp, y = (-4).dp)
+                        .size(10.dp)
+                        .shadow(3.dp, CircleShape)
+                        .clip(CircleShape)
+                        .background(Color.Yellow)
+                )
             }
         }
     }
 
     // Note dialog
     if (showNoteDialog) {
+        val draft = drafts[currentRoute]
         DebugNoteDialog(
             screenContext = screenContext,
-            noteCountOnScreen = noteCount,
+            currentRoute = currentRoute ?: "unknown",
+            draftText = draft?.noteText ?: "",
+            draftType = draft?.noteType ?: NoteType.BUG,
+            queuedNotes = queue,
+            noteCountOnScreen = queuedCount,
             onDismiss = { showNoteDialog = false },
-            onSubmit = { noteType, text ->
+            onSaveDraft = { noteType, text ->
+                debugNoteRepo.saveDraft(currentRoute ?: "unknown", noteType, text)
+            },
+            onQueueNote = { noteType, text ->
+                debugNoteRepo.enqueueNote(
+                    screenRoute = currentRoute ?: "unknown",
+                    screenContext = screenContext,
+                    noteType = noteType,
+                    noteText = text
+                )
+            },
+            onSubmitQueue = {
                 scope.launch {
-                    debugNoteRepo.addNote(
-                        screenRoute = currentRoute ?: "unknown",
-                        screenContext = screenContext,
-                        noteType = noteType,
-                        noteText = text
-                    )
+                    debugNoteRepo.submitQueue()
                 }
-                showNoteDialog = false
+            },
+            onRemoveFromQueue = { noteId ->
+                debugNoteRepo.removeFromQueue(noteId)
             }
         )
     }

@@ -1,21 +1,25 @@
-## ADR: Debug Bubble Feature
+## ADR: Bridge Generic BLE HR into Shared RR Buffer
 
-**Date:** 2026-04-22
-**Status:** Implemented
+**Date**: 2026-04-24
+**Status**: Accepted
+
+### Context
+The O2 ring (and other generic BLE devices) provided HR data through `GenericBleManager.emitReadings()` → `_liveHr` StateFlow, which is why HR showed on the top bar. However, all HRV/RR interval data flowed exclusively through `PolarBleManager.rrBuffer`, which the O2 ring never wrote to. This caused:
+- Meditation/NSDR sessions: flat HR/HRV charts, null RMSSD, no analytics
+- Readiness scoring: no RR intervals for HRV calculation
+- Breathing/resonance: no live RMSSD/SDNN updates
+- Session screen: same flat-line issue
 
 ### Decision
-Added a floating debug bubble overlay that allows users to annotate bugs, features, or notes on any screen. The bubble is draggable, shows a badge indicating notes on the current screen, and persists notes to `debug_wags.json` with source file context for programmer LLMs.
+Bridge `GenericBleManager` HR data into the shared `PolarBleManager.rrBuffer` by:
+1. Adding `sharedRrBuffer` reference in `GenericBleManager`, wired by `UnifiedDeviceManager.init`
+2. Writing synthesized RR intervals (60000/HR ms) in `emitReadings()` for O2Ring/OxySmart
+3. Extracting real RR intervals from standard BLE HR packets (UUID 0x2A37, bit 4) in `handleStandardHrPacket()`
+4. Guarding `startRrStream()` to only call Polar SDK for Polar devices
+5. Adding `DeviceCapability.RR` to `OXIMETER` and `GENERIC_BLE` device types
 
-### Architecture
-- **DebugPreferences** (`data/debug/`) — SharedPreferences-backed toggle + file path setting, exposed as StateFlow
-- **DebugNoteRepository** (`data/debug/`) — In-memory note tracking + JSON file I/O using org.json (no extra deps)
-- **ScreenContextMapper** (`data/debug/`) — Maps navigation routes to source file + function hints
-- **DebugBubbleOverlay** (`ui/debug/`) — Draggable Compose overlay with badge indicator
-- **DebugNoteDialog** (`ui/debug/`) — Note entry dialog with Bug/Feature/Note type selector
-- **DebugModeCard** in SettingsScreen — Toggle + file path configuration
-
-### Key Design Choices
-- Used Compose overlay (not system overlay window) to avoid SYSTEM_ALERT_WINDOW permission
-- Route-to-source mapping is static (ScreenContextMapper) — no runtime reflection needed
-- JSON output uses org.json (already on Android) instead of kotlinx.serialization (not in project)
-- Bubble visibility is driven by DebugPreferences StateFlow — reactive, no service lifecycle needed
+### Consequences
+- All HRV consumers now work with any device type, not just Polar
+- Synthesized RR intervals from HR are less precise than real RR (no beat-to-beat variability), so RMSSD will be near-zero for O2 ring. This is expected — the O2 ring doesn't provide true RR intervals.
+- Apnea code is unaffected: it uses `oximeterIsPrimary` to skip `rrBuffer` and uses `oximeterSamples` instead
+- Standard BLE HR straps that include RR intervals in their packets (bit 4 of flags) will get real RR data, not synthesized

@@ -38,6 +38,13 @@ class UnifiedDeviceManager @Inject constructor(
 ) {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
+    init {
+        // Bridge the shared RR buffer so generic BLE devices (O2 ring, etc.)
+        // can feed HR-derived RR intervals into the same buffer that Polar
+        // uses.  This allows all HRV consumers to work with any device type.
+        genericBleManager.sharedRrBuffer = polarBleManager.rrBuffer
+    }
+
     // ── Connection state ──────────────────────────────────────────────────────
 
     /**
@@ -223,7 +230,22 @@ class UnifiedDeviceManager @Inject constructor(
     val ppiBuffer get() = polarBleManager.ppiBuffer
     val accBuffer get() = polarBleManager.accBuffer
 
-    fun startRrStream(deviceId: String) = polarBleManager.startRrStream(deviceId)
+    /**
+     * Start the RR interval stream for the given device.
+     *
+     * For Polar devices this starts the Polar SDK HR stream which feeds
+     * [rrBuffer] with real RR intervals.  For generic BLE devices the
+     * stream is already running (O2Ring polling / standard HR
+     * notifications) and HR-derived RR intervals are bridged into
+     * [rrBuffer] via [GenericBleManager.sharedRrBuffer], so this is a
+     * no-op.
+     */
+    fun startRrStream(deviceId: String) {
+        if (connectedDeviceType()?.isPolar == true) {
+            polarBleManager.startRrStream(deviceId)
+        }
+        // Non-Polar devices: RR data is already flowing via sharedRrBuffer
+    }
     fun startEcgStream(deviceId: String) = polarBleManager.startEcgStream(deviceId)
     fun startAccStream(deviceId: String) = polarBleManager.startAccStream(deviceId)
     fun startPpiStream(deviceId: String) = polarBleManager.startPpiStream(deviceId)

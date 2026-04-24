@@ -1,0 +1,9 @@
+Music recommender that is based on my apnea box
+
+Instead of trophys it could be any emoji or even an ai generated icon. Maybe decided by the user, maybe automatically by the app - it could be something sort of system where the awards are based on the current average weekly or monthly rate of trophys
+
+I could have periods of time where I block myself from even getting to see my hrv and bio data so that I just behave more naturally and use the intuition I've built from when I was looking. This can be a wags setting
+
+A calendar or graph or chart or something that connects and compares all sections of the app.  graphs that join data from both. Would be nice to plug it into Ai in some way to find connections and trends. maybe evn on the computer for the bigger screen.
+
+Subtle recommendations through minor coloring. Here is the vague idea, the app is usually black and white, however, in order to recommend to myself to do things that I've not done in awhile, there could be slight color added to things, like buttons of various features and such and as more and more stuff is done, more colors get activated. Maybe the more I do all at once, the app starts to come to life with colors and then time away makes it go dark again, sort of simulating the body filling with life from inhaling and then the longer you go without breathing the more the body goes back into the lifeless mode

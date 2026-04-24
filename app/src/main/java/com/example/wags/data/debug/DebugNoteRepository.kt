@@ -3,7 +3,6 @@ package com.example.wags.data.debug
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import androidx.documentfile.provider.DocumentFile
 import com.example.wags.data.debug.ScreenContextMapper.ScreenContext
 import com.example.wags.domain.model.NoteType
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -39,131 +38,209 @@ data class DebugNoteEntry(
 )
 
 /**
- * Manages debug notes: in-memory tracking for the bubble indicator
- * and persistence to [debug_wags.json].
+ * A draft note — saved per-screen but not yet queued for submission.
+ */
+data class DebugDraft(
+    val screenRoute: String,
+    val noteType: NoteType = NoteType.BUG,
+    val noteText: String = ""
+)
+
+/**
+ * A queued note — ready to be submitted to the JSON file.
+ */
+data class QueuedNote(
+    val id: String = System.currentTimeMillis().toString(),
+    val timestamp: String = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date()),
+    val screenRoute: String,
+    val screenLabel: String,
+    val sourceFile: String,
+    val sourceFunctions: String,
+    val noteType: NoteType,
+    val noteText: String
+)
+
+/**
+ * Manages debug notes with a draft → queue → submit flow.
  *
- * When a SAF directory URI is configured, writes via [ContentResolver].
- * Otherwise falls back to app-internal storage.
+ * - **Drafts**: per-screen scratchpads that persist across dialog opens
+ * - **Queue**: notes ready for batch submission (drives the bubble badge)
+ * - **Submit**: writes all queued notes to [debug_wags.json] and clears them
+ *
+ * After submission, notes are completely gone from the app —
+ * they only live in the JSON file for a programmer LLM to read.
  */
 @Singleton
 class DebugNoteRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val debugPrefs: DebugPreferences
 ) {
-    /** All notes loaded from the JSON file, keyed by screen route for fast lookup. */
-    private val _notesByScreen = MutableStateFlow<Map<String, List<DebugNoteEntry>>>(emptyMap())
-    val notesByScreen: StateFlow<Map<String, List<DebugNoteEntry>>> = _notesByScreen.asStateFlow()
+    // ── Drafts (per-screen, in-memory) ────────────────────────────────────────
 
-    /** Total count of notes, for quick badge display. */
-    private val _totalNoteCount = MutableStateFlow(0)
-    val totalNoteCount: StateFlow<Int> = _totalNoteCount.asStateFlow()
+    private val _drafts = MutableStateFlow<Map<String, DebugDraft>>(emptyMap())
+    val drafts: StateFlow<Map<String, DebugDraft>> = _drafts.asStateFlow()
 
-    init {
-        loadFromFile()
+    fun saveDraft(screenRoute: String, noteType: NoteType, noteText: String) {
+        val current = _drafts.value.toMutableMap()
+        current[screenRoute] = DebugDraft(screenRoute, noteType, noteText)
+        _drafts.value = current
     }
 
-    /**
-     * Add a new debug note and persist it to the JSON file.
-     */
-    suspend fun addNote(
+    fun getDraft(screenRoute: String): DebugDraft? = _drafts.value[screenRoute]
+
+    // ── Queue (in-memory, visible in dialog, drives badge) ────────────────────
+
+    private val _queue = MutableStateFlow<List<QueuedNote>>(emptyList())
+    val queue: StateFlow<List<QueuedNote>> = _queue.asStateFlow()
+
+    val queueSize: Int get() = _queue.value.size
+
+    fun enqueueNote(
         screenRoute: String,
         screenContext: ScreenContext,
         noteType: NoteType,
         noteText: String
-    ) = withContext(Dispatchers.IO) {
-        val now = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
-        val entry = DebugNoteEntry(
-            id = System.currentTimeMillis().toString(),
-            timestamp = now,
+    ) {
+        val note = QueuedNote(
             screenRoute = screenRoute,
             screenLabel = screenContext.label,
             sourceFile = screenContext.sourceFile,
             sourceFunctions = screenContext.sourceFunctions,
-            noteType = noteType.name,
+            noteType = noteType,
             noteText = noteText
         )
+        _queue.value = _queue.value + note
 
-        // Update in-memory state
-        val current = _notesByScreen.value.toMutableMap()
-        val screenNotes = (current[screenRoute] ?: emptyList()).toMutableList()
-        screenNotes.add(entry)
-        current[screenRoute] = screenNotes
-        _notesByScreen.value = current
-        _totalNoteCount.value = current.values.sumOf { it.size }
+        // Clear the draft for this screen since it's been queued
+        val current = _drafts.value.toMutableMap()
+        current.remove(screenRoute)
+        _drafts.value = current
+    }
 
-        // Persist
-        writeToFile(current)
+    fun removeFromQueue(noteId: String) {
+        _queue.value = _queue.value.filter { it.id != noteId }
     }
 
     /**
-     * Returns whether any notes exist for the given screen route.
+     * Submit all queued notes to the JSON file and clear the queue.
+     * After submission, notes are completely gone from the app —
+     * they only live in the JSON file.
      */
+    suspend fun submitQueue() = withContext(Dispatchers.IO) {
+        val queued = _queue.value
+        if (queued.isEmpty()) return@withContext
+
+        // Load existing notes from file
+        val existingNotes = loadExistingEntries().toMutableList()
+
+        // Add queued notes
+        queued.forEach { qn ->
+            existingNotes.add(DebugNoteEntry(
+                id = qn.id,
+                timestamp = qn.timestamp,
+                screenRoute = qn.screenRoute,
+                screenLabel = qn.screenLabel,
+                sourceFile = qn.sourceFile,
+                sourceFunctions = qn.sourceFunctions,
+                noteType = qn.noteType.name,
+                noteText = qn.noteText
+            ))
+        }
+
+        // Write combined
+        writeEntriesToFile(existingNotes)
+
+        // Clear queue — notes are now only in the file, not in the app
+        _queue.value = emptyList()
+
+        // Refresh saved notes from file so the green indicator updates
+        loadSavedNotes()
+    }
+
+    // ── Submitted notes (from file, for "saved" indicator) ────────────────────
+
+    private val _savedNotesByScreen = MutableStateFlow<Map<String, List<DebugNoteEntry>>>(emptyMap())
+    val savedNotesByScreen: StateFlow<Map<String, List<DebugNoteEntry>>> = _savedNotesByScreen.asStateFlow()
+
+    init {
+        loadSavedNotes()
+    }
+
+    fun hasSavedNotesForScreen(route: String?): Boolean {
+        if (route == null) return false
+        return (_savedNotesByScreen.value[route]?.size ?: 0) > 0
+    }
+
+    fun savedNoteCountForScreen(route: String?): Int {
+        if (route == null) return 0
+        return _savedNotesByScreen.value[route]?.size ?: 0
+    }
+
+    // ── Badge / indicator (queued = yellow, saved = green) ────────────────────
+
     fun hasNotesForScreen(route: String?): Boolean {
         if (route == null) return false
-        return (_notesByScreen.value[route]?.size ?: 0) > 0
+        return hasQueuedNotesForScreen(route) || hasSavedNotesForScreen(route)
     }
 
-    /**
-     * Returns the count of notes for the given screen route.
-     */
-    fun noteCountForScreen(route: String?): Int {
+    fun queuedNoteCountForScreen(route: String?): Int {
         if (route == null) return 0
-        return _notesByScreen.value[route]?.size ?: 0
+        return _queue.value.count { it.screenRoute == route }
+    }
+
+    fun hasQueuedNotesForScreen(route: String): Boolean {
+        return _queue.value.any { it.screenRoute == route }
+    }
+
+    private fun loadSavedNotes() {
+        try {
+            val entries = loadExistingEntries()
+            _savedNotesByScreen.value = entries.groupBy { it.screenRoute }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load saved notes", e)
+        }
     }
 
     // ── File I/O ──────────────────────────────────────────────────────────────
 
-    private fun loadFromFile() {
-        try {
-            val dirUri = debugPrefs.debugFileDirUri
-            if (dirUri.isNotBlank()) {
-                loadFromSaf(dirUri)
-            } else {
-                loadFromInternal()
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to load debug notes", e)
+    private fun loadExistingEntries(): List<DebugNoteEntry> {
+        val dirUri = debugPrefs.debugFileDirUri
+        val contents = if (dirUri.isNotBlank()) {
+            readFromSaf(dirUri)
+        } else {
+            readFromInternal()
         }
+        if (contents.isNullOrBlank()) return emptyList()
+        return parseEntries(contents)
     }
 
-    private fun loadFromInternal() {
+    private fun readFromInternal(): String? {
         val file = File(context.filesDir, FILE_NAME)
-        if (!file.exists()) {
-            _notesByScreen.value = emptyMap()
-            _totalNoteCount.value = 0
-            return
-        }
-        parseAndSet(file.readText())
+        if (!file.exists()) return null
+        return file.readText()
     }
 
-    private fun loadFromSaf(dirUriString: String) {
-        try {
+    private fun readFromSaf(dirUriString: String): String? {
+        return try {
             val dirUri = Uri.parse(dirUriString)
-            val docFile = DocumentFile.fromTreeUri(context, dirUri)
-                ?: return
+            val docFile = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, dirUri)
+                ?: return null
             val existing = docFile.findFile(FILE_NAME)
-            if (existing == null || !existing.exists()) {
-                _notesByScreen.value = emptyMap()
-                _totalNoteCount.value = 0
-                return
-            }
-            val contents = context.contentResolver.openInputStream(existing.uri)?.bufferedReader()?.readText()
-            if (contents.isNullOrBlank()) return
-            parseAndSet(contents)
+            if (existing == null || !existing.exists()) return null
+            context.contentResolver.openInputStream(existing.uri)?.bufferedReader()?.readText()
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to load from SAF", e)
-            // Fall back to internal
-            loadFromInternal()
+            Log.e(TAG, "Failed to read from SAF", e)
+            readFromInternal()
         }
     }
 
-    private fun parseAndSet(contents: String) {
+    private fun parseEntries(contents: String): List<DebugNoteEntry> {
         val root = JSONObject(contents)
-        val arr = root.optJSONArray("notes") ?: return
-        val allNotes = mutableListOf<DebugNoteEntry>()
+        val arr = root.optJSONArray("notes") ?: return emptyList()
+        val notes = mutableListOf<DebugNoteEntry>()
         for (i in 0 until arr.length()) {
             val obj = arr.getJSONObject(i)
-            allNotes.add(DebugNoteEntry(
+            notes.add(DebugNoteEntry(
                 id = obj.getString("id"),
                 timestamp = obj.getString("timestamp"),
                 screenRoute = obj.getString("screenRoute"),
@@ -174,16 +251,13 @@ class DebugNoteRepository @Inject constructor(
                 noteText = obj.getString("noteText")
             ))
         }
-        val map = allNotes.groupBy { it.screenRoute }
-        _notesByScreen.value = map
-        _totalNoteCount.value = allNotes.size
+        return notes
     }
 
-    private fun writeToFile(notesMap: Map<String, List<DebugNoteEntry>>) {
+    private fun writeEntriesToFile(entries: List<DebugNoteEntry>) {
         try {
-            val allNotes = notesMap.values.flatten()
             val arr = JSONArray()
-            allNotes.forEach { entry ->
+            entries.forEach { entry ->
                 arr.put(JSONObject().apply {
                     put("id", entry.id)
                     put("timestamp", entry.timestamp)
@@ -215,22 +289,18 @@ class DebugNoteRepository @Inject constructor(
 
     private fun writeToSaf(dirUriString: String, jsonText: String) {
         val dirUri = Uri.parse(dirUriString)
-        val docFile = DocumentFile.fromTreeUri(context, dirUri)
+        val docFile = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, dirUri)
             ?: run {
                 Log.e(TAG, "Cannot access SAF directory, falling back to internal")
                 writeToInternal(jsonText)
                 return
             }
-
-        // Delete existing file if present, then create new
         docFile.findFile(FILE_NAME)?.delete()
-
         val newFile = docFile.createFile("application/json", FILE_NAME) ?: run {
             Log.e(TAG, "Cannot create file in SAF directory, falling back to internal")
             writeToInternal(jsonText)
             return
         }
-
         context.contentResolver.openOutputStream(newFile.uri)?.use { os ->
             os.write(jsonText.toByteArray(Charsets.UTF_8))
             os.flush()

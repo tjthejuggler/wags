@@ -47,6 +47,15 @@ class GenericBleManager @Inject constructor(
      */
     var onKnownDeviceFound: ((address: String) -> Unit)? = null
 
+    /**
+     * Shared RR interval buffer, wired to [PolarBleManager.rrBuffer] by
+     * [UnifiedDeviceManager]. When non-null, HR readings from generic BLE
+     * devices are bridged into this buffer as synthesized RR intervals so
+     * that all HRV consumers (meditation, readiness, breathing, etc.) work
+     * regardless of which device type is connected.
+     */
+    var sharedRrBuffer: CircularBuffer<Double>? = null
+
     private val bluetoothManager =
         context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
     private val bluetoothAdapter: BluetoothAdapter? = bluetoothManager.adapter
@@ -668,6 +677,25 @@ class GenericBleManager @Inject constructor(
 
         if (hr in 20..250) {
             _liveHr.value = hr
+
+            // Extract real RR intervals if present (bit 4).
+            // BLE spec: each RR is uint16 LE in 1/1024 seconds.
+            // Convert to ms: rrMs = value * 1000 / 1024
+            if ((flags and 0x10) != 0) {
+                val buf = sharedRrBuffer
+                while (offset + 2 <= bytes.size) {
+                    val rrRaw = (bytes[offset].toInt() and 0xFF) or
+                        ((bytes[offset + 1].toInt() and 0xFF) shl 8)
+                    offset += 2
+                    if (rrRaw > 0) {
+                        val rrMs = rrRaw * 1000.0 / 1024.0
+                        buf?.write(rrMs)
+                    }
+                }
+            } else {
+                // No RR intervals in packet — synthesize from HR
+                sharedRrBuffer?.write(60_000.0 / hr)
+            }
         }
     }
 
@@ -817,6 +845,14 @@ class GenericBleManager @Inject constructor(
         _liveHr.value = hr
         val reading = OximeterReading(spO2 = spO2, heartRateBpm = hr)
         scope.launch { _readings.emit(reading) }
+
+        // Bridge HR into the shared RR buffer so that HRV consumers
+        // (meditation, readiness, breathing, etc.) work with generic
+        // BLE devices, not just Polar.  We synthesize one RR interval
+        // per reading: RR = 60 000 / HR  (ms).
+        if (hr in 20..250) {
+            sharedRrBuffer?.write(60_000.0 / hr)
+        }
     }
 
     // ── O2Ring command sending ────────────────────────────────────────────────

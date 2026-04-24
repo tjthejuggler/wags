@@ -25,15 +25,17 @@ enum class DeviceType(val capabilities: Set<DeviceCapability>) {
         DeviceCapability.PPI
     )),
 
-    /** OxySmart / PC-60F / Viatom / Wellue pulse oximeter — HR, SpO₂. */
+    /** OxySmart / PC-60F / Viatom / Wellue pulse oximeter — HR, SpO₂, RR (synthesized from HR). */
     OXIMETER(setOf(
         DeviceCapability.HR,
-        DeviceCapability.SPO2
+        DeviceCapability.SPO2,
+        DeviceCapability.RR
     )),
 
-    /** Any other BLE device — assume HR only (best effort). */
+    /** Any other BLE device — HR, and RR (synthesized from HR or extracted from standard BLE HR packets). */
     GENERIC_BLE(setOf(
-        DeviceCapability.HR
+        DeviceCapability.HR,
+        DeviceCapability.RR
     ));
 
     /** True if this device uses the Polar SDK for connection and streaming. */
