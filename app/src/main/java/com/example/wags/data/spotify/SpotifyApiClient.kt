@@ -196,6 +196,75 @@ class SpotifyApiClient @Inject constructor(
     }
 
     /**
+     * Get a recommended track URI based on a seed track.
+     *
+     * Calls `GET /v1/recommendations?seed_tracks={trackId}&limit=5` and returns
+     * a random URI from the results (to add variety). Returns null if the request
+     * fails or the recommendations list is empty.
+     *
+     * @param seedTrackUri Spotify URI like "spotify:track:XXXX"
+     * @return A recommended Spotify URI, or null on failure.
+     */
+    suspend fun getRecommendation(seedTrackUri: String): String? = withContext(Dispatchers.IO) {
+        val token = authManager.getValidAccessToken() ?: return@withContext null
+        val trackId = seedTrackUri.removePrefix("spotify:track:")
+        try {
+            val request = Request.Builder()
+                .url("$BASE_URL/recommendations?seed_tracks=$trackId&limit=5")
+                .addHeader("Authorization", "Bearer $token")
+                .build()
+
+            val response = client.newCall(request).execute()
+            val body = response.body?.string() ?: return@withContext null
+
+            if (!response.isSuccessful) {
+                Log.w(TAG, "getRecommendation failed (${response.code}): $body")
+                return@withContext null
+            }
+
+            val tracks = JSONObject(body).optJSONArray("tracks")
+            if (tracks == null || tracks.length() == 0) return@withContext null
+
+            // Pick a random track from the results for variety
+            val pick = tracks.getJSONObject((0 until tracks.length()).random())
+            pick.getString("uri")
+        } catch (e: Exception) {
+            Log.e(TAG, "getRecommendation error", e)
+            null
+        }
+    }
+
+    /**
+     * Add a track to the user's Spotify playback queue.
+     *
+     * Calls `POST /v1/me/player/queue?uri={trackUri}`.
+     *
+     * @param trackUri Spotify URI like "spotify:track:XXXX"
+     * @return true if the command was accepted (HTTP 204).
+     */
+    suspend fun addToQueue(trackUri: String): Boolean = withContext(Dispatchers.IO) {
+        val token = authManager.getValidAccessToken() ?: return@withContext false
+        try {
+            val encodedUri = java.net.URLEncoder.encode(trackUri, "UTF-8")
+            val request = Request.Builder()
+                .url("$BASE_URL/me/player/queue?uri=$encodedUri")
+                .addHeader("Authorization", "Bearer $token")
+                .post("".toRequestBody(null))
+                .build()
+
+            val response = client.newCall(request).execute()
+            val ok = response.isSuccessful || response.code == 204
+            if (!ok) {
+                Log.w(TAG, "addToQueue failed (${response.code}): ${response.body?.string()}")
+            }
+            ok
+        } catch (e: Exception) {
+            Log.e(TAG, "addToQueue error", e)
+            false
+        }
+    }
+
+    /**
      * Fetch the first available Spotify device ID from the Web API.
      * Returns null if no devices are available or the request fails.
      */

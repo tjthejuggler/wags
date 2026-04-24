@@ -252,6 +252,8 @@ class ApneaViewModel @Inject constructor(
 
     private var freeHoldStartTime = 0L
     private var tableSessionStartTime = 0L
+    /** Tracks played during the current table session; populated in stopTableSession() and read in saveCompletedSession(). */
+    private var tableTracksPlayed: List<TrackInfo> = emptyList()
 
     /**
      * Timestamped oximeter readings collected while a free hold is active.
@@ -635,6 +637,12 @@ class ApneaViewModel @Inject constructor(
             //    so it appears in All Records, Stats, and Calendar.
             //    Duration = total hold time (sum of all hold durations).
             val totalHoldMs = table.steps.sumOf { it.apneaDurationMs }
+            // If MUSIC was selected but no song actually played, record as SILENCE.
+            val tableEffectiveAudio = if (state.audio == AudioSetting.MUSIC && tableTracksPlayed.isEmpty()) {
+                AudioSetting.SILENCE.name
+            } else {
+                state.audio.name
+            }
             val recordId = apneaRepository.saveRecord(
                 ApneaRecordEntity(
                     timestamp = now,
@@ -649,7 +657,7 @@ class ApneaViewModel @Inject constructor(
                     firstContractionMs = null,
                     hrDeviceId = deviceLabel,
                     posture = state.posture.name,
-                    audio = state.audio.name,
+                    audio = tableEffectiveAudio,
                     guidedAudioName = if (_audio.value == AudioSetting.GUIDED) _uiState.value.guidedSelectedName else null
                 )
             )
@@ -851,7 +859,7 @@ class ApneaViewModel @Inject constructor(
         oximeterCollectionJob?.cancel()
         oximeterCollectionJob = null
         oximeterSamples.clear()
-        val tracksPlayed = if (_audio.value == AudioSetting.MUSIC) {
+        tableTracksPlayed = if (_audio.value == AudioSetting.MUSIC) {
             val tracks = spotifyManager.stopTracking()
             spotifyManager.sendPauseAndRewindCommand()
             tracks
@@ -861,8 +869,8 @@ class ApneaViewModel @Inject constructor(
             guidedAudioManager.stopPlayback()
         }
         stateMachine.stop()
-        if (tracksPlayed.isNotEmpty()) {
-            persistSongHistory(tracksPlayed.map { SpotifySong(it.title, it.artist, null, it.spotifyUri, it.startedAtMs, it.endedAtMs) })
+        if (tableTracksPlayed.isNotEmpty()) {
+            persistSongHistory(tableTracksPlayed.map { SpotifySong(it.title, it.artist, null, it.spotifyUri, it.startedAtMs, it.endedAtMs) })
         }
     }
 
@@ -1035,6 +1043,12 @@ class ApneaViewModel @Inject constructor(
         if (state.audio == AudioSetting.GUIDED) {
             guidedAudioManager.stopPlayback()
         }
+        // If MUSIC was selected but no song played, treat as SILENCE for PB/save purposes.
+        val fhEffectiveAudio = if (state.audio == AudioSetting.MUSIC && tracksPlayed.isEmpty()) {
+            AudioSetting.SILENCE.name
+        } else {
+            state.audio.name
+        }
         // Signal the Habit app that a free breath hold was successfully completed
         habitRepo.sendHabitIncrement(Slot.FREE_HOLD)
         viewModelScope.launch {
@@ -1045,7 +1059,7 @@ class ApneaViewModel @Inject constructor(
                 prepType   = state.prepType.name,
                 timeOfDay  = state.timeOfDay.name,
                 posture    = state.posture.name,
-                audio      = state.audio.name
+                audio      = fhEffectiveAudio
             )
             saveFreeHoldRecord(duration, firstContractionMs, tracksPlayed)
             if (pbResult != null) {
@@ -1108,6 +1122,13 @@ class ApneaViewModel @Inject constructor(
             val state = _uiState.value
             val now = System.currentTimeMillis()
 
+            // If MUSIC was selected but no song actually played, record as SILENCE.
+            val fhEffectiveAudio = if (state.audio == AudioSetting.MUSIC && tracksPlayed.isEmpty()) {
+                AudioSetting.SILENCE.name
+            } else {
+                state.audio.name
+            }
+
             // ── Save summary record ───────────────────────────────────────────
             val recordId = apneaRepository.saveRecord(
                 ApneaRecordEntity(
@@ -1117,7 +1138,7 @@ class ApneaViewModel @Inject constructor(
                     prepType = state.prepType.name,
                     timeOfDay = state.timeOfDay.name,
                     posture = state.posture.name,
-                    audio = state.audio.name,
+                    audio = fhEffectiveAudio,
                     minHrBpm = minHr,
                     maxHrBpm = maxHr,
                     lowestSpO2 = lowestSpO2,

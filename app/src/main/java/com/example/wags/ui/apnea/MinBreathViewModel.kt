@@ -600,13 +600,22 @@ class MinBreathViewModel @Inject constructor(
 
         val currentState = _uiState.value
 
+        // If MUSIC was selected but no song actually played, record as SILENCE.
+        val effectiveAudio = if (currentState.audio == AudioSetting.GUIDED.name) {
+            currentState.audio
+        } else if (currentState.audio == AudioSetting.MUSIC.name && trackedSongs.isEmpty()) {
+            AudioSetting.SILENCE.name
+        } else {
+            currentState.audio
+        }
+
         // Check broader PB BEFORE saving so queries compare against prior records only
         val drill = DrillContext.minBreath(sessionDurationSec)
         val pbResult = if (totalHoldTimeMs > 0L) {
             apneaRepository.checkBroaderPersonalBest(
                 drill, totalHoldTimeMs,
                 currentState.lungVolume, currentState.prepType, currentState.timeOfDay,
-                currentState.posture, currentState.audio
+                currentState.posture, effectiveAudio
             )
         } else null
 
@@ -623,7 +632,7 @@ class MinBreathViewModel @Inject constructor(
                 timeOfDay = currentState.timeOfDay,
                 hrDeviceId = deviceLabel,
                 posture = currentState.posture,
-                audio = currentState.audio,
+                audio = effectiveAudio,
                 drillParamValue = sessionDurationSec,
                 guidedAudioName = if (currentState.audio == AudioSetting.GUIDED.name) _uiState.value.guidedSelectedName else null
             )

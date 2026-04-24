@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
@@ -23,6 +24,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.json.JSONArray
+import org.json.JSONObject
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -67,6 +70,12 @@ class SpotifyManager @Inject constructor(
         // Spotify legacy broadcast actions (no permissions required)
         private const val SPOTIFY_METADATA_CHANGED = "com.spotify.music.metadatachanged"
         private const val SPOTIFY_PLAYBACK_CHANGED = "com.spotify.music.playbackstatechanged"
+
+        // SharedPreferences for persisting the song picker cache across app restarts
+        private const val PREFS_NAME = "spotify_song_cache"
+        private const val KEY_SONG_CACHE = "song_picker_cache"
+        /** Maximum number of songs to persist in the cache. */
+        private const val MAX_CACHED_SONGS = 100
     }
 
     /** Internal scope for fire-and-forget work (metadata polling). */
@@ -81,15 +90,65 @@ class SpotifyManager @Inject constructor(
     val sessionSongs: StateFlow<List<TrackInfo>> = _sessionSongs.asStateFlow()
 
     // ── Song picker cache ─────────────────────────────────────────────────────
-    // Enriched song list cached after the first load so the picker dialog
-    // can open instantly on subsequent visits. Invalidated when a session ends
-    // (new songs may have been played).
-    private val _songPickerCache = MutableStateFlow<List<SpotifyTrackDetail>?>(null)
+    // Enriched song list cached in memory AND in SharedPreferences so the picker
+    // dialog can open instantly on subsequent visits — even after an app restart.
+    // Invalidated when a session ends (new songs may have been played).
+    private val cachePrefs: SharedPreferences =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    private val _songPickerCache = MutableStateFlow<List<SpotifyTrackDetail>?>(
+        loadSongPickerCacheFromPrefs()
+    )
     val songPickerCache: StateFlow<List<SpotifyTrackDetail>?> = _songPickerCache.asStateFlow()
 
-    /** Update the song picker cache with freshly enriched data. */
+    /** Update the song picker cache in memory and persist it to SharedPreferences. */
     fun updateSongPickerCache(songs: List<SpotifyTrackDetail>) {
         _songPickerCache.value = songs
+        persistSongPickerCache(songs)
+    }
+
+    /** Serialize the song list to JSON and store it in SharedPreferences. */
+    private fun persistSongPickerCache(songs: List<SpotifyTrackDetail>) {
+        try {
+            val arr = JSONArray()
+            songs.take(MAX_CACHED_SONGS).forEach { track ->
+                arr.put(JSONObject().apply {
+                    put("uri", track.spotifyUri)
+                    put("title", track.title)
+                    put("artist", track.artist)
+                    put("durationMs", track.durationMs)
+                    if (track.albumArt != null) put("albumArt", track.albumArt)
+                })
+            }
+            cachePrefs.edit().putString(KEY_SONG_CACHE, arr.toString()).apply()
+        } catch (e: Exception) {
+            Log.w("SpotifyMgr", "Failed to persist song picker cache", e)
+        }
+    }
+
+    /** Deserialize the song list from SharedPreferences. Returns null if nothing is stored. */
+    private fun loadSongPickerCacheFromPrefs(): List<SpotifyTrackDetail>? {
+        val raw = cachePrefs.getString(KEY_SONG_CACHE, null) ?: return null
+        return try {
+            val arr = JSONArray(raw)
+            val result = mutableListOf<SpotifyTrackDetail>()
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                result.add(
+                    SpotifyTrackDetail(
+                        spotifyUri = obj.getString("uri"),
+                        title = obj.getString("title"),
+                        artist = obj.getString("artist"),
+                        durationMs = obj.getLong("durationMs"),
+                        albumArt = obj.optString("albumArt").takeIf { it.isNotBlank() }
+                    )
+                )
+            }
+            result.ifEmpty { null }
+        } catch (e: Exception) {
+            Log.w("SpotifyMgr", "Failed to load song picker cache from prefs", e)
+            null
+        }
     }
 
     private var isTracking = false
@@ -129,9 +188,17 @@ class SpotifyManager @Inject constructor(
                     handleNewTrack(title, artist, nowMs, spotifyUri)
                 }
                 SPOTIFY_PLAYBACK_CHANGED -> {
-                    // Playback state changed (play/pause/skip) — if playing
-                    // started and we don't have a song yet, the metadata
-                    // broadcast usually follows immediately.
+                    // Playback state changed (play/pause/skip).
+                    // When playing=false and we are actively tracking, the current
+                    // song has ended — send NEXT so Spotify advances to the next
+                    // track in its queue, keeping music going for the whole session.
+                    if (isTracking) {
+                        val playing = intent.getBooleanExtra("playing", true)
+                        if (!playing) {
+                            Log.d("SpotifyMgr", "playbackstatechanged: playing=false during tracking — sending NEXT")
+                            sendNextTrackCommand()
+                        }
+                    }
                 }
             }
         }
@@ -318,7 +385,9 @@ class SpotifyManager @Inject constructor(
         metadataPollJob?.cancel()
         metadataPollJob = null
 
-        // Invalidate song picker cache — new songs may have been played
+        // Invalidate in-memory song picker cache — new songs may have been played.
+        // The persisted SharedPreferences cache is intentionally kept so the picker
+        // still opens quickly on the next visit; it will be refreshed by loadPreviousSongs().
         _songPickerCache.value = null
 
         // Unregister the broadcast receiver
@@ -410,6 +479,23 @@ class SpotifyManager @Inject constructor(
         audioManager.dispatchMediaKeyEvent(
             KeyEvent(eventTime, eventTime, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0)
         )
+    }
+
+    /**
+     * Send a NEXT track command to Spotify via AudioManager media key dispatch.
+     * Called when the current song ends during an active session so playback
+     * continues seamlessly with the next track in Spotify's queue.
+     */
+    fun sendNextTrackCommand() {
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
+        val eventTime = SystemClock.uptimeMillis()
+        audioManager.dispatchMediaKeyEvent(
+            KeyEvent(eventTime, eventTime, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_NEXT, 0)
+        )
+        audioManager.dispatchMediaKeyEvent(
+            KeyEvent(eventTime, eventTime, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_NEXT, 0)
+        )
+        Log.d("SpotifyMgr", "sendNextTrackCommand: dispatched MEDIA_NEXT")
     }
 
     /**
@@ -514,11 +600,53 @@ class SpotifyManager @Inject constructor(
         if (success) {
             delay(PRELOAD_PAUSE_DELAY_MS)
             sendPauseAndRewindCommand()
+            // Queue a follow-up song so playback continues when the selected track ends.
+            // Try Spotify Recommendations first; fall back to a random song from the cache.
+            scope.launch(Dispatchers.IO) {
+                queueFollowUpSong(trackUri)
+            }
         } else {
             Log.w("SpotifyMgr", "preloadTrack: failed after $PRELOAD_MAX_ATTEMPTS attempts for $trackUri")
         }
 
         return success
+    }
+
+    /**
+     * Queue a follow-up song after [selectedTrackUri] so that playback continues
+     * automatically when the selected track ends.
+     *
+     * Strategy:
+     *  1. Ask the Spotify Recommendations API for a related track (seed = selected track).
+     *  2. If that fails, pick a random track from the in-memory song picker cache,
+     *     excluding the selected track itself.
+     *
+     * The queued track is added via `POST /v1/me/player/queue` — it will play
+     * automatically after the selected track finishes.
+     */
+    private suspend fun queueFollowUpSong(selectedTrackUri: String) {
+        // 1. Try Spotify Recommendations
+        val recommendedUri = spotifyApiClient.getRecommendation(selectedTrackUri)
+        if (recommendedUri != null) {
+            val queued = spotifyApiClient.addToQueue(recommendedUri)
+            Log.d("SpotifyMgr", "queueFollowUpSong: recommendation queued=$queued uri=$recommendedUri")
+            if (queued) return
+        }
+
+        // 2. Fallback: random song from the picker cache (excluding the selected track)
+        val cache = _songPickerCache.value
+        if (cache.isNullOrEmpty()) {
+            Log.d("SpotifyMgr", "queueFollowUpSong: no cache available, skipping fallback")
+            return
+        }
+        val candidates = cache.filter { it.spotifyUri != selectedTrackUri }
+        if (candidates.isEmpty()) {
+            Log.d("SpotifyMgr", "queueFollowUpSong: only one song in cache, skipping fallback")
+            return
+        }
+        val fallbackUri = candidates.random().spotifyUri
+        val queued = spotifyApiClient.addToQueue(fallbackUri)
+        Log.d("SpotifyMgr", "queueFollowUpSong: fallback queued=$queued uri=$fallbackUri")
     }
 
     /**

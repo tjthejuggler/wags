@@ -612,11 +612,18 @@ class ProgressiveO2ViewModel @Inject constructor(
         val posture = currentState.posture
         val audio = currentState.audio
 
+        // If MUSIC was selected but no song actually played, record as SILENCE.
+        val effectiveAudio = if (audio == AudioSetting.MUSIC.name && trackedSongs.isEmpty()) {
+            AudioSetting.SILENCE.name
+        } else {
+            audio
+        }
+
         // Check broader PB BEFORE saving so queries compare against prior records only
         val drill = DrillContext.progressiveO2(breathPeriodSec)
         val pbResult = if (longestCompletedHoldMs > 0L) {
             apneaRepository.checkBroaderPersonalBest(
-                drill, longestCompletedHoldMs, lungVolume, prepType, timeOfDay, posture, audio
+                drill, longestCompletedHoldMs, lungVolume, prepType, timeOfDay, posture, effectiveAudio
             )
         } else null
 
@@ -633,9 +640,9 @@ class ProgressiveO2ViewModel @Inject constructor(
                 timeOfDay = timeOfDay,
                 hrDeviceId = deviceLabel,
                 posture = posture,
-                audio = audio,
+                audio = effectiveAudio,
                 drillParamValue = breathPeriodSec,
-                guidedAudioName = if (audio == AudioSetting.GUIDED.name) _uiState.value.guidedSelectedName else null
+                guidedAudioName = if (effectiveAudio == AudioSetting.GUIDED.name) _uiState.value.guidedSelectedName else null
             )
         )
 
