@@ -12,6 +12,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.ui.res.painterResource
+import com.example.wags.R
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -195,11 +197,21 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "⌚ Garmin Watch",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = TextPrimary
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_watch),
+                                    contentDescription = "Watch",
+                                    tint = TextPrimary
+                                )
+                                Text(
+                                    text = "Garmin Watch",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = TextPrimary
+                                )
+                            }
                             val (garminStatusText, garminStatusColor) = when (val gs = state.garminState) {
                                 is GarminConnectionState.Connected ->
                                     "Connected: ${gs.deviceName}" to ReadinessGreen
