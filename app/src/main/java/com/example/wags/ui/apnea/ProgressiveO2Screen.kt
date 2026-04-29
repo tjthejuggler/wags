@@ -212,7 +212,9 @@ fun ProgressiveO2Screen(
             BreathPeriodHistorySection(
                 history = state.pastBreathPeriods,
                 currentBreathPeriodSec = state.breathPeriodSec,
-                onSelectBreathPeriod = { viewModel.setBreathPeriod(it) }
+                onViewSessionDetail = { sessionId ->
+                    navController.navigate(WagsRoutes.progressiveO2Detail(sessionId))
+                }
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -329,7 +331,7 @@ private fun BreathPeriodSection(
 private fun BreathPeriodHistorySection(
     history: List<BreathPeriodHistory>,
     currentBreathPeriodSec: Int,
-    onSelectBreathPeriod: (Int) -> Unit
+    onViewSessionDetail: (Long) -> Unit
 ) {
     Text(
         text = "Past Breath Periods",
@@ -355,7 +357,7 @@ private fun BreathPeriodHistorySection(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
                         .background(bgColor)
-                        .clickable { onSelectBreathPeriod(item.breathPeriodSec) }
+                        .clickable { onViewSessionDetail(item.maxHoldSessionId) }
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -366,11 +368,19 @@ private fun BreathPeriodHistorySection(
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                         color = TextPrimary
                     )
-                    Text(
-                        text = "Max hold: ${formatSeconds(item.maxHoldReachedSec)}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextSecondary
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Max hold: ${formatSeconds(item.maxHoldReachedSec)}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextSecondary
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = "›",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = TextSecondary
+                        )
+                    }
                 }
             }
         }

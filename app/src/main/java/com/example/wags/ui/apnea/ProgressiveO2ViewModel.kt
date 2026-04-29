@@ -87,7 +87,9 @@ data class BreathPeriodHistory(
     /** Longest completed hold (in seconds) across all sessions with this breath period. */
     val maxHoldReachedSec: Int,
     /** How many sessions used this breath period. */
-    val sessionCount: Int
+    val sessionCount: Int,
+    /** Session ID of the session that achieved the max hold — used for navigation to detail. */
+    val maxHoldSessionId: Long
 )
 
 // ── ViewModel ───────────────────────────────────────────────────────────────
@@ -716,7 +718,7 @@ class ProgressiveO2ViewModel @Inject constructor(
         sessions: List<ApneaSessionEntity>
     ): List<BreathPeriodHistory> {
         // Parse each session's tableParamsJson to extract breathPeriodSec and max completed hold
-        data class Parsed(val breathPeriodSec: Int, val maxCompletedHoldSec: Int)
+        data class Parsed(val breathPeriodSec: Int, val maxCompletedHoldSec: Int, val sessionId: Long)
 
         val parsed = sessions.mapNotNull { entity ->
             try {
@@ -732,7 +734,7 @@ class ProgressiveO2ViewModel @Inject constructor(
                         if (targetMs > maxHoldMs) maxHoldMs = targetMs
                     }
                 }
-                Parsed(breathPeriod, (maxHoldMs / 1000).toInt())
+                Parsed(breathPeriod, (maxHoldMs / 1000).toInt(), entity.sessionId)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to parse session ${entity.sessionId}", e)
                 null
@@ -742,10 +744,12 @@ class ProgressiveO2ViewModel @Inject constructor(
         // Group by breath period, compute max hold and session count
         return parsed.groupBy { it.breathPeriodSec }
             .map { (bp, group) ->
+                val maxEntry = group.maxByOrNull { it.maxCompletedHoldSec }
                 BreathPeriodHistory(
                     breathPeriodSec = bp,
-                    maxHoldReachedSec = group.maxOf { it.maxCompletedHoldSec },
-                    sessionCount = group.size
+                    maxHoldReachedSec = maxEntry?.maxCompletedHoldSec ?: 0,
+                    sessionCount = group.size,
+                    maxHoldSessionId = maxEntry?.sessionId ?: -1L
                 )
             }
             .sortedBy { it.breathPeriodSec }

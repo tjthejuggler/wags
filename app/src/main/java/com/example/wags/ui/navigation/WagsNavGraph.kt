@@ -26,6 +26,7 @@ import com.example.wags.ui.apnea.PersonalBestsScreen
 import com.example.wags.ui.apnea.MinBreathActiveScreen
 import com.example.wags.ui.apnea.MinBreathScreen
 import com.example.wags.ui.apnea.ProgressiveO2ActiveScreen
+import com.example.wags.ui.apnea.ProgressiveO2DetailScreen
 import com.example.wags.ui.apnea.ProgressiveO2Screen
 import com.example.wags.ui.apnea.SessionAnalyticsHistoryScreen
 import com.example.wags.ui.apnea.SessionAnalyticsScreen
@@ -98,6 +99,7 @@ object WagsRoutes {
     // ── Progressive O₂ ──────────────────────────────────────────────────────
     const val PROGRESSIVE_O2 = "progressive_o2"
     const val PROGRESSIVE_O2_ACTIVE = "progressive_o2_active"
+    const val PROGRESSIVE_O2_DETAIL = "progressive_o2_detail/{sessionId}"
 
     // ── Min Breath ──
     const val MIN_BREATH = "min_breath"
@@ -145,6 +147,7 @@ object WagsRoutes {
     fun resonanceSession(vibration: Boolean = false, duration: Int = 5, infinity: Boolean = false, rate: Float = 5.5f) =
         "resonance_session?vibration=$vibration&duration=$duration&infinity=$infinity&rate=$rate"
     fun resonanceSessionDetail(sessionId: Long) = "resonance_session_detail/$sessionId"
+    fun progressiveO2Detail(sessionId: Long) = "progressive_o2_detail/$sessionId"
 
     /**
      * Navigate to All Records pre-filtered to the given settings.
@@ -323,6 +326,12 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
         }
         composable(WagsRoutes.PROGRESSIVE_O2_ACTIVE) {
             ProgressiveO2ActiveScreen(navController = navController)
+        }
+        composable(
+            route = WagsRoutes.PROGRESSIVE_O2_DETAIL,
+            arguments = listOf(navArgument("sessionId") { type = NavType.LongType })
+        ) {
+            ProgressiveO2DetailScreen(navController = navController)
         }
         // ── Min Breath ──────────────────────────────────────────────────────
         composable(WagsRoutes.MIN_BREATH) {

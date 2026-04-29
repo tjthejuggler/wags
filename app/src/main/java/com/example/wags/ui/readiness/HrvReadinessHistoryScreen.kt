@@ -504,9 +504,10 @@ private fun HrvSessionSummaryCard(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     reading.readinessScore.toString(),
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     color = TextPrimary,
-                    fontWeight = FontWeight.ExtraBold
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1
                 )
                 Text(
                     "score",
