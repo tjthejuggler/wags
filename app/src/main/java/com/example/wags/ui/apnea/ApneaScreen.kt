@@ -69,6 +69,7 @@ fun ApneaScreen(
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                 viewModel.refreshDrillParams()
+                viewModel.refreshForecast()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)

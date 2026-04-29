@@ -1401,6 +1401,16 @@ class ApneaViewModel @Inject constructor(
     }
 
     /**
+     * Bumps the forecast refresh trigger so the record-breaking probability
+     * is recomputed with the latest data from the DB.
+     * Called when the ApneaScreen resumes (e.g. after returning from a
+     * completed free hold, drill, or table session on a separate screen).
+     */
+    fun refreshForecast() {
+        _forecastRefreshTrigger.value++
+    }
+
+    /**
      * Opens [section] if it is currently closed; closes it if it is already open.
      * Only one accordion section can be open at a time (settings is independent).
      */
