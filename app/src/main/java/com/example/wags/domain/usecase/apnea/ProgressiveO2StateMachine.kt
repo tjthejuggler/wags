@@ -125,7 +125,8 @@ class ProgressiveO2StateMachine @Inject constructor() {
             phase = ProgressiveO2Phase.HOLD,
             currentRound = round,
             holdDurationMs = holdMs,
-            timerMs = holdMs
+            timerMs = holdMs,
+            firstContractionMs = null  // reset so button is available each hold
         )
         runCountdown(holdMs) { onHoldComplete(round, holdMs) }
     }

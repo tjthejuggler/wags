@@ -129,31 +129,34 @@ class DebugNoteRepository @Inject constructor(
      * they only live in the JSON file.
      */
     suspend fun submitQueue() = withContext(Dispatchers.IO) {
+        // Atomically drain the queue first — prevents double-submit if called
+        // concurrently (e.g. user taps "Submit All" twice quickly).
         val queued = _queue.value
         if (queued.isEmpty()) return@withContext
+        _queue.value = emptyList()
 
         // Load existing notes from file
         val existingNotes = loadExistingEntries().toMutableList()
 
-        // Add queued notes
+        // Append only the notes we just drained (de-duplicate by id to be safe)
+        val existingIds = existingNotes.mapTo(mutableSetOf()) { it.id }
         queued.forEach { qn ->
-            existingNotes.add(DebugNoteEntry(
-                id = qn.id,
-                timestamp = qn.timestamp,
-                screenRoute = qn.screenRoute,
-                screenLabel = qn.screenLabel,
-                sourceFile = qn.sourceFile,
-                sourceFunctions = qn.sourceFunctions,
-                noteType = qn.noteType.name,
-                noteText = qn.noteText
-            ))
+            if (existingIds.add(qn.id)) {          // add() returns false if already present
+                existingNotes.add(DebugNoteEntry(
+                    id = qn.id,
+                    timestamp = qn.timestamp,
+                    screenRoute = qn.screenRoute,
+                    screenLabel = qn.screenLabel,
+                    sourceFile = qn.sourceFile,
+                    sourceFunctions = qn.sourceFunctions,
+                    noteType = qn.noteType.name,
+                    noteText = qn.noteText
+                ))
+            }
         }
 
         // Write combined
         writeEntriesToFile(existingNotes)
-
-        // Clear queue — notes are now only in the file, not in the app
-        _queue.value = emptyList()
 
         // Refresh saved notes from file so the green indicator updates
         loadSavedNotes()

@@ -216,31 +216,31 @@ private fun ActiveContent(
         // ── Live HR / SpO₂ ──────────────────────────────────────────────
         LiveVitals(hr = state.liveHr, spo2 = state.liveSpO2)
 
-        Spacer(Modifier.weight(1f))
-
         // ── Large "First Contraction" button during HOLD phase ──────────
         if (phase == ProgressiveO2Phase.HOLD) {
             val alreadyLogged = state.sessionState.firstContractionMs != null
-            Button(
-                onClick = onFirstContraction,
-                enabled = !alreadyLogged,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(120.dp)
-                    .padding(horizontal = 8.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (alreadyLogged) SurfaceVariant else ButtonPrimary,
-                    disabledContainerColor = SurfaceVariant
-                )
-            ) {
-                Text(
-                    text = if (alreadyLogged) "✓ Contraction Logged" else "First Contraction",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = if (alreadyLogged) TextSecondary else TextPrimary
-                )
+            if (!alreadyLogged) {
+                Button(
+                    onClick = onFirstContraction,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 8.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = ButtonPrimary)
+                ) {
+                    Text(
+                        text = "First Contraction",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                }
+            } else {
+                Spacer(Modifier.weight(1f))
             }
+        } else {
+            Spacer(Modifier.weight(1f))
         }
 
         Spacer(Modifier.height(16.dp))
