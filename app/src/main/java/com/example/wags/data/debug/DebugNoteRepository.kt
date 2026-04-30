@@ -175,7 +175,8 @@ class DebugNoteRepository @Inject constructor(
     /**
      * Submit all queued notes to the JSON file and clear the queue.
      * After submission, notes are completely gone from the app —
-     * they only live in the JSON file.
+     * they only live in the JSON file. The file is overwritten each time
+     * so old submitted notes do not accumulate.
      */
     suspend fun submitQueue() = withContext(Dispatchers.IO) {
         // Atomically drain the queue first — prevents double-submit if called
@@ -184,28 +185,20 @@ class DebugNoteRepository @Inject constructor(
         if (queued.isEmpty()) return@withContext
         _queue.value = emptyList()
 
-        // Load existing notes from file
-        val existingNotes = loadExistingEntries().toMutableList()
-
-        // Append only the notes we just drained (de-duplicate by id to be safe)
-        val existingIds = existingNotes.mapTo(mutableSetOf()) { it.id }
-        queued.forEach { qn ->
-            if (existingIds.add(qn.id)) {          // add() returns false if already present
-                existingNotes.add(DebugNoteEntry(
-                    id = qn.id,
-                    timestamp = qn.timestamp,
-                    screenRoute = qn.screenRoute,
-                    screenLabel = qn.screenLabel,
-                    sourceFile = qn.sourceFile,
-                    sourceFunctions = qn.sourceFunctions,
-                    noteType = qn.noteType.name,
-                    noteText = qn.noteText
-                ))
-            }
+        // Write ONLY the newly submitted notes — replace the file entirely
+        val entries = queued.map { qn ->
+            DebugNoteEntry(
+                id = qn.id,
+                timestamp = qn.timestamp,
+                screenRoute = qn.screenRoute,
+                screenLabel = qn.screenLabel,
+                sourceFile = qn.sourceFile,
+                sourceFunctions = qn.sourceFunctions,
+                noteType = qn.noteType.name,
+                noteText = qn.noteText
+            )
         }
-
-        // Write combined
-        writeEntriesToFile(existingNotes)
+        writeEntriesToFile(entries)
     }
 
     // ── Badge / indicator (queued = yellow, saved = green) ────────────────────
@@ -228,11 +221,23 @@ class DebugNoteRepository @Inject constructor(
 
     init {
         // One-time cleanup: clear stale submitted notes and legacy drafts
-        if (!debugPrefs.savedNotesCleared) {
+        // Uses a versioned flag so we can re-run cleanup after code changes.
+        if (!debugPrefs.legacyDataV2Cleared) {
+            // Delete internal file
             runCatching { File(context.filesDir, FILE_NAME).delete() }
+            // Delete SAF file if configured
+            runCatching { deleteSafFile() }
             debugPrefs.clearLegacyDrafts()
-            debugPrefs.savedNotesCleared = true
+            debugPrefs.legacyDataV2Cleared = true
         }
+    }
+
+    private fun deleteSafFile() {
+        val dirUri = debugPrefs.debugFileDirUri
+        if (dirUri.isBlank()) return
+        val treeUri = Uri.parse(dirUri)
+        val docFile = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, treeUri)
+        docFile?.findFile(FILE_NAME)?.delete()
     }
 
     // ── File I/O ──────────────────────────────────────────────────────

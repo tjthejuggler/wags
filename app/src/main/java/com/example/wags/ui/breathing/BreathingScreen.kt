@@ -739,7 +739,7 @@ private fun BreathingControls(
     onRateChange: (Float) -> Unit,
     onIeRatioChange: (Float) -> Unit
 ) {
-    // Rate: 4.00–7.00 BPM in 0.01 steps → 300 intervals = 299 steps
+    // Rate: 4.00–7.00 BPM in 0.05 steps → 60 intervals = 59 steps
     // Ratio: 0.5–3.0 in 0.1 steps → 25 intervals = 24 steps
     Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
         Column(
@@ -753,12 +753,12 @@ private fun BreathingControls(
             Slider(
                 value = rateBpm,
                 onValueChange = { raw ->
-                    // Snap to 0.01 precision
-                    val snapped = (raw * 100).roundToInt() / 100f
+                    // Snap to 0.05 precision
+                    val snapped = (raw * 20).roundToInt() / 20f
                     onRateChange(snapped.coerceIn(4f, 7f))
                 },
                 valueRange = 4f..7f,
-                steps = 299   // (7.00 - 4.00) / 0.01 - 1 = 299
+                steps = 59    // (7.00 - 4.00) / 0.05 - 1 = 59
             )
             Text(
                 "I:E Ratio: 1:${String.format("%.1f", ieRatio)}",

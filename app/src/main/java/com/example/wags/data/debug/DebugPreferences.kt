@@ -39,11 +39,12 @@ class DebugPreferences @Inject constructor(
             refresh()
         }
 
-    /** One-time flag: clear stale submitted notes and legacy drafts on first run. */
-    var savedNotesCleared: Boolean
-        get() = prefs.getBoolean(KEY_SAVED_NOTES_CLEARED, false)
+    /** Versioned cleanup flag: clear stale submitted notes and legacy drafts.
+     *  V2 also clears the SAF file. */
+    var legacyDataV2Cleared: Boolean
+        get() = prefs.getBoolean(KEY_LEGACY_V2_CLEARED, false)
         set(value) {
-            prefs.edit().putBoolean(KEY_SAVED_NOTES_CLEARED, value).apply()
+            prefs.edit().putBoolean(KEY_LEGACY_V2_CLEARED, value).apply()
         }
 
     // ── Saved notes persistence ─────────────────────────────────────────────
@@ -116,7 +117,7 @@ class DebugPreferences @Inject constructor(
         private const val KEY_DEBUG_DIR_URI = "debug_dir_uri"
         private const val KEY_DRAFTS = "debug_drafts_json"
         private const val KEY_SAVED_NOTES = "debug_saved_notes_json"
-        private const val KEY_SAVED_NOTES_CLEARED = "debug_saved_notes_cleared"
+        private const val KEY_LEGACY_V2_CLEARED = "debug_legacy_v2_cleared"
     }
 }
 
