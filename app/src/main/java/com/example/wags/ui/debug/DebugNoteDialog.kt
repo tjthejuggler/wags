@@ -1,6 +1,7 @@
 package com.example.wags.ui.debug
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,8 +15,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.wags.data.debug.DebugNoteEntry
 import com.example.wags.data.debug.QueuedNote
+import com.example.wags.data.debug.SavedNote
 import com.example.wags.data.debug.ScreenContextMapper.ScreenContext
 import com.example.wags.domain.model.NoteType
 import com.example.wags.ui.theme.*
@@ -26,31 +27,53 @@ private enum class DebugTab { NOTE, QUEUE, SAVED }
  * Dialog shown when the user taps the debug bubble.
  *
  * Three tabs:
- * - **Note** — compose a note with Save (draft) and Queue buttons
+ * - **Note** — compose a note with Save and Queue buttons
  * - **Queue** — view queued notes (all screens) with Submit All and per-note delete
- * - **Saved** — view all submitted notes from the JSON file, grouped by screen
+ * - **Saved** — view all saved notes, click to view/edit, queue, or delete
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DebugNoteDialog(
     screenContext: ScreenContext,
     currentRoute: String,
-    draftText: String,
-    draftType: NoteType,
     queuedNotes: List<QueuedNote>,
-    savedNotesByScreen: Map<String, List<DebugNoteEntry>>,
+    savedNotes: List<SavedNote>,
     noteCountOnScreen: Int,
     onDismiss: () -> Unit,
-    onSaveDraft: (NoteType, String) -> Unit,
+    onSaveNote: (NoteType, String) -> Unit,
     onQueueNote: (NoteType, String) -> Unit,
     onSubmitQueue: () -> Unit,
-    onRemoveFromQueue: (String) -> Unit
+    onRemoveFromQueue: (String) -> Unit,
+    onUpdateSavedNote: (String, NoteType, String) -> Unit,
+    onDeleteSavedNote: (String) -> Unit,
+    onQueueSavedNote: (String) -> Unit
 ) {
-    var noteText by remember(draftText) { mutableStateOf(draftText) }
-    var selectedType by remember(draftType) { mutableStateOf(draftType) }
+    var noteText by remember { mutableStateOf("") }
+    var selectedType by remember { mutableStateOf(NoteType.BUG) }
     var activeTab by remember { mutableStateOf(DebugTab.NOTE) }
+    var editingNote by remember { mutableStateOf<SavedNote?>(null) }
 
-    val totalSaved = savedNotesByScreen.values.sumOf { it.size }
+    val totalSaved = savedNotes.size
+
+    // If an editing note is set, show the edit dialog instead
+    if (editingNote != null) {
+        SavedNoteEditDialog(
+            note = editingNote!!,
+            onUpdate = { noteId, noteType, text ->
+                onUpdateSavedNote(noteId, noteType, text)
+                editingNote = null
+            },
+            onQueue = { noteId ->
+                onQueueSavedNote(noteId)
+                editingNote = null
+            },
+            onDelete = { noteId ->
+                onDeleteSavedNote(noteId)
+                editingNote = null
+            },
+            onDismiss = { editingNote = null }
+        )
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -122,7 +145,8 @@ fun DebugNoteDialog(
                 )
 
                 DebugTab.SAVED -> SavedContent(
-                    savedNotesByScreen = savedNotesByScreen
+                    savedNotes = savedNotes,
+                    onClickNote = { editingNote = it }
                 )
             }
         },
@@ -130,8 +154,18 @@ fun DebugNoteDialog(
             when (activeTab) {
                 DebugTab.NOTE -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
-                        onClick = { onSaveDraft(selectedType, noteText) },
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
+                        onClick = {
+                            if (noteText.isNotBlank()) {
+                                onSaveNote(selectedType, noteText)
+                                noteText = ""
+                                selectedType = NoteType.BUG
+                            }
+                        },
+                        enabled = noteText.isNotBlank(),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = TextPrimary,
+                            disabledContentColor = TextSecondary
+                        )
                     ) {
                         Text("Save")
                     }
@@ -304,9 +338,10 @@ private fun QueueContent(
 
 @Composable
 private fun SavedContent(
-    savedNotesByScreen: Map<String, List<DebugNoteEntry>>
+    savedNotes: List<SavedNote>,
+    onClickNote: (SavedNote) -> Unit
 ) {
-    if (savedNotesByScreen.isEmpty()) {
+    if (savedNotes.isEmpty()) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -314,7 +349,7 @@ private fun SavedContent(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                "No submitted notes yet",
+                "No saved notes",
                 color = TextSecondary,
                 style = MaterialTheme.typography.bodySmall
             )
@@ -322,35 +357,144 @@ private fun SavedContent(
     } else {
         LazyColumn(
             modifier = Modifier.heightIn(max = 320.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            savedNotesByScreen.entries
-                .sortedBy { it.key }
-                .forEach { (_, notes) ->
-                    val screenLabel = notes.firstOrNull()?.screenLabel ?: "Unknown"
-                    item(key = "header_$screenLabel") {
-                        Text(
-                            "📍 $screenLabel (${notes.size})",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = ReadinessGreen,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    items(notes, key = { it.id }) { entry ->
-                        val noteType = runCatching { NoteType.valueOf(entry.noteType) }
-                            .getOrDefault(NoteType.NOTE)
-                        NoteCard(
-                            typeLabel = noteType.label,
-                            typeColor = noteTypeColor(noteType),
-                            screenLabel = entry.timestamp,
-                            noteText = entry.noteText,
-                            sourceFile = entry.sourceFile,
-                            trailingContent = null
+            items(savedNotes, key = { it.id }) { note ->
+                NoteCard(
+                    typeLabel = note.noteType.label,
+                    typeColor = noteTypeColor(note.noteType),
+                    screenLabel = note.screenLabel,
+                    noteText = note.noteText,
+                    sourceFile = note.sourceFile,
+                    trailingContent = null,
+                    modifier = Modifier.clickable { onClickNote(note) }
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Full-screen edit dialog for a saved note.
+ * Allows viewing the full text, editing, queuing, or deleting.
+ */
+@Composable
+private fun SavedNoteEditDialog(
+    note: SavedNote,
+    onUpdate: (String, NoteType, String) -> Unit,
+    onQueue: (String) -> Unit,
+    onDelete: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var editType by remember(note.id) { mutableStateOf(note.noteType) }
+    var editText by remember(note.id) { mutableStateOf(note.noteText) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceDark,
+        shape = RoundedCornerShape(16.dp),
+        title = {
+            Column {
+                Text(
+                    "📝 Saved Note",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = TextPrimary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "📍 ${note.screenLabel}  •  ${note.timestamp}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondary
+                )
+                Text(
+                    note.sourceFile,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = EcgCyan.copy(alpha = 0.7f)
+                )
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // Type selector
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    NoteType.entries.forEach { type ->
+                        FilterChip(
+                            selected = editType == type,
+                            onClick = { editType = type },
+                            label = { Text(type.label) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = when (type) {
+                                    NoteType.BUG -> ReadinessRed.copy(alpha = 0.3f)
+                                    NoteType.FEATURE -> ReadinessGreen.copy(alpha = 0.3f)
+                                    NoteType.NOTE -> EcgCyan.copy(alpha = 0.3f)
+                                },
+                                selectedLabelColor = TextPrimary
+                            )
                         )
                     }
                 }
+                // Editable text
+                OutlinedTextField(
+                    value = editText,
+                    onValueChange = { editText = it },
+                    label = { Text("Note text") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 120.dp, max = 200.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = EcgCyan,
+                        unfocusedBorderColor = SurfaceVariant,
+                        cursorColor = EcgCyan,
+                        focusedLabelColor = EcgCyan,
+                        unfocusedLabelColor = TextSecondary
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                )
+            }
+        },
+        confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Delete button
+                OutlinedButton(
+                    onClick = { onDelete(note.id) },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = ReadinessRed)
+                ) {
+                    Text("Delete")
+                }
+                // Queue button
+                Button(
+                    onClick = { onQueue(note.id) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ReadinessOrange,
+                        contentColor = BackgroundDark
+                    )
+                ) {
+                    Text("Queue")
+                }
+                // Save (update) button
+                Button(
+                    onClick = { onUpdate(note.id, editType, editText) },
+                    enabled = editText.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ReadinessGreen,
+                        contentColor = BackgroundDark,
+                        disabledContainerColor = SurfaceVariant,
+                        disabledContentColor = TextSecondary
+                    )
+                ) {
+                    Text("Update")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = TextSecondary)
+            }
         }
-    }
+    )
 }
 
 @Composable
@@ -360,11 +504,12 @@ private fun NoteCard(
     screenLabel: String,
     noteText: String,
     sourceFile: String,
-    trailingContent: (@Composable () -> Unit)?
+    trailingContent: (@Composable () -> Unit)?,
+    modifier: Modifier = Modifier
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = SurfaceVariant),
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier

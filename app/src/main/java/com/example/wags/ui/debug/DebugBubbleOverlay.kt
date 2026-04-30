@@ -55,12 +55,10 @@ fun DebugBubbleOverlay(
     }
 
     val queue by debugNoteRepo.queue.collectAsStateWithLifecycle()
-    val drafts by debugNoteRepo.drafts.collectAsStateWithLifecycle()
-    val savedNotesByScreen by debugNoteRepo.savedNotesByScreen.collectAsStateWithLifecycle()
+    val savedNotes by debugNoteRepo.savedNotes.collectAsStateWithLifecycle()
 
     val queuedCount = queue.count { it.screenRoute == currentRoute }
-    val savedCount = savedNotesByScreen[currentRoute]?.size ?: 0
-    val hasDraft = drafts.containsKey(currentRoute)
+    val savedCount = savedNotes.count { it.screenRoute == currentRoute }
     val hasQueued = queuedCount > 0
     val hasSaved = savedCount > 0
     val totalQueueSize = queue.size
@@ -105,8 +103,7 @@ fun DebugBubbleOverlay(
                 .background(
                     when {
                         hasQueued -> ReadinessOrange.copy(alpha = pulseAlpha)
-                        hasDraft -> EcgCyan.copy(alpha = pulseAlpha)
-                        hasSaved -> ReadinessGreen.copy(alpha = 0.85f)
+                        hasSaved -> ReadinessGreen.copy(alpha = pulseAlpha)
                         totalQueueSize > 0 -> ReadinessOrange.copy(alpha = 0.6f)
                         else -> EcgCyan.copy(alpha = 0.85f)
                     }
@@ -150,21 +147,8 @@ fun DebugBubbleOverlay(
                 }
             }
 
-            // Cyan dot = draft exists for this screen
-            if (hasDraft && !hasQueued) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .offset(x = 2.dp, y = (-6).dp)
-                        .size(14.dp)
-                        .shadow(3.dp, CircleShape)
-                        .clip(CircleShape)
-                        .background(EcgCyan)
-                )
-            }
-
-            // Green dot = saved/submitted notes exist for this screen
-            if (hasSaved && !hasQueued && !hasDraft) {
+            // Green dot = saved notes exist for this screen
+            if (hasSaved && !hasQueued) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -177,7 +161,7 @@ fun DebugBubbleOverlay(
             }
 
             // Small yellow dot for global queue items on other screens
-            if (totalQueueSize > 0 && !hasQueued && !hasDraft && !hasSaved) {
+            if (totalQueueSize > 0 && !hasQueued && !hasSaved) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -193,18 +177,20 @@ fun DebugBubbleOverlay(
 
     // Note dialog
     if (showNoteDialog) {
-        val draft = drafts[currentRoute]
         DebugNoteDialog(
             screenContext = screenContext,
             currentRoute = currentRoute ?: "unknown",
-            draftText = draft?.noteText ?: "",
-            draftType = draft?.noteType ?: NoteType.BUG,
             queuedNotes = queue,
-            savedNotesByScreen = savedNotesByScreen,
+            savedNotes = savedNotes,
             noteCountOnScreen = queuedCount,
             onDismiss = { showNoteDialog = false },
-            onSaveDraft = { noteType, text ->
-                debugNoteRepo.saveDraft(currentRoute ?: "unknown", noteType, text)
+            onSaveNote = { noteType, text ->
+                debugNoteRepo.saveNote(
+                    screenRoute = currentRoute ?: "unknown",
+                    screenContext = screenContext,
+                    noteType = noteType,
+                    noteText = text
+                )
             },
             onQueueNote = { noteType, text ->
                 debugNoteRepo.enqueueNote(
@@ -221,6 +207,15 @@ fun DebugBubbleOverlay(
             },
             onRemoveFromQueue = { noteId ->
                 debugNoteRepo.removeFromQueue(noteId)
+            },
+            onUpdateSavedNote = { noteId, noteType, text ->
+                debugNoteRepo.updateSavedNote(noteId, noteType, text)
+            },
+            onDeleteSavedNote = { noteId ->
+                debugNoteRepo.deleteSavedNote(noteId)
+            },
+            onQueueSavedNote = { noteId ->
+                debugNoteRepo.queueSavedNote(noteId)
             }
         )
     }

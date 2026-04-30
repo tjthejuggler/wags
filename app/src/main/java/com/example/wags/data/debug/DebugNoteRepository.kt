@@ -38,12 +38,18 @@ data class DebugNoteEntry(
 )
 
 /**
- * A draft note — saved per-screen but not yet queued for submission.
+ * A saved note — persisted in SharedPreferences, visible in the Saved tab.
+ * Can be edited or queued for submission.
  */
-data class DebugDraft(
+data class SavedNote(
+    val id: String = System.currentTimeMillis().toString(),
+    val timestamp: String = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date()),
     val screenRoute: String,
-    val noteType: NoteType = NoteType.BUG,
-    val noteText: String = ""
+    val screenLabel: String,
+    val sourceFile: String,
+    val sourceFunctions: String,
+    val noteType: NoteType,
+    val noteText: String
 )
 
 /**
@@ -61,9 +67,9 @@ data class QueuedNote(
 )
 
 /**
- * Manages debug notes with a draft → queue → submit flow.
+ * Manages debug notes with a save → queue → submit flow.
  *
- * - **Drafts**: per-screen scratchpads that persist across dialog opens
+ * - **Saved**: notes persisted in SharedPreferences, visible in the Saved tab
  * - **Queue**: notes ready for batch submission (drives the bubble badge)
  * - **Submit**: writes all queued notes to [debug_wags.json] and clears them
  *
@@ -75,19 +81,68 @@ class DebugNoteRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val debugPrefs: DebugPreferences
 ) {
-    // ── Drafts (per-screen, persisted to SharedPreferences) ──────────────────
+    // ── Saved notes (persisted to SharedPreferences) ──────────────────
 
-    private val _drafts = MutableStateFlow<Map<String, DebugDraft>>(debugPrefs.loadDrafts())
-    val drafts: StateFlow<Map<String, DebugDraft>> = _drafts.asStateFlow()
+    private val _savedNotes = MutableStateFlow<List<SavedNote>>(debugPrefs.loadSavedNotes())
+    val savedNotes: StateFlow<List<SavedNote>> = _savedNotes.asStateFlow()
 
-    fun saveDraft(screenRoute: String, noteType: NoteType, noteText: String) {
-        val current = _drafts.value.toMutableMap()
-        current[screenRoute] = DebugDraft(screenRoute, noteType, noteText)
-        _drafts.value = current
-        debugPrefs.saveDrafts(current)
+    fun saveNote(
+        screenRoute: String,
+        screenContext: ScreenContext,
+        noteType: NoteType,
+        noteText: String
+    ) {
+        val note = SavedNote(
+            screenRoute = screenRoute,
+            screenLabel = screenContext.label,
+            sourceFile = screenContext.sourceFile,
+            sourceFunctions = screenContext.sourceFunctions,
+            noteType = noteType,
+            noteText = noteText
+        )
+        _savedNotes.value = _savedNotes.value + note
+        debugPrefs.saveSavedNotes(_savedNotes.value)
     }
 
-    fun getDraft(screenRoute: String): DebugDraft? = _drafts.value[screenRoute]
+    fun updateSavedNote(noteId: String, noteType: NoteType, noteText: String) {
+        _savedNotes.value = _savedNotes.value.map {
+            if (it.id == noteId) it.copy(noteType = noteType, noteText = noteText) else it
+        }
+        debugPrefs.saveSavedNotes(_savedNotes.value)
+    }
+
+    fun deleteSavedNote(noteId: String) {
+        _savedNotes.value = _savedNotes.value.filter { it.id != noteId }
+        debugPrefs.saveSavedNotes(_savedNotes.value)
+    }
+
+    fun queueSavedNote(noteId: String) {
+        val note = _savedNotes.value.find { it.id == noteId } ?: return
+        _savedNotes.value = _savedNotes.value.filter { it.id != noteId }
+        debugPrefs.saveSavedNotes(_savedNotes.value)
+
+        val queued = QueuedNote(
+            id = note.id,
+            timestamp = note.timestamp,
+            screenRoute = note.screenRoute,
+            screenLabel = note.screenLabel,
+            sourceFile = note.sourceFile,
+            sourceFunctions = note.sourceFunctions,
+            noteType = note.noteType,
+            noteText = note.noteText
+        )
+        _queue.value = _queue.value + queued
+    }
+
+    fun hasSavedNotesForScreen(route: String?): Boolean {
+        if (route == null) return false
+        return _savedNotes.value.any { it.screenRoute == route }
+    }
+
+    fun savedNoteCountForScreen(route: String?): Int {
+        if (route == null) return 0
+        return _savedNotes.value.count { it.screenRoute == route }
+    }
 
     // ── Queue (in-memory, visible in dialog, drives badge) ────────────────────
 
@@ -111,12 +166,6 @@ class DebugNoteRepository @Inject constructor(
             noteText = noteText
         )
         _queue.value = _queue.value + note
-
-        // Clear the draft for this screen since it's been queued
-        val current = _drafts.value.toMutableMap()
-        current.remove(screenRoute)
-        _drafts.value = current
-        debugPrefs.saveDrafts(current)
     }
 
     fun removeFromQueue(noteId: String) {
@@ -157,28 +206,6 @@ class DebugNoteRepository @Inject constructor(
 
         // Write combined
         writeEntriesToFile(existingNotes)
-
-        // Refresh saved notes from file so the green indicator updates
-        loadSavedNotes()
-    }
-
-    // ── Submitted notes (from file, for "saved" indicator) ────────────────────
-
-    private val _savedNotesByScreen = MutableStateFlow<Map<String, List<DebugNoteEntry>>>(emptyMap())
-    val savedNotesByScreen: StateFlow<Map<String, List<DebugNoteEntry>>> = _savedNotesByScreen.asStateFlow()
-
-    init {
-        loadSavedNotes()
-    }
-
-    fun hasSavedNotesForScreen(route: String?): Boolean {
-        if (route == null) return false
-        return (_savedNotesByScreen.value[route]?.size ?: 0) > 0
-    }
-
-    fun savedNoteCountForScreen(route: String?): Int {
-        if (route == null) return 0
-        return _savedNotesByScreen.value[route]?.size ?: 0
     }
 
     // ── Badge / indicator (queued = yellow, saved = green) ────────────────────
@@ -197,16 +224,18 @@ class DebugNoteRepository @Inject constructor(
         return _queue.value.any { it.screenRoute == route }
     }
 
-    private fun loadSavedNotes() {
-        try {
-            val entries = loadExistingEntries()
-            _savedNotesByScreen.value = entries.groupBy { it.screenRoute }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to load saved notes", e)
+    // ── One-time cleanup ──────────────────────────────────────────────
+
+    init {
+        // One-time cleanup: clear stale submitted notes and legacy drafts
+        if (!debugPrefs.savedNotesCleared) {
+            runCatching { File(context.filesDir, FILE_NAME).delete() }
+            debugPrefs.clearLegacyDrafts()
+            debugPrefs.savedNotesCleared = true
         }
     }
 
-    // ── File I/O ──────────────────────────────────────────────────────────────
+    // ── File I/O ──────────────────────────────────────────────────────
 
     private fun loadExistingEntries(): List<DebugNoteEntry> {
         val dirUri = debugPrefs.debugFileDirUri
