@@ -46,13 +46,13 @@ class MorningReadinessFsm @Inject constructor(
     companion object {
         const val SUPINE_HRV_SECONDS = 120    // 120s supine raw data collection
         const val STANDING_SECONDS = 120       // 120s standing raw data collection (peak HR + all standing data)
-        const val INIT_DURATION_SECONDS = 30   // 30s prep
+        const val INIT_DURATION_SECONDS = 15   // 15s prep
         private const val STAND_PROMPT_DURATION_SECONDS = 3
     }
 
     /**
      * Start the FSM. Transitions IDLE → INIT → SUPINE_HRV automatically.
-     * Total timed duration: 30s prep + 120s supine + 3s prompt + 120s standing = ~273s.
+     * Total timed duration: 15s prep + 120s supine + 3s prompt + 120s standing = ~258s.
      */
     fun start(scope: CoroutineScope) {
         synchronized(this) {
