@@ -65,6 +65,9 @@ data class MinBreathUiState(
     // Spotify
     val spotifyConnected: Boolean = false,
     val isMusicMode: Boolean = false,
+    val isMovieMode: Boolean = false,
+    val movieAutoControl: Boolean = false,
+    val remoteMediaAvailable: Boolean = false,
     val isGuidedMode: Boolean = false,
     val guidedAudios: List<GuidedAudioEntity> = emptyList(),
     val guidedSelectedId: Long = -1L,
@@ -108,7 +111,8 @@ class MinBreathViewModel @Inject constructor(
         hrDataSource.liveHr,
         hrDataSource.liveSpO2,
         stateMachine.state,
-        spotifyAuthManager.isConnected
+        spotifyAuthManager.isConnected,
+        spotifyManager.remoteMediaAvailable
     ) { args ->
         @Suppress("UNCHECKED_CAST")
         val ui = args[0] as MinBreathUiState
@@ -116,7 +120,11 @@ class MinBreathViewModel @Inject constructor(
         val spo2 = args[2] as Int?
         val session = args[3] as MinBreathState
         val connected = args[4] as Boolean
-        ui.copy(sessionState = session, liveHr = hr, liveSpO2 = spo2, spotifyConnected = connected)
+        val remoteAvail = args[5] as Boolean
+        ui.copy(
+            sessionState = session, liveHr = hr, liveSpO2 = spo2, spotifyConnected = connected,
+            remoteMediaAvailable = remoteAvail
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -145,6 +153,8 @@ class MinBreathViewModel @Inject constructor(
         val savedPosture    = prefs.getString("setting_posture", "LAYING") ?: "LAYING"
         val savedAudio      = prefs.getString("setting_audio", "SILENCE") ?: "SILENCE"
 
+        val savedMovieAutoControl = prefs.getBoolean("setting_movie_auto_control", false)
+
         _uiState.update {
             it.copy(
                 sessionDurationSec = savedDuration,
@@ -154,6 +164,8 @@ class MinBreathViewModel @Inject constructor(
                 posture     = savedPosture,
                 audio       = savedAudio,
                 isMusicMode = savedAudio == AudioSetting.MUSIC.name,
+                isMovieMode = savedAudio == AudioSetting.MOVIE.name,
+                movieAutoControl = savedMovieAutoControl && savedAudio == AudioSetting.MOVIE.name,
                 isGuidedMode = savedAudio == AudioSetting.GUIDED.name,
                 guidedSelectedId = guidedAudioManager.selectedId
             )
@@ -182,6 +194,10 @@ class MinBreathViewModel @Inject constructor(
                     audioHapticEngine.announceSessionComplete()
                     // Auto-save when session completes naturally (timer ran out)
                     if (_uiState.value.isSessionActive) {
+                        // Pause movie if auto-control enabled
+                        if (_uiState.value.movieAutoControl) {
+                            spotifyManager.sendRemotePauseCommand()
+                        }
                         // Stop Spotify if MUSIC was selected — capture tracked songs
                         trackedSongs = if (_uiState.value.isMusicMode) {
                             val tracks = spotifyManager.stopTracking()
@@ -241,10 +257,13 @@ class MinBreathViewModel @Inject constructor(
     fun setAudio(v: String) {
         prefs.edit().putString("setting_audio", v).apply()
         val isGuided = v == AudioSetting.GUIDED.name
+        val isMovie = v == AudioSetting.MOVIE.name
         _uiState.update {
             it.copy(
                 audio = v,
                 isMusicMode = v == AudioSetting.MUSIC.name,
+                isMovieMode = isMovie,
+                movieAutoControl = if (isMovie) it.movieAutoControl else false,
                 isGuidedMode = isGuided
             )
         }
@@ -406,6 +425,11 @@ class MinBreathViewModel @Inject constructor(
         }
     }
 
+    fun setMovieAutoControl(enabled: Boolean) {
+        prefs.edit().putBoolean("setting_movie_auto_control", enabled).apply()
+        _uiState.update { it.copy(movieAutoControl = enabled) }
+    }
+
     fun startSession() {
         val durationMs = _uiState.value.sessionDurationSec * 1000L
         sessionStartMs = System.currentTimeMillis()
@@ -417,6 +441,11 @@ class MinBreathViewModel @Inject constructor(
         if (_uiState.value.isMusicMode) {
             spotifyManager.startTracking()
             spotifyManager.sendPlayCommand()
+        }
+
+        // Start movie playback if MOVIE mode with auto-control enabled
+        if (_uiState.value.movieAutoControl) {
+            spotifyManager.sendRemotePlayCommand()
         }
 
         // Start guided audio if GUIDED is selected
@@ -454,6 +483,11 @@ class MinBreathViewModel @Inject constructor(
 
         telemetryJob?.cancel()
         telemetryJob = null
+
+        // Pause movie if auto-control enabled
+        if (_uiState.value.movieAutoControl) {
+            spotifyManager.sendRemotePauseCommand()
+        }
 
         // Stop Spotify if MUSIC was selected — capture tracked songs
         trackedSongs = if (_uiState.value.isMusicMode) {
@@ -500,6 +534,11 @@ class MinBreathViewModel @Inject constructor(
         telemetryJob?.cancel()
         telemetryJob = null
 
+        // Pause movie if auto-control enabled
+        if (_uiState.value.movieAutoControl) {
+            spotifyManager.sendRemotePauseCommand()
+        }
+
         // Stop Spotify if MUSIC was selected (no tracking save since we're cancelling)
         if (_uiState.value.isMusicMode) {
             spotifyManager.stopTracking()
@@ -523,6 +562,10 @@ class MinBreathViewModel @Inject constructor(
     }
 
     fun switchToBreathing() {
+        // Pause movie if auto-control enabled (hold → breathing)
+        if (_uiState.value.movieAutoControl) {
+            spotifyManager.sendRemotePauseCommand()
+        }
         stateMachine.switchToBreathing()
     }
 
@@ -533,6 +576,10 @@ class MinBreathViewModel @Inject constructor(
             val holdNumber = currentState.currentHoldNumber
             // holdNumber is the hold that just ended; breath follows it
             breathDurations[holdNumber] = currentState.currentPhaseElapsedMs
+        }
+        // Resume movie if auto-control enabled (breathing → hold)
+        if (_uiState.value.movieAutoControl) {
+            spotifyManager.sendRemotePlayCommand()
         }
         stateMachine.switchToHolding()
     }
@@ -769,6 +816,10 @@ class MinBreathViewModel @Inject constructor(
 
     override fun onCleared() {
         guidedAudioManager.stopPlayback()
+        // Pause movie if auto-control enabled
+        if (_uiState.value.movieAutoControl) {
+            try { spotifyManager.sendRemotePauseCommand() } catch (_: Exception) {}
+        }
         // Also stop Spotify if still tracking
         if (_uiState.value.isMusicMode) {
             try {

@@ -152,6 +152,15 @@ fun MinBreathScreen(
                 )
             }
 
+            // 0d. Movie auto-control toggle — shown when MOVIE mode
+            if (state.isMovieMode) {
+                MovieAutoControlCard(
+                    enabled = state.movieAutoControl,
+                    remoteAvailable = state.remoteMediaAvailable,
+                    onToggle = { viewModel.setMovieAutoControl(it) }
+                )
+            }
+
             // 1. Explanation card
             MinBreathExplanationCard()
 
@@ -232,6 +241,60 @@ private fun MinBreathExplanationCard() {
             color = TextSecondary,
             modifier = Modifier.padding(16.dp)
         )
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Movie Auto-Control Card
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun MovieAutoControlCard(
+    enabled: Boolean,
+    remoteAvailable: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = SurfaceVariant.copy(alpha = 0.3f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "🎬 Auto Movie Control",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+                Text(
+                    text = if (remoteAvailable) "Play during holds, pause while breathing" else "No remote media session found",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (remoteAvailable) TextSecondary else TextDisabled
+                )
+            }
+            Switch(
+                checked = enabled,
+                onCheckedChange = onToggle,
+                enabled = remoteAvailable,
+                colors = SwitchDefaults.colors(
+                    checkedTrackColor = ButtonPrimary,
+                    checkedThumbColor = TextPrimary,
+                    disabledCheckedTrackColor = SurfaceVariant.copy(alpha = 0.5f),
+                    disabledCheckedThumbColor = TextDisabled,
+                    disabledUncheckedTrackColor = SurfaceVariant.copy(alpha = 0.3f),
+                    disabledUncheckedThumbColor = TextDisabled
+                )
+            )
+        }
     }
 }
 

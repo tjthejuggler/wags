@@ -52,6 +52,7 @@ class SpotifyManager @Inject constructor(
 
     companion object {
         private const val SPOTIFY_PACKAGE = "com.spotify.music"
+        private const val KDE_CONNECT_PACKAGE = "org.kde.kdeconnect_tp"
         /** Max time (ms) to poll for Spotify metadata after sending a play command. */
         private const val METADATA_POLL_TIMEOUT_MS = 2_000L
         /** Interval (ms) between metadata poll attempts. */
@@ -158,6 +159,13 @@ class SpotifyManager @Inject constructor(
 
     // Active MediaController for Spotify (set by MediaNotificationListener)
     private var spotifyController: MediaController? = null
+
+    // Active MediaController for KDE Connect / remote media (set by MediaNotificationListener)
+    private var remoteMediaController: MediaController? = null
+
+    // Exposed as StateFlow so ViewModels can reactively observe remote media availability
+    private val _remoteMediaAvailable = MutableStateFlow(false)
+    val remoteMediaAvailable: StateFlow<Boolean> = _remoteMediaAvailable.asStateFlow()
 
     // ── Spotify broadcast receiver (no permissions required) ─────────────────
 
@@ -290,9 +298,19 @@ class SpotifyManager @Inject constructor(
      * Finds Spotify's controller and registers our metadata callback.
      */
     fun onActiveSessionsChanged(controllers: List<MediaController>) {
-        // Unregister from old controller
+        // Unregister from old controllers
         spotifyController?.unregisterCallback(mediaCallback)
         spotifyController = null
+        remoteMediaController = null
+
+        // Log all active sessions for debugging
+        Log.d("SpotifyMgr", "onActiveSessionsChanged: ${controllers.size} active sessions")
+        for (ctrl in controllers) {
+            val meta = ctrl.metadata
+            val title = meta?.getString(MediaMetadata.METADATA_KEY_TITLE)
+            val artist = meta?.getString(MediaMetadata.METADATA_KEY_ARTIST)
+            Log.d("SpotifyMgr", "  session: pkg=${ctrl.packageName}, title=$title, artist=$artist")
+        }
 
         val spotify = controllers.firstOrNull { it.packageName == SPOTIFY_PACKAGE }
         if (spotify != null) {
@@ -314,6 +332,26 @@ class SpotifyManager @Inject constructor(
                     )
                 }
             }
+        }
+
+        // Track a remote media session for movie auto-control.
+        // Strategy: pick the first active session that is NOT our own app and NOT Spotify.
+        // This covers KDE Connect (any package name variant) and any other remote media app.
+        // Note: we do NOT require metadata != null — KDE Connect may expose transport
+        // controls without publishing track metadata.
+        val remote = controllers.firstOrNull {
+            it.packageName != SPOTIFY_PACKAGE &&
+            it.packageName != context.packageName
+        }
+        if (remote != null) {
+            remoteMediaController = remote
+            _remoteMediaAvailable.value = true
+            val meta = remote.metadata
+            val title = meta?.getString(MediaMetadata.METADATA_KEY_TITLE)
+            Log.d("SpotifyMgr", "Remote media session discovered: pkg=${remote.packageName}, title=$title, playbackState=${remote.playbackState}")
+        } else {
+            _remoteMediaAvailable.value = false
+            Log.d("SpotifyMgr", "No remote media session found")
         }
     }
 
@@ -450,6 +488,112 @@ class SpotifyManager @Inject constructor(
             audioManager.dispatchMediaKeyEvent(
                 KeyEvent(eventTime, eventTime, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PLAY, 0)
             )
+        }
+    }
+
+    /**
+     * Send a pause command only (no rewind) via AudioManager.
+     *
+     * Sends KEYCODE_MEDIA_PAUSE via AudioManager. Falls back to AudioManager
+     * if no targeted remote controller is available.
+     * Used for movie auto-control where rewinding to the start would be undesirable.
+     */
+    fun sendPauseCommand() {
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
+        val eventTime = SystemClock.uptimeMillis()
+        audioManager.dispatchMediaKeyEvent(
+            KeyEvent(eventTime, eventTime, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PAUSE, 0)
+        )
+        audioManager.dispatchMediaKeyEvent(
+            KeyEvent(eventTime, eventTime, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PAUSE, 0)
+        )
+    }
+
+    // ── Remote media control (KDE Connect / movie auto-control) ──────────────
+
+    /**
+     * Returns true if a remote media session (e.g. KDE Connect) is currently active.
+     * Used by the UI to indicate whether movie auto-control can reach a target.
+     */
+    fun hasRemoteMediaSession(): Boolean = _remoteMediaAvailable.value
+
+    /**
+     * Send a play command directly to the remote media controller (KDE Connect).
+     *
+     * Uses [MediaController.TransportControls.play] which targets the specific
+     * session, unlike [AudioManager.dispatchMediaKeyEvent] which routes to
+     * whichever session Android considers "active".
+     *
+     * Refreshes the controller list before sending to catch any newly-appeared sessions.
+     * Falls back to [sendPlayCommand] (AudioManager) if no remote controller is available.
+     */
+    fun sendRemotePlayCommand() {
+        // Refresh sessions in case a new one appeared since last check
+        refreshRemoteController()
+        val controller = remoteMediaController
+        if (controller != null) {
+            Log.d("SpotifyMgr", "sendRemotePlayCommand: targeting ${controller.packageName}, playbackState=${controller.playbackState}")
+            try {
+                controller.transportControls.play()
+                Log.d("SpotifyMgr", "sendRemotePlayCommand: play() sent successfully")
+            } catch (e: Exception) {
+                Log.e("SpotifyMgr", "sendRemotePlayCommand: play() failed", e)
+            }
+        } else {
+            Log.d("SpotifyMgr", "sendRemotePlayCommand: no remote controller, falling back to AudioManager")
+            sendPlayCommand()
+        }
+    }
+
+    /**
+     * Send a pause command directly to the remote media controller (KDE Connect).
+     *
+     * Uses [MediaController.TransportControls.pause] which targets the specific
+     * session. Does NOT rewind — the movie resumes from where it was paused.
+     *
+     * Refreshes the controller list before sending to catch any newly-appeared sessions.
+     * Falls back to [sendPauseCommand] (AudioManager) if no remote controller is available.
+     */
+    fun sendRemotePauseCommand() {
+        // Refresh sessions in case a new one appeared since last check
+        refreshRemoteController()
+        val controller = remoteMediaController
+        if (controller != null) {
+            Log.d("SpotifyMgr", "sendRemotePauseCommand: targeting ${controller.packageName}, playbackState=${controller.playbackState}")
+            try {
+                controller.transportControls.pause()
+                Log.d("SpotifyMgr", "sendRemotePauseCommand: pause() sent successfully")
+            } catch (e: Exception) {
+                Log.e("SpotifyMgr", "sendRemotePauseCommand: pause() failed", e)
+            }
+        } else {
+            Log.d("SpotifyMgr", "sendRemotePauseCommand: no remote controller, falling back to AudioManager")
+            sendPauseCommand()
+        }
+    }
+
+    /**
+     * Refresh the remote media controller by querying MediaSessionManager directly.
+     * Called before sending play/pause to catch sessions that appeared after the
+     * last onActiveSessionsChanged callback.
+     */
+    private fun refreshRemoteController() {
+        try {
+            val sessionManager = context.getSystemService(Context.MEDIA_SESSION_SERVICE)
+                as? MediaSessionManager ?: return
+            val listenerComponent = ComponentName(context, MediaNotificationListener::class.java)
+            val controllers = sessionManager.getActiveSessions(listenerComponent)
+            // Update remote controller if found
+            val remote = controllers.firstOrNull {
+                it.packageName != SPOTIFY_PACKAGE &&
+                it.packageName != context.packageName
+            }
+            if (remote != null) {
+                remoteMediaController = remote
+                _remoteMediaAvailable.value = true
+            }
+        } catch (_: SecurityException) {
+            // Notification access not granted
         }
     }
 
