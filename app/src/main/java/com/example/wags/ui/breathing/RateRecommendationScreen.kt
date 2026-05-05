@@ -23,8 +23,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wags.domain.usecase.breathing.DataPointSource
 import com.example.wags.domain.usecase.breathing.RateBucket
 import com.example.wags.domain.usecase.breathing.RateRecommendation
+import com.example.wags.ui.common.BarEntry
 import com.example.wags.ui.common.LiveSensorActionsCallback
-import com.example.wags.ui.common.LiveSensorActionsCallback
+import com.example.wags.ui.common.RateBarChart
 import com.example.wags.ui.theme.*
 import java.time.Instant
 import java.time.ZoneId
@@ -193,6 +194,74 @@ private fun RecommendationContent(rec: RateRecommendation, modifier: Modifier = 
                     color = RecBone,
                     lineHeight = 18.sp
                 )
+            }
+        }
+
+        // ── Comparison charts ────────────────────────────────────────────────
+        if (rec.buckets.isNotEmpty()) {
+            val sortedByRate = rec.buckets.sortedBy { it.rateBpm }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    // Chart 1: Overall Score
+                    RateBarChart(
+                        title = "OVERALL SCORE BY RATE",
+                        entries = sortedByRate.map {
+                            BarEntry(
+                                label = "%.1f".format(it.rateBpm),
+                                value = it.finalScore,
+                                isHighlighted = it.isRecommended
+                            )
+                        }
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // Chart 2: Weighted Average Score
+                    RateBarChart(
+                        title = "WEIGHTED AVG SCORE BY RATE",
+                        entries = sortedByRate.map {
+                            BarEntry(
+                                label = "%.1f".format(it.rateBpm),
+                                value = it.weightedAvgScore,
+                                isHighlighted = it.isRecommended
+                            )
+                        }
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // Chart 3: Confidence Multiplier
+                    RateBarChart(
+                        title = "CONFIDENCE BY RATE",
+                        entries = sortedByRate.map {
+                            BarEntry(
+                                label = "%.1f".format(it.rateBpm),
+                                value = it.confidenceMultiplier,
+                                isHighlighted = it.isRecommended
+                            )
+                        },
+                        maxValue = 1f
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // Chart 4: Data Point Count
+                    RateBarChart(
+                        title = "DATA POINTS BY RATE",
+                        entries = sortedByRate.map {
+                            BarEntry(
+                                label = "%.1f".format(it.rateBpm),
+                                value = it.dataPointCount.toFloat(),
+                                isHighlighted = it.isRecommended
+                            )
+                        }
+                    )
+                }
             }
         }
 

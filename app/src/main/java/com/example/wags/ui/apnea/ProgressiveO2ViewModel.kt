@@ -88,8 +88,8 @@ data class BreathPeriodHistory(
     val maxHoldReachedSec: Int,
     /** How many sessions used this breath period. */
     val sessionCount: Int,
-    /** Session ID of the session that achieved the max hold — used for navigation to detail. */
-    val maxHoldSessionId: Long
+    /** Record ID of the record that achieved the max hold — used for navigation to detail. */
+    val maxHoldRecordId: Long
 )
 
 // ── ViewModel ───────────────────────────────────────────────────────────────
@@ -708,17 +708,22 @@ class ProgressiveO2ViewModel @Inject constructor(
             obj.put("targetMs", r.targetHoldMs)
             obj.put("actualMs", r.actualHoldMs)
             obj.put("completed", r.completed)
+            if (r.contractionElapsedMs != null) {
+                obj.put("contractionMs", r.contractionElapsedMs)
+            } else {
+                obj.put("contractionMs", JSONObject.NULL)
+            }
             roundsArray.put(obj)
         }
         root.put("rounds", roundsArray)
         return root.toString()
     }
 
-    private fun buildBreathPeriodHistory(
+    private suspend fun buildBreathPeriodHistory(
         sessions: List<ApneaSessionEntity>
     ): List<BreathPeriodHistory> {
         // Parse each session's tableParamsJson to extract breathPeriodSec and max completed hold
-        data class Parsed(val breathPeriodSec: Int, val maxCompletedHoldSec: Int, val sessionId: Long)
+        data class Parsed(val breathPeriodSec: Int, val maxCompletedHoldSec: Int, val sessionId: Long, val timestamp: Long)
 
         val parsed = sessions.mapNotNull { entity ->
             try {
@@ -734,7 +739,7 @@ class ProgressiveO2ViewModel @Inject constructor(
                         if (targetMs > maxHoldMs) maxHoldMs = targetMs
                     }
                 }
-                Parsed(breathPeriod, (maxHoldMs / 1000).toInt(), entity.sessionId)
+                Parsed(breathPeriod, (maxHoldMs / 1000).toInt(), entity.sessionId, entity.timestamp)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to parse session ${entity.sessionId}", e)
                 null
@@ -745,11 +750,15 @@ class ProgressiveO2ViewModel @Inject constructor(
         return parsed.groupBy { it.breathPeriodSec }
             .map { (bp, group) ->
                 val maxEntry = group.maxByOrNull { it.maxCompletedHoldSec }
+                // Resolve the record ID from the session's timestamp + table type
+                val recordId = if (maxEntry != null) {
+                    apneaRepository.getRecordByTimestampAndType(maxEntry.timestamp, "PROGRESSIVE_O2")?.recordId ?: -1L
+                } else -1L
                 BreathPeriodHistory(
                     breathPeriodSec = bp,
                     maxHoldReachedSec = maxEntry?.maxCompletedHoldSec ?: 0,
                     sessionCount = group.size,
-                    maxHoldSessionId = maxEntry?.sessionId ?: -1L
+                    maxHoldRecordId = recordId
                 )
             }
             .sortedBy { it.breathPeriodSec }

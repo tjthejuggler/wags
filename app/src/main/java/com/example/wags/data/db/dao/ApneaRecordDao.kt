@@ -386,6 +386,10 @@ interface ApneaRecordDao {
     @Query("SELECT * FROM apnea_records WHERE recordId = :recordId LIMIT 1")
     suspend fun getById(recordId: Long): ApneaRecordEntity?
 
+    /** Find a record by timestamp and table type (used to locate the record matching a session). */
+    @Query("SELECT * FROM apnea_records WHERE timestamp = :timestamp AND tableType = :tableType LIMIT 1")
+    suspend fun getByTimestampAndType(timestamp: Long, tableType: String): ApneaRecordEntity?
+
     /** Permanently delete a record (CASCADE will remove its free_hold_telemetry and song_log rows). */
     @Query("DELETE FROM apnea_records WHERE recordId = :recordId")
     suspend fun deleteById(recordId: Long)

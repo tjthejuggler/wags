@@ -212,8 +212,8 @@ fun ProgressiveO2Screen(
             BreathPeriodHistorySection(
                 history = state.pastBreathPeriods,
                 currentBreathPeriodSec = state.breathPeriodSec,
-                onViewSessionDetail = { sessionId ->
-                    navController.navigate(WagsRoutes.progressiveO2Detail(sessionId))
+                onViewSessionDetail = { recordId ->
+                    navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
                 }
             )
 
@@ -357,7 +357,7 @@ private fun BreathPeriodHistorySection(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
                         .background(bgColor)
-                        .clickable { onViewSessionDetail(item.maxHoldSessionId) }
+                        .clickable { onViewSessionDetail(item.maxHoldRecordId) }
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically

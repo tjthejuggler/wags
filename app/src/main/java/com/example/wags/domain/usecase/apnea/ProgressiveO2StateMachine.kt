@@ -33,7 +33,9 @@ data class ProgressiveO2State(
     /** Completed round data for serialisation into tableParamsJson. */
     val roundResults: List<ProgressiveO2RoundResult> = emptyList(),
     /** Epoch ms when first contraction was logged (null if not yet). */
-    val firstContractionMs: Long? = null
+    val firstContractionMs: Long? = null,
+    /** Wall-clock epoch ms when the current hold round started. */
+    val holdStartEpochMs: Long? = null
 )
 
 // ── Per-round result ────────────────────────────────────────────────────────
@@ -45,7 +47,9 @@ data class ProgressiveO2RoundResult(
     /** How long the user actually held (equals target if completed, less if stopped mid-hold). */
     val actualHoldMs: Long,
     /** True if the user held for the full target duration. */
-    val completed: Boolean
+    val completed: Boolean,
+    /** Elapsed ms within the hold when first contraction was logged (null if none). */
+    val contractionElapsedMs: Long? = null
 )
 
 // ── State machine ───────────────────────────────────────────────────────────
@@ -85,11 +89,15 @@ class ProgressiveO2StateMachine @Inject constructor() {
         when (current.phase) {
             ProgressiveO2Phase.HOLD -> {
                 val elapsed = current.holdDurationMs - current.timerMs
+                val contractionElapsed = current.firstContractionMs?.let { fc ->
+                    current.holdStartEpochMs?.let { start -> fc - start }
+                }
                 val partialResult = ProgressiveO2RoundResult(
                     roundNumber = current.currentRound,
                     targetHoldMs = current.holdDurationMs,
                     actualHoldMs = elapsed,
-                    completed = false
+                    completed = false,
+                    contractionElapsedMs = contractionElapsed
                 )
                 _state.value = current.copy(
                     phase = ProgressiveO2Phase.COMPLETE,
@@ -126,19 +134,24 @@ class ProgressiveO2StateMachine @Inject constructor() {
             currentRound = round,
             holdDurationMs = holdMs,
             timerMs = holdMs,
-            firstContractionMs = null  // reset so button is available each hold
+            firstContractionMs = null,  // reset so button is available each hold
+            holdStartEpochMs = System.currentTimeMillis()
         )
         runCountdown(holdMs) { onHoldComplete(round, holdMs) }
     }
 
     private fun onHoldComplete(round: Int, holdMs: Long) {
+        val current = _state.value
+        val contractionElapsed = current.firstContractionMs?.let { fc ->
+            current.holdStartEpochMs?.let { start -> fc - start }
+        }
         val result = ProgressiveO2RoundResult(
             roundNumber = round,
             targetHoldMs = holdMs,
             actualHoldMs = holdMs,
-            completed = true
+            completed = true,
+            contractionElapsedMs = contractionElapsed
         )
-        val current = _state.value
         val breathMs = current.breathDurationMs
         _state.value = current.copy(
             phase = ProgressiveO2Phase.BREATHING,

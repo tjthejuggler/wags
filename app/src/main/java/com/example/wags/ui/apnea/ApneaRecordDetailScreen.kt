@@ -37,6 +37,7 @@ import androidx.navigation.NavController
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.ApneaSessionEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
+import org.json.JSONObject
 import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.PersonalBestCategory
 import com.example.wags.domain.model.Posture
@@ -756,13 +757,21 @@ private fun RecordDetailContent(
 
         // ── Parse Min Breath holds for session-aware charts ─────────────
         val isMinBreath = record.tableType == "MIN_BREATH"
+        val isProgressiveO2 = record.tableType == "PROGRESSIVE_O2"
         val minBreathHolds = remember(tableSession, isMinBreath) {
             if (isMinBreath && tableSession != null) {
                 parseMinBreathParams(tableSession.tableParamsJson)?.holds ?: emptyList()
             } else emptyList()
         }
-        val sessionTotalDurationMs = remember(tableSession, isMinBreath) {
-            if (isMinBreath && tableSession != null) {
+        val progressiveO2Holds = remember(tableSession, isProgressiveO2) {
+            if (isProgressiveO2 && tableSession != null) {
+                parseProgressiveO2Holds(tableSession.tableParamsJson)
+            } else emptyList()
+        }
+        val sessionHolds = if (isMinBreath) minBreathHolds else progressiveO2Holds
+        val useSessionChart = sessionHolds.isNotEmpty() && (isMinBreath || isProgressiveO2)
+        val sessionTotalDurationMs = remember(tableSession, isMinBreath, isProgressiveO2) {
+            if ((isMinBreath || isProgressiveO2) && tableSession != null) {
                 tableSession.totalSessionDurationMs
             } else 0L
         }
@@ -806,14 +815,14 @@ private fun RecordDetailContent(
                             color = TextPrimary
                         )
                     }
-                    if (isMinBreath && minBreathHolds.isNotEmpty()) {
+                    if (useSessionChart) {
                         val hrTimestamps = remember(hrSamples) { hrSamples.map { it.second } }
                         MinBreathSessionChart(
                             samples = hrValues,
                             sampleTimestampsMs = hrTimestamps,
                             lineColor = TextPrimary,
                             sessionDurationMs = sessionTotalDurationMs,
-                            holds = minBreathHolds,
+                            holds = sessionHolds,
                             showYLabels = true,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -839,7 +848,7 @@ private fun RecordDetailContent(
                         )
                     }
                     Text(
-                        if (isMinBreath) "HR across the session (${hrValues.size} samples)"
+                        if (useSessionChart) "HR across the session (${hrValues.size} samples)"
                         else "HR over the hold (${hrValues.size} beats)",
                         style = MaterialTheme.typography.labelSmall,
                         color = TextSecondary
@@ -906,14 +915,14 @@ private fun RecordDetailContent(
                             color = TextPrimary
                         )
                     }
-                    if (isMinBreath && minBreathHolds.isNotEmpty()) {
+                    if (useSessionChart) {
                         val spO2Timestamps = remember(spO2Samples) { spO2Samples.map { it.second } }
                         MinBreathSessionChart(
                             samples = spO2Values,
                             sampleTimestampsMs = spO2Timestamps,
                             lineColor = SpO2Blue,
                             sessionDurationMs = sessionTotalDurationMs,
-                            holds = minBreathHolds,
+                            holds = sessionHolds,
                             showYLabels = false,
                             yMin = 70f,
                             yMax = 100f,
@@ -941,7 +950,7 @@ private fun RecordDetailContent(
                         )
                     }
                     Text(
-                        if (isMinBreath) "SpO₂ across the session (${spO2Values.size} samples)"
+                        if (useSessionChart) "SpO₂ across the session (${spO2Values.size} samples)"
                         else "SpO₂ over the hold (${spO2Values.size} samples)",
                         style = MaterialTheme.typography.labelSmall,
                         color = TextSecondary
@@ -1305,4 +1314,30 @@ private fun formatMsDetail(ms: Long): String {
         "${minutes}m ${seconds}s ${centis}cs"
     else
         "${seconds}.${centis.toString().padStart(2, '0')}s"
+}
+
+/**
+ * Parse Progressive O₂ tableParamsJson into [MinBreathHoldInfo] objects
+ * so the session-aware chart can render hold/breath regions and contraction markers.
+ */
+private fun parseProgressiveO2Holds(jsonStr: String): List<MinBreathHoldInfo> {
+    return try {
+        val root = JSONObject(jsonStr)
+        val breathPeriodSec = root.optInt("breathPeriodSec", 0)
+        val breathDurationMs = breathPeriodSec.toLong() * 1000L
+        val roundsArray = root.optJSONArray("rounds") ?: return emptyList()
+        val holds = mutableListOf<MinBreathHoldInfo>()
+        for (i in 0 until roundsArray.length()) {
+            val r = roundsArray.getJSONObject(i)
+            val holdNum = r.optInt("round", i + 1)
+            val actualMs = r.optLong("actualMs", 0L)
+            val cMs = if (r.isNull("contractionMs")) null
+                      else r.optLong("contractionMs", -1L).takeIf { it >= 0 }
+            val bMs = if (i < roundsArray.length() - 1) breathDurationMs else null
+            holds.add(MinBreathHoldInfo(holdNum, actualMs, cMs, bMs))
+        }
+        holds
+    } catch (_: Exception) {
+        emptyList()
+    }
 }

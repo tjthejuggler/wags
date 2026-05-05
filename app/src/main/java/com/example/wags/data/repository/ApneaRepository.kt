@@ -1212,6 +1212,9 @@ class ApneaRepository @Inject constructor(
     suspend fun getById(recordId: Long): ApneaRecordEntity? =
         dao.getById(recordId)
 
+    suspend fun getRecordByTimestampAndType(timestamp: Long, tableType: String): ApneaRecordEntity? =
+        dao.getByTimestampAndType(timestamp, tableType)
+
     suspend fun saveRecord(entity: ApneaRecordEntity): Long =
         dao.insert(entity)
 
