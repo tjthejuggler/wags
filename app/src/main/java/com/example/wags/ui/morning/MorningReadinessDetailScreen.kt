@@ -34,7 +34,6 @@ import com.example.wags.data.db.entity.MorningReadinessEntity
 import com.example.wags.data.db.entity.MorningReadinessTelemetryEntity
 import com.example.wags.ui.common.InfoHelpBubble
 import com.example.wags.ui.common.LiveSensorActionsCallback
-import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.theme.*
 import java.time.Instant
 import java.time.ZoneId
@@ -139,13 +138,6 @@ private const val HELP_ARTIFACT_TEXT =
     "• 5–15% — Acceptable; results are reliable.\n" +
     "• >15% — Poor signal; results may be less accurate. Ensure the H10 strap is wet and snug.\n\n" +
     "Artifacts are replaced using interpolation rather than discarded, so the HRV calculation remains valid at low artifact rates."
-
-private const val HELP_STAND_MARKER_TITLE = "Stand Marker"
-private const val HELP_STAND_MARKER_TEXT =
-    "The orange dashed line marks the precise moment you stood up, detected from the H10 accelerometer.\n\n" +
-    "Everything to the left is your supine (lying) phase; everything to the right is your standing phase.\n\n" +
-    "The orthostatic response — the HR spike and subsequent recovery — is the key signal in the standing window."
-
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -311,20 +303,12 @@ private fun MorningReadinessDetailContent(
     val totalBeatCount    = telemetry.size
     val standingComplete  = totalBeatCount > 0 && standingBeatCount * 2 >= totalBeatCount
 
-    // Pre-compute stand marker fraction (0..1 across the full telemetry timeline)
-    // — only relevant when standing was actually completed.
-    val sessionStartMs = telemetry.firstOrNull()?.timestampMs
-    val sessionEndMs   = telemetry.lastOrNull()?.timestampMs
-    val standFraction: Float? = if (
-        standingComplete &&
-        reading.standTimestampMs != null &&
-        sessionStartMs != null &&
-        sessionEndMs != null &&
-        sessionEndMs > sessionStartMs
-    ) {
-        ((reading.standTimestampMs - sessionStartMs).toFloat() /
-                (sessionEndMs - sessionStartMs).toFloat()).coerceIn(0f, 1f)
-    } else null
+    // Phase-segregated telemetry — the primary HR / HRV charts must be supine-only
+    // so that day-to-day comparisons remain consistent regardless of whether the
+    // user performed the standing portion. Standing telemetry is rendered in its
+    // own (smaller) charts further down the screen.
+    val supineTelemetry   = telemetry.filter { it.phase == "SUPINE" }
+    val standingTelemetry = telemetry.filter { it.phase == "STANDING" }
 
     Column(
         modifier = modifier
@@ -379,38 +363,63 @@ private fun MorningReadinessDetailContent(
             }
         }
 
-        // ── HR chart ──────────────────────────────────────────────────────────
-        if (telemetry.isNotEmpty()) {
+        // ── Supine HR chart (always supine-only so day-to-day comparisons stay
+        //    consistent regardless of whether the standing portion was done) ──
+        if (supineTelemetry.isNotEmpty()) {
             TelemetryChartCard(
                 title         = "Heart Rate",
-                subtitle      = if (standingComplete) "bpm · supine → stand" else "bpm · supine",
-                telemetry     = telemetry,
+                subtitle      = "bpm · supine",
+                telemetry     = supineTelemetry,
                 valueSelector = { it.hrBpm.toFloat() },
                 lineColor     = EcgCyan,
-                unit          = "bpm",
-                standFraction = standFraction,
-                showStandingLabel = standingComplete
+                unit          = "bpm"
             )
         }
 
-        // ── HRV (rolling RMSSD) chart ─────────────────────────────────────────
-        val hasHrv = telemetry.any { it.rollingRmssdMs > 0.0 }
-        if (hasHrv) {
+        // ── Supine rolling HRV (RMSSD) chart ─────────────────────────────────
+        val supineHrvSeries = supineTelemetry.filter { it.rollingRmssdMs > 0.0 }
+        if (supineHrvSeries.isNotEmpty()) {
             TelemetryChartCard(
                 title         = "Rolling HRV (RMSSD)",
-                subtitle      = "ms · 20-beat sliding window",
-                telemetry     = telemetry.filter { it.rollingRmssdMs > 0.0 },
+                subtitle      = "ms · supine · 20-beat sliding window",
+                telemetry     = supineHrvSeries,
                 valueSelector = { it.rollingRmssdMs.toFloat() },
                 lineColor     = ReadinessGreen,
-                unit          = "ms",
-                standFraction = standFraction,
-                showStandingLabel = standingComplete
+                unit          = "ms"
             )
         }
 
         // ── Orthostatic response stats — only when standing was truly completed ──
         if (standingComplete) {
             OrthostasisStatsCard(reading = reading, telemetry = telemetry)
+        }
+
+        // ── Standing-phase telemetry charts — secondary, only when standing
+        //    was truly completed. Kept separate so they never pollute the
+        //    primary supine charts above.
+        if (standingComplete && standingTelemetry.isNotEmpty()) {
+            TelemetryChartCard(
+                title         = "Heart Rate (standing)",
+                subtitle      = "bpm · post-stand",
+                telemetry     = standingTelemetry,
+                valueSelector = { it.hrBpm.toFloat() },
+                lineColor     = ReadinessOrange,
+                unit          = "bpm",
+                compact       = true
+            )
+
+            val standingHrvSeries = standingTelemetry.filter { it.rollingRmssdMs > 0.0 }
+            if (standingHrvSeries.isNotEmpty()) {
+                TelemetryChartCard(
+                    title         = "Rolling HRV (standing)",
+                    subtitle      = "ms · post-stand · 20-beat sliding window",
+                    telemetry     = standingHrvSeries,
+                    valueSelector = { it.rollingRmssdMs.toFloat() },
+                    lineColor     = ReadinessOrange,
+                    unit          = "ms",
+                    compact       = true
+                )
+            }
         }
 
         // ── Supine HRV ────────────────────────────────────────────────────────
@@ -527,6 +536,16 @@ private fun MorningReadinessDetailContent(
 
 // ── Telemetry chart card ──────────────────────────────────────────────────────
 
+/**
+ * Renders a phase-pure telemetry chart (either supine or standing, never mixed).
+ * Min/avg/max chips are computed from the supplied telemetry only, so they are
+ * directly comparable across days regardless of whether the standing portion
+ * was performed.
+ *
+ * @param compact When true, uses tighter padding and a shorter chart height —
+ *                used for the secondary "standing" charts so the supine charts
+ *                remain visually dominant.
+ */
 @Composable
 private fun TelemetryChartCard(
     title: String,
@@ -535,31 +554,26 @@ private fun TelemetryChartCard(
     valueSelector: (MorningReadinessTelemetryEntity) -> Float,
     lineColor: Color,
     unit: String,
-    standFraction: Float?,
-    showStandingLabel: Boolean = true,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    compact: Boolean = false
 ) {
     val values = telemetry.map(valueSelector)
     val yMin   = (values.minOrNull() ?: 0f) * 0.92f
     val yMax   = (values.maxOrNull() ?: 1f) * 1.08f
 
-    // Stats
     val avg    = values.average().toFloat()
     val minVal = values.minOrNull() ?: 0f
     val maxVal = values.maxOrNull() ?: 0f
 
-    // Supine vs standing split values for the legend
-    val supineValues   = telemetry.filter { it.phase == "SUPINE"   }.map(valueSelector)
-    val standingValues = telemetry.filter { it.phase == "STANDING" }.map(valueSelector)
-    val supineAvg   = supineValues.average().toFloat().takeIf { supineValues.isNotEmpty() }
-    val standingAvg = standingValues.average().toFloat().takeIf { standingValues.isNotEmpty() }
+    val cardPadding  = if (compact) 12.dp else 16.dp
+    val chartHeight  = if (compact) 110.dp else 160.dp
 
     Card(colors = CardDefaults.cardColors(containerColor = SurfaceVariant), modifier = modifier) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(cardPadding),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 10.dp)
         ) {
             // Title row
             Row(
@@ -576,7 +590,7 @@ private fun TelemetryChartCard(
                     )
                     Text(subtitle, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
                 }
-                // Min / Avg / Max chips
+                // Min / Avg / Max chips — computed from the supplied (phase-pure) telemetry only.
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     MiniStat("min", "${minVal.toInt()} $unit", TextSecondary)
                     MiniStat("avg", "${avg.toInt()} $unit", lineColor)
@@ -588,51 +602,15 @@ private fun TelemetryChartCard(
 
             // Chart
             TelemetryLineChart(
-                values            = values,
-                yMin              = yMin,
-                yMax              = yMax,
-                lineColor         = lineColor,
-                unit              = unit,
-                standFraction     = standFraction,
-                showStandingLabel = showStandingLabel,
-                modifier          = Modifier
+                values    = values,
+                yMin      = yMin,
+                yMax      = yMax,
+                lineColor = lineColor,
+                unit      = unit,
+                modifier  = Modifier
                     .fillMaxWidth()
-                    .height(160.dp)
+                    .height(chartHeight)
             )
-
-            // Stand marker legend
-            if (standFraction != null) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Canvas(modifier = Modifier.size(width = 16.dp, height = 2.dp)) {
-                        drawLine(
-                            color       = ReadinessOrange,
-                            start       = Offset(0f, size.height / 2f),
-                            end         = Offset(size.width, size.height / 2f),
-                            strokeWidth = 3f
-                        )
-                    }
-                    Text(
-                        "Stand",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = ReadinessOrange
-                    )
-                    InfoHelpBubble(
-                        title   = HELP_STAND_MARKER_TITLE,
-                        content = HELP_STAND_MARKER_TEXT,
-                        iconTint = ReadinessOrange
-                    )
-                    if (supineAvg != null && standingAvg != null) {
-                        Text(
-                            "Supine avg ${supineAvg.toInt()} $unit  →  Stand avg ${standingAvg.toInt()} $unit",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextSecondary
-                        )
-                    }
-                }
-            }
         }
     }
 }
@@ -764,12 +742,11 @@ private fun OrthostasisStatsCard(
 // ── Canvas chart ──────────────────────────────────────────────────────────────
 
 /**
- * Draws a time-series line chart for telemetry values.
+ * Draws a phase-pure time-series line chart for telemetry values.
  *
- * @param values        Y values in chronological order.
- * @param yMin / yMax   Y-axis bounds (pre-padded by caller).
- * @param lineColor     Stroke + fill tint colour.
- * @param standFraction 0..1 fraction along the X axis where the stand cue occurred, or null.
+ * @param values    Y values in chronological order (single phase only).
+ * @param yMin/yMax Y-axis bounds (pre-padded by caller).
+ * @param lineColor Stroke + fill tint colour.
  */
 @Composable
 private fun TelemetryLineChart(
@@ -778,8 +755,6 @@ private fun TelemetryLineChart(
     yMax: Float,
     lineColor: Color,
     unit: String,
-    standFraction: Float?,
-    showStandingLabel: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     if (values.size < 2) {
@@ -793,13 +768,12 @@ private fun TelemetryLineChart(
     val leftPadPx      = with(density) { 36.dp.toPx() }   // Y-axis labels
     val rightPadPx     = with(density) { 6.dp.toPx() }
     val topPadPx       = with(density) { 6.dp.toPx() }
-    val bottomPadPx    = with(density) { 18.dp.toPx() }   // X-axis labels
+    val bottomPadPx    = with(density) { 6.dp.toPx() }
     val labelTextSizePx = with(density) { 9.sp.toPx() }
 
     val yRange         = (yMax - yMin).coerceAtLeast(1f)
     val gridColor      = TextDisabled.copy(alpha = 0.15f)
     val labelArgb      = TextSecondary.copy(alpha = 0.7f).toArgb()
-    val standColor     = ReadinessOrange
 
     var tappedIndex by remember { mutableStateOf<Int?>(null) }
     var chartWidthPx by remember { mutableFloatStateOf(0f) }
@@ -837,37 +811,6 @@ private fun TelemetryLineChart(
         listOf(0.25f, 0.5f, 0.75f, 1.0f).forEach { frac ->
             val gy = plotTop + plotH * (1f - frac)
             drawLine(gridColor, Offset(plotLeft, gy), Offset(plotRight, gy), strokeWidth = 1f)
-        }
-
-        // ── Stand-cue vertical marker ─────────────────────────────────────────
-        if (standFraction != null) {
-            val sx = plotLeft + standFraction * plotW
-            // Dashed-style: draw short segments
-            val dashLen = with(density) { 5.dp.toPx() }
-            val gapLen  = with(density) { 3.dp.toPx() }
-            var y = plotTop
-            while (y < plotBot) {
-                val segEnd = (y + dashLen).coerceAtMost(plotBot)
-                drawLine(
-                    color       = standColor.copy(alpha = 0.85f),
-                    start       = Offset(sx, y),
-                    end         = Offset(sx, segEnd),
-                    strokeWidth = 2f
-                )
-                y += dashLen + gapLen
-            }
-            // Small "STAND" label at top of marker
-            drawContext.canvas.nativeCanvas.drawText(
-                "STAND",
-                sx + with(density) { 3.dp.toPx() },
-                plotTop + labelTextSizePx + with(density) { 2.dp.toPx() },
-                Paint().apply {
-                    isAntiAlias = true
-                    textSize    = labelTextSizePx
-                    color       = standColor.copy(alpha = 0.9f).toArgb()
-                    textAlign   = Paint.Align.LEFT
-                }
-            )
         }
 
         // ── Fill path ─────────────────────────────────────────────────────────
@@ -924,28 +867,6 @@ private fun TelemetryLineChart(
             )
         }
 
-        // ── X-axis phase labels ───────────────────────────────────────────────
-        val xPaint = Paint().apply {
-            isAntiAlias = true
-            textSize    = labelTextSizePx
-            color       = labelArgb
-            textAlign   = Paint.Align.CENTER
-        }
-        val supineLabelX = if (showStandingLabel) plotLeft + plotW * 0.20f else plotLeft + plotW * 0.50f
-        drawContext.canvas.nativeCanvas.drawText(
-            "Supine",
-            supineLabelX,
-            totalH - with(density) { 2.dp.toPx() },
-            xPaint
-        )
-        if (showStandingLabel) {
-            drawContext.canvas.nativeCanvas.drawText(
-                "Standing",
-                plotLeft + plotW * 0.75f,
-                totalH - with(density) { 2.dp.toPx() },
-                xPaint
-            )
-        }
     }
 
         // ── Info popup ─────────────────────────────────────────────────────

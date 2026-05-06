@@ -1,25 +1,16 @@
-## ADR: Bridge Generic BLE HR into Shared RR Buffer
-
-**Date**: 2026-04-24
-**Status**: Accepted
+## ADR — Morning Readiness Detail charts are phase-pure (2026-05-06)
 
 ### Context
-The O2 ring (and other generic BLE devices) provided HR data through `GenericBleManager.emitReadings()` → `_liveHr` StateFlow, which is why HR showed on the top bar. However, all HRV/RR interval data flowed exclusively through `PolarBleManager.rrBuffer`, which the O2 ring never wrote to. This caused:
-- Meditation/NSDR sessions: flat HR/HRV charts, null RMSSD, no analytics
-- Readiness scoring: no RR intervals for HRV calculation
-- Breathing/resonance: no live RMSSD/SDNN updates
-- Session screen: same flat-line issue
+On `MorningReadinessDetailScreen`, the per-session "Heart Rate" and "Rolling HRV (RMSSD)" cards were rendering both supine and standing telemetry on a single line, with the prominent **min/avg/max** chips computed over the full mixed series. Standing telemetry has higher HR and lower RMSSD, so the chip values silently differed between days where the user did vs skipped the standing portion — making day-to-day comparison meaningless. The DB schema (`MorningReadinessEntity`) was already correctly phase-segregated and the history-trend charts in `MorningReadinessHistoryViewModel` already plotted only `supineRhr` / `supineRmssdMs`, so the bug was purely in the detail-screen chart presentation layer.
 
 ### Decision
-Bridge `GenericBleManager` HR data into the shared `PolarBleManager.rrBuffer` by:
-1. Adding `sharedRrBuffer` reference in `GenericBleManager`, wired by `UnifiedDeviceManager.init`
-2. Writing synthesized RR intervals (60000/HR ms) in `emitReadings()` for O2Ring/OxySmart
-3. Extracting real RR intervals from standard BLE HR packets (UUID 0x2A37, bit 4) in `handleStandardHrPacket()`
-4. Guarding `startRrStream()` to only call Polar SDK for Polar devices
-5. Adding `DeviceCapability.RR` to `OXIMETER` and `GENERIC_BLE` device types
+Make the primary "Heart Rate" and "Rolling HRV (RMSSD)" cards on the morning readiness detail screen **strictly supine-only**. When the user actually completed the standing portion, render two additional **smaller (compact)** cards below the orthostatic stats card titled "Heart Rate (standing)" and "Rolling HRV (standing)" containing only the standing-phase telemetry. `TelemetryChartCard` and `TelemetryLineChart` are now phase-pure: the in-chart stand-marker / "Supine→Stand avg" legend / X-axis phase labels were removed. The supine→stand transition narrative lives entirely in `OrthostasisStatsCard` which already shows pre-stand HR, peak stand HR, HR rise, and HRV change.
 
 ### Consequences
-- All HRV consumers now work with any device type, not just Polar
-- Synthesized RR intervals from HR are less precise than real RR (no beat-to-beat variability), so RMSSD will be near-zero for O2 ring. This is expected — the O2 ring doesn't provide true RR intervals.
-- Apnea code is unaffected: it uses `oximeterIsPrimary` to skip `rrBuffer` and uses `oximeterSamples` instead
-- Standard BLE HR straps that include RR intervals in their packets (bit 4 of flags) will get real RR data, not synthesized
+- Day-to-day comparison of the displayed avg/min/max HR & HRV is now **consistent regardless of whether the standing portion was performed** — the user's original complaint is resolved.
+- No DB migration required: historical readings render correctly on the new layout because the change is presentation-only (telemetry has always been tagged with `phase = "SUPINE" | "STANDING"`).
+- The orphan `HELP_STAND_MARKER_*` constants and the `standFraction` / `showStandingLabel` parameters are removed.
+- Score calculation, history trend charts, dashboard "Today's Readiness" card, and `ReadingDetailCard` were already supine-anchored and were untouched.
+
+### File touched
+- `app/src/main/java/com/example/wags/ui/morning/MorningReadinessDetailScreen.kt`
