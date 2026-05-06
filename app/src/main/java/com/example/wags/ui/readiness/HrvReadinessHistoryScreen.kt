@@ -3,9 +3,11 @@ package com.example.wags.ui.readiness
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,13 +19,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wags.data.db.entity.DailyReadingEntity
-import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.theme.*
 import java.time.Instant
@@ -31,6 +35,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.math.abs
 
 // ── Tab definitions ────────────────────────────────────────────────────────────
 
@@ -114,7 +119,16 @@ fun HrvReadinessHistoryScreen(
                 HrvEmptyHistoryContent()
             } else {
                 when (selectedTab) {
-                    HrvHistoryTab.GRAPHS -> HrvGraphsContent(uiState = uiState)
+                    HrvHistoryTab.GRAPHS -> HrvGraphsContent(
+                        chartData = uiState.chartData,
+                        readingCount = uiState.allReadings.size,
+                        timePeriod = uiState.timePeriod,
+                        canStepBack = uiState.canStepBack,
+                        canStepForward = uiState.canStepForward,
+                        onTimePeriodChange = viewModel::setTimePeriod,
+                        onStepBack = viewModel::stepBack,
+                        onStepForward = viewModel::stepForward
+                    )
                     HrvHistoryTab.CALENDAR -> HrvCalendarContent(
                         uiState = uiState,
                         displayedMonth = displayedMonth,
@@ -141,7 +155,19 @@ fun HrvReadinessHistoryScreen(
 // ── Graphs tab ─────────────────────────────────────────────────────────────────
 
 @Composable
-private fun HrvGraphsContent(uiState: HrvReadinessHistoryUiState) {
+private fun HrvGraphsContent(
+    chartData: HrvHistoryChartData,
+    readingCount: Int,
+    timePeriod: HrvChartTimePeriod,
+    canStepBack: Boolean,
+    canStepForward: Boolean,
+    onTimePeriodChange: (HrvChartTimePeriod) -> Unit,
+    onStepBack: () -> Unit,
+    onStepForward: () -> Unit
+) {
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -149,67 +175,503 @@ private fun HrvGraphsContent(uiState: HrvReadinessHistoryUiState) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // Header summary
-        HrvHistorySummaryCard(uiState = uiState)
+        // ── Time period selector ───────────────────────────────────────────
+        HrvTimePeriodSelector(
+            selected = timePeriod,
+            onSelect = onTimePeriodChange
+        )
+
+        // ── Step navigation (only shown when a finite period is selected) ──
+        if (timePeriod != HrvChartTimePeriod.ALL) {
+            HrvPeriodStepRow(
+                timePeriod = timePeriod,
+                canStepBack = canStepBack,
+                canStepForward = canStepForward,
+                onStepBack = onStepBack,
+                onStepForward = onStepForward
+            )
+        }
+
+        Text(
+            "$readingCount readings total · showing ${timePeriod.label}",
+            style = MaterialTheme.typography.labelMedium,
+            color = TextDisabled
+        )
 
         // ── 1. Readiness Score ─────────────────────────────────────────────
         HrvGraphSection(
             title = "Readiness Score",
-            subtitle = "0–100 composite score over time"
+            subtitle = "0–100 composite score · x-axis = date"
         ) {
-            HrvReadinessScoreChart(points = uiState.chartData.readinessScore)
+            HrvReadinessScoreChart(points = chartData.readinessScore, isLandscape = isLandscape)
         }
 
         // ── 2. RMSSD ──────────────────────────────────────────────────────
         HrvGraphSection(
             title = "RMSSD",
-            subtitle = "Root mean square of successive differences (ms)"
+            subtitle = "Root mean square of successive differences (ms) · x-axis = date"
         ) {
             HrvMetricChart(
                 label = "RMSSD (ms)",
-                points = uiState.chartData.rmssd,
-                lineColor = TextPrimary
+                points = chartData.rmssd,
+                lineColor = TextPrimary,
+                isLandscape = isLandscape
             )
         }
 
         // ── 3. ln(RMSSD) ──────────────────────────────────────────────────
         HrvGraphSection(
             title = "ln(RMSSD)",
-            subtitle = "Natural log of RMSSD — used for baseline scoring"
+            subtitle = "Natural log of RMSSD — used for baseline scoring · x-axis = date"
         ) {
             HrvMetricChart(
                 label = "ln(RMSSD)",
-                points = uiState.chartData.lnRmssd,
-                lineColor = Color(0xFFD0D0D0)
+                points = chartData.lnRmssd,
+                lineColor = Color(0xFFD0D0D0),
+                isLandscape = isLandscape
             )
         }
 
         // ── 4. SDNN ───────────────────────────────────────────────────────
         HrvGraphSection(
             title = "SDNN",
-            subtitle = "Standard deviation of NN intervals (ms)"
+            subtitle = "Standard deviation of NN intervals (ms) · x-axis = date"
         ) {
             HrvMetricChart(
                 label = "SDNN (ms)",
-                points = uiState.chartData.sdnn,
-                lineColor = Color(0xFFB0B0B0)
+                points = chartData.sdnn,
+                lineColor = Color(0xFFB0B0B0),
+                isLandscape = isLandscape
             )
         }
 
         // ── 5. Resting HR ─────────────────────────────────────────────────
         HrvGraphSection(
             title = "Resting Heart Rate",
-            subtitle = "Average HR during 2-minute session (bpm)"
+            subtitle = "Average HR during 2-minute session (bpm) · x-axis = date"
         ) {
             HrvMetricChart(
                 label = "Resting HR (bpm)",
-                points = uiState.chartData.restingHr,
+                points = chartData.restingHr,
                 lineColor = Color(0xFF909090),
-                invertGood = true
+                invertGood = true,
+                isLandscape = isLandscape
             )
         }
 
         Spacer(Modifier.height(16.dp))
+    }
+}
+
+// ── Time period selector ───────────────────────────────────────────────────────
+
+@Composable
+private fun HrvTimePeriodSelector(
+    selected: HrvChartTimePeriod,
+    onSelect: (HrvChartTimePeriod) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        HrvChartTimePeriod.entries.forEach { period ->
+            val isSelected = period == selected
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(if (isSelected) TextSecondary.copy(alpha = 0.25f) else SurfaceVariant)
+                    .clickable { onSelect(period) }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = period.label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (isSelected) TextPrimary else TextSecondary,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                )
+            }
+        }
+    }
+}
+
+// ── Period step navigation row ─────────────────────────────────────────────────
+
+@Composable
+private fun HrvPeriodStepRow(
+    timePeriod: HrvChartTimePeriod,
+    canStepBack: Boolean,
+    canStepForward: Boolean,
+    onStepBack: () -> Unit,
+    onStepForward: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(
+            onClick = onStepBack,
+            enabled = canStepBack
+        ) {
+            Text(
+                "‹",
+                style = MaterialTheme.typography.headlineMedium,
+                color = if (canStepBack) TextPrimary else TextDisabled
+            )
+        }
+
+        Text(
+            "Scroll ${timePeriod.label} windows",
+            style = MaterialTheme.typography.labelSmall,
+            color = TextDisabled
+        )
+
+        IconButton(
+            onClick = onStepForward,
+            enabled = canStepForward
+        ) {
+            Text(
+                "›",
+                style = MaterialTheme.typography.headlineMedium,
+                color = if (canStepForward) TextPrimary else TextDisabled
+            )
+        }
+    }
+}
+
+// ── Graph section wrapper ──────────────────────────────────────────────────────
+
+@Composable
+private fun HrvGraphSection(
+    title: String,
+    subtitle: String,
+    content: @Composable () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = SurfaceVariant)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Column {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = TextDisabled)
+            }
+            HorizontalDivider(color = SurfaceDark)
+            content()
+        }
+    }
+}
+
+// ── Readiness score chart ──────────────────────────────────────────────────────
+
+@Composable
+private fun HrvReadinessScoreChart(
+    points: List<HrvChartPoint>,
+    isLandscape: Boolean
+) {
+    if (points.isEmpty()) { HrvNoDataLabel(); return }
+
+    val latest = points.last()
+    val avg    = points.map { it.value }.average().toFloat()
+    val min    = points.minOf { it.value }
+    val max    = points.maxOf { it.value }
+
+    var tooltipPoint by remember { mutableStateOf<HrvChartPoint?>(null) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            HrvStatChip("Latest", latest.value.toInt().toString(), hrvScoreColor(latest.value))
+            HrvStatChip("Avg",    avg.toInt().toString(),          hrvScoreColor(avg))
+            HrvStatChip("Min",    min.toInt().toString(),          hrvScoreColor(min))
+            HrvStatChip("Max",    max.toInt().toString(),          hrvScoreColor(max))
+        }
+
+        val chartHeight = if (isLandscape) 200.dp else 140.dp
+
+        HrvLineChartCanvas(
+            points = points,
+            lineColor = TextPrimary,
+            fillAlpha = 0.15f,
+            yMin = 0f,
+            yMax = 100f,
+            referenceLines = listOf(80f to Color(0xFF606060), 60f to Color(0xFF404040)),
+            tooltipPoint = tooltipPoint,
+            onTap = { tooltipPoint = if (tooltipPoint == it) null else it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(chartHeight)
+        )
+
+        tooltipPoint?.let { tp ->
+            HrvTooltipCard(
+                label = "Readiness Score",
+                value = tp.value.toInt().toString(),
+                date = tp.dateLabel,
+                color = hrvScoreColor(tp.value)
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            HrvZoneLegend("≥80",   Color(0xFF606060))
+            HrvZoneLegend("60–79", Color(0xFF404040))
+            HrvZoneLegend("<60",   Color(0xFF282828))
+        }
+    }
+}
+
+// ── Generic metric chart ───────────────────────────────────────────────────────
+
+@Composable
+private fun HrvMetricChart(
+    label: String,
+    points: List<HrvChartPoint>,
+    lineColor: Color,
+    invertGood: Boolean = false,
+    isLandscape: Boolean = false
+) {
+    if (points.isEmpty()) { HrvNoDataLabel(); return }
+
+    val latest = points.last()
+    val avg    = points.map { it.value }.average().toFloat()
+    val min    = points.minOf { it.value }
+    val max    = points.maxOf { it.value }
+    val yPad   = ((max - min) * 0.1f).coerceAtLeast(0.1f)
+
+    var tooltipPoint by remember { mutableStateOf<HrvChartPoint?>(null) }
+
+    val chartHeight = if (isLandscape) 160.dp else 100.dp
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(label, style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+            Text(
+                "Latest: ${String.format("%.2f", latest.value)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = lineColor,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        HrvLineChartCanvas(
+            points = points,
+            lineColor = lineColor,
+            fillAlpha = 0.10f,
+            yMin = min - yPad,
+            yMax = max + yPad,
+            tooltipPoint = tooltipPoint,
+            onTap = { tooltipPoint = if (tooltipPoint == it) null else it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(chartHeight)
+        )
+
+        tooltipPoint?.let { tp ->
+            HrvTooltipCard(
+                label = label,
+                value = String.format("%.2f", tp.value),
+                date = tp.dateLabel,
+                color = lineColor
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                "Avg ${String.format("%.2f", avg)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextDisabled
+            )
+            Text(
+                "Min ${String.format("%.2f", min)}  Max ${String.format("%.2f", max)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextDisabled
+            )
+        }
+    }
+}
+
+// ── Tooltip card ───────────────────────────────────────────────────────────────
+
+@Composable
+private fun HrvTooltipCard(label: String, value: String, date: String, color: Color) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(SurfaceDark)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = TextDisabled)
+            Text(date, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+        }
+        Text(value, style = MaterialTheme.typography.titleMedium, color = color, fontWeight = FontWeight.Bold)
+    }
+}
+
+// ── Pure Canvas line chart with x-axis labels and tap interaction ──────────────
+
+@Composable
+private fun HrvLineChartCanvas(
+    points: List<HrvChartPoint>,
+    lineColor: Color,
+    fillAlpha: Float,
+    yMin: Float,
+    yMax: Float,
+    modifier: Modifier = Modifier,
+    referenceLines: List<Pair<Float, Color>> = emptyList(),
+    tooltipPoint: HrvChartPoint? = null,
+    onTap: (HrvChartPoint) -> Unit = {}
+) {
+    if (points.size < 2) {
+        Canvas(modifier = modifier) {
+            drawCircle(color = lineColor, radius = 6f, center = Offset(size.width / 2f, size.height / 2f))
+        }
+        return
+    }
+
+    val xAxisHeight = 18.dp
+    val yRange = (yMax - yMin).coerceAtLeast(0.001f)
+
+    // Pick up to 5 evenly-spaced label indices, always including first and last
+    val maxLabels = 5
+    val labelIndices: List<Int> = when {
+        points.size <= maxLabels -> points.indices.toList()
+        else -> {
+            val step = (points.size - 1).toFloat() / (maxLabels - 1).toFloat()
+            (0 until maxLabels).map { i -> (i * step).toInt().coerceIn(0, points.size - 1) }
+        }
+    }
+
+    // Format "MMM d" from ISO date string "yyyy-MM-dd"
+    fun shortDate(isoDate: String): String = try {
+        val parts = isoDate.split("-")
+        val month = java.time.Month.of(parts[1].toInt()).name.take(3).lowercase()
+            .replaceFirstChar { it.uppercase() }
+        "$month ${parts[2].trimStart('0')}"
+    } catch (_: Exception) { isoDate }
+
+    Column(modifier = modifier) {
+        // ── Chart canvas ──────────────────────────────────────────────────
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .pointerInput(points) {
+                    detectTapGestures { tapOffset ->
+                        val w = size.width.toFloat()
+                        val xStep = w / (points.size - 1).toFloat()
+                        val tappedIdx = (tapOffset.x / xStep).toInt().coerceIn(0, points.size - 1)
+                        val closest = points.minByOrNull { p -> abs(p.index - tappedIdx.toFloat()) }
+                        closest?.let { onTap(it) }
+                    }
+                }
+        ) {
+            val w = size.width
+            val h = size.height
+            val xStep = w / (points.size - 1).toFloat()
+
+            fun xOf(i: Int) = i * xStep
+            fun yOf(v: Float) = h - ((v - yMin) / yRange * h).coerceIn(0f, h)
+
+            // Reference lines
+            referenceLines.forEach { (refY, refColor) ->
+                val ry = yOf(refY)
+                drawLine(color = refColor.copy(alpha = 0.35f), start = Offset(0f, ry), end = Offset(w, ry), strokeWidth = 1.5f)
+            }
+
+            // Fill path
+            val fillPath = Path().apply {
+                moveTo(xOf(0), h)
+                lineTo(xOf(0), yOf(points[0].value))
+                for (i in 1 until points.size) lineTo(xOf(i), yOf(points[i].value))
+                lineTo(xOf(points.size - 1), h)
+                close()
+            }
+            drawPath(fillPath, color = lineColor.copy(alpha = fillAlpha))
+
+            // Line path
+            val linePath = Path().apply {
+                moveTo(xOf(0), yOf(points[0].value))
+                for (i in 1 until points.size) lineTo(xOf(i), yOf(points[i].value))
+            }
+            drawPath(linePath, color = lineColor, style = Stroke(width = 2.5f, cap = StrokeCap.Round))
+
+            // Latest point dot
+            val lastX = xOf(points.size - 1)
+            val lastY = yOf(points.last().value)
+            drawCircle(color = lineColor, radius = 5f, center = Offset(lastX, lastY))
+            drawCircle(color = BackgroundDark, radius = 2.5f, center = Offset(lastX, lastY))
+
+            // Highlighted tapped point
+            tooltipPoint?.let { tp ->
+                val tpIdx = points.indexOfFirst { it.dateLabel == tp.dateLabel && it.value == tp.value }
+                if (tpIdx >= 0) {
+                    val tx = xOf(tpIdx)
+                    val ty = yOf(tp.value)
+                    drawLine(color = lineColor.copy(alpha = 0.4f), start = Offset(tx, 0f), end = Offset(tx, h), strokeWidth = 1f)
+                    drawCircle(color = lineColor, radius = 7f, center = Offset(tx, ty))
+                    drawCircle(color = BackgroundDark, radius = 4f, center = Offset(tx, ty))
+                }
+            }
+
+            // Tick marks at label positions
+            labelIndices.forEach { idx ->
+                val tx = xOf(idx)
+                drawLine(color = TextDisabled.copy(alpha = 0.5f), start = Offset(tx, h - 4f), end = Offset(tx, h), strokeWidth = 1f)
+            }
+        }
+
+        // ── X-axis date labels ────────────────────────────────────────────
+        // Use a BoxWithConstraints so we can position each label by fraction of width
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(xAxisHeight)
+        ) {
+            val totalWidth = maxWidth
+            labelIndices.forEach { idx ->
+                val fraction = if (points.size > 1) idx.toFloat() / (points.size - 1).toFloat() else 0f
+                val dateStr = shortDate(points[idx].dateLabel)
+                // Estimate label width ~30dp; clamp so it doesn't overflow edges
+                val labelWidthEst = 30.dp
+                val rawOffset = totalWidth * fraction - labelWidthEst / 2
+                val clampedOffset = rawOffset.coerceIn(0.dp, totalWidth - labelWidthEst)
+                Text(
+                    text = dateStr,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                    color = TextDisabled,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .absoluteOffset(x = clampedOffset)
+                        .width(labelWidthEst)
+                )
+            }
+        }
     }
 }
 
@@ -468,8 +930,6 @@ private fun HrvSessionSummaryCard(
     val timeLabel = Instant.ofEpochMilli(reading.timestamp).atZone(zone)
         .format(DateTimeFormatter.ofPattern("h:mm a"))
 
-    val scoreColor = TextPrimary
-
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -519,281 +979,7 @@ private fun HrvSessionSummaryCard(
     }
 }
 
-// ── Summary card ───────────────────────────────────────────────────────────────
-
-@Composable
-private fun HrvHistorySummaryCard(uiState: HrvReadinessHistoryUiState) {
-    val count = uiState.allReadings.size
-    val latestScore = uiState.chartData.readinessScore.lastOrNull()?.value?.toInt()
-    val avgScore = if (uiState.chartData.readinessScore.isNotEmpty())
-        uiState.chartData.readinessScore.map { it.value }.average().toInt() else null
-    val latestRmssd = uiState.chartData.rmssd.lastOrNull()?.value
-    val avgRmssd = if (uiState.chartData.rmssd.isNotEmpty())
-        uiState.chartData.rmssd.map { it.value }.average().toFloat() else null
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = SurfaceVariant)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                "Summary",
-                style = MaterialTheme.typography.titleMedium,
-                color = TextPrimary,
-                fontWeight = FontWeight.Bold
-            )
-            HorizontalDivider(color = SurfaceDark)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                HrvSummaryChip(label = "Sessions", value = count.toString(), color = TextPrimary)
-                latestScore?.let {
-                    HrvSummaryChip(label = "Latest Score", value = it.toString(), color = TextPrimary)
-                }
-                avgScore?.let {
-                    HrvSummaryChip(label = "Avg Score", value = it.toString(), color = TextSecondary)
-                }
-            }
-            if (latestRmssd != null && avgRmssd != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    HrvSummaryChip(
-                        label = "Latest RMSSD",
-                        value = String.format("%.1f ms", latestRmssd),
-                        color = TextPrimary
-                    )
-                    HrvSummaryChip(
-                        label = "Avg RMSSD",
-                        value = String.format("%.1f ms", avgRmssd),
-                        color = TextSecondary
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ── Graph section wrapper ──────────────────────────────────────────────────────
-
-@Composable
-private fun HrvGraphSection(
-    title: String,
-    subtitle: String,
-    content: @Composable () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = SurfaceVariant)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Column {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = TextPrimary,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = TextDisabled)
-            }
-            HorizontalDivider(color = SurfaceDark)
-            content()
-        }
-    }
-}
-
-// ── Readiness score chart ──────────────────────────────────────────────────────
-
-@Composable
-private fun HrvReadinessScoreChart(points: List<HrvChartPoint>) {
-    if (points.isEmpty()) { HrvNoDataLabel(); return }
-
-    val latest = points.last()
-    val avg    = points.map { it.value }.average().toFloat()
-    val min    = points.minOf { it.value }
-    val max    = points.maxOf { it.value }
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            HrvStatChip("Latest", latest.value.toInt().toString(), hrvScoreColor(latest.value))
-            HrvStatChip("Avg",    avg.toInt().toString(),          hrvScoreColor(avg))
-            HrvStatChip("Min",    min.toInt().toString(),          hrvScoreColor(min))
-            HrvStatChip("Max",    max.toInt().toString(),          hrvScoreColor(max))
-        }
-
-        HrvLineChartCanvas(
-            points = points.map { it.index to it.value },
-            lineColor = TextPrimary,
-            fillAlpha = 0.15f,
-            yMin = 0f,
-            yMax = 100f,
-            referenceLines = listOf(80f to Color(0xFF606060), 60f to Color(0xFF404040)),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(120.dp)
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            HrvZoneLegend("≥80",   Color(0xFF606060))
-            HrvZoneLegend("60–79", Color(0xFF404040))
-            HrvZoneLegend("<60",   Color(0xFF282828))
-        }
-    }
-}
-
-// ── Generic metric chart ───────────────────────────────────────────────────────
-
-@Composable
-private fun HrvMetricChart(
-    label: String,
-    points: List<HrvChartPoint>,
-    lineColor: Color,
-    invertGood: Boolean = false
-) {
-    if (points.isEmpty()) { HrvNoDataLabel(); return }
-
-    val latest = points.last()
-    val avg    = points.map { it.value }.average().toFloat()
-    val min    = points.minOf { it.value }
-    val max    = points.maxOf { it.value }
-    val yPad   = ((max - min) * 0.1f).coerceAtLeast(0.1f)
-
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(label, style = MaterialTheme.typography.labelMedium, color = TextSecondary)
-            Text(
-                "Latest: ${String.format("%.2f", latest.value)}",
-                style = MaterialTheme.typography.labelMedium,
-                color = lineColor,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        HrvLineChartCanvas(
-            points = points.map { it.index to it.value },
-            lineColor = lineColor,
-            fillAlpha = 0.10f,
-            yMin = min - yPad,
-            yMax = max + yPad,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(90.dp)
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                "Avg ${String.format("%.2f", avg)}",
-                style = MaterialTheme.typography.labelSmall,
-                color = TextDisabled
-            )
-            Text(
-                "Min ${String.format("%.2f", min)}  Max ${String.format("%.2f", max)}",
-                style = MaterialTheme.typography.labelSmall,
-                color = TextDisabled
-            )
-        }
-    }
-}
-
-// ── Pure Canvas line chart ─────────────────────────────────────────────────────
-
-@Composable
-private fun HrvLineChartCanvas(
-    points: List<Pair<Float, Float>>,
-    lineColor: Color,
-    fillAlpha: Float,
-    yMin: Float,
-    yMax: Float,
-    modifier: Modifier = Modifier,
-    referenceLines: List<Pair<Float, Color>> = emptyList()
-) {
-    if (points.size < 2) {
-        Canvas(modifier = modifier) {
-            drawCircle(color = lineColor, radius = 6f, center = Offset(size.width / 2f, size.height / 2f))
-        }
-        return
-    }
-
-    val yRange = (yMax - yMin).coerceAtLeast(0.001f)
-
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val xStep = w / (points.size - 1).toFloat()
-
-        fun xOf(i: Int) = i * xStep
-        fun yOf(v: Float) = h - ((v - yMin) / yRange * h).coerceIn(0f, h)
-
-        // Reference lines
-        referenceLines.forEach { (refY, refColor) ->
-            val ry = yOf(refY)
-            drawLine(
-                color = refColor.copy(alpha = 0.35f),
-                start = Offset(0f, ry),
-                end = Offset(w, ry),
-                strokeWidth = 1.5f
-            )
-        }
-
-        // Fill
-        val fillPath = Path().apply {
-            moveTo(xOf(0), h)
-            lineTo(xOf(0), yOf(points[0].second))
-            for (i in 1 until points.size) {
-                lineTo(xOf(i), yOf(points[i].second))
-            }
-            lineTo(xOf(points.size - 1), h)
-            close()
-        }
-        drawPath(fillPath, color = lineColor.copy(alpha = fillAlpha))
-
-        // Line
-        val linePath = Path().apply {
-            moveTo(xOf(0), yOf(points[0].second))
-            for (i in 1 until points.size) {
-                lineTo(xOf(i), yOf(points[i].second))
-            }
-        }
-        drawPath(linePath, color = lineColor, style = Stroke(width = 2.5f, cap = StrokeCap.Round))
-
-        // Latest dot
-        val lastX = xOf(points.size - 1)
-        val lastY = yOf(points.last().second)
-        drawCircle(color = lineColor, radius = 5f, center = Offset(lastX, lastY))
-        drawCircle(color = BackgroundDark, radius = 2.5f, center = Offset(lastX, lastY))
-    }
-}
-
 // ── Small helpers ──────────────────────────────────────────────────────────────
-
-@Composable
-private fun HrvSummaryChip(label: String, value: String, color: Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, style = MaterialTheme.typography.titleMedium, color = color, fontWeight = FontWeight.Bold)
-        Text(label, style = MaterialTheme.typography.labelSmall, color = TextDisabled)
-    }
-}
 
 @Composable
 private fun HrvStatChip(label: String, value: String, color: Color) {

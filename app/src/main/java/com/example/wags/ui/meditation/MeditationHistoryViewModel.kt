@@ -24,7 +24,16 @@ typealias PostureFilter = MeditationPosture?
 
 // ── Chart point ────────────────────────────────────────────────────────────────
 
-data class MeditationChartPoint(val index: Float, val value: Float, val sessionId: Long)
+data class MeditationChartPoint(val index: Float, val value: Float, val sessionId: Long, val label: String)
+
+/** Time period filter for the graphs tab. */
+enum class MeditationChartTimePeriod(val label: String, val days: Int?) {
+    WEEK("7d", 7),
+    MONTH("1m", 30),
+    THREE_MONTHS("3m", 90),
+    YEAR("1y", 365),
+    ALL("All", null)
+}
 
 // ── Chart data bundle ──────────────────────────────────────────────────────────
 
@@ -51,7 +60,15 @@ data class MeditationHistoryUiState(
     val selectedDaySessions: List<MeditationSessionEntity> = emptyList(),
     /** null = all postures; non-null = only sessions with that posture */
     val postureFilter: PostureFilter = null,
-    val selectedTab: MeditationHistoryTabSelection = MeditationHistoryTabSelection.GRAPHS
+    val selectedTab: MeditationHistoryTabSelection = MeditationHistoryTabSelection.GRAPHS,
+    /** Currently selected time period filter for graphs. */
+    val timePeriod: MeditationChartTimePeriod = MeditationChartTimePeriod.ALL,
+    /** Step offset from the present (0 = current period, -1 = one step back, etc.). */
+    val periodOffset: Int = 0,
+    /** Whether stepping further back is possible (no data before the window). */
+    val canStepBack: Boolean = true,
+    /** Whether stepping forward is possible (not already at the present). */
+    val canStepForward: Boolean = false,
 )
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
@@ -71,6 +88,8 @@ class MeditationHistoryViewModel @Inject constructor(
                 ?: MeditationHistoryTabSelection.GRAPHS
         )
     )
+    private val _timePeriod = MutableStateFlow(MeditationChartTimePeriod.ALL)
+    private val _periodOffset = MutableStateFlow(0)
 
     fun selectTab(tab: MeditationHistoryTabSelection) {
         savedStateHandle[KEY_SELECTED_TAB] = tab.name
@@ -80,8 +99,10 @@ class MeditationHistoryViewModel @Inject constructor(
     val uiState: StateFlow<MeditationHistoryUiState> = combine(
         repository.observeSessions(),
         repository.observeAudios(),
-        _extra
-    ) { sessions, audios, extra ->
+        _extra,
+        _timePeriod,
+        _periodOffset
+    ) { sessions, audios, extra, timePeriod, periodOffset ->
         val audioMap = audios.associateBy { it.audioId }
         val zone = ZoneId.systemDefault()
 
@@ -99,15 +120,24 @@ class MeditationHistoryViewModel @Inject constructor(
             }
         } ?: emptyList()
 
+        // Build chart data from chronological order (oldest first), filtered by time period
+        val chronological = filteredSessions.sortedBy { it.timestamp }
+        val (periodFiltered, canBack, canFwd) = filterByPeriod(chronological, timePeriod, periodOffset, zone)
+        val chartData = buildChartData(periodFiltered, zone)
+
         MeditationHistoryUiState(
             allSessions         = sessions,
             audioMap            = audioMap,
-            chartData           = buildChartData(filteredSessions),
+            chartData           = chartData,
             datesWithSessions   = datesWithSessions,
             selectedDate        = extra.selectedDate,
             selectedDaySessions = selectedDaySessions,
             postureFilter       = extra.postureFilter,
-            selectedTab         = extra.selectedTab
+            selectedTab         = extra.selectedTab,
+            timePeriod          = timePeriod,
+            periodOffset        = periodOffset,
+            canStepBack         = canBack,
+            canStepForward      = canFwd,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -127,23 +157,87 @@ class MeditationHistoryViewModel @Inject constructor(
         _extra.update { it.copy(postureFilter = posture) }
     }
 
+    /** Called when user selects a time period filter. Resets offset to 0. */
+    fun setTimePeriod(period: MeditationChartTimePeriod) {
+        _timePeriod.value = period
+        _periodOffset.value = 0
+    }
+
+    /** Step backward in time by one period. */
+    fun stepBack() {
+        _periodOffset.value = _periodOffset.value - 1
+    }
+
+    /** Step forward in time by one period. */
+    fun stepForward() {
+        if (_periodOffset.value < 0) {
+            _periodOffset.value = _periodOffset.value + 1
+        }
+    }
+
+    // ── Filtering ─────────────────────────────────────────────────────────────
+
+    private data class FilterResult(
+        val sessions: List<MeditationSessionEntity>,
+        val canStepBack: Boolean,
+        val canStepForward: Boolean
+    )
+
+    private fun filterByPeriod(
+        chronological: List<MeditationSessionEntity>,
+        period: MeditationChartTimePeriod,
+        offset: Int,
+        zone: ZoneId
+    ): FilterResult {
+        val days = period.days
+        if (days == null) {
+            // ALL — no filtering, no stepping
+            return FilterResult(chronological, canStepBack = false, canStepForward = false)
+        }
+
+        val today = LocalDate.now(zone)
+        // The end of the window: if offset=0, end = today; offset=-1, end = today - days; etc.
+        val windowEnd = today.minusDays((-offset).toLong() * days)
+        val windowStart = windowEnd.minusDays(days.toLong())
+
+        val filtered = chronological.filter { entity ->
+            val date = Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate()
+            date > windowStart && date <= windowEnd
+        }
+
+        // Can step back if there's any data before windowStart
+        val canBack = chronological.any { entity ->
+            Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate() <= windowStart
+        }
+
+        // Can step forward if offset < 0
+        val canFwd = offset < 0
+
+        return FilterResult(filtered, canStepBack = canBack, canStepForward = canFwd)
+    }
+
     // ── Private helpers ────────────────────────────────────────────────────────
 
-    private fun buildChartData(sessions: List<MeditationSessionEntity>): MeditationChartData {
-        val sorted = sessions.sortedBy { it.timestamp }
+    private fun buildChartData(
+        chronological: List<MeditationSessionEntity>,
+        zone: ZoneId
+    ): MeditationChartData {
         val avgHr = mutableListOf<MeditationChartPoint>()
         val startRmssd = mutableListOf<MeditationChartPoint>()
         val endRmssd = mutableListOf<MeditationChartPoint>()
         val lnSlope = mutableListOf<MeditationChartPoint>()
         val durationMin = mutableListOf<MeditationChartPoint>()
 
-        sorted.forEachIndexed { i, s ->
+        chronological.forEachIndexed { i, s ->
             val idx = i.toFloat()
-            s.avgHrBpm?.let { avgHr.add(MeditationChartPoint(idx, it, s.sessionId)) }
-            s.startRmssdMs?.let { startRmssd.add(MeditationChartPoint(idx, it, s.sessionId)) }
-            s.endRmssdMs?.let { endRmssd.add(MeditationChartPoint(idx, it, s.sessionId)) }
-            s.lnRmssdSlope?.let { lnSlope.add(MeditationChartPoint(idx, it, s.sessionId)) }
-            durationMin.add(MeditationChartPoint(idx, s.durationMs / 60_000f, s.sessionId))
+            val label = Instant.ofEpochMilli(s.timestamp)
+                .atZone(zone).toLocalDate().toString()
+
+            s.avgHrBpm?.let { avgHr.add(MeditationChartPoint(idx, it, s.sessionId, label)) }
+            s.startRmssdMs?.let { startRmssd.add(MeditationChartPoint(idx, it, s.sessionId, label)) }
+            s.endRmssdMs?.let { endRmssd.add(MeditationChartPoint(idx, it, s.sessionId, label)) }
+            s.lnRmssdSlope?.let { lnSlope.add(MeditationChartPoint(idx, it, s.sessionId, label)) }
+            durationMin.add(MeditationChartPoint(idx, s.durationMs / 60_000f, s.sessionId, label))
         }
 
         return MeditationChartData(

@@ -30,6 +30,34 @@ import javax.inject.Inject
 /** Sentinel value meaning "don't filter on this setting". */
 const val FILTER_ALL = "ALL"
 
+// ── Chart time period ──────────────────────────────────────────────────────────
+
+/** Time period filter for the Graphs tab. Prefixed with Apnea to avoid conflicts. */
+enum class ApneaChartTimePeriod(val label: String, val days: Int?) {
+    WEEK("7d", 7),
+    MONTH("1m", 30),
+    THREE_MONTHS("3m", 90),
+    YEAR("1y", 365),
+    ALL("All", null)
+}
+
+/** A single (x=index, y=value) point for a line chart. */
+data class ApneaChartPoint(val dayIndex: Float, val value: Float, val label: String)
+
+/** All chart series derived from the apnea free-hold history. */
+data class ApneaChartData(
+    /** Hold duration (seconds) over time — free holds only. */
+    val holdDuration: List<ApneaChartPoint> = emptyList(),
+    /** Min HR (bpm) over time — free holds only. */
+    val minHr: List<ApneaChartPoint> = emptyList(),
+    /** Max HR (bpm) over time — free holds only. */
+    val maxHr: List<ApneaChartPoint> = emptyList(),
+    /** Lowest SpO₂ (%) over time — only records where oximeter was connected. */
+    val lowestSpO2: List<ApneaChartPoint> = emptyList(),
+    /** Time to first contraction (seconds) over time — only records where it was tapped. */
+    val firstContractionSec: List<ApneaChartPoint> = emptyList(),
+)
+
 /**
  * Per-drill-type trophy statistics.
  *
@@ -94,6 +122,19 @@ data class ApneaHistoryUiState(
      * - Size >1 → show multi-session picker list
      */
     val selectedDayRecords: List<ApneaRecordEntity> = emptyList(),
+    // Graphs tab
+    /** Pre-computed chart series (chronological order, oldest → newest). */
+    val chartData: ApneaChartData = ApneaChartData(),
+    /** Total number of free-hold records (for the reading count label). */
+    val totalFreeHoldCount: Int = 0,
+    /** Currently selected time period filter for graphs. */
+    val timePeriod: ApneaChartTimePeriod = ApneaChartTimePeriod.ALL,
+    /** Step offset from the present (0 = current period, -1 = one step back, etc.). */
+    val periodOffset: Int = 0,
+    /** Whether stepping further back is possible (data exists before the window). */
+    val canStepBack: Boolean = true,
+    /** Whether stepping forward is possible (not already at the present). */
+    val canStepForward: Boolean = false,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -124,6 +165,10 @@ class ApneaHistoryViewModel @Inject constructor(
     private val _selectedDate = MutableStateFlow<LocalDate?>(null)
     private val _showAllStats = MutableStateFlow(false)
 
+    // ── Graphs tab state ──────────────────────────────────────────────────────
+    private val _timePeriod = MutableStateFlow(ApneaChartTimePeriod.ALL)
+    private val _periodOffset = MutableStateFlow(0)
+
     // ── Settings tuple flow (triggers re-subscription when any setting changes) ──
     private val settingsFlow = combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) {
         lv, pt, tod, pos, aud -> Quintuple(lv, pt, tod, pos, aud)
@@ -147,8 +192,10 @@ class ApneaHistoryViewModel @Inject constructor(
             apneaRepository.getAllRecords(),
             combine(_selectedDate, MutableStateFlow(Unit)) { d, _ -> d }
         ) { allStats, allRecords, selectedDate -> Triple(allStats, allRecords, selectedDate) },
-        _trophyStats
-    ) { (settings, filteredStats, showAll), (allStats, allRecords, selectedDate), trophyStats ->
+        combine(_trophyStats, _timePeriod, _periodOffset) { trophy, period, offset ->
+            Triple(trophy, period, offset)
+        }
+    ) { (settings, filteredStats, showAll), (allStats, allRecords, selectedDate), (trophyStats, timePeriod, periodOffset) ->
         val (lv, pt, tod, pos, aud) = settings
         val zone = ZoneId.systemDefault()
 
@@ -159,6 +206,12 @@ class ApneaHistoryViewModel @Inject constructor(
         val selectedDayRecords = if (selectedDate != null) {
             byDate[selectedDate] ?: emptyList()
         } else emptyList()
+
+        // Build chart data from free-hold records only (chronological, oldest first)
+        val freeHolds = allRecords.filter { it.tableType == null }.reversed()
+        val totalFreeHoldCount = freeHolds.size
+        val (filteredForChart, canBack, canFwd) = filterByPeriod(freeHolds, timePeriod, periodOffset, zone)
+        val chartData = buildChartData(filteredForChart, zone)
 
         ApneaHistoryUiState(
             lungVolume          = lv,
@@ -175,6 +228,12 @@ class ApneaHistoryViewModel @Inject constructor(
             allRecordsByDate    = byDate,
             selectedDate        = selectedDate,
             selectedDayRecords  = selectedDayRecords,
+            chartData           = chartData,
+            totalFreeHoldCount  = totalFreeHoldCount,
+            timePeriod          = timePeriod,
+            periodOffset        = periodOffset,
+            canStepBack         = canBack,
+            canStepForward      = canFwd,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -215,6 +274,104 @@ class ApneaHistoryViewModel @Inject constructor(
     fun clearSelection() { _selectedDate.value = null }
 
     fun toggleShowAllStats() { _showAllStats.value = !_showAllStats.value }
+
+    // ── Graphs tab actions ────────────────────────────────────────────────────
+
+    /** Called when user selects a time period filter. Resets offset to 0. */
+    fun setTimePeriod(period: ApneaChartTimePeriod) {
+        _timePeriod.value = period
+        _periodOffset.value = 0
+    }
+
+    /** Step backward in time by one period. */
+    fun stepBack() {
+        _periodOffset.value = _periodOffset.value - 1
+    }
+
+    /** Step forward in time by one period. */
+    fun stepForward() {
+        if (_periodOffset.value < 0) {
+            _periodOffset.value = _periodOffset.value + 1
+        }
+    }
+
+    // ── Period filtering ──────────────────────────────────────────────────────
+
+    private data class FilterResult(
+        val records: List<ApneaRecordEntity>,
+        val canStepBack: Boolean,
+        val canStepForward: Boolean
+    )
+
+    private fun filterByPeriod(
+        chronological: List<ApneaRecordEntity>,
+        period: ApneaChartTimePeriod,
+        offset: Int,
+        zone: ZoneId
+    ): FilterResult {
+        val days = period.days
+        if (days == null) {
+            // ALL — no filtering, no stepping
+            return FilterResult(chronological, canStepBack = false, canStepForward = false)
+        }
+
+        val today = LocalDate.now(zone)
+        // The end of the window: if offset=0, end = today; offset=-1, end = today - days; etc.
+        val windowEnd = today.minusDays((-offset).toLong() * days)
+        val windowStart = windowEnd.minusDays(days.toLong())
+
+        val filtered = chronological.filter { entity ->
+            val date = Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate()
+            date > windowStart && date <= windowEnd
+        }
+
+        // Can step back if there's any data before windowStart
+        val canBack = chronological.any { entity ->
+            Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate() <= windowStart
+        }
+
+        // Can step forward if offset < 0
+        val canFwd = offset < 0
+
+        return FilterResult(filtered, canStepBack = canBack, canStepForward = canFwd)
+    }
+
+    // ── Chart builder ─────────────────────────────────────────────────────────
+
+    private fun buildChartData(
+        chronological: List<ApneaRecordEntity>,
+        zone: ZoneId
+    ): ApneaChartData {
+        if (chronological.isEmpty()) return ApneaChartData()
+
+        val holdDuration       = mutableListOf<ApneaChartPoint>()
+        val minHr              = mutableListOf<ApneaChartPoint>()
+        val maxHr              = mutableListOf<ApneaChartPoint>()
+        val lowestSpO2         = mutableListOf<ApneaChartPoint>()
+        val firstContractionSec = mutableListOf<ApneaChartPoint>()
+
+        chronological.forEachIndexed { idx, e ->
+            val x = idx.toFloat()
+            val label = Instant.ofEpochMilli(e.timestamp)
+                .atZone(zone).toLocalDate().toString()
+
+            holdDuration.add(ApneaChartPoint(x, (e.durationMs / 1000f), label))
+            minHr.add(ApneaChartPoint(x, e.minHrBpm, label))
+            maxHr.add(ApneaChartPoint(x, e.maxHrBpm, label))
+            e.lowestSpO2?.let { lowestSpO2.add(ApneaChartPoint(x, it.toFloat(), label)) }
+            e.firstContractionMs?.let {
+                firstContractionSec.add(ApneaChartPoint(x, it / 1000f, label))
+            }
+        }
+
+        return ApneaChartData(
+            holdDuration        = holdDuration,
+            minHr               = minHr,
+            maxHr               = maxHr,
+            lowestSpO2          = lowestSpO2,
+            firstContractionSec = firstContractionSec,
+        )
+    }
 
     // ── Trophy stats computation ──────────────────────────────────────────────
 

@@ -1,22 +1,31 @@
 package com.example.wags.ui.apnea
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -26,22 +35,21 @@ import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TimeOfDay
-import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.common.LiveSensorActionsNav
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 import java.text.NumberFormat
-import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.*
+import kotlin.math.abs
 
 // ── Tab definitions ────────────────────────────────────────────────────────────
 
 private enum class ApneaHistoryTab(val label: String) {
+    GRAPHS("Graphs"),
     ALL_RECORDS("All Records"),
     STATS("Stats"),
     CALENDAR("Calendar")
@@ -56,7 +64,8 @@ fun ApneaHistoryScreen(
     viewModel: ApneaHistoryViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    var selectedTab by remember { mutableStateOf(ApneaHistoryTab.ALL_RECORDS) }
+    var selectedTabOrdinal by rememberSaveable { mutableIntStateOf(ApneaHistoryTab.GRAPHS.ordinal) }
+    val selectedTab = ApneaHistoryTab.entries[selectedTabOrdinal]
     var displayedMonth by remember { mutableStateOf(YearMonth.now()) }
 
     // Single-session auto-navigate: when exactly 1 record is selected, navigate immediately
@@ -91,16 +100,17 @@ fun ApneaHistoryScreen(
                 .padding(padding)
         ) {
             // Tab row
-            TabRow(
+            ScrollableTabRow(
                 selectedTabIndex = selectedTab.ordinal,
                 containerColor = SurfaceDark,
-                contentColor = TextSecondary
+                contentColor = TextSecondary,
+                edgePadding = 8.dp
             ) {
                 ApneaHistoryTab.entries.forEach { tab ->
                     val isSelected = selectedTab == tab
                     Tab(
                         selected = isSelected,
-                        onClick = { selectedTab = tab },
+                        onClick = { selectedTabOrdinal = tab.ordinal },
                         modifier = Modifier.background(
                             if (isSelected) TextSecondary.copy(alpha = 0.15f)
                             else Color.Transparent
@@ -117,6 +127,16 @@ fun ApneaHistoryScreen(
             }
 
             when (selectedTab) {
+                ApneaHistoryTab.GRAPHS -> GraphsTabContent(
+                    chartData = state.chartData,
+                    readingCount = state.totalFreeHoldCount,
+                    timePeriod = state.timePeriod,
+                    canStepBack = state.canStepBack,
+                    canStepForward = state.canStepForward,
+                    onTimePeriodChange = viewModel::setTimePeriod,
+                    onStepBack = viewModel::stepBack,
+                    onStepForward = viewModel::stepForward
+                )
                 ApneaHistoryTab.ALL_RECORDS -> AllApneaRecordsScreen(navController = navController)
                 ApneaHistoryTab.STATS -> StatsTabContent(
                     state = state,
@@ -149,6 +169,440 @@ fun ApneaHistoryScreen(
                         viewModel.clearSelection()
                         navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
                     }
+                )
+            }
+        }
+    }
+}
+
+// ── Graphs tab ─────────────────────────────────────────────────────────────────
+
+@Composable
+private fun GraphsTabContent(
+    chartData: ApneaChartData,
+    readingCount: Int,
+    timePeriod: ApneaChartTimePeriod,
+    canStepBack: Boolean,
+    canStepForward: Boolean,
+    onTimePeriodChange: (ApneaChartTimePeriod) -> Unit,
+    onStepBack: () -> Unit,
+    onStepForward: () -> Unit
+) {
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        // ── Time period selector ───────────────────────────────────────────
+        ApneaTimePeriodSelector(
+            selected = timePeriod,
+            onSelect = onTimePeriodChange
+        )
+
+        // ── Step navigation (only shown when a finite period is selected) ──
+        if (timePeriod != ApneaChartTimePeriod.ALL) {
+            ApneaPeriodStepRow(
+                timePeriod = timePeriod,
+                canStepBack = canStepBack,
+                canStepForward = canStepForward,
+                onStepBack = onStepBack,
+                onStepForward = onStepForward
+            )
+        }
+
+        Text(
+            "$readingCount free holds total · showing ${timePeriod.label}",
+            style = MaterialTheme.typography.labelMedium,
+            color = TextDisabled
+        )
+
+        // ── 1. Hold Duration ───────────────────────────────────────────────
+        ApneaGraphSection(title = "Hold Duration", subtitle = "Free holds only · x-axis = date") {
+            ApneaMetricLineChart(
+                label = "Duration (s)",
+                points = chartData.holdDuration,
+                lineColor = EcgCyan,
+                isLandscape = isLandscape,
+                isPrimary = true
+            )
+        }
+
+        // ── 2. Heart Rate ─────────────────────────────────────────────────
+        if (chartData.minHr.isNotEmpty() || chartData.maxHr.isNotEmpty()) {
+            ApneaGraphSection(title = "Heart Rate", subtitle = "Free holds only · x-axis = date") {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (chartData.minHr.isNotEmpty()) {
+                        ApneaMetricLineChart(label = "Min HR (bpm)", points = chartData.minHr, lineColor = ReadinessBlue, invertGood = true, isLandscape = isLandscape)
+                    }
+                    if (chartData.maxHr.isNotEmpty()) {
+                        ApneaMetricLineChart(label = "Max HR (bpm)", points = chartData.maxHr, lineColor = ReadinessOrange, invertGood = true, isLandscape = isLandscape)
+                    }
+                }
+            }
+        }
+
+        // ── 3. Oximetry ───────────────────────────────────────────────────
+        if (chartData.lowestSpO2.isNotEmpty()) {
+            ApneaGraphSection(title = "Oximetry", subtitle = "Lowest SpO₂ recorded · x-axis = date") {
+                ApneaMetricLineChart(label = "Lowest SpO₂ (%)", points = chartData.lowestSpO2, lineColor = ReadinessGreen, isLandscape = isLandscape)
+            }
+        }
+
+        // ── 4. Contractions ───────────────────────────────────────────────
+        if (chartData.firstContractionSec.isNotEmpty()) {
+            ApneaGraphSection(title = "Contractions", subtitle = "Time to first contraction · x-axis = date") {
+                ApneaMetricLineChart(label = "First Contraction (s)", points = chartData.firstContractionSec, lineColor = CoherencePink, isLandscape = isLandscape)
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+    }
+}
+
+// ── Time period selector ───────────────────────────────────────────────────────
+
+@Composable
+private fun ApneaTimePeriodSelector(
+    selected: ApneaChartTimePeriod,
+    onSelect: (ApneaChartTimePeriod) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        ApneaChartTimePeriod.entries.forEach { period ->
+            val isSelected = period == selected
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(if (isSelected) EcgCyan.copy(alpha = 0.25f) else SurfaceVariant)
+                    .clickable { onSelect(period) }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = period.label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (isSelected) EcgCyan else TextSecondary,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                )
+            }
+        }
+    }
+}
+
+// ── Period step navigation row ─────────────────────────────────────────────────
+
+@Composable
+private fun ApneaPeriodStepRow(
+    timePeriod: ApneaChartTimePeriod,
+    canStepBack: Boolean,
+    canStepForward: Boolean,
+    onStepBack: () -> Unit,
+    onStepForward: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(
+            onClick = onStepBack,
+            enabled = canStepBack
+        ) {
+            Text(
+                "‹",
+                style = MaterialTheme.typography.headlineMedium,
+                color = if (canStepBack) EcgCyan else TextDisabled
+            )
+        }
+
+        Text(
+            "Scroll ${timePeriod.label} windows",
+            style = MaterialTheme.typography.labelSmall,
+            color = TextDisabled
+        )
+
+        IconButton(
+            onClick = onStepForward,
+            enabled = canStepForward
+        ) {
+            Text(
+                "›",
+                style = MaterialTheme.typography.headlineMedium,
+                color = if (canStepForward) EcgCyan else TextDisabled
+            )
+        }
+    }
+}
+
+// ── Graph section wrapper ──────────────────────────────────────────────────────
+
+@Composable
+private fun ApneaGraphSection(
+    title: String,
+    subtitle: String,
+    content: @Composable () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = SurfaceVariant)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Column {
+                Text(title, style = MaterialTheme.typography.titleMedium, color = TextPrimary, fontWeight = FontWeight.Bold)
+                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = TextDisabled)
+            }
+            HorizontalDivider(color = SurfaceDark)
+            content()
+        }
+    }
+}
+
+// ── Generic metric line chart ──────────────────────────────────────────────────
+
+@Composable
+private fun ApneaMetricLineChart(
+    label: String,
+    points: List<ApneaChartPoint>,
+    lineColor: Color,
+    invertGood: Boolean = false,
+    isLandscape: Boolean = false,
+    isPrimary: Boolean = false
+) {
+    if (points.isEmpty()) {
+        Text(
+            "No data yet",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextDisabled,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center
+        )
+        return
+    }
+
+    val latest = points.last()
+    val avg = points.map { it.value }.average().toFloat()
+    val min = points.minOf { it.value }
+    val max = points.maxOf { it.value }
+    val yPad = ((max - min) * 0.1f).coerceAtLeast(1f)
+
+    var tooltipPoint by remember { mutableStateOf<ApneaChartPoint?>(null) }
+
+    val chartHeight = if (isLandscape) {
+        if (isPrimary) 200.dp else 160.dp
+    } else {
+        if (isPrimary) 140.dp else 100.dp
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(label, style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+            Text(
+                "Latest: ${String.format("%.1f", latest.value)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = lineColor,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        ApneaLineChartCanvas(
+            points = points,
+            lineColor = lineColor,
+            fillAlpha = 0.10f,
+            yMin = (min - yPad),
+            yMax = (max + yPad),
+            tooltipPoint = tooltipPoint,
+            onTap = { tooltipPoint = if (tooltipPoint == it) null else it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(chartHeight)
+        )
+
+        tooltipPoint?.let { tp ->
+            ApneaTooltipCard(label = label, value = String.format("%.1f", tp.value), date = tp.label, color = lineColor)
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("Avg ${String.format("%.1f", avg)}", style = MaterialTheme.typography.labelSmall, color = TextDisabled)
+            Text("Min ${String.format("%.1f", min)}  Max ${String.format("%.1f", max)}", style = MaterialTheme.typography.labelSmall, color = TextDisabled)
+        }
+    }
+}
+
+// ── Tooltip card ───────────────────────────────────────────────────────────────
+
+@Composable
+private fun ApneaTooltipCard(label: String, value: String, date: String, color: Color) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(SurfaceDark)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = TextDisabled)
+            Text(date, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+        }
+        Text(value, style = MaterialTheme.typography.titleMedium, color = color, fontWeight = FontWeight.Bold)
+    }
+}
+
+// ── Pure Canvas line chart with x-axis labels and tap interaction ──────────────
+
+@Composable
+private fun ApneaLineChartCanvas(
+    points: List<ApneaChartPoint>,
+    lineColor: Color,
+    fillAlpha: Float,
+    yMin: Float,
+    yMax: Float,
+    modifier: Modifier = Modifier,
+    referenceLines: List<Pair<Float, Color>> = emptyList(),
+    tooltipPoint: ApneaChartPoint? = null,
+    onTap: (ApneaChartPoint) -> Unit = {}
+) {
+    if (points.size < 2) {
+        Canvas(modifier = modifier) {
+            drawCircle(color = lineColor, radius = 6f, center = Offset(size.width / 2f, size.height / 2f))
+        }
+        return
+    }
+
+    val xAxisHeight = 18.dp
+    val yRange = (yMax - yMin).coerceAtLeast(0.001f)
+
+    // Pick up to 5 evenly-spaced label indices, always including first and last
+    val maxLabels = 5
+    val labelIndices: List<Int> = when {
+        points.size <= maxLabels -> points.indices.toList()
+        else -> {
+            val step = (points.size - 1).toFloat() / (maxLabels - 1).toFloat()
+            (0 until maxLabels).map { i -> (i * step).toInt().coerceIn(0, points.size - 1) }
+        }
+    }
+
+    // Format "MMM d" from ISO date string "yyyy-MM-dd"
+    fun shortDate(isoDate: String): String = try {
+        val parts = isoDate.split("-")
+        val month = java.time.Month.of(parts[1].toInt()).name.take(3).lowercase()
+            .replaceFirstChar { it.uppercase() }
+        "$month ${parts[2].trimStart('0')}"
+    } catch (_: Exception) { isoDate }
+
+    Column(modifier = modifier) {
+        // ── Chart canvas ──────────────────────────────────────────────────
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .pointerInput(points) {
+                    detectTapGestures { tapOffset ->
+                        val w = size.width.toFloat()
+                        val xStep = w / (points.size - 1).toFloat()
+                        val tappedIdx = (tapOffset.x / xStep).toInt().coerceIn(0, points.size - 1)
+                        val closest = points.minByOrNull { p -> abs(p.dayIndex - tappedIdx.toFloat()) }
+                        closest?.let { onTap(it) }
+                    }
+                }
+        ) {
+            val w = size.width
+            val h = size.height
+            val xStep = w / (points.size - 1).toFloat()
+
+            fun xOf(i: Int) = i * xStep
+            fun yOf(v: Float) = h - ((v - yMin) / yRange * h).coerceIn(0f, h)
+
+            // Reference lines
+            referenceLines.forEach { (refY, refColor) ->
+                val ry = yOf(refY)
+                drawLine(color = refColor.copy(alpha = 0.35f), start = Offset(0f, ry), end = Offset(w, ry), strokeWidth = 1.5f)
+            }
+
+            // Fill path
+            val fillPath = Path().apply {
+                moveTo(xOf(0), h)
+                lineTo(xOf(0), yOf(points[0].value))
+                for (i in 1 until points.size) lineTo(xOf(i), yOf(points[i].value))
+                lineTo(xOf(points.size - 1), h)
+                close()
+            }
+            drawPath(fillPath, color = lineColor.copy(alpha = fillAlpha))
+
+            // Line path
+            val linePath = Path().apply {
+                moveTo(xOf(0), yOf(points[0].value))
+                for (i in 1 until points.size) lineTo(xOf(i), yOf(points[i].value))
+            }
+            drawPath(linePath, color = lineColor, style = Stroke(width = 2.5f, cap = StrokeCap.Round))
+
+            // Latest point dot
+            val lastX = xOf(points.size - 1)
+            val lastY = yOf(points.last().value)
+            drawCircle(color = lineColor, radius = 5f, center = Offset(lastX, lastY))
+            drawCircle(color = BackgroundDark, radius = 2.5f, center = Offset(lastX, lastY))
+
+            // Highlighted tapped point
+            tooltipPoint?.let { tp ->
+                val tpIdx = points.indexOfFirst { it.label == tp.label && it.value == tp.value }
+                if (tpIdx >= 0) {
+                    val tx = xOf(tpIdx)
+                    val ty = yOf(tp.value)
+                    drawLine(color = lineColor.copy(alpha = 0.4f), start = Offset(tx, 0f), end = Offset(tx, h), strokeWidth = 1f)
+                    drawCircle(color = lineColor, radius = 7f, center = Offset(tx, ty))
+                    drawCircle(color = BackgroundDark, radius = 4f, center = Offset(tx, ty))
+                }
+            }
+
+            // Tick marks at label positions
+            labelIndices.forEach { idx ->
+                val tx = xOf(idx)
+                drawLine(color = TextDisabled.copy(alpha = 0.5f), start = Offset(tx, h - 4f), end = Offset(tx, h), strokeWidth = 1f)
+            }
+        }
+
+        // ── X-axis date labels ────────────────────────────────────────────
+        // Use a BoxWithConstraints so we can position each label by fraction of width
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(xAxisHeight)
+        ) {
+            val totalWidth = maxWidth
+            labelIndices.forEach { idx ->
+                val fraction = if (points.size > 1) idx.toFloat() / (points.size - 1).toFloat() else 0f
+                val dateStr = shortDate(points[idx].label)
+                // Estimate label width ~30dp; clamp so it doesn't overflow edges
+                val labelWidthEst = 30.dp
+                val rawOffset = totalWidth * fraction - labelWidthEst / 2
+                val clampedOffset = rawOffset.coerceIn(0.dp, totalWidth - labelWidthEst)
+                Text(
+                    text = dateStr,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                    color = TextDisabled,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .absoluteOffset(x = clampedOffset)
+                        .width(labelWidthEst)
                 )
             }
         }

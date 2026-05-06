@@ -1,13 +1,13 @@
 package com.example.wags.ui.breathing
 
-import android.graphics.Paint as NativePaint
-import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,10 +18,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -31,13 +31,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wags.data.db.entity.ResonanceSessionEntity
 import com.example.wags.data.db.entity.RfAssessmentEntity
 import com.example.wags.ui.common.LiveSensorActionsCallback
-import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.theme.*
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.math.abs
 
 // ── Tab definitions ────────────────────────────────────────────────────────────
 
@@ -129,7 +129,12 @@ fun RfAssessmentHistoryScreen(
                 RfEmptyHistoryContent()
             } else {
                 when (selectedTab) {
-                    RfHistoryTab.GRAPHS -> RfGraphsContent(uiState = uiState)
+                    RfHistoryTab.GRAPHS -> RfGraphsContent(
+                        uiState = uiState,
+                        onTimePeriodChange = viewModel::setTimePeriod,
+                        onStepBack = viewModel::stepBack,
+                        onStepForward = viewModel::stepForward
+                    )
                     RfHistoryTab.CALENDAR -> RfCalendarContent(
                         uiState = uiState,
                         displayedMonth = displayedMonth,
@@ -161,7 +166,15 @@ fun RfAssessmentHistoryScreen(
 // ── Graphs tab ─────────────────────────────────────────────────────────────────
 
 @Composable
-private fun RfGraphsContent(uiState: RfAssessmentHistoryUiState) {
+private fun RfGraphsContent(
+    uiState: RfAssessmentHistoryUiState,
+    onTimePeriodChange: (RfChartTimePeriod) -> Unit,
+    onStepBack: () -> Unit,
+    onStepForward: () -> Unit
+) {
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -169,6 +182,30 @@ private fun RfGraphsContent(uiState: RfAssessmentHistoryUiState) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
+        // ── Time period selector ───────────────────────────────────────────
+        RfTimePeriodSelector(
+            selected = uiState.timePeriod,
+            onSelect = onTimePeriodChange
+        )
+
+        // ── Step navigation (only shown when a finite period is selected) ──
+        if (uiState.timePeriod != RfChartTimePeriod.ALL) {
+            RfPeriodStepRow(
+                timePeriod = uiState.timePeriod,
+                canStepBack = uiState.canStepBack,
+                canStepForward = uiState.canStepForward,
+                onStepBack = onStepBack,
+                onStepForward = onStepForward
+            )
+        }
+
+        val totalReadings = uiState.allAssessments.size + uiState.allSessions.size
+        Text(
+            "$totalReadings readings total · showing ${uiState.timePeriod.label}",
+            style = MaterialTheme.typography.labelMedium,
+            color = TextDisabled
+        )
+
         // ── ASSESSMENT GRAPHS ───────────────────────────────────────────
         if (uiState.allAssessments.isNotEmpty()) {
             Text(
@@ -186,69 +223,77 @@ private fun RfGraphsContent(uiState: RfAssessmentHistoryUiState) {
             // ── 1. Optimal BPM ──────────────────────────────────────────
             RfGraphSection(
                 title = "Optimal Breathing Rate",
-                subtitle = "Your resonance frequency (BPM) over time"
+                subtitle = "Your resonance frequency (BPM) over time · x-axis = date"
             ) {
                 RfMetricChart(
                     label = "Optimal BPM",
                     points = uiState.chartData.optimalBpm,
-                    lineColor = TextPrimary
+                    lineColor = TextPrimary,
+                    isLandscape = isLandscape
                 )
             }
 
             // ── 2. Coherence Ratio ──────────────────────────────────────
             RfGraphSection(
                 title = "Coherence Ratio",
-                subtitle = "Peak coherence achieved per assessment"
+                subtitle = "Peak coherence achieved per assessment · x-axis = date"
             ) {
                 RfMetricChart(
                     label = "Coherence Ratio",
                     points = uiState.chartData.coherenceRatio,
-                    lineColor = Color(0xFFD0D0D0)
+                    lineColor = Color(0xFFD0D0D0),
+                    isLandscape = isLandscape
                 )
             }
 
             // ── 3. LF Power ────────────────────────────────────────────
             RfGraphSection(
                 title = "LF Power",
-                subtitle = "Absolute low-frequency power at resonance (ms²/Hz)"
+                subtitle = "Absolute low-frequency power at resonance (ms²/Hz) · x-axis = date"
             ) {
                 RfMetricChart(
                     label = "LF Power (ms²/Hz)",
                     points = uiState.chartData.lfPower,
-                    lineColor = Color(0xFFB0B0B0)
+                    lineColor = Color(0xFFB0B0B0),
+                    isLandscape = isLandscape
                 )
             }
 
             // ── 4. RMSSD ───────────────────────────────────────────────
             RfGraphSection(
                 title = "RMSSD",
-                subtitle = "Root mean square of successive differences (ms)"
+                subtitle = "Root mean square of successive differences (ms) · x-axis = date"
             ) {
                 RfMetricChart(
                     label = "RMSSD (ms)",
                     points = uiState.chartData.rmssd,
-                    lineColor = Color(0xFF909090)
+                    lineColor = Color(0xFF909090),
+                    isLandscape = isLandscape
                 )
             }
 
             // ── 5. SDNN ────────────────────────────────────────────────
             RfGraphSection(
                 title = "SDNN",
-                subtitle = "Standard deviation of NN intervals (ms)"
+                subtitle = "Standard deviation of NN intervals (ms) · x-axis = date"
             ) {
                 RfMetricChart(
                     label = "SDNN (ms)",
                     points = uiState.chartData.sdnn,
-                    lineColor = Color(0xFF808080)
+                    lineColor = Color(0xFF808080),
+                    isLandscape = isLandscape
                 )
             }
 
             // ── 6. Composite Score ─────────────────────────────────────
             RfGraphSection(
                 title = "Composite Score",
-                subtitle = "Overall assessment quality score"
+                subtitle = "Overall assessment quality score · x-axis = date"
             ) {
-                RfScoreChart(points = uiState.chartData.compositeScore)
+                RfScoreChart(
+                    points = uiState.chartData.compositeScore,
+                    isLandscape = isLandscape
+                )
             }
         }
 
@@ -268,53 +313,460 @@ private fun RfGraphsContent(uiState: RfAssessmentHistoryUiState) {
             // Session Coherence
             RfGraphSection(
                 title = "Session Coherence",
-                subtitle = "Mean coherence ratio per session"
+                subtitle = "Mean coherence ratio per session · x-axis = date"
             ) {
                 RfMetricChart(
                     label = "Coherence Ratio",
                     points = uiState.sessionChartData.coherenceRatio,
-                    lineColor = Color(0xFFD0D0D0)
+                    lineColor = Color(0xFFD0D0D0),
+                    isLandscape = isLandscape
                 )
             }
 
             // Session RMSSD
             RfGraphSection(
                 title = "Session RMSSD",
-                subtitle = "Mean RMSSD per session (ms)"
+                subtitle = "Mean RMSSD per session (ms) · x-axis = date"
             ) {
                 RfMetricChart(
                     label = "RMSSD (ms)",
                     points = uiState.sessionChartData.rmssd,
-                    lineColor = Color(0xFF909090)
+                    lineColor = Color(0xFF909090),
+                    isLandscape = isLandscape
                 )
             }
 
             // Session SDNN
             RfGraphSection(
                 title = "Session SDNN",
-                subtitle = "Mean SDNN per session (ms)"
+                subtitle = "Mean SDNN per session (ms) · x-axis = date"
             ) {
                 RfMetricChart(
                     label = "SDNN (ms)",
                     points = uiState.sessionChartData.sdnn,
-                    lineColor = Color(0xFF808080)
+                    lineColor = Color(0xFF808080),
+                    isLandscape = isLandscape
                 )
             }
 
             // Session Duration
             RfGraphSection(
                 title = "Session Duration",
-                subtitle = "Duration per session (minutes)"
+                subtitle = "Duration per session (minutes) · x-axis = date"
             ) {
                 RfMetricChart(
                     label = "Duration (min)",
                     points = uiState.sessionChartData.duration,
-                    lineColor = Color(0xFFB0B0B0)
+                    lineColor = Color(0xFFB0B0B0),
+                    isLandscape = isLandscape
                 )
             }
         }
 
         Spacer(Modifier.height(16.dp))
+    }
+}
+
+// ── Time period selector ───────────────────────────────────────────────────────
+
+@Composable
+private fun RfTimePeriodSelector(
+    selected: RfChartTimePeriod,
+    onSelect: (RfChartTimePeriod) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        RfChartTimePeriod.entries.forEach { period ->
+            val isSelected = period == selected
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(if (isSelected) TextSecondary.copy(alpha = 0.25f) else SurfaceVariant)
+                    .clickable { onSelect(period) }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = period.label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (isSelected) TextPrimary else TextSecondary,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                )
+            }
+        }
+    }
+}
+
+// ── Period step navigation row ─────────────────────────────────────────────────
+
+@Composable
+private fun RfPeriodStepRow(
+    timePeriod: RfChartTimePeriod,
+    canStepBack: Boolean,
+    canStepForward: Boolean,
+    onStepBack: () -> Unit,
+    onStepForward: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(
+            onClick = onStepBack,
+            enabled = canStepBack
+        ) {
+            Text(
+                "‹",
+                style = MaterialTheme.typography.headlineMedium,
+                color = if (canStepBack) TextPrimary else TextDisabled
+            )
+        }
+
+        Text(
+            "Scroll ${timePeriod.label} windows",
+            style = MaterialTheme.typography.labelSmall,
+            color = TextDisabled
+        )
+
+        IconButton(
+            onClick = onStepForward,
+            enabled = canStepForward
+        ) {
+            Text(
+                "›",
+                style = MaterialTheme.typography.headlineMedium,
+                color = if (canStepForward) TextPrimary else TextDisabled
+            )
+        }
+    }
+}
+
+// ── Graph section wrapper ──────────────────────────────────────────────────────
+
+@Composable
+private fun RfGraphSection(
+    title: String,
+    subtitle: String,
+    content: @Composable () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = SurfaceVariant)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Column {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = TextDisabled)
+            }
+            HorizontalDivider(color = SurfaceDark)
+            content()
+        }
+    }
+}
+
+// ── Score chart (with zone reference lines) ────────────────────────────────────
+
+@Composable
+private fun RfScoreChart(
+    points: List<RfChartPoint>,
+    isLandscape: Boolean
+) {
+    if (points.isEmpty()) { RfNoDataLabel(); return }
+
+    val latest = points.last()
+    val avg = points.map { it.value }.average().toFloat()
+    val min = points.minOf { it.value }
+    val max = points.maxOf { it.value }
+    val yPad = ((max - min) * 0.1f).coerceAtLeast(1f)
+
+    var tooltipPoint by remember { mutableStateOf<RfChartPoint?>(null) }
+
+    val chartHeight = if (isLandscape) 200.dp else 140.dp
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            RfStatChip("Latest", String.format("%.0f", latest.value), rfScoreColor(latest.value))
+            RfStatChip("Avg", String.format("%.0f", avg), rfScoreColor(avg))
+            RfStatChip("Min", String.format("%.0f", min), rfScoreColor(min))
+            RfStatChip("Max", String.format("%.0f", max), rfScoreColor(max))
+        }
+
+        RfLineChartCanvas(
+            points = points,
+            lineColor = TextPrimary,
+            fillAlpha = 0.15f,
+            yMin = (min - yPad).coerceAtLeast(0f),
+            yMax = max + yPad,
+            tooltipPoint = tooltipPoint,
+            onTap = { tooltipPoint = if (tooltipPoint == it) null else it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(chartHeight)
+        )
+
+        tooltipPoint?.let { tp ->
+            RfTooltipCard(
+                label = "Composite Score",
+                value = String.format("%.0f", tp.value),
+                date = tp.dateLabel,
+                color = rfScoreColor(tp.value)
+            )
+        }
+    }
+}
+
+// ── Generic metric chart ───────────────────────────────────────────────────────
+
+@Composable
+private fun RfMetricChart(
+    label: String,
+    points: List<RfChartPoint>,
+    lineColor: Color,
+    isLandscape: Boolean = false
+) {
+    if (points.isEmpty()) { RfNoDataLabel(); return }
+
+    val latest = points.last()
+    val avg = points.map { it.value }.average().toFloat()
+    val min = points.minOf { it.value }
+    val max = points.maxOf { it.value }
+    val yPad = ((max - min) * 0.1f).coerceAtLeast(0.1f)
+
+    var tooltipPoint by remember { mutableStateOf<RfChartPoint?>(null) }
+
+    val chartHeight = if (isLandscape) 160.dp else 100.dp
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(label, style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+            Text(
+                "Latest: ${String.format("%.2f", latest.value)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = lineColor,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        RfLineChartCanvas(
+            points = points,
+            lineColor = lineColor,
+            fillAlpha = 0.10f,
+            yMin = min - yPad,
+            yMax = max + yPad,
+            tooltipPoint = tooltipPoint,
+            onTap = { tooltipPoint = if (tooltipPoint == it) null else it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(chartHeight)
+        )
+
+        tooltipPoint?.let { tp ->
+            RfTooltipCard(
+                label = label,
+                value = String.format("%.2f", tp.value),
+                date = tp.dateLabel,
+                color = lineColor
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                "Avg ${String.format("%.2f", avg)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextDisabled
+            )
+            Text(
+                "Min ${String.format("%.2f", min)}  Max ${String.format("%.2f", max)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextDisabled
+            )
+        }
+    }
+}
+
+// ── Tooltip card ───────────────────────────────────────────────────────────────
+
+@Composable
+private fun RfTooltipCard(label: String, value: String, date: String, color: Color) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(SurfaceDark)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = TextDisabled)
+            Text(date, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+        }
+        Text(value, style = MaterialTheme.typography.titleMedium, color = color, fontWeight = FontWeight.Bold)
+    }
+}
+
+// ── Pure Canvas line chart with x-axis labels and tap interaction ──────────────
+
+@Composable
+private fun RfLineChartCanvas(
+    points: List<RfChartPoint>,
+    lineColor: Color,
+    fillAlpha: Float,
+    yMin: Float,
+    yMax: Float,
+    modifier: Modifier = Modifier,
+    tooltipPoint: RfChartPoint? = null,
+    onTap: (RfChartPoint) -> Unit = {}
+) {
+    if (points.size < 2) {
+        Canvas(modifier = modifier) {
+            drawCircle(
+                color = lineColor,
+                radius = 6f,
+                center = Offset(size.width / 2f, size.height / 2f)
+            )
+        }
+        return
+    }
+
+    val xAxisHeight = 18.dp
+    val yRange = (yMax - yMin).coerceAtLeast(0.001f)
+
+    // Pick up to 5 evenly-spaced label indices, always including first and last
+    val maxLabels = 5
+    val labelIndices: List<Int> = when {
+        points.size <= maxLabels -> points.indices.toList()
+        else -> {
+            val step = (points.size - 1).toFloat() / (maxLabels - 1).toFloat()
+            (0 until maxLabels).map { i -> (i * step).toInt().coerceIn(0, points.size - 1) }
+        }
+    }
+
+    // Format "MMM d" from ISO date string "yyyy-MM-dd"
+    fun shortDate(isoDate: String): String = try {
+        val parts = isoDate.split("-")
+        val month = java.time.Month.of(parts[1].toInt()).name.take(3).lowercase()
+            .replaceFirstChar { it.uppercase() }
+        "$month ${parts[2].trimStart('0')}"
+    } catch (_: Exception) { isoDate }
+
+    Column(modifier = modifier) {
+        // ── Chart canvas ──────────────────────────────────────────────────
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .pointerInput(points) {
+                    detectTapGestures { tapOffset ->
+                        val w = size.width.toFloat()
+                        val xStep = w / (points.size - 1).toFloat()
+                        val tappedIdx = (tapOffset.x / xStep).toInt().coerceIn(0, points.size - 1)
+                        val closest = points.minByOrNull { p -> abs(p.index - tappedIdx.toFloat()) }
+                        closest?.let { onTap(it) }
+                    }
+                }
+        ) {
+            val w = size.width
+            val h = size.height
+            val xStep = w / (points.size - 1).toFloat()
+
+            fun xOf(i: Int) = i * xStep
+            fun yOf(v: Float) = h - ((v - yMin) / yRange * h).coerceIn(0f, h)
+
+            // Fill path
+            val fillPath = Path().apply {
+                moveTo(xOf(0), h)
+                lineTo(xOf(0), yOf(points[0].value))
+                for (i in 1 until points.size) {
+                    lineTo(xOf(i), yOf(points[i].value))
+                }
+                lineTo(xOf(points.size - 1), h)
+                close()
+            }
+            drawPath(fillPath, color = lineColor.copy(alpha = fillAlpha))
+
+            // Line path
+            val linePath = Path().apply {
+                moveTo(xOf(0), yOf(points[0].value))
+                for (i in 1 until points.size) {
+                    lineTo(xOf(i), yOf(points[i].value))
+                }
+            }
+            drawPath(linePath, color = lineColor, style = Stroke(width = 2.5f, cap = StrokeCap.Round))
+
+            // Latest dot
+            val lastX = xOf(points.size - 1)
+            val lastY = yOf(points.last().value)
+            drawCircle(color = lineColor, radius = 5f, center = Offset(lastX, lastY))
+            drawCircle(color = BackgroundDark, radius = 2.5f, center = Offset(lastX, lastY))
+
+            // Highlighted tapped point
+            tooltipPoint?.let { tp ->
+                val tpIdx = points.indexOfFirst { it.dateLabel == tp.dateLabel && it.value == tp.value }
+                if (tpIdx >= 0) {
+                    val tx = xOf(tpIdx)
+                    val ty = yOf(tp.value)
+                    drawLine(color = lineColor.copy(alpha = 0.4f), start = Offset(tx, 0f), end = Offset(tx, h), strokeWidth = 1f)
+                    drawCircle(color = lineColor, radius = 7f, center = Offset(tx, ty))
+                    drawCircle(color = BackgroundDark, radius = 4f, center = Offset(tx, ty))
+                }
+            }
+
+            // Tick marks at label positions
+            labelIndices.forEach { idx ->
+                val tx = xOf(idx)
+                drawLine(color = TextDisabled.copy(alpha = 0.5f), start = Offset(tx, h - 4f), end = Offset(tx, h), strokeWidth = 1f)
+            }
+        }
+
+        // ── X-axis date labels ────────────────────────────────────────────
+        // Use a BoxWithConstraints so we can position each label by fraction of width
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(xAxisHeight)
+        ) {
+            val totalWidth = maxWidth
+            labelIndices.forEach { idx ->
+                val fraction = if (points.size > 1) idx.toFloat() / (points.size - 1).toFloat() else 0f
+                val dateStr = shortDate(points[idx].dateLabel)
+                // Estimate label width ~30dp; clamp so it doesn't overflow edges
+                val labelWidthEst = 30.dp
+                val rawOffset = totalWidth * fraction - labelWidthEst / 2
+                val clampedOffset = rawOffset.coerceIn(0.dp, totalWidth - labelWidthEst)
+                Text(
+                    text = dateStr,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                    color = TextDisabled,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .absoluteOffset(x = clampedOffset)
+                        .width(labelWidthEst)
+                )
+            }
+        }
     }
 }
 
@@ -802,239 +1254,6 @@ private fun RfHistorySummaryCard(uiState: RfAssessmentHistoryUiState) {
                 }
             }
         }
-    }
-}
-
-// ── Graph section wrapper ──────────────────────────────────────────────────────
-
-@Composable
-private fun RfGraphSection(
-    title: String,
-    subtitle: String,
-    content: @Composable () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = SurfaceVariant)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Column {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = TextPrimary,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = TextDisabled)
-            }
-            HorizontalDivider(color = SurfaceDark)
-            content()
-        }
-    }
-}
-
-// ── Score chart (with zone reference lines) ────────────────────────────────────
-
-@Composable
-private fun RfScoreChart(points: List<RfChartPoint>) {
-    if (points.isEmpty()) { RfNoDataLabel(); return }
-
-    val latest = points.last()
-    val avg = points.map { it.value }.average().toFloat()
-    val min = points.minOf { it.value }
-    val max = points.maxOf { it.value }
-    val yPad = ((max - min) * 0.1f).coerceAtLeast(1f)
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            RfStatChip("Latest", String.format("%.0f", latest.value), rfScoreColor(latest.value))
-            RfStatChip("Avg", String.format("%.0f", avg), rfScoreColor(avg))
-            RfStatChip("Min", String.format("%.0f", min), rfScoreColor(min))
-            RfStatChip("Max", String.format("%.0f", max), rfScoreColor(max))
-        }
-
-        RfLineChartCanvas(
-            points = points.map { it.index to it.value },
-            lineColor = TextPrimary,
-            fillAlpha = 0.15f,
-            yMin = (min - yPad).coerceAtLeast(0f),
-            yMax = max + yPad,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(120.dp)
-        )
-    }
-}
-
-// ── Generic metric chart ───────────────────────────────────────────────────────
-
-@Composable
-private fun RfMetricChart(
-    label: String,
-    points: List<RfChartPoint>,
-    lineColor: Color
-) {
-    if (points.isEmpty()) { RfNoDataLabel(); return }
-
-    val latest = points.last()
-    val avg = points.map { it.value }.average().toFloat()
-    val min = points.minOf { it.value }
-    val max = points.maxOf { it.value }
-    val yPad = ((max - min) * 0.1f).coerceAtLeast(0.1f)
-
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(label, style = MaterialTheme.typography.labelMedium, color = TextSecondary)
-            Text(
-                "Latest: ${String.format("%.2f", latest.value)}",
-                style = MaterialTheme.typography.labelMedium,
-                color = lineColor,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        RfLineChartCanvas(
-            points = points.map { it.index to it.value },
-            lineColor = lineColor,
-            fillAlpha = 0.10f,
-            yMin = min - yPad,
-            yMax = max + yPad,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(90.dp)
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                "Avg ${String.format("%.2f", avg)}",
-                style = MaterialTheme.typography.labelSmall,
-                color = TextDisabled
-            )
-            Text(
-                "Min ${String.format("%.2f", min)}  Max ${String.format("%.2f", max)}",
-                style = MaterialTheme.typography.labelSmall,
-                color = TextDisabled
-            )
-        }
-    }
-}
-
-// ── Pure Canvas line chart ─────────────────────────────────────────────────────
-
-@Composable
-private fun RfLineChartCanvas(
-    points: List<Pair<Float, Float>>,
-    lineColor: Color,
-    fillAlpha: Float,
-    yMin: Float,
-    yMax: Float,
-    modifier: Modifier = Modifier
-) {
-    if (points.size < 2) {
-        Canvas(modifier = modifier) {
-            drawCircle(
-                color = lineColor,
-                radius = 6f,
-                center = Offset(size.width / 2f, size.height / 2f)
-            )
-        }
-        return
-    }
-
-    val yRange = (yMax - yMin).coerceAtLeast(0.001f)
-    val yMid = (yMin + yMax) / 2f
-
-    // Smart format: use integers when values are large enough, decimals otherwise
-    fun fmtLabel(v: Float): String = when {
-        yRange >= 10f -> String.format("%.0f", v)
-        yRange >= 1f  -> String.format("%.1f", v)
-        else          -> String.format("%.2f", v)
-    }
-
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-
-        // ── Y-axis labels ────────────────────────────────────────────────
-        val textPaint = NativePaint().apply {
-            color = android.graphics.Color.rgb(0x70, 0x70, 0x70) // Ash
-            textSize = 24f  // ~10sp at mdpi
-            typeface = Typeface.DEFAULT
-            isAntiAlias = true
-            textAlign = NativePaint.Align.RIGHT
-        }
-        val labelMargin = 48f  // px reserved for Y-axis labels on the left
-        val chartLeft = labelMargin + 4f
-        val chartWidth = w - chartLeft
-
-        val xStep = chartWidth / (points.size - 1).toFloat()
-
-        fun xOf(i: Int) = chartLeft + i * xStep
-        fun yOf(v: Float) = h - ((v - yMin) / yRange * h).coerceIn(0f, h)
-
-        // Draw 3 horizontal grid lines (bottom=yMin, middle=yMid, top=yMax)
-        // with Y-axis labels
-        val gridColor = Color(0xFF2A2A2A)
-        val dashEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f), 0f)
-        val gridValues = listOf(yMin, yMid, yMax)
-        for (v in gridValues) {
-            val gy = yOf(v)
-            // Grid line
-            drawLine(
-                color = gridColor,
-                start = Offset(chartLeft, gy),
-                end = Offset(w, gy),
-                strokeWidth = 1f,
-                pathEffect = dashEffect
-            )
-            // Y-axis label
-            drawContext.canvas.nativeCanvas.drawText(
-                fmtLabel(v),
-                labelMargin - 2f,
-                gy + 8f,  // offset down slightly to vertically center on the line
-                textPaint
-            )
-        }
-
-        // ── Fill ─────────────────────────────────────────────────────────
-        val fillPath = Path().apply {
-            moveTo(xOf(0), h)
-            lineTo(xOf(0), yOf(points[0].second))
-            for (i in 1 until points.size) {
-                lineTo(xOf(i), yOf(points[i].second))
-            }
-            lineTo(xOf(points.size - 1), h)
-            close()
-        }
-        drawPath(fillPath, color = lineColor.copy(alpha = fillAlpha))
-
-        // ── Line ─────────────────────────────────────────────────────────
-        val linePath = Path().apply {
-            moveTo(xOf(0), yOf(points[0].second))
-            for (i in 1 until points.size) {
-                lineTo(xOf(i), yOf(points[i].second))
-            }
-        }
-        drawPath(linePath, color = lineColor, style = Stroke(width = 2.5f, cap = StrokeCap.Round))
-
-        // ── Latest dot ───────────────────────────────────────────────────
-        val lastX = xOf(points.size - 1)
-        val lastY = yOf(points.last().second)
-        drawCircle(color = lineColor, radius = 5f, center = Offset(lastX, lastY))
-        drawCircle(color = BackgroundDark, radius = 2.5f, center = Offset(lastX, lastY))
     }
 }
 
