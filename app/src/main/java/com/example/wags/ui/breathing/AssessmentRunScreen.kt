@@ -87,6 +87,11 @@ fun AssessmentRunScreen(
     LaunchedEffect(uiState.isComplete) {
         if (uiState.isComplete) {
             WagsFeedback.sessionEnd(context)
+
+            // Set apnea prep type to RESONANCE so the next free hold is tagged correctly
+            val apneaPrefs = context.getSharedPreferences("apnea_prefs", android.content.Context.MODE_PRIVATE)
+            apneaPrefs.edit().putString("setting_prep_type", "RESONANCE").apply()
+
             val id = uiState.sessionId ?: return@LaunchedEffect
             onSessionComplete(id)
         }

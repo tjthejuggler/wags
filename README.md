@@ -5,6 +5,15 @@
 ## Changelog
 
 
+### 2026-05-08 — Resonance assessment auto-sets apnea prep
+
+**Improved: Resonance assessment now automatically sets apnea prep to RESONANCE** ([`AssessmentRunScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/AssessmentRunScreen.kt))
+- Completing a resonance assessment (any protocol) now automatically sets the global apnea prep setting to **RESONANCE**, matching the behavior of a normal resonance breathing session.
+- This ensures that any subsequent apnea sessions (free holds, tables, etc.) are correctly tagged as having used resonance preparation.
+
+#### Files Changed
+- **Modified**: [`AssessmentRunScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/AssessmentRunScreen.kt) — Added `SharedPreferences` update to `LaunchedEffect(uiState.isComplete)`
+
 ### 2026-04-01 — Persistent crash logging to file
 
 **New: Crash logs written to internal storage for offline review** ([`CrashLogWriter.kt`](app/src/main/java/com/example/wags/data/crash/CrashLogWriter.kt), [`CrashLogScreen.kt`](app/src/main/java/com/example/wags/ui/settings/CrashLogScreen.kt))
