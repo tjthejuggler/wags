@@ -5,6 +5,28 @@
 ## Changelog
 
 
+### 2026-05-08 — Clean up Apnea History UI
+
+**Improved: Removed redundant top bar elements from Apnea History tabs** ([`ApneaHistoryScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaHistoryScreen.kt), [`AllApneaRecordsScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/AllApneaRecordsScreen.kt))
+- Removed the redundant `TopAppBar` (back arrow, title, and live HR/SpO2 data) from the Apnea History screen and its "All Records" tab.
+- These elements are now handled by the parent screen/navigation, preventing double-headers when switching between history tabs.
+- Simplified `AllApneaRecordsScreen` to be a plain `LazyColumn` instead of a `Scaffold` with its own top bar.
+
+#### Files Changed
+- **Modified**: [`ApneaHistoryScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaHistoryScreen.kt) — Removed `topBar` from `Scaffold`.
+- **Modified**: [`AllApneaRecordsScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/AllApneaRecordsScreen.kt) — Replaced `Scaffold` and `TopAppBar` with a direct `LazyColumn`.
+
+### 2026-05-08 — Fix "billions" coherence score bug
+
+**Fixed: Coherence ratio calculation now clamped to 0–100** ([`CoherenceScoreCalculator.kt`](app/src/main/java/com/example/wags/domain/usecase/breathing/CoherenceScoreCalculator.kt), [`RfAssessmentHistoryViewModel.kt`](app/src/main/java/com/example/wags/ui/breathing/RfAssessmentHistoryViewModel.kt))
+- Fixed a bug where the coherence ratio could explode into the billions if the denominator (Total Power - Peak Power) became extremely small (near `EPSILON`).
+- Added a `coerceIn(0.0, 100.0)` clamp to the final ratio calculation to ensure UI stability and prevent overflow in history charts.
+- **Retroactive Fix**: Added UI-side clamping in the history ViewModel so that existing sessions with corrupted "billions" scores are displayed correctly as 100.0.
+
+#### Files Changed
+- **Modified**: [`CoherenceScoreCalculator.kt`](app/src/main/java/com/example/wags/domain/usecase/breathing/CoherenceScoreCalculator.kt) — Clamped `coherenceRatio` in `calculateCoherenceRatio`.
+- **Modified**: [`RfAssessmentHistoryViewModel.kt`](app/src/main/java/com/example/wags/ui/breathing/RfAssessmentHistoryViewModel.kt) — Added `coerceIn(0f, 100f)` to `coherenceRatio` points in `buildChartData` and `buildSessionChartData`.
+
 ### 2026-05-08 — Resonance assessment auto-sets apnea prep
 
 **Improved: Resonance assessment now automatically sets apnea prep to RESONANCE** ([`AssessmentRunScreen.kt`](app/src/main/java/com/example/wags/ui/breathing/AssessmentRunScreen.kt))

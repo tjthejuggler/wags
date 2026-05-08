@@ -267,7 +267,8 @@ class RfAssessmentHistoryViewModel @Inject constructor(
                 .atZone(zone).toLocalDate().toString()
 
             optimalBpm.add(RfChartPoint(x, e.optimalBpm, label))
-            coherenceRatio.add(RfChartPoint(x, e.maxCoherenceRatio, label))
+            // Clamp historical data to 100.0 to fix existing "billions" bug
+            coherenceRatio.add(RfChartPoint(x, e.maxCoherenceRatio.coerceIn(0f, 100f), label))
             lfPower.add(RfChartPoint(x, e.maxLfPowerMs2, label))
             rmssd.add(RfChartPoint(x, e.meanRmssdMs, label))
             sdnn.add(RfChartPoint(x, e.meanSdnnMs, label))
@@ -301,7 +302,8 @@ class RfAssessmentHistoryViewModel @Inject constructor(
             val label = Instant.ofEpochMilli(s.timestamp)
                 .atZone(zone).toLocalDate().toString()
 
-            coherenceRatio.add(RfChartPoint(x, s.meanCoherenceRatio, label))
+            // Clamp historical data to 100.0 to fix existing "billions" bug
+            coherenceRatio.add(RfChartPoint(x, s.meanCoherenceRatio.coerceIn(0f, 100f), label))
             rmssd.add(RfChartPoint(x, s.meanRmssdMs, label))
             sdnn.add(RfChartPoint(x, s.meanSdnnMs, label))
             totalPoints.add(RfChartPoint(x, s.totalPoints, label))

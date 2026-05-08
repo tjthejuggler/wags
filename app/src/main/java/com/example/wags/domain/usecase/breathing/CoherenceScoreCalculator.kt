@@ -160,8 +160,10 @@ class CoherenceScoreCalculator @Inject constructor(
         )
 
         // Step 4: Coherence Ratio
+        // Ensure totalPower is at least peakBandPower to avoid negative or near-zero denominators
+        // that lead to "billions" in the score.
         val denominator = max(totalPower - peakBandPower, EPSILON)
-        val ratio = peakBandPower / denominator
+        val ratio = (peakBandPower / denominator).coerceIn(0.0, 100.0)
 
         return CoherenceRatioResult(
             coherenceRatio = ratio.toFloat(),

@@ -1,6 +1,7 @@
 package com.example.wags.ui.apnea
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -35,7 +36,6 @@ import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.ui.common.LiveSensorActionsNav
-import com.example.wags.ui.common.LiveSensorActionsNav
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 import java.text.SimpleDateFormat
@@ -68,425 +68,338 @@ fun AllApneaRecordsScreen(
     // Sort popup state
     var showSortMenu by remember { mutableStateOf(false) }
 
-    Scaffold(
-        containerColor = BackgroundDark,
-        topBar = {
-            TopAppBar(
-                title = { Text("All Records", style = MaterialTheme.typography.titleMedium) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
-                    }
-                },
-                actions = {
-                    LiveSensorActionsNav(navController)
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
-            )
-        }
-    ) { padding ->
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(bottom = 32.dp)
-        ) {
-            // ── Header surface (Sort + Filters + Event Types) ──────────────
-            item {
-                Surface(
-                    color = SurfaceDark,
-                    tonalElevation = 2.dp
-                ) {
-                    Column {
-                        // ── Sort row (same style as Filters / Event Types) ──
-                        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                            Box {
+    LazyColumn(
+        state = listState,
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BackgroundDark),
+        contentPadding = PaddingValues(bottom = 32.dp)
+    ) {
+        // ── Header surface (Sort + Filters + Event Types) ──────────────
+        item {
+            Surface(
+                color = SurfaceDark,
+                tonalElevation = 2.dp
+            ) {
+                Column {
+                    // ── Sort row (same style as Filters / Event Types) ──
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        Box {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showSortMenu = true }
+                                    .padding(vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "Sort",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = TextPrimary
+                                )
                                 Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { showSortMenu = true }
-                                        .padding(vertical = 10.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Text(
-                                        "Sort",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = TextPrimary
+                                        state.sortOrder.label,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = TextSecondary
                                     )
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Text(
-                                            state.sortOrder.label,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = TextSecondary
-                                        )
-                                        Icon(
-                                            imageVector = Icons.Filled.KeyboardArrowDown,
-                                            contentDescription = "Sort options",
-                                            tint = TextSecondary
-                                        )
-                                    }
-                                }
-                                DropdownMenu(
-                                    expanded = showSortMenu,
-                                    onDismissRequest = { showSortMenu = false },
-                                    containerColor = SurfaceDark
-                                ) {
-                                    RecordSortOrder.entries.forEach { order ->
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    order.label,
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = if (state.sortOrder == order) TextPrimary else TextSecondary,
-                                                    fontWeight = if (state.sortOrder == order) FontWeight.SemiBold else FontWeight.Normal
-                                                )
-                                            },
-                                            onClick = {
-                                                viewModel.setSortOrder(order)
-                                                showSortMenu = false
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        HorizontalDivider(color = SurfaceVariant.copy(alpha = 0.5f))
-
-                        // ── Collapsible Filters section ────────────────────
-                        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                            // Filters header row
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { filtersExpanded = !filtersExpanded }
-                                    .padding(vertical = 10.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    "Filters",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = TextPrimary
-                                )
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    if (!filtersExpanded) {
-                                        // Show current filter summary when collapsed
-                                        Text(
-                                            buildFilterSummary(state),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = TextSecondary
-                                        )
-                                    }
                                     Icon(
-                                        imageVector = if (filtersExpanded) Icons.Filled.KeyboardArrowUp
-                                                      else Icons.Filled.KeyboardArrowDown,
-                                        contentDescription = if (filtersExpanded) "Collapse" else "Expand",
+                                        imageVector = Icons.Filled.KeyboardArrowDown,
+                                        contentDescription = "Sort options",
                                         tint = TextSecondary
                                     )
                                 }
                             }
-
-                            if (filtersExpanded) {
-                                Column(
-                                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                ) {
-                                    Text("Lung Volume", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        FilterChip(
-                                            selected = state.filterLungVolume == "",
-                                            onClick = { viewModel.setLungVolumeFilter("") },
-                                            label = { Text("All", style = MaterialTheme.typography.bodySmall) },
-                                            modifier = Modifier.height(30.dp),
-                                            colors = FilterChipDefaults.filterChipColors(
-                                                selectedContainerColor = SurfaceVariant,
-                                                selectedLabelColor = TextPrimary
-                                            )
-                                        )
-                                        listOf("FULL", "PARTIAL", "EMPTY").forEach { vol ->
-                                            FilterChip(
-                                                selected = state.filterLungVolume == vol,
-                                                onClick = { viewModel.setLungVolumeFilter(vol) },
-                                                label = { Text(if (vol == "PARTIAL") "Half" else vol.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall) },
-                                                modifier = Modifier.height(30.dp),
-                                                colors = FilterChipDefaults.filterChipColors(
-                                                    selectedContainerColor = SurfaceVariant,
-                                                    selectedLabelColor = TextPrimary
-                                                )
-                                            )
-                                        }
-                                    }
-
-                                    Text("Prep Type", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        FilterChip(
-                                            selected = state.filterPrepType == "",
-                                            onClick = { viewModel.setPrepTypeFilter("") },
-                                            label = { Text("All", style = MaterialTheme.typography.bodySmall) },
-                                            modifier = Modifier.height(30.dp),
-                                            colors = FilterChipDefaults.filterChipColors(
-                                                selectedContainerColor = SurfaceVariant,
-                                                selectedLabelColor = TextPrimary
-                                            )
-                                        )
-                                        PrepType.entries.forEach { pt ->
-                                            FilterChip(
-                                                selected = state.filterPrepType == pt.name,
-                                                onClick = { viewModel.setPrepTypeFilter(pt.name) },
-                                                label = { Text(pt.displayName(), style = MaterialTheme.typography.bodySmall) },
-                                                modifier = Modifier.height(30.dp),
-                                                colors = FilterChipDefaults.filterChipColors(
-                                                    selectedContainerColor = SurfaceVariant,
-                                                    selectedLabelColor = TextPrimary
-                                                )
-                                            )
-                                        }
-                                    }
-
-                                    Text("Time of Day", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        FilterChip(
-                                            selected = state.filterTimeOfDay == "",
-                                            onClick = { viewModel.setTimeOfDayFilter("") },
-                                            label = { Text("All", style = MaterialTheme.typography.bodySmall) },
-                                            modifier = Modifier.height(30.dp),
-                                            colors = FilterChipDefaults.filterChipColors(
-                                                selectedContainerColor = SurfaceVariant,
-                                                selectedLabelColor = TextPrimary
-                                            )
-                                        )
-                                        TimeOfDay.entries.forEach { tod ->
-                                            FilterChip(
-                                                selected = state.filterTimeOfDay == tod.name,
-                                                onClick = { viewModel.setTimeOfDayFilter(tod.name) },
-                                                label = { Text(tod.displayName(), style = MaterialTheme.typography.bodySmall) },
-                                                modifier = Modifier.height(30.dp),
-                                                colors = FilterChipDefaults.filterChipColors(
-                                                    selectedContainerColor = SurfaceVariant,
-                                                    selectedLabelColor = TextPrimary
-                                                )
-                                            )
-                                        }
-                                    }
-
-                                    Text("Posture", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        FilterChip(
-                                            selected = state.filterPosture == "",
-                                            onClick = { viewModel.setPostureFilter("") },
-                                            label = { Text("All", style = MaterialTheme.typography.bodySmall) },
-                                            modifier = Modifier.height(30.dp),
-                                            colors = FilterChipDefaults.filterChipColors(
-                                                selectedContainerColor = SurfaceVariant,
-                                                selectedLabelColor = TextPrimary
-                                            )
-                                        )
-                                        Posture.entries.forEach { pos ->
-                                            FilterChip(
-                                                selected = state.filterPosture == pos.name,
-                                                onClick = { viewModel.setPostureFilter(pos.name) },
-                                                label = { Text(pos.displayName(), style = MaterialTheme.typography.bodySmall) },
-                                                modifier = Modifier.height(30.dp),
-                                                colors = FilterChipDefaults.filterChipColors(
-                                                    selectedContainerColor = SurfaceVariant,
-                                                    selectedLabelColor = TextPrimary
-                                                )
-                                            )
-                                        }
-                                    }
-
-                                    Text("Audio", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        FilterChip(
-                                            selected = state.filterAudio == "",
-                                            onClick = { viewModel.setAudioFilter("") },
-                                            label = { Text("All", style = MaterialTheme.typography.bodySmall) },
-                                            modifier = Modifier.height(30.dp),
-                                            colors = FilterChipDefaults.filterChipColors(
-                                                selectedContainerColor = SurfaceVariant,
-                                                selectedLabelColor = TextPrimary
-                                            )
-                                        )
-                                        AudioSetting.entries.forEach { audio ->
-                                            FilterChip(
-                                                selected = state.filterAudio == audio.name,
-                                                onClick = { viewModel.setAudioFilter(audio.name) },
-                                                label = { Text(audio.displayName(), style = MaterialTheme.typography.bodySmall) },
-                                                modifier = Modifier.height(30.dp),
-                                                colors = FilterChipDefaults.filterChipColors(
-                                                    selectedContainerColor = SurfaceVariant,
-                                                    selectedLabelColor = TextPrimary
-                                                )
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            HorizontalDivider(color = SurfaceVariant.copy(alpha = 0.5f))
-
-                            // ── Collapsible Event Types section ────────────
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { eventTypesExpanded = !eventTypesExpanded }
-                                    .padding(vertical = 10.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                            DropdownMenu(
+                                expanded = showSortMenu,
+                                onDismissRequest = { showSortMenu = false },
+                                containerColor = SurfaceDark
                             ) {
-                                Text(
-                                    "Event Types",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = TextPrimary
-                                )
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    if (!eventTypesExpanded) {
-                                        // Show current event type summary when collapsed
-                                        Text(
-                                            buildEventTypeSummary(state),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = TextSecondary
-                                        )
-                                    }
-                                    Icon(
-                                        imageVector = if (eventTypesExpanded) Icons.Filled.KeyboardArrowUp
-                                                      else Icons.Filled.KeyboardArrowDown,
-                                        contentDescription = if (eventTypesExpanded) "Collapse" else "Expand",
-                                        tint = TextSecondary
-                                    )
-                                }
-                            }
-
-                            if (eventTypesExpanded) {
-                                Column(
-                                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                ) {
-                                    // Select All / Deselect All
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.End
-                                    ) {
-                                        val allSelected = ApneaEventType.ALL
-                                            .all { state.selectedEventTypes.contains(it.tableTypeValue) }
-                                        TextButton(
-                                            onClick = {
-                                                if (allSelected) viewModel.clearAllEventTypes()
-                                                else viewModel.selectAllEventTypes()
-                                            },
-                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-                                        ) {
+                                RecordSortOrder.entries.forEach { order ->
+                                    DropdownMenuItem(
+                                        text = {
                                             Text(
-                                                if (allSelected) "Deselect All" else "Select All",
+                                                order.label,
                                                 style = MaterialTheme.typography.bodySmall,
-                                                color = TextSecondary
+                                                color = if (state.sortOrder == order) TextPrimary else TextSecondary,
+                                                fontWeight = if (state.sortOrder == order) FontWeight.SemiBold else FontWeight.Normal
                                             )
+                                        },
+                                        onClick = {
+                                            viewModel.setSortOrder(order)
+                                            showSortMenu = false
                                         }
-                                    }
-
-                                    ApneaEventType.ALL.chunked(2).forEach { rowItems ->
-                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                            rowItems.forEach { eventType ->
-                                                FilterChip(
-                                                    selected = state.selectedEventTypes.contains(eventType.tableTypeValue),
-                                                    onClick = { viewModel.toggleEventType(eventType.tableTypeValue) },
-                                                    label = { Text(eventType.label, style = MaterialTheme.typography.bodySmall) },
-                                                    modifier = Modifier.weight(1f).height(30.dp),
-                                                    colors = FilterChipDefaults.filterChipColors(
-                                                        selectedContainerColor = SurfaceVariant,
-                                                        selectedLabelColor = TextPrimary
-                                                    )
-                                                )
-                                            }
-                                            if (rowItems.size == 1) Spacer(modifier = Modifier.weight(1f))
-                                        }
-                                    }
+                                    )
                                 }
                             }
                         }
                     }
-                }
-            }
 
-            // ── Progress chart (shown only when exactly one event type selected) ──
-            state.chartPoints?.let { points ->
-                if (points.isNotEmpty()) {
-                    item {
-                        ApneaProgressChart(
-                            points = points,
-                            yLabel = state.chartYLabel,
+                    HorizontalDivider(color = SurfaceVariant.copy(alpha = 0.5f))
+
+                    // ── Collapsible Filters section ────────────────────
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        // Filters header row
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                        )
-                    }
-                }
-            }
-
-            // ── Record count summary ───────────────────────────────────────
-            item {
-                if (!state.isInitialLoad && !state.isLoading) {
-                    Text(
-                        text = if (state.records.isEmpty()) "No records match the current filters."
-                               else "${state.records.size} records",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = TextSecondary,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
-                }
-            }
-
-            // ── Record rows ────────────────────────────────────────────────
-            if (state.isInitialLoad || state.isLoading) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(color = TextSecondary)
-                    }
-                }
-            } else {
-                itemsIndexed(state.records) { _, record ->
-                    AllRecordsRow(
-                        record = record,
-                        onClick = {
-                            navController.navigate(WagsRoutes.apneaRecordDetail(record.recordId))
+                                .clickable { filtersExpanded = !filtersExpanded }
+                                .padding(vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Filters",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextPrimary
+                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                if (!filtersExpanded) {
+                                    // Show current filter summary when collapsed
+                                    Text(
+                                        buildFilterSummary(state),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = TextSecondary
+                                    )
+                                }
+                                Icon(
+                                    imageVector = if (filtersExpanded) Icons.Filled.KeyboardArrowUp
+                                                  else Icons.Filled.KeyboardArrowDown,
+                                    contentDescription = if (filtersExpanded) "Collapse" else "Expand",
+                                    tint = TextSecondary
+                                )
+                            }
                         }
+
+                        if (filtersExpanded) {
+                            Column(
+                                modifier = Modifier.padding(bottom = 16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                // Lung Volume
+                                FilterRow(label = "Lung Volume") {
+                                    FilterChip(
+                                        selected = state.filterLungVolume == "",
+                                        onClick = { viewModel.setLungVolumeFilter("") },
+                                        label = { Text("All", style = MaterialTheme.typography.labelSmall) }
+                                    )
+                                    listOf("FULL", "PARTIAL", "EMPTY").forEach { lv ->
+                                        FilterChip(
+                                            selected = state.filterLungVolume == lv,
+                                            onClick = { viewModel.setLungVolumeFilter(lv) },
+                                            label = { Text(if (lv == "PARTIAL") "Half" else lv.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelSmall) }
+                                        )
+                                    }
+                                }
+
+                                // Prep Type
+                                FilterRow(label = "Prep") {
+                                    FilterChip(
+                                        selected = state.filterPrepType == "",
+                                        onClick = { viewModel.setPrepTypeFilter("") },
+                                        label = { Text("All", style = MaterialTheme.typography.labelSmall) }
+                                    )
+                                    PrepType.entries.forEach { pt ->
+                                        FilterChip(
+                                            selected = state.filterPrepType == pt.name,
+                                            onClick = { viewModel.setPrepTypeFilter(pt.name) },
+                                            label = { Text(pt.displayName(), style = MaterialTheme.typography.labelSmall) }
+                                        )
+                                    }
+                                }
+
+                                // Time of Day
+                                FilterRow(label = "Time of Day") {
+                                    FilterChip(
+                                        selected = state.filterTimeOfDay == "",
+                                        onClick = { viewModel.setTimeOfDayFilter("") },
+                                        label = { Text("All", style = MaterialTheme.typography.labelSmall) }
+                                    )
+                                    TimeOfDay.entries.forEach { tod ->
+                                        FilterChip(
+                                            selected = state.filterTimeOfDay == tod.name,
+                                            onClick = { viewModel.setTimeOfDayFilter(tod.name) },
+                                            label = { Text(tod.displayName(), style = MaterialTheme.typography.labelSmall) }
+                                        )
+                                    }
+                                }
+
+                                // Posture
+                                FilterRow(label = "Posture") {
+                                    FilterChip(
+                                        selected = state.filterPosture == "",
+                                        onClick = { viewModel.setPostureFilter("") },
+                                        label = { Text("All", style = MaterialTheme.typography.labelSmall) }
+                                    )
+                                    Posture.entries.forEach { pos ->
+                                        FilterChip(
+                                            selected = state.filterPosture == pos.name,
+                                            onClick = { viewModel.setPostureFilter(pos.name) },
+                                            label = { Text(pos.displayName(), style = MaterialTheme.typography.labelSmall) }
+                                        )
+                                    }
+                                }
+
+                                // Audio
+                                FilterRow(label = "Audio") {
+                                    FilterChip(
+                                        selected = state.filterAudio == "",
+                                        onClick = { viewModel.setAudioFilter("") },
+                                        label = { Text("All", style = MaterialTheme.typography.labelSmall) }
+                                    )
+                                    AudioSetting.entries.forEach { aud ->
+                                        FilterChip(
+                                            selected = state.filterAudio == aud.name,
+                                            onClick = { viewModel.setAudioFilter(aud.name) },
+                                            label = { Text(aud.displayName(), style = MaterialTheme.typography.labelSmall) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = SurfaceVariant.copy(alpha = 0.5f))
+
+                    // ── Collapsible Event Types section ────────────────
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { eventTypesExpanded = !eventTypesExpanded }
+                                .padding(vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Event Types",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextPrimary
+                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                if (!eventTypesExpanded) {
+                                    Text(
+                                        buildEventTypeSummary(state),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = TextSecondary
+                                    )
+                                }
+                                Icon(
+                                    imageVector = if (eventTypesExpanded) Icons.Filled.KeyboardArrowUp
+                                                  else Icons.Filled.KeyboardArrowDown,
+                                    contentDescription = if (eventTypesExpanded) "Collapse" else "Expand",
+                                    tint = TextSecondary
+                                )
+                            }
+                        }
+
+                        if (eventTypesExpanded) {
+                            @OptIn(ExperimentalLayoutApi::class)
+                            FlowRow(
+                                modifier = Modifier.padding(bottom = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                ApneaEventType.ALL.forEach { type ->
+                                    val isSelected = state.selectedEventTypes.contains(type.tableTypeValue)
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = { viewModel.toggleEventType(type.tableTypeValue) },
+                                        label = { Text(type.label, style = MaterialTheme.typography.labelSmall) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Progress chart section ─────────────────────────────────────
+        if (state.records.size >= 2) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        "Progress",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = TextPrimary,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    AllRecordsProgressChart(
+                        records = state.records,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
                     )
                 }
             }
+        }
 
-            // ── End of list indicator ──────────────────────────────────────
-            if (state.records.isNotEmpty() && !state.isLoading) {
-                item {
-                    Text(
-                        "— End of records —",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondary,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 16.dp)
-                            .wrapContentWidth(Alignment.CenterHorizontally)
-                    )
+        // ── Record count header ────────────────────────────────────────
+        item {
+            if (!state.isInitialLoad && !state.isLoading) {
+                Text(
+                    text = if (state.records.isEmpty()) "No records match the current filters."
+                           else "${state.records.size} records",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TextSecondary,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+        }
+
+        // ── Record rows ────────────────────────────────────────────────
+        if (state.isInitialLoad || state.isLoading) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = TextSecondary)
                 }
+            }
+        } else {
+            itemsIndexed(state.records) { _, record ->
+                AllRecordsRow(
+                    record = record,
+                    onClick = {
+                        navController.navigate(WagsRoutes.apneaRecordDetail(record.recordId))
+                    }
+                )
+            }
+        }
+
+        // ── End of list indicator ──────────────────────────────────────
+        if (state.records.isNotEmpty() && !state.isLoading) {
+            item {
+                Text(
+                    "— End of records —",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondary,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp)
+                        .wrapContentWidth(Alignment.CenterHorizontally)
+                )
             }
         }
     }
@@ -540,292 +453,155 @@ private fun buildEventTypeSummary(state: AllApneaRecordsUiState): String {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * A simple Canvas-based line chart that plots [points] (oldest→newest left→right).
- * The Y axis is labelled with [yLabel].
- *
- * For "Hold duration" the Y values are in milliseconds; we display them as
- * human-readable time strings on the axis.
+ * A simple line chart showing hold duration progress over the current filtered list.
  */
 @Composable
-private fun ApneaProgressChart(
-    points: List<ChartPoint>,
-    yLabel: String,
+private fun AllRecordsProgressChart(
+    records: List<ApneaRecordEntity>,
     modifier: Modifier = Modifier
 ) {
-    if (points.size < 2) {
-        // Single point — just show a note
-        Card(
-            modifier = modifier,
-            colors = CardDefaults.cardColors(containerColor = SurfaceDark)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "Not enough data to plot a chart yet.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
-                )
-            }
+    // We want to show progress in chronological order (oldest to newest)
+    // The list is usually newest first, so we reverse it for the chart.
+    val chartRecords = remember(records) { records.reversed() }
+    val durations = chartRecords.map { it.durationMs.toFloat() / 1000f }
+    
+    if (durations.isEmpty()) return
+
+    val maxDuration = durations.maxOrNull() ?: 1f
+    val minDuration = durations.minOrNull() ?: 0f
+    val range = (maxDuration - minDuration).coerceAtLeast(1f)
+
+    Canvas(modifier = modifier) {
+        val width = size.width
+        val height = size.height
+        val spacing = width / (durations.size - 1).coerceAtLeast(1)
+
+        val path = Path()
+        durations.forEachIndexed { index, duration ->
+            val x = index * spacing
+            val normalized = (duration - minDuration) / range
+            val y = height - (normalized * height)
+            
+            if (index == 0) path.moveTo(x, y)
+            else path.lineTo(x, y)
         }
-        return
-    }
 
-    val isDuration = yLabel == "Hold duration" || yLabel == "Total hold time"
-
-    val lineColor   = TextPrimary
-    val dotColor    = TextPrimary
-    val axisColor   = TextSecondary
-    val gridColor   = SurfaceVariant.copy(alpha = 0.5f)
-    val labelColor  = TextSecondary
-
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = SurfaceDark)
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            // Title row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "Progress",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = TextPrimary
-                )
-                Text(
-                    yLabel,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextSecondary
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            val minY = points.minOf { it.y }
-            val maxY = points.maxOf { it.y }
-            val yRange = (maxY - minY).coerceAtLeast(1f)
-
-            val minX = points.first().x
-            val maxX = points.last().x
-            val xRange = (maxX - minX).coerceAtLeast(1L).toFloat()
-
-            Canvas(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(180.dp)
-            ) {
-                val leftPad   = 64f
-                val rightPad  = 16f
-                val topPad    = 16f
-                val bottomPad = 32f
-
-                val chartW = size.width  - leftPad - rightPad
-                val chartH = size.height - topPad  - bottomPad
-
-                // ── Grid lines (4 horizontal) ──────────────────────────────
-                val gridSteps = 4
-                for (i in 0..gridSteps) {
-                    val fraction = i.toFloat() / gridSteps
-                    val y = topPad + chartH * (1f - fraction)
-                    drawLine(
-                        color = gridColor,
-                        start = Offset(leftPad, y),
-                        end   = Offset(leftPad + chartW, y),
-                        strokeWidth = 1f
-                    )
-                    // Y axis label
-                    val yVal = minY + yRange * fraction
-                    val labelText = if (isDuration) formatChartMs(yVal.toLong()) else "%.1f".format(yVal)
-                    drawContext.canvas.nativeCanvas.drawText(
-                        labelText,
-                        leftPad - 4f,
-                        y + 4f,
-                        android.graphics.Paint().apply {
-                            color     = labelColor.toArgb()
-                            textSize  = 22f
-                            textAlign = android.graphics.Paint.Align.RIGHT
-                            isAntiAlias = true
-                        }
-                    )
-                }
-
-                // ── X axis ────────────────────────────────────────────────
-                drawLine(
-                    color = axisColor,
-                    start = Offset(leftPad, topPad + chartH),
-                    end   = Offset(leftPad + chartW, topPad + chartH),
-                    strokeWidth = 1.5f
-                )
-
-                // ── Line path ─────────────────────────────────────────────
-                val path = Path()
-                points.forEachIndexed { idx, pt ->
-                    val px = leftPad + ((pt.x - minX).toFloat() / xRange) * chartW
-                    val py = topPad  + chartH * (1f - (pt.y - minY) / yRange)
-                    if (idx == 0) path.moveTo(px, py) else path.lineTo(px, py)
-                }
-                drawPath(
-                    path  = path,
-                    color = lineColor,
-                    style = Stroke(
-                        width     = 2.5f,
-                        cap       = StrokeCap.Round,
-                        join      = StrokeJoin.Round
-                    )
-                )
-
-                // ── Dots ──────────────────────────────────────────────────
-                points.forEach { pt ->
-                    val px = leftPad + ((pt.x - minX).toFloat() / xRange) * chartW
-                    val py = topPad  + chartH * (1f - (pt.y - minY) / yRange)
-                    drawCircle(color = dotColor, radius = 4f, center = Offset(px, py))
-                    drawCircle(color = BackgroundDark, radius = 2f, center = Offset(px, py))
-                }
-
-                // ── X axis date labels (first and last) ───────────────────
-                val dateFmt = SimpleDateFormat("MMM d", Locale.getDefault())
-                val firstLabel = dateFmt.format(Date(points.first().x))
-                val lastLabel  = dateFmt.format(Date(points.last().x))
-                val xLabelY    = topPad + chartH + 22f
-                val paint = android.graphics.Paint().apply {
-                    color       = labelColor.toArgb()
-                    textSize    = 22f
-                    isAntiAlias = true
-                }
-                drawContext.canvas.nativeCanvas.drawText(firstLabel, leftPad, xLabelY, paint.apply {
-                    textAlign = android.graphics.Paint.Align.LEFT
-                })
-                drawContext.canvas.nativeCanvas.drawText(lastLabel, leftPad + chartW, xLabelY, paint.apply {
-                    textAlign = android.graphics.Paint.Align.RIGHT
-                })
-            }
+        drawPath(
+            path = path,
+            color = EcgCyan,
+            style = Stroke(
+                width = 2.dp.toPx(),
+                cap = StrokeCap.Round,
+                join = StrokeJoin.Round
+            )
+        )
+        
+        // Draw dots for each point
+        durations.forEachIndexed { index, duration ->
+            val x = index * spacing
+            val normalized = (duration - minDuration) / range
+            val y = height - (normalized * height)
+            drawCircle(
+                color = EcgCyan,
+                radius = 3.dp.toPx(),
+                center = Offset(x, y)
+            )
         }
     }
 }
 
-/** Format milliseconds as a compact time string for chart axis labels. */
-private fun formatChartMs(ms: Long): String {
-    val totalSecs = ms / 1000L
-    val mins = totalSecs / 60
-    val secs = totalSecs % 60
-    return if (mins > 0) "${mins}m${secs}s" else "${secs}s"
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Components
+// ─────────────────────────────────────────────────────────────────────────────
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Row composable for a single record in the All Records list
-// ─────────────────────────────────────────────────────────────────────────────
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FilterRow(label: String, chips: @Composable FlowRowScope.() -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) { chips() }
+    }
+}
 
 @Composable
 private fun AllRecordsRow(
     record: ApneaRecordEntity,
     onClick: () -> Unit
 ) {
-    val dateStr = remember(record.timestamp) {
-        SimpleDateFormat("MMM d, yyyy  HH:mm", Locale.getDefault()).format(Date(record.timestamp))
-    }
-    val eventLabel = remember(record.tableType) {
-        when (record.tableType) {
-            null                       -> "Free Hold"
-            "O2"                       -> "O₂ Table"
-            "CO2"                      -> "CO₂ Table"
-            "PROGRESSIVE_O2"           -> "Progressive O₂"
-            "MIN_BREATH"               -> "Min Breath"
-            "WONKA_FIRST_CONTRACTION"  -> "Wonka: Contraction"
-            "WONKA_ENDURANCE"          -> "Wonka: Endurance"
-            else                       -> record.tableType
-        }
-    }
+    val sdf = remember { SimpleDateFormat("EEE, MMM d · HH:mm", Locale.getDefault()) }
+    val dateStr = remember(record.timestamp) { sdf.format(Date(record.timestamp)) }
 
-    Surface(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        color = Color.Transparent
+            .clickable { onClick() }
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                if (record.tableType != null) {
-                    // Table record: show table type as primary, duration as secondary
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Text(
-                        eventLabel,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = EcgCyan,
-                        fontWeight = FontWeight.SemiBold
+                        text = formatAllRecordsMs(record.durationMs),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
                     )
-                    Text(
-                        if (record.tableType == "MIN_BREATH" || record.tableType == "O2" || record.tableType == "CO2")
-                            "Total hold time: ${formatAllRecordsMs(record.durationMs)}"
-                        else
-                            "Longest hold: ${formatAllRecordsMs(record.durationMs)}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondary
-                    )
-                    if (record.audio == "GUIDED" && !record.guidedAudioName.isNullOrBlank()) {
+                    Surface(
+                        color = SurfaceVariant.copy(alpha = 0.3f),
+                        shape = MaterialTheme.shapes.extraSmall
+                    ) {
                         Text(
-                            "🎧 ${record.guidedAudioName}",
+                            text = record.tableType?.replace("_", " ") ?: "FREE HOLD",
                             style = MaterialTheme.typography.labelSmall,
                             color = TextSecondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
-                } else {
-                    // Free hold: show duration as primary
-                    Text(
-                        formatAllRecordsMs(record.durationMs),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = EcgCyan,
-                        fontWeight = FontWeight.SemiBold
-                    )
                 }
-                if (record.tableType == null && record.audio == "GUIDED" && !record.guidedAudioName.isNullOrBlank()) {
-                    Text(
-                        "🎧 ${record.guidedAudioName}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    dateStr,
-                    style = MaterialTheme.typography.labelSmall,
+                    text = dateStr,
+                    style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary
                 )
-            }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(horizontalAlignment = Alignment.End) {
-                    if (record.tableType == null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (record.minHrBpm > 0) {
                         Text(
-                            eventLabel,
-                            style = MaterialTheme.typography.labelMedium,
+                            "Min HR: ${record.minHrBpm.toInt()}",
+                            style = MaterialTheme.typography.labelSmall,
                             color = TextSecondary
                         )
                     }
-                    Text(
-                        "${if (record.lungVolume == "PARTIAL") "Half" else record.lungVolume.lowercase().replaceFirstChar { it.uppercase() }}  ·  ${record.prepType.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }}  ·  ${record.posture.lowercase().replaceFirstChar { it.uppercase() }}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondary.copy(alpha = 0.7f)
-                    )
+                    if (record.lowestSpO2 != null && record.lowestSpO2 > 0) {
+                        Text(
+                            "SpO₂: ${record.lowestSpO2}%",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextSecondary
+                        )
+                    }
                 }
-                Text("›", style = MaterialTheme.typography.titleMedium, color = TextSecondary)
+                Text(
+                    "${if (record.lungVolume == "PARTIAL") "Half" else record.lungVolume.lowercase().replaceFirstChar { it.uppercase() }}  ·  ${record.prepType.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }}  ·  ${record.posture.lowercase().replaceFirstChar { it.uppercase() }}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondary.copy(alpha = 0.7f)
+                )
             }
+            Text("›", style = MaterialTheme.typography.titleMedium, color = TextSecondary)
         }
     }
     HorizontalDivider(

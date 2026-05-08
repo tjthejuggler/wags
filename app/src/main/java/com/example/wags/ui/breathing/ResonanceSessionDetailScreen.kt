@@ -221,7 +221,7 @@ private fun SessionDetailContent(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "%.2f".format(session.meanCoherenceRatio),
+                    text = "%.2f".format(session.meanCoherenceRatio.coerceIn(0f, 100f)),
                     style = MaterialTheme.typography.displayLarge.copy(
                         fontSize = 56.sp,
                         fontWeight = FontWeight.Bold
@@ -294,8 +294,8 @@ private fun SessionDetailContent(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    MetricChip("Mean Coherence", "%.2f".format(session.meanCoherenceRatio))
-                    MetricChip("Max Coherence", "%.2f".format(session.maxCoherenceRatio))
+                    MetricChip("Mean Coherence", "%.2f".format(session.meanCoherenceRatio.coerceIn(0f, 100f)))
+                    MetricChip("Max Coherence", "%.2f".format(session.maxCoherenceRatio.coerceIn(0f, 100f)))
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -528,7 +528,7 @@ private fun parseCoherenceHistory(json: String): List<Float> {
     if (json.isBlank() || json == "[]") return emptyList()
     return try {
         val arr = JSONArray(json)
-        (0 until arr.length()).map { arr.getDouble(it).toFloat() }
+        (0 until arr.length()).map { arr.getDouble(it).toFloat().coerceIn(0f, 100f) }
     } catch (_: Exception) {
         emptyList()
     }
