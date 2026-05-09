@@ -338,6 +338,7 @@ fun SettingsScreen(
                     rapidHrChangeHabit      = state.rapidHrChangeHabit,
                     progressiveO2Habit      = state.progressiveO2Habit,
                     minBreathHabit          = state.minBreathHabit,
+                    musicHabit              = state.musicHabit,
                     onSelectHabit           = { slot, entry -> viewModel.selectHabit(slot, entry) },
                     onClearHabit            = { slot -> viewModel.clearHabit(slot) },
                     onRefresh               = { viewModel.loadHabits() }
@@ -693,6 +694,7 @@ private fun TailAppIntegrationCard(
     rapidHrChangeHabit: HabitSlotSelection,
     progressiveO2Habit: HabitSlotSelection,
     minBreathHabit: HabitSlotSelection,
+    musicHabit: HabitSlotSelection,
     onSelectHabit: (Slot, HabitEntry) -> Unit,
     onClearHabit: (Slot) -> Unit,
     onRefresh: () -> Unit
@@ -759,7 +761,8 @@ private fun TailAppIntegrationCard(
                 Slot.HRV_READINESS       to hrvReadinessHabit,
                 Slot.RESONANCE_BREATHING to resonanceBreathingHabit,
                 Slot.MEDITATION          to meditationHabit,
-                Slot.RAPID_HR_CHANGE     to rapidHrChangeHabit
+                Slot.RAPID_HR_CHANGE     to rapidHrChangeHabit,
+                Slot.MUSIC               to musicHabit
             )
 
             slots.forEachIndexed { index, (slot, selection) ->

@@ -1,16 +1,26 @@
-## ADR — Morning Readiness Detail charts are phase-pure (2026-05-06)
+# ADR: Music Tail Habit Integration with Time-of-Day Deduplication
 
-### Context
-On `MorningReadinessDetailScreen`, the per-session "Heart Rate" and "Rolling HRV (RMSSD)" cards were rendering both supine and standing telemetry on a single line, with the prominent **min/avg/max** chips computed over the full mixed series. Standing telemetry has higher HR and lower RMSSD, so the chip values silently differed between days where the user did vs skipped the standing portion — making day-to-day comparison meaningless. The DB schema (`MorningReadinessEntity`) was already correctly phase-segregated and the history-trend charts in `MorningReadinessHistoryViewModel` already plotted only `supineRhr` / `supineRmssdMs`, so the bug was purely in the detail-screen chart presentation layer.
+**Date:** 2026-05-09
+**Status:** Accepted
 
-### Decision
-Make the primary "Heart Rate" and "Rolling HRV (RMSSD)" cards on the morning readiness detail screen **strictly supine-only**. When the user actually completed the standing portion, render two additional **smaller (compact)** cards below the orthostatic stats card titled "Heart Rate (standing)" and "Rolling HRV (standing)" containing only the standing-phase telemetry. `TelemetryChartCard` and `TelemetryLineChart` are now phase-pure: the in-chart stand-marker / "Supine→Stand avg" legend / X-axis phase labels were removed. The supine→stand transition narrative lives entirely in `OrthostasisStatsCard` which already shows pre-stand HR, peak stand HR, HR rise, and HRV change.
+## Context
+We want to add a new Tail habit integration for "music" — when an apnea session (of any kind: free hold, table training, progressive O2, min breath, or advanced) has its audio setting set to MUSIC, we want to increment the corresponding Tail habit.
 
-### Consequences
-- Day-to-day comparison of the displayed avg/min/max HR & HRV is now **consistent regardless of whether the standing portion was performed** — the user's original complaint is resolved.
-- No DB migration required: historical readings render correctly on the new layout because the change is presentation-only (telemetry has always been tagged with `phase = "SUPINE" | "STANDING"`).
-- The orphan `HELP_STAND_MARKER_*` constants and the `standFraction` / `showStandingLabel` parameters are removed.
-- Score calculation, history trend charts, dashboard "Today's Readiness" card, and `ReadingDetailCard` were already supine-anchored and were untouched.
+The complication: we only want to send the increment signal once per TimeOfDay bucket (Morning/Day/Night) per calendar day. So even if a user does 3 drills with music in the Morning, we only increment once. The maximum possible increments per day is 3.
 
-### File touched
-- `app/src/main/java/com/example/wags/ui/morning/MorningReadinessDetailScreen.kt`
+## Decision
+- Added `Slot.MUSIC` to `HabitIntegrationRepository.Slot` enum with keys `habit_id_music` / `habit_name_music` and label "Music Session".
+- Added `sendMusicHabitIncrementIfNeeded(audioSetting: String, timeOfDay: String)` method to `HabitIntegrationRepository` that:
+  1. Checks if `audioSetting == AudioSetting.MUSIC.name` (skips if not)
+  2. Parses `timeOfDay` string into `TimeOfDay` enum (skips if invalid)
+  3. Checks a SharedPreferences boolean key `habit_music_sent_{TOD}_{yyyy-MM-dd}` — if already true, skips
+  4. Marks the key as true before firing the broadcast (prevents double-fire on crash)
+  5. Calls `sendHabitIncrement(Slot.MUSIC)`
+- The "effective audio" logic (MUSIC with no tracks played → SILENCE) is handled at each call site before calling the method.
+- Called from all 5 apnea completion points: ApneaViewModel.stopFreeHold, ApneaViewModel.onStateChanged (TABLE COMPLETE), FreeHoldActiveViewModel.stopFreeHold, MinBreathViewModel.saveSession, ProgressiveO2ViewModel.saveSession, AdvancedApneaViewModel.saveCompletedSession.
+- Updated SettingsViewModel (HabitPartialState, copySlot, buildInitialHabitState) and SettingsScreen (TailAppIntegrationCard) to expose the new MUSIC slot in the UI.
+
+## Consequences
+- Maximum 3 music habit increments per day (one per TimeOfDay bucket).
+- SharedPreferences keys accumulate daily but are tiny; old dates are simply never true-checked again.
+- The deduplication is local to this device; if the user uses WAGS on another device, it could send another increment for the same TimeOfDay. This is acceptable for now.

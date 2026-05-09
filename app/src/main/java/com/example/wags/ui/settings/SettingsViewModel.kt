@@ -64,6 +64,7 @@ data class SettingsUiState(
     val rapidHrChangeHabit: HabitSlotSelection = HabitSlotSelection(),
     val progressiveO2Habit: HabitSlotSelection = HabitSlotSelection(),
     val minBreathHabit: HabitSlotSelection = HabitSlotSelection(),
+    val musicHabit: HabitSlotSelection = HabitSlotSelection(),
     // ── Spotify account ───────────────────────────────────────────────────────
     val spotifyConnected: Boolean = false,
     // ── Data Export / Import ────────────────────────────────────────────────────
@@ -131,7 +132,8 @@ class SettingsViewModel @Inject constructor(
             meditationHabit         = habit.meditationHabit,
             rapidHrChangeHabit      = habit.rapidHrChangeHabit,
             progressiveO2Habit      = habit.progressiveO2Habit,
-            minBreathHabit          = habit.minBreathHabit
+            minBreathHabit          = habit.minBreathHabit,
+            musicHabit              = habit.musicHabit
         )
     }.combine(_exportImportState) { state, exportImport ->
         state.copy(
@@ -320,7 +322,8 @@ class SettingsViewModel @Inject constructor(
         meditationHabit         = slotSelection(Slot.MEDITATION),
         rapidHrChangeHabit      = slotSelection(Slot.RAPID_HR_CHANGE),
         progressiveO2Habit      = slotSelection(Slot.PROGRESSIVE_O2),
-        minBreathHabit          = slotSelection(Slot.MIN_BREATH)
+        minBreathHabit          = slotSelection(Slot.MIN_BREATH),
+        musicHabit              = slotSelection(Slot.MUSIC)
     )
 }
 
@@ -339,7 +342,8 @@ private data class HabitPartialState(
     val meditationHabit: HabitSlotSelection = HabitSlotSelection(),
     val rapidHrChangeHabit: HabitSlotSelection = HabitSlotSelection(),
     val progressiveO2Habit: HabitSlotSelection = HabitSlotSelection(),
-    val minBreathHabit: HabitSlotSelection = HabitSlotSelection()
+    val minBreathHabit: HabitSlotSelection = HabitSlotSelection(),
+    val musicHabit: HabitSlotSelection = HabitSlotSelection()
 ) {
     fun copySlot(slot: HabitIntegrationRepository.Slot, value: HabitSlotSelection) = when (slot) {
         HabitIntegrationRepository.Slot.FREE_HOLD           -> copy(freeHoldHabit = value)
@@ -352,6 +356,7 @@ private data class HabitPartialState(
         HabitIntegrationRepository.Slot.RAPID_HR_CHANGE     -> copy(rapidHrChangeHabit = value)
         HabitIntegrationRepository.Slot.PROGRESSIVE_O2      -> copy(progressiveO2Habit = value)
         HabitIntegrationRepository.Slot.MIN_BREATH          -> copy(minBreathHabit = value)
+        HabitIntegrationRepository.Slot.MUSIC               -> copy(musicHabit = value)
     }
 }
 

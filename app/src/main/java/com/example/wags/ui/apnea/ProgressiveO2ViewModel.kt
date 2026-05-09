@@ -657,6 +657,9 @@ class ProgressiveO2ViewModel @Inject constructor(
         // Fire Tail habit for every completed Progressive O2 session
         try { habitRepo.sendHabitIncrement(Slot.PROGRESSIVE_O2) } catch (_: Exception) {}
 
+        // Fire music habit if applicable (once per TimeOfDay per day)
+        try { habitRepo.sendMusicHabitIncrementIfNeeded(effectiveAudio, timeOfDay) } catch (_: Exception) {}
+
         // 2b. Save song log (Spotify tracks played during session)
         if (recordId > 0 && trackedSongs.isNotEmpty()) {
             apneaRepository.saveSongLog(recordId, trackedSongs)

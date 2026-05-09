@@ -5,10 +5,15 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
 import android.util.Log
+import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.HabitEntry
+import com.example.wags.domain.model.TimeOfDay
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
@@ -25,6 +30,7 @@ import javax.inject.Singleton
  *  • [Slot.HRV_READINESS]       – HRV Readiness session completion
  *  • [Slot.RESONANCE_BREATHING] – Resonance Breathing session stop
  *  • [Slot.MEDITATION]          – Meditation / NSDR session completion
+ *  • [Slot.MUSIC]               – Apnea session with music audio (once per TimeOfDay per day)
  *
  * The broadcast is:
  *  - **Explicit** (package + action set) — required for reliable delivery on API 26+
@@ -92,6 +98,11 @@ class HabitIntegrationRepository @Inject constructor(
             idKey   = "habit_id_min_breath",
             nameKey = "habit_name_min_breath",
             label   = "Min Breath"
+        ),
+        MUSIC(
+            idKey   = "habit_id_music",
+            nameKey = "habit_name_music",
+            label   = "Music Session"
         )
     }
 
@@ -156,6 +167,46 @@ class HabitIntegrationRepository @Inject constructor(
             .putString(slot.idKey,   "")
             .putString(slot.nameKey, "")
             .apply()
+    }
+
+    // ── Music habit with Time-of-Day deduplication ────────────────────────────
+
+    /**
+     * Attempts to increment the MUSIC habit slot.
+     *
+     * The increment is only sent if:
+     * 1. The session's [AudioSetting] is [AudioSetting.MUSIC] (and at least one
+     *    track actually played, so "MUSIC but nothing played" is treated as SILENCE).
+     * 2. No increment has already been sent for the same [TimeOfDay] bucket
+     *    (Morning / Day / Night) on the current calendar date.
+     *
+     * This means the maximum number of music-habit increments per day is 3
+     * (one per TimeOfDay bucket).
+     */
+    fun sendMusicHabitIncrementIfNeeded(audioSetting: String, timeOfDay: String) {
+        if (audioSetting != AudioSetting.MUSIC.name) {
+            Log.d(TAG, "sendMusicHabitIncrementIfNeeded: audio=$audioSetting, not MUSIC — skipping")
+            return
+        }
+
+        val tod = try { TimeOfDay.valueOf(timeOfDay) } catch (_: IllegalArgumentException) {
+            Log.w(TAG, "sendMusicHabitIncrementIfNeeded: unknown timeOfDay=$timeOfDay — skipping")
+            return
+        }
+
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+        val key = "habit_music_sent_${tod.name}_$today"
+
+        if (prefs.getBoolean(key, false)) {
+            Log.d(TAG, "sendMusicHabitIncrementIfNeeded: already sent for ${tod.name} on $today — skipping")
+            return
+        }
+
+        // Mark as sent *before* firing so a crash mid-broadcast can't cause a double-fire
+        prefs.edit().putBoolean(key, true).apply()
+
+        sendHabitIncrement(Slot.MUSIC)
+        Log.d(TAG, "sendMusicHabitIncrementIfNeeded: sent for ${tod.name} on $today")
     }
 
     // ── Broadcast trigger ─────────────────────────────────────────────────────

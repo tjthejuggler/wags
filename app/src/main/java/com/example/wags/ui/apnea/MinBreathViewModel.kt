@@ -694,6 +694,9 @@ class MinBreathViewModel @Inject constructor(
         // Fire Tail habit for every completed Min Breath session
         try { habitRepo.sendHabitIncrement(Slot.MIN_BREATH) } catch (_: Exception) {}
 
+        // Fire music habit if applicable (once per TimeOfDay per day)
+        try { habitRepo.sendMusicHabitIncrementIfNeeded(effectiveAudio, currentState.timeOfDay) } catch (_: Exception) {}
+
         // 2b. Save song log (Spotify tracks played during session)
         if (recordId > 0 && trackedSongs.isNotEmpty()) {
             apneaRepository.saveSongLog(recordId, trackedSongs)

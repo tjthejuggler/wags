@@ -571,6 +571,13 @@ class ApneaViewModel @Inject constructor(
                     saveCompletedSession()
                     // Signal the Habit app that a full O2/CO2 table session was completed
                     habitRepo.sendHabitIncrement(Slot.TABLE_TRAINING)
+                    val uiSnap = _uiState.value
+                    val tableEffectiveAudio = if (uiSnap.audio == AudioSetting.MUSIC && tableTracksPlayed.isEmpty()) {
+                        AudioSetting.SILENCE.name
+                    } else {
+                        uiSnap.audio.name
+                    }
+                    habitRepo.sendMusicHabitIncrementIfNeeded(tableEffectiveAudio, uiSnap.timeOfDay.name)
                 }
                 tableSessionCancelled = false
             }
@@ -1051,6 +1058,7 @@ class ApneaViewModel @Inject constructor(
         }
         // Signal the Habit app that a free breath hold was successfully completed
         habitRepo.sendHabitIncrement(Slot.FREE_HOLD)
+        habitRepo.sendMusicHabitIncrementIfNeeded(fhEffectiveAudio, state.timeOfDay.name)
         viewModelScope.launch {
             // Check broader PB categories BEFORE saving so queries compare against prior records only.
             val pbResult = apneaRepository.checkBroaderPersonalBest(

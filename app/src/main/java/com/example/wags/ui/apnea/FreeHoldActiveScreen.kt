@@ -740,6 +740,7 @@ class FreeHoldActiveViewModel @Inject constructor(
         }
         audioHapticEngine.vibrateHoldEnd()
         habitRepo.sendHabitIncrement(Slot.FREE_HOLD)
+        habitRepo.sendMusicHabitIncrementIfNeeded(audio, timeOfDay)
         viewModelScope.launch {
             // Check broader PB categories BEFORE saving so queries compare against prior records only.
             val pbResult = apneaRepository.checkBroaderPersonalBest(

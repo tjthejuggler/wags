@@ -69,6 +69,7 @@ class AdvancedApneaViewModel @Inject constructor(
     private val spotifyApiClient: SpotifyApiClient,
     private val spotifyAuthManager: SpotifyAuthManager,
     private val guidedAudioManager: GuidedAudioManager,
+    private val habitRepo: com.example.wags.data.ipc.HabitIntegrationRepository,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
@@ -397,6 +398,9 @@ class AdvancedApneaViewModel @Inject constructor(
             )
             sessionRepository.saveSession(entity)
         }
+
+        // Fire music habit if applicable (once per TimeOfDay per day)
+        try { habitRepo.sendMusicHabitIncrementIfNeeded(_uiState.value.audio, _uiState.value.timeOfDay) } catch (_: Exception) {}
     }
 
     override fun onCleared() {
