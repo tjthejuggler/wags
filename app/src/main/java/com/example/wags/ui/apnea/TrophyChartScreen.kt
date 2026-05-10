@@ -2,6 +2,7 @@ package com.example.wags.ui.apnea
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
+import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -52,8 +53,10 @@ fun TrophyChartScreen(
     // Settings popup
     if (state.showSettingsPopup) {
         TrophyChartSettingsDialog(
+            includeFreeHold = state.includeFreeHold,
             includeProgressiveO2 = state.includeProgressiveO2,
             includeMinBreath = state.includeMinBreath,
+            onSetFreeHold = { viewModel.setIncludeFreeHold(it) },
             onSetProgressiveO2 = { viewModel.setIncludeProgressiveO2(it) },
             onSetMinBreath = { viewModel.setIncludeMinBreath(it) },
             onDismiss = { viewModel.toggleSettingsPopup() }
@@ -148,22 +151,30 @@ fun TrophyChartScreen(
 
 @Composable
 private fun TrophyChartSettingsDialog(
+    includeFreeHold: Boolean,
     includeProgressiveO2: Boolean,
     includeMinBreath: Boolean,
+    onSetFreeHold: (Boolean) -> Unit,
     onSetProgressiveO2: (Boolean) -> Unit,
     onSetMinBreath: (Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
+
+    /** Returns false if turning this off would leave zero session types on. */
+    fun wouldLeaveNone(togglingOn: Boolean, currentOn: Int): Boolean =
+        !togglingOn && currentOn <= 1
+
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = SurfaceDark,
         title = {
-            Text("Include Drills", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+            Text("Include Sessions", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    "Free Hold is always included. Select additional drills that award trophies:",
+                    "Select session types to include in the chart. At least one must be on.",
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary
                 )
@@ -172,10 +183,35 @@ private fun TrophyChartSettingsDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Text("Free Hold", style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
+                    Switch(
+                        checked = includeFreeHold,
+                        onCheckedChange = { on ->
+                            val currentOn = listOf(includeFreeHold, includeProgressiveO2, includeMinBreath).count { it }
+                            if (wouldLeaveNone(on, currentOn)) {
+                                Toast.makeText(context, "At least one session type must be enabled", Toast.LENGTH_SHORT).show()
+                            } else {
+                                onSetFreeHold(on)
+                            }
+                        }
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text("Progressive O₂", style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
                     Switch(
                         checked = includeProgressiveO2,
-                        onCheckedChange = onSetProgressiveO2
+                        onCheckedChange = { on ->
+                            val currentOn = listOf(includeFreeHold, includeProgressiveO2, includeMinBreath).count { it }
+                            if (wouldLeaveNone(on, currentOn)) {
+                                Toast.makeText(context, "At least one session type must be enabled", Toast.LENGTH_SHORT).show()
+                            } else {
+                                onSetProgressiveO2(on)
+                            }
+                        }
                     )
                 }
                 Row(
@@ -186,7 +222,14 @@ private fun TrophyChartSettingsDialog(
                     Text("Min Breath", style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
                     Switch(
                         checked = includeMinBreath,
-                        onCheckedChange = onSetMinBreath
+                        onCheckedChange = { on ->
+                            val currentOn = listOf(includeFreeHold, includeProgressiveO2, includeMinBreath).count { it }
+                            if (wouldLeaveNone(on, currentOn)) {
+                                Toast.makeText(context, "At least one session type must be enabled", Toast.LENGTH_SHORT).show()
+                            } else {
+                                onSetMinBreath(on)
+                            }
+                        }
                     )
                 }
             }

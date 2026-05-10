@@ -32,6 +32,8 @@ data class TrophyChartUiState(
     val days: List<TrophyChartDay> = emptyList(),
     /** When true, show total trophies per day; when false, show max single-record trophies. */
     val showTotal: Boolean = true,
+    /** When true, include Free Hold records in the chart. */
+    val includeFreeHold: Boolean = true,
     /** When true, include Progressive O₂ records in the chart. */
     val includeProgressiveO2: Boolean = true,
     /** When true, include Min Breath records in the chart. */
@@ -57,7 +59,7 @@ class TrophyChartViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             val state = _uiState.value
-            val days = computeDays(state.includeProgressiveO2, state.includeMinBreath)
+            val days = computeDays(state.includeFreeHold, state.includeProgressiveO2, state.includeMinBreath)
             _uiState.update { it.copy(days = days, isLoading = false) }
         }
     }
@@ -68,6 +70,11 @@ class TrophyChartViewModel @Inject constructor(
 
     fun toggleSettingsPopup() {
         _uiState.update { it.copy(showSettingsPopup = !it.showSettingsPopup) }
+    }
+
+    fun setIncludeFreeHold(include: Boolean) {
+        _uiState.update { it.copy(includeFreeHold = include) }
+        loadChart()
     }
 
     fun setIncludeProgressiveO2(include: Boolean) {
@@ -91,6 +98,7 @@ class TrophyChartViewModel @Inject constructor(
      * a better 5-min record. This matches what the PersonalBests screen shows.
      */
     private suspend fun computeDays(
+        includeFreeHold: Boolean,
         includeProgressiveO2: Boolean,
         includeMinBreath: Boolean
     ): List<TrophyChartDay> {
@@ -102,7 +110,10 @@ class TrophyChartViewModel @Inject constructor(
 
         // Build per-duration drill contexts instead of *_ANY.
         // This ensures a 2-min min breath PB appears even if a 5-min record is better overall.
-        val drills = mutableListOf(DrillContext.FREE_HOLD)
+        val drills = mutableListOf<DrillContext>()
+        if (includeFreeHold) {
+            drills += DrillContext.FREE_HOLD
+        }
         if (includeProgressiveO2) {
             val breathPeriods = allRecords
                 .filter { it.tableType == "PROGRESSIVE_O2" && it.drillParamValue != null }
@@ -152,13 +163,23 @@ class TrophyChartViewModel @Inject constructor(
             byDate.getOrPut(date) { mutableListOf() }.add(trophyCount)
         }
 
+        // Fill in empty days between first and last trophy date
+        val sortedDates = byDate.keys.sorted()
+        val firstDate = sortedDates.first()
+        val lastDate = sortedDates.last()
+        var d = firstDate
+        while (d <= lastDate) {
+            byDate.getOrPut(d) { mutableListOf() }
+            d = d.plusDays(1)
+        }
+
         return byDate.entries
             .sortedBy { it.key }
             .map { (date, trophies) ->
                 TrophyChartDay(
                     date = date,
                     totalTrophies = trophies.sum(),
-                    maxTrophies = trophies.max()
+                    maxTrophies = trophies.maxOrNull() ?: 0
                 )
             }
     }

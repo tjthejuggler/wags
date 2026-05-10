@@ -13,11 +13,13 @@ import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.data.repository.ApneaSessionRepository
 import com.example.wags.data.spotify.SpotifyApiClient
 import com.example.wags.domain.model.AudioSetting
+import com.example.wags.domain.model.DrillContext
 import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.RecordPbBadge
 import com.example.wags.domain.model.SpotifySong
 import com.example.wags.domain.model.TimeOfDay
+import com.example.wags.domain.model.trophyCount
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,6 +36,8 @@ data class ApneaRecordDetailUiState(
     val record: ApneaRecordEntity? = null,
     val telemetry: List<FreeHoldTelemetryEntity> = emptyList(),
     val pbBadges: List<RecordPbBadge> = emptyList(),
+    /** Number of trophies this record currently holds (0 if none or no longer current). */
+    val trophyCount: Int = 0,
     val songLog: List<SpotifySong> = emptyList(),
     val isLoading: Boolean = true,
     val notFound: Boolean = false,
@@ -91,6 +95,7 @@ class ApneaRecordDetailViewModel @Inject constructor(
             } else {
                 val telemetry = apneaRepository.getTelemetryForRecord(recordId)
                 val badges = apneaRepository.getRecordPbBadges(recordId)
+                val trophyCount = computeTrophyCount(recordId, record, badges)
                 val songLog = apneaRepository.getSongLogForRecord(recordId)
                 val tableSession = if (record.tableType != null) {
                     sessionRepository.getSessionByTimestampAndType(record.timestamp, record.tableType)
@@ -100,6 +105,7 @@ class ApneaRecordDetailViewModel @Inject constructor(
                         record       = record,
                         telemetry    = telemetry,
                         pbBadges     = badges,
+                        trophyCount  = trophyCount,
                         songLog      = songLog,
                         tableSession = tableSession,
                         isLoading    = false,
@@ -126,6 +132,7 @@ class ApneaRecordDetailViewModel @Inject constructor(
             } else {
                 val telemetry = apneaRepository.getTelemetryForRecord(id)
                 val badges = apneaRepository.getRecordPbBadges(id)
+                val trophyCount = computeTrophyCount(id, record, badges)
                 val songLog = apneaRepository.getSongLogForRecord(id)
                 val tableSession = if (record.tableType != null) {
                     sessionRepository.getSessionByTimestampAndType(record.timestamp, record.tableType)
@@ -135,6 +142,7 @@ class ApneaRecordDetailViewModel @Inject constructor(
                         record       = record,
                         telemetry    = telemetry,
                         pbBadges     = badges,
+                        trophyCount  = trophyCount,
                         songLog      = songLog,
                         tableSession = tableSession
                     )
@@ -255,7 +263,8 @@ class ApneaRecordDetailViewModel @Inject constructor(
             )
             apneaRepository.updateRecord(updated)
             val badges = apneaRepository.getRecordPbBadges(record.recordId)
-            _uiState.update { it.copy(record = updated, pbBadges = badges, showEditSheet = false) }
+            val trophyCount = computeTrophyCount(record.recordId, updated, badges)
+            _uiState.update { it.copy(record = updated, pbBadges = badges, trophyCount = trophyCount, showEditSheet = false) }
         }
     }
 
@@ -331,5 +340,36 @@ class ApneaRecordDetailViewModel @Inject constructor(
                 _uiState.update { it.copy(songLog = refreshed) }
             }
         }
+    }
+
+    /**
+     * Computes the trophy count for a record.
+     *
+     * For free holds: uses the [pbBadges] list (which is already populated by
+     * [ApneaRepository.getRecordPbBadges] for free holds) and returns the
+     * trophy count of the broadest current badge.
+     *
+     * For drill records (PROGRESSIVE_O2, MIN_BREATH): queries
+     * [ApneaRepository.getAllPersonalBests] for the matching [DrillContext]
+     * and finds the highest trophy count where this record is the current best.
+     */
+    private suspend fun computeTrophyCount(
+        recordId: Long,
+        record: ApneaRecordEntity,
+        pbBadges: List<RecordPbBadge>
+    ): Int {
+        // Free holds: use badges directly
+        if (record.tableType == null) {
+            return pbBadges
+                .filter { it.isCurrent }
+                .maxOfOrNull { it.category.trophyCount() } ?: 0
+        }
+
+        // Drill records: query personal bests for the matching drill context
+        val drill = DrillContext.fromNavArgs(record.tableType, record.drillParamValue)
+        val entries = apneaRepository.getAllPersonalBests(drill)
+        return entries
+            .filter { it.recordId == recordId }
+            .maxOfOrNull { it.trophyCount } ?: 0
     }
 }

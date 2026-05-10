@@ -2,6 +2,7 @@ package com.example.wags.ui.apnea
 
 import android.graphics.Paint
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -184,6 +185,7 @@ fun ApneaRecordDetailScreen(
                         record = state.record!!,
                         telemetry = state.telemetry,
                         pbBadges = state.pbBadges,
+                        trophyCount = state.trophyCount,
                         songLog = state.songLog,
                         tableSession = state.tableSession,
                         onRepeatHold = {
@@ -194,6 +196,17 @@ fun ApneaRecordDetailScreen(
                             }
                         },
                         onRecalculateSongs = { viewModel.recalculateSongTimes() },
+                        onTrophyClick = {
+                            val record = state.record
+                            if (record != null) {
+                                navController.navigate(
+                                    WagsRoutes.personalBests(
+                                        drillType = record.tableType ?: "",
+                                        drillParamValue = record.drillParamValue
+                                    )
+                                )
+                            }
+                        },
                         modifier = Modifier
                     )
                 }
@@ -494,10 +507,12 @@ private fun RecordDetailContent(
     record: ApneaRecordEntity,
     telemetry: List<FreeHoldTelemetryEntity>,
     pbBadges: List<RecordPbBadge>,
+    trophyCount: Int = 0,
     songLog: List<SpotifySong> = emptyList(),
     tableSession: ApneaSessionEntity? = null,
     onRepeatHold: () -> Unit = {},
     onRecalculateSongs: () -> Unit = {},
+    onTrophyClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val dateStr = remember(record.timestamp) {
@@ -635,6 +650,22 @@ private fun RecordDetailContent(
                         valueColor = TextPrimary,
                         valueBold = true
                     )
+                }
+
+                // ── Trophies earned ──────────────────────────────────────
+                if (trophyCount > 0) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Trophies", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                        Text(
+                            "🏆".repeat(trophyCount),
+                            style = MaterialTheme.typography.headlineSmall,
+                            modifier = Modifier.clickable { onTrophyClick() }.grayscale()
+                        )
+                    }
                 }
 
                 // ── Personal Best badges ────────────────────────────────────
