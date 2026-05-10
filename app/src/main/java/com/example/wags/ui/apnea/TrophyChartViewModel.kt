@@ -86,8 +86,9 @@ class TrophyChartViewModel @Inject constructor(
      * For each record that is a PB (i.e. it was the best for its exact 5-setting combo
      * at the time it was saved), we assign it a trophyCount based on how broad a PB it was.
      *
-     * Simplification: we use the current broadest category for each record (not historical).
-     * This is consistent with how the Personal Bests screen works.
+     * Uses per-duration drill contexts (e.g. minBreath(120), progressiveO2(60))
+     * instead of *_ANY so that a 2-min min breath PB shows up even if there's
+     * a better 5-min record. This matches what the PersonalBests screen shows.
      */
     private suspend fun computeDays(
         includeProgressiveO2: Boolean,
@@ -95,10 +96,36 @@ class TrophyChartViewModel @Inject constructor(
     ): List<TrophyChartDay> {
         val zone = ZoneId.systemDefault()
 
-        // Collect all PB entries across selected drill types
+        // Load all records up front — needed for timestamps and to discover drill param values
+        val allRecords = apneaRepository.getAllRecordsOnce()
+        val recordById = allRecords.associateBy { it.recordId }
+
+        // Build per-duration drill contexts instead of *_ANY.
+        // This ensures a 2-min min breath PB appears even if a 5-min record is better overall.
         val drills = mutableListOf(DrillContext.FREE_HOLD)
-        if (includeProgressiveO2) drills += DrillContext.PROGRESSIVE_O2_ANY
-        if (includeMinBreath) drills += DrillContext.MIN_BREATH_ANY
+        if (includeProgressiveO2) {
+            val breathPeriods = allRecords
+                .filter { it.tableType == "PROGRESSIVE_O2" && it.drillParamValue != null }
+                .map { it.drillParamValue!! }
+                .toSet()
+            if (breathPeriods.isNotEmpty()) {
+                drills += breathPeriods.map { DrillContext.progressiveO2(it) }
+            } else {
+                // Fallback: no records with param yet, use ANY to find any PBs
+                drills += DrillContext.PROGRESSIVE_O2_ANY
+            }
+        }
+        if (includeMinBreath) {
+            val sessionDurations = allRecords
+                .filter { it.tableType == "MIN_BREATH" && it.drillParamValue != null }
+                .map { it.drillParamValue!! }
+                .toSet()
+            if (sessionDurations.isNotEmpty()) {
+                drills += sessionDurations.map { DrillContext.minBreath(it) }
+            } else {
+                drills += DrillContext.MIN_BREATH_ANY
+            }
+        }
 
         // Map from recordId → trophyCount (only records that are current PBs)
         val recordTrophies = mutableMapOf<Long, Int>()
@@ -116,10 +143,6 @@ class TrophyChartViewModel @Inject constructor(
         }
 
         if (recordTrophies.isEmpty()) return emptyList()
-
-        // Load all records to get their timestamps
-        val allRecords = apneaRepository.getAllRecordsOnce()
-        val recordById = allRecords.associateBy { it.recordId }
 
         // Group by date
         val byDate = mutableMapOf<LocalDate, MutableList<Int>>()

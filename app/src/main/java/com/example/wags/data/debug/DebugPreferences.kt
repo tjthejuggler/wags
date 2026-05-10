@@ -97,6 +97,51 @@ class DebugPreferences @Inject constructor(
         prefs.edit().remove(KEY_DRAFTS).apply()
     }
 
+    // ── Queued notes persistence ─────────────────────────────────────────────
+
+    /** Load all persisted queued notes from SharedPreferences. */
+    fun loadQueuedNotes(): List<QueuedNote> {
+        val json = prefs.getString(KEY_QUEUED_NOTES, null) ?: return emptyList()
+        return try {
+            val arr = JSONArray(json)
+            val notes = mutableListOf<QueuedNote>()
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                notes.add(QueuedNote(
+                    id = obj.getString("id"),
+                    timestamp = obj.getString("timestamp"),
+                    screenRoute = obj.getString("screenRoute"),
+                    screenLabel = obj.getString("screenLabel"),
+                    sourceFile = obj.getString("sourceFile"),
+                    sourceFunctions = obj.getString("sourceFunctions"),
+                    noteType = NoteType.valueOf(obj.getString("noteType")),
+                    noteText = obj.getString("noteText")
+                ))
+            }
+            notes
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    /** Persist the current queued notes list to SharedPreferences. */
+    fun saveQueuedNotes(notes: List<QueuedNote>) {
+        val arr = JSONArray()
+        notes.forEach { note ->
+            arr.put(JSONObject().apply {
+                put("id", note.id)
+                put("timestamp", note.timestamp)
+                put("screenRoute", note.screenRoute)
+                put("screenLabel", note.screenLabel)
+                put("sourceFile", note.sourceFile)
+                put("sourceFunctions", note.sourceFunctions)
+                put("noteType", note.noteType.name)
+                put("noteText", note.noteText)
+            })
+        }
+        prefs.edit().putString(KEY_QUEUED_NOTES, arr.toString()).apply()
+    }
+
     // ── Snapshot ──────────────────────────────────────────────────────────────
 
     private val _snapshot = MutableStateFlow(buildSnapshot())
@@ -117,6 +162,7 @@ class DebugPreferences @Inject constructor(
         private const val KEY_DEBUG_DIR_URI = "debug_dir_uri"
         private const val KEY_DRAFTS = "debug_drafts_json"
         private const val KEY_SAVED_NOTES = "debug_saved_notes_json"
+        private const val KEY_QUEUED_NOTES = "debug_queued_notes_json"
         private const val KEY_LEGACY_V2_CLEARED = "debug_legacy_v2_cleared"
     }
 }

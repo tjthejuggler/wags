@@ -1,26 +1,24 @@
-# ADR: Music Tail Habit Integration with Time-of-Day Deduplication
+## ADR: Trophy Chart Per-Duration Drill Contexts + Debug Queue Persistence + Debug Bubble Rotation Fix
 
-**Date:** 2026-05-09
-**Status:** Accepted
+**Date**: 2026-05-10
 
-## Context
-We want to add a new Tail habit integration for "music" — when an apnea session (of any kind: free hold, table training, progressive O2, min breath, or advanced) has its audio setting set to MUSIC, we want to increment the corresponding Tail habit.
+### Bug 1: Trophy chart missing min breath / progressive O2 trophies
+**Root cause**: `TrophyChartViewModel.computeDays()` used `MIN_BREATH_ANY` and `PROGRESSIVE_O2_ANY` which pool all session durations together. A 2-min min breath PB wouldn't appear if a better 5-min record existed, because the "any" query only returns the single best across all durations.
 
-The complication: we only want to send the increment signal once per TimeOfDay bucket (Morning/Day/Night) per calendar day. So even if a user does 3 drills with music in the Morning, we only increment once. The maximum possible increments per day is 3.
+**Fix**: Changed `computeDays()` to discover distinct `drillParamValue` values from existing records and create per-duration `DrillContext` instances (e.g. `DrillContext.minBreath(120)`, `DrillContext.progressiveO2(60)`). This matches the PersonalBests screen behavior where each duration gets its own trophy hierarchy. Falls back to `*_ANY` only when no records with `drillParamValue` exist yet.
 
-## Decision
-- Added `Slot.MUSIC` to `HabitIntegrationRepository.Slot` enum with keys `habit_id_music` / `habit_name_music` and label "Music Session".
-- Added `sendMusicHabitIncrementIfNeeded(audioSetting: String, timeOfDay: String)` method to `HabitIntegrationRepository` that:
-  1. Checks if `audioSetting == AudioSetting.MUSIC.name` (skips if not)
-  2. Parses `timeOfDay` string into `TimeOfDay` enum (skips if invalid)
-  3. Checks a SharedPreferences boolean key `habit_music_sent_{TOD}_{yyyy-MM-dd}` — if already true, skips
-  4. Marks the key as true before firing the broadcast (prevents double-fire on crash)
-  5. Calls `sendHabitIncrement(Slot.MUSIC)`
-- The "effective audio" logic (MUSIC with no tracks played → SILENCE) is handled at each call site before calling the method.
-- Called from all 5 apnea completion points: ApneaViewModel.stopFreeHold, ApneaViewModel.onStateChanged (TABLE COMPLETE), FreeHoldActiveViewModel.stopFreeHold, MinBreathViewModel.saveSession, ProgressiveO2ViewModel.saveSession, AdvancedApneaViewModel.saveCompletedSession.
-- Updated SettingsViewModel (HabitPartialState, copySlot, buildInitialHabitState) and SettingsScreen (TailAppIntegrationCard) to expose the new MUSIC slot in the UI.
+**Files changed**: `TrophyChartViewModel.kt`
 
-## Consequences
-- Maximum 3 music habit increments per day (one per TimeOfDay bucket).
-- SharedPreferences keys accumulate daily but are tiny; old dates are simply never true-checked again.
-- The deduplication is local to this device; if the user uses WAGS on another device, it could send another increment for the same TimeOfDay. This is acceptable for now.
+### Bug 2: Debug bubble invisible on Trophy Chart (landscape) screen
+**Root cause**: `DebugBubbleOverlay` initialized `offsetX`/`offsetY` with `remember` which doesn't update when screen configuration changes. When TrophyChartScreen forces landscape rotation, the bubble's Y position (calculated from portrait height) goes off-screen.
+
+**Fix**: Added `LaunchedEffect(screenWidthPx, screenHeightPx)` that re-clamps `offsetX` and `offsetY` to valid screen bounds whenever dimensions change.
+
+**Files changed**: `DebugBubbleOverlay.kt`
+
+### Bug 3: Queued debug notes lost on app restart
+**Root cause**: `DebugNoteRepository._queue` was a `MutableStateFlow(emptyList())` — purely in-memory. Saved notes were persisted to SharedPreferences, but queued notes were not.
+
+**Fix**: Added `loadQueuedNotes()` and `saveQueuedNotes()` to `DebugPreferences`, initialized `_queue` from persisted data, and added `debugPrefs.saveQueuedNotes()` calls after every queue mutation (`enqueueNote`, `removeFromQueue`, `queueSavedNote`, `submitQueue`).
+
+**Files changed**: `DebugPreferences.kt`, `DebugNoteRepository.kt`

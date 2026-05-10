@@ -76,6 +76,12 @@ fun DebugBubbleOverlay(
     var offsetX by remember { mutableFloatStateOf(16f) }
     var offsetY by remember { mutableFloatStateOf(screenHeightPx * 0.4f) }
 
+    // Re-clamp position when screen dimensions change (e.g. landscape rotation)
+    LaunchedEffect(screenWidthPx, screenHeightPx) {
+        offsetX = offsetX.coerceIn(0f, screenWidthPx - bubbleSizePx)
+        offsetY = offsetY.coerceIn(0f, screenHeightPx - bubbleSizePx)
+    }
+
     val scope = rememberCoroutineScope()
 
     // Pulsing animation for the badge when notes exist

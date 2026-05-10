@@ -132,6 +132,7 @@ class DebugNoteRepository @Inject constructor(
             noteText = note.noteText
         )
         _queue.value = _queue.value + queued
+        debugPrefs.saveQueuedNotes(_queue.value)
     }
 
     fun hasSavedNotesForScreen(route: String?): Boolean {
@@ -144,9 +145,9 @@ class DebugNoteRepository @Inject constructor(
         return _savedNotes.value.count { it.screenRoute == route }
     }
 
-    // ── Queue (in-memory, visible in dialog, drives badge) ────────────────────
+    // ── Queue (persisted to SharedPreferences, visible in dialog, drives badge) ─
 
-    private val _queue = MutableStateFlow<List<QueuedNote>>(emptyList())
+    private val _queue = MutableStateFlow<List<QueuedNote>>(debugPrefs.loadQueuedNotes())
     val queue: StateFlow<List<QueuedNote>> = _queue.asStateFlow()
 
     val queueSize: Int get() = _queue.value.size
@@ -166,10 +167,12 @@ class DebugNoteRepository @Inject constructor(
             noteText = noteText
         )
         _queue.value = _queue.value + note
+        debugPrefs.saveQueuedNotes(_queue.value)
     }
 
     fun removeFromQueue(noteId: String) {
         _queue.value = _queue.value.filter { it.id != noteId }
+        debugPrefs.saveQueuedNotes(_queue.value)
     }
 
     /**
@@ -184,6 +187,7 @@ class DebugNoteRepository @Inject constructor(
         val queued = _queue.value
         if (queued.isEmpty()) return@withContext
         _queue.value = emptyList()
+        debugPrefs.saveQueuedNotes(_queue.value)
 
         // Write ONLY the newly submitted notes — replace the file entirely
         val entries = queued.map { qn ->
