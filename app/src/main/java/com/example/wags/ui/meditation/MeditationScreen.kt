@@ -1,26 +1,18 @@
 package com.example.wags.ui.meditation
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -53,6 +45,8 @@ fun MeditationScreen(
 
     // Keep screen on during COMPLETE too so the user can review results
     val keepScreenOn = isActive || state.sessionState == MeditationSessionState.COMPLETE
+
+    var showAudioPicker by remember { mutableStateOf(false) }
 
     SessionBackHandler(enabled = isActive) { navController.popBackStack() }
     KeepScreenOn(enabled = keepScreenOn)
@@ -95,11 +89,8 @@ fun MeditationScreen(
             when (state.sessionState) {
                 MeditationSessionState.IDLE -> IdleContent(
                     state = state,
-                    onSelectAudio = { viewModel.selectAudio(it) },
-                    onEditAudioUrl = { viewModel.openUrlEditor(it) },
-                    onRefreshAudios = { viewModel.refreshAudios() },
+                    onAudioPickerClick = { showAudioPicker = true },
                     onSonificationToggle = { viewModel.setSonificationEnabled(!state.sonificationEnabled) },
-                    onChannelFilterSelected = { viewModel.setChannelFilter(it) },
                     onPostureSelected = { viewModel.setPosture(it) },
                     onTimerEnabledChange = { viewModel.setTimerEnabled(it) },
                     onTimerHoursChange = { viewModel.setTimerHours(it) },
@@ -128,6 +119,23 @@ fun MeditationScreen(
         }
     }
 
+    // Audio picker dialog
+    if (showAudioPicker) {
+        MeditationAudioPickerDialog(
+            audios = state.audios,
+            selectedAudio = state.selectedAudio,
+            availableChannels = state.availableChannels,
+            selectedChannelFilter = state.selectedChannelFilter,
+            isLoadingAudios = state.isLoadingAudios,
+            audioDirUri = state.audioDirUri,
+            onSelectAudio = { viewModel.selectAudio(it) },
+            onChannelFilterSelected = { viewModel.setChannelFilter(it) },
+            onRefreshAudios = { viewModel.refreshAudios() },
+            onEditAudioUrl = { viewModel.openUrlEditor(it) },
+            onDismiss = { showAudioPicker = false }
+        )
+    }
+
     // URL edit dialog
     state.editingAudio?.let { audio ->
         AudioUrlEditDialog(
@@ -146,11 +154,8 @@ fun MeditationScreen(
 @Composable
 private fun IdleContent(
     state: MeditationUiState,
-    onSelectAudio: (MeditationAudioEntity) -> Unit,
-    onEditAudioUrl: (MeditationAudioEntity) -> Unit,
-    onRefreshAudios: () -> Unit,
+    onAudioPickerClick: () -> Unit,
     onSonificationToggle: () -> Unit,
-    onChannelFilterSelected: (String?) -> Unit,
     onPostureSelected: (MeditationPosture) -> Unit,
     onTimerEnabledChange: (Boolean) -> Unit,
     onTimerHoursChange: (Int) -> Unit,
@@ -166,99 +171,16 @@ private fun IdleContent(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(vertical = 16.dp)
     ) {
-        // ── Header ─────────────────────────────────────────────────────────
+        // ── Audio picker button + selected banner ──────────────────────────
         item {
-            Text(
-                "Select Audio",
-                style = MaterialTheme.typography.titleLarge,
-                color = TextPrimary,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        // ── Audio directory hint ────────────────────────────────────────────
-        if (state.audioDirUri.isBlank()) {
-            item {
-                Card(colors = CardDefaults.cardColors(containerColor = SurfaceVariant)) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("ℹ️", style = MaterialTheme.typography.bodyLarge)
-                        Text(
-                            "No audio folder set. Go to Settings → Meditation Audio Directory to choose a folder.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
-                        )
-                    }
-                }
-            }
-        }
-
-        // ── Refresh button ──────────────────────────────────────────────────
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                if (state.isLoadingAudios) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = TextSecondary,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    TextButton(onClick = onRefreshAudios) {
-                        Icon(
-                            Icons.Default.Refresh,
-                            contentDescription = "Refresh",
-                            modifier = Modifier.size(16.dp),
-                            tint = TextSecondary
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text("Refresh", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                    }
-                }
-            }
-        }
-
-        // ── Channel filter chips ────────────────────────────────────────────
-        if (state.availableChannels.isNotEmpty()) {
-            item {
-                ChannelFilterRow(
-                    channels = state.availableChannels,
-                    selectedChannel = state.selectedChannelFilter,
-                    onChannelSelected = onChannelFilterSelected
+            state.selectedAudio?.let { audio ->
+                SelectedMeditationAudioBanner(
+                    name = if (audio.isNone) "None (silent meditation)" else audio.displayName
                 )
             }
         }
-
-        // ── Audio list ──────────────────────────────────────────────────────
-        if (state.filteredAudios.isEmpty() && !state.isLoadingAudios) {
-            item {
-                Text(
-                    if (state.audios.isEmpty())
-                        "No audio files found. Add audio files to your chosen folder and tap Refresh."
-                    else
-                        "No audios match the selected filter.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextDisabled,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 16.dp)
-                )
-            }
-        }
-
-        items(state.filteredAudios, key = { it.audioId }) { audio ->
-            AudioListItem(
-                audio = audio,
-                isSelected = state.selectedAudio?.audioId == audio.audioId,
-                onSelect = { onSelectAudio(audio) },
-                onEditUrl = { onEditAudioUrl(audio) }
-            )
+        item {
+            MeditationAudioPickerButton(onClick = onAudioPickerClick)
         }
 
         // ── HR monitor status ───────────────────────────────────────────────
@@ -450,188 +372,6 @@ private fun TimerField(
             cursorColor = TextPrimary
         )
     )
-}
-
-// ── Channel filter chip row ────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ChannelFilterRow(
-    channels: List<String>,
-    selectedChannel: String?,
-    onChannelSelected: (String?) -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(
-            "Filter by channel",
-            style = MaterialTheme.typography.labelMedium,
-            color = TextSecondary
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // "All" chip
-            FilterChip(
-                selected = selectedChannel == null,
-                onClick = { onChannelSelected(null) },
-                label = { Text("All") },
-                colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = TextSecondary.copy(alpha = 0.2f),
-                        selectedLabelColor = TextPrimary
-                    ),
-                    border = FilterChipDefaults.filterChipBorder(
-                        enabled = true,
-                        selected = selectedChannel == null,
-                        selectedBorderColor = TextSecondary,
-                        borderColor = SurfaceVariant
-                    )
-            )
-            // One chip per channel
-            channels.forEach { channel ->
-                FilterChip(
-                    selected = selectedChannel == channel,
-                    onClick = { onChannelSelected(if (selectedChannel == channel) null else channel) },
-                    label = {
-                        Text(
-                            channel,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = TextSecondary.copy(alpha = 0.2f),
-                        selectedLabelColor = TextPrimary
-                    ),
-                    border = FilterChipDefaults.filterChipBorder(
-                        enabled = true,
-                        selected = selectedChannel == channel,
-                        selectedBorderColor = TextSecondary,
-                        borderColor = SurfaceVariant
-                    )
-                )
-            }
-        }
-    }
-}
-
-// ── Audio list item ────────────────────────────────────────────────────────────
-
-@Composable
-private fun AudioListItem(
-    audio: MeditationAudioEntity,
-    isSelected: Boolean,
-    onSelect: () -> Unit,
-    onEditUrl: () -> Unit
-) {
-    val borderColor = if (isSelected) TextSecondary else Color.Transparent
-    val bgColor = if (isSelected) TextSecondary.copy(alpha = 0.08f) else SurfaceDark
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .border(
-                width = if (isSelected) 1.5.dp else 0.dp,
-                color = borderColor,
-                shape = MaterialTheme.shapes.medium
-            )
-            .clickable(onClick = onSelect),
-        colors = CardDefaults.cardColors(containerColor = bgColor)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                // Title row: checkmark + display name
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (isSelected) {
-                        Text("✓", color = TextPrimary, style = MaterialTheme.typography.bodyMedium)
-                    }
-                    Text(
-                        text = when {
-                            audio.isNone -> "None  (silent meditation)"
-                            else -> audio.displayName
-                        },
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = if (isSelected) TextPrimary else TextPrimary,
-                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                // Channel badge (YouTube audios only)
-                if (!audio.isNone && !audio.youtubeChannel.isNullOrBlank()) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            "▶",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextSecondary
-                        )
-                        Text(
-                            text = audio.youtubeChannel,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextSecondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                // For non-YouTube audios that have a URL, show the URL as a hint
-                if (!audio.isNone && audio.youtubeChannel.isNullOrBlank() && audio.sourceUrl.isNotBlank()) {
-                    Text(
-                        text = audio.sourceUrl,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextDisabled,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                // For non-YouTube audios, show the filename as a subtitle when the display name
-                // is the YouTube title (i.e. they differ)
-                if (!audio.isNone && audio.youtubeTitle != null && audio.fileName.isNotBlank()) {
-                    Text(
-                        text = audio.fileName,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextDisabled,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
-            // Edit URL button (not shown for None)
-            if (!audio.isNone) {
-                IconButton(
-                    onClick = onEditUrl,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Edit,
-                        contentDescription = "Edit URL",
-                        tint = TextSecondary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-        }
-    }
 }
 
 // ── Monitor status banner ──────────────────────────────────────────────────────
