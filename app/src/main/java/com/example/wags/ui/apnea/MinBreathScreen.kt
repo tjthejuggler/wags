@@ -325,7 +325,7 @@ private fun SessionDurationSection(
         ) {
             FilledTonalButton(
                 onClick = {
-                    val newVal = (sessionDurationSec - 30).coerceIn(60, 600)
+                    val newVal = (sessionDurationSec - 30).coerceIn(60, 1800)
                     onSetSessionDuration(newVal)
                 },
                 enabled = sessionDurationSec > 60,
@@ -353,10 +353,10 @@ private fun SessionDurationSection(
             Spacer(modifier = Modifier.width(24.dp))
             FilledTonalButton(
                 onClick = {
-                    val newVal = (sessionDurationSec + 30).coerceIn(60, 600)
+                    val newVal = (sessionDurationSec + 30).coerceIn(60, 1800)
                     onSetSessionDuration(newVal)
                 },
-                enabled = sessionDurationSec < 600,
+                enabled = sessionDurationSec < 1800,
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.filledTonalButtonColors(
                     containerColor = SurfaceVariant,

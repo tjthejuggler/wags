@@ -36,7 +36,7 @@ fun MinBreathActiveScreen(
     val isActive = phase == MinBreathPhase.HOLD || phase == MinBreathPhase.BREATHING
 
     PipSessionHost(
-        pipEnabled = isActive || phase == MinBreathPhase.COMPLETE,
+        pipEnabled = true, // always eligible: covers pre-start, active, and result phases
         pipContent = { MinBreathPipContent(viewModel = viewModel) },
         fullContent = { MinBreathActiveScreenContent(navController, state, viewModel) }
     )

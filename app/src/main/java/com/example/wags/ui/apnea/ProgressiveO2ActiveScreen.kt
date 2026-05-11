@@ -37,7 +37,7 @@ fun ProgressiveO2ActiveScreen(
     val isActive = phase == ProgressiveO2Phase.HOLD || phase == ProgressiveO2Phase.BREATHING
 
     PipSessionHost(
-        pipEnabled = isActive || phase == ProgressiveO2Phase.COMPLETE,
+        pipEnabled = true, // always eligible: covers pre-start, active, and result phases
         pipContent = { ProgressiveO2PipContent(viewModel = viewModel) },
         fullContent = { ProgressiveO2ActiveScreenContent(navController, state, viewModel) }
     )

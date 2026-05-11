@@ -3,11 +3,13 @@ package com.example.wags.ui.common
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -23,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
@@ -44,7 +47,8 @@ fun AdviceNoteDialog(
     adviceText: String,
     currentNotes: String?,
     onSave: (String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onAddAdvice: () -> Unit = {}
 ) {
     var noteText by remember { mutableStateOf(currentNotes ?: "") }
 
@@ -61,11 +65,24 @@ fun AdviceNoteDialog(
                 .padding(16.dp)
         ) {
             // ── Header ──────────────────────────────────────────────────────
-            Text(
-                text = "My Thoughts",
-                style = MaterialTheme.typography.titleMedium,
-                color = TextPrimary
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "My Thoughts",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextPrimary,
+                    modifier = Modifier.weight(1f)
+                )
+                OutlinedButton(
+                    onClick = onAddAdvice,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                ) {
+                    Text("+ Add advice", fontSize = 12.sp)
+                }
+            }
 
             Spacer(Modifier.height(8.dp))
 
