@@ -125,16 +125,20 @@ class MainActivity : ComponentActivity() {
         setContent {
             WagsTheme {
                 val navController = rememberNavController()
+                val isInPip by PipController.isInPipMode.collectAsState()
                 Box {
                     WagsNavGraph(navController = navController)
-                    // Debug bubble overlay — reads current route from navController
-                    val navBackStackEntry by navController.currentBackStackEntryAsState()
-                    val currentRoute = navBackStackEntry?.destination?.route
-                    DebugBubbleOverlay(
-                        currentRoute = currentRoute,
-                        debugPrefs = debugPrefs,
-                        debugNoteRepo = debugNoteRepo
-                    )
+                    // Debug bubble overlay — hidden in PiP mode so it doesn't
+                    // appear inside the small PiP window
+                    if (!isInPip) {
+                        val navBackStackEntry by navController.currentBackStackEntryAsState()
+                        val currentRoute = navBackStackEntry?.destination?.route
+                        DebugBubbleOverlay(
+                            currentRoute = currentRoute,
+                            debugPrefs = debugPrefs,
+                            debugNoteRepo = debugNoteRepo
+                        )
+                    }
                 }
             }
         }
