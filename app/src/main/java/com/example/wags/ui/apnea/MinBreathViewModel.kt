@@ -62,6 +62,12 @@ data class MinBreathUiState(
     val timeOfDay: String = "DAY",
     val posture: String = "LAYING",
     val audio: String = "SILENCE",
+    // Filter state ("" = all, specific value = filter to that value)
+    val filterLungVolume: String = "",
+    val filterPrepType: String = "",
+    val filterTimeOfDay: String = "",
+    val filterPosture: String = "",
+    val filterAudio: String = "",
     // Spotify
     val spotifyConnected: Boolean = false,
     val isMusicMode: Boolean = false,
@@ -84,7 +90,8 @@ data class MinBreathUiState(
 data class DurationHistory(
     val durationSec: Int,
     val bestHoldPct: Double,
-    val sessionCount: Int
+    val sessionCount: Int,
+    val bestRecordId: Long = -1L
 )
 
 // ── ViewModel ───────────────────────────────────────────────────────────────
@@ -280,6 +287,28 @@ class MinBreathViewModel @Inject constructor(
         }
     }
 
+    // ── Filter methods ────────────────────────────────────────────────────────
+
+    fun setFilterLungVolume(v: String) { _uiState.update { it.copy(filterLungVolume = v) }; loadPastSessions() }
+    fun setFilterPrepType(v: String)   { _uiState.update { it.copy(filterPrepType = v) }; loadPastSessions() }
+    fun setFilterTimeOfDay(v: String) { _uiState.update { it.copy(filterTimeOfDay = v) }; loadPastSessions() }
+    fun setFilterPosture(v: String)   { _uiState.update { it.copy(filterPosture = v) }; loadPastSessions() }
+    fun setFilterAudio(v: String)     { _uiState.update { it.copy(filterAudio = v) }; loadPastSessions() }
+
+    fun resetFilters() {
+        val s = _uiState.value
+        _uiState.update {
+            it.copy(
+                filterLungVolume = s.lungVolume,
+                filterPrepType   = s.prepType,
+                filterTimeOfDay  = s.timeOfDay,
+                filterPosture    = s.posture,
+                filterAudio      = s.audio
+            )
+        }
+        loadPastSessions()
+    }
+
     // ── Guided audio library methods ─────────────────────────────────────────
 
     fun selectGuidedAudio(audio: GuidedAudioEntity) {
@@ -416,8 +445,20 @@ class MinBreathViewModel @Inject constructor(
     fun loadPastSessions() {
         viewModelScope.launch {
             try {
-                val sessions = sessionRepository.getSessionsByType("MIN_BREATH")
-                val history = buildDurationHistory(sessions)
+                val allRecords = apneaRepository.getAllRecordsOnce()
+                val s = _uiState.value
+                val filtered = allRecords
+                    .filter { it.tableType == "MIN_BREATH" }
+                    .let { records ->
+                        var result = records
+                        if (s.filterLungVolume.isNotEmpty()) result = result.filter { it.lungVolume == s.filterLungVolume }
+                        if (s.filterPrepType.isNotEmpty()) result = result.filter { it.prepType == s.filterPrepType }
+                        if (s.filterTimeOfDay.isNotEmpty()) result = result.filter { it.timeOfDay == s.filterTimeOfDay }
+                        if (s.filterPosture.isNotEmpty()) result = result.filter { it.posture == s.filterPosture }
+                        if (s.filterAudio.isNotEmpty()) result = result.filter { it.audio == s.filterAudio }
+                        result
+                    }
+                val history = buildDurationHistory(filtered)
                 _uiState.update { it.copy(pastDurations = history) }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to load past sessions", e)
@@ -791,27 +832,21 @@ class MinBreathViewModel @Inject constructor(
         return root.toString()
     }
 
-    private fun buildDurationHistory(sessions: List<ApneaSessionEntity>): List<DurationHistory> {
-        data class Parsed(val sessionDurationSec: Int, val holdPct: Double)
-
-        val parsed = sessions.mapNotNull { entity ->
-            try {
-                val json = JSONObject(entity.tableParamsJson)
-                val duration = json.optInt("sessionDurationSec", 300)
-                val pct = json.optDouble("holdPct", 0.0)
-                Parsed(duration, pct)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to parse session ${entity.sessionId}", e)
-                null
-            }
-        }
-
-        return parsed.groupBy { it.sessionDurationSec }
-            .map { (dur, group) ->
+    private fun buildDurationHistory(records: List<ApneaRecordEntity>): List<DurationHistory> {
+        return records
+            .filter { it.drillParamValue != null && it.durationMs > 0 }
+            .groupBy { it.drillParamValue!! }
+            .map { (durSec, group) ->
+                val bestRecord = group.maxByOrNull { it.durationMs }
+                val sessionDurationMs = durSec * 1000L
+                val bestHoldPct = if (sessionDurationMs > 0)
+                    (bestRecord?.durationMs?.toDouble() ?: 0.0) / sessionDurationMs * 100.0
+                else 0.0
                 DurationHistory(
-                    durationSec = dur,
-                    bestHoldPct = group.maxOf { it.holdPct },
-                    sessionCount = group.size
+                    durationSec = durSec,
+                    bestHoldPct = bestHoldPct,
+                    sessionCount = group.size,
+                    bestRecordId = bestRecord?.recordId ?: -1L
                 )
             }
             .sortedBy { it.durationSec }

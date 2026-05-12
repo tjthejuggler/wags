@@ -1,8 +1,10 @@
 package com.example.wags.ui.apnea
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,9 +16,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.ui.common.LiveSensorActions
@@ -35,8 +41,16 @@ fun MinBreathScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    LaunchedEffect(Unit) {
-        viewModel.loadPastSessions()
+    // Reset filters to current settings every time this screen is entered
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.resetFilters()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Scaffold(
@@ -64,6 +78,8 @@ fun MinBreathScreen(
         var showSettingsDialog by remember { mutableStateOf(false) }
         // Song picker dialog state
         var showSongPicker by remember { mutableStateOf(false) }
+        // Filter dialog state
+        var showFilterDialog by remember { mutableStateOf(false) }
 
         if (showSettingsDialog) {
             FreeHoldSettingsDialog(
@@ -89,6 +105,23 @@ fun MinBreathScreen(
                 loadingSelectedSong = state.loadingSelectedSong,
                 onSongSelected = { track -> viewModel.selectSong(track) },
                 onDismiss = { showSongPicker = false }
+            )
+        }
+
+        if (showFilterDialog) {
+            MinBreathFilterDialog(
+                filterLungVolume = state.filterLungVolume,
+                filterPrepType = state.filterPrepType,
+                filterTimeOfDay = state.filterTimeOfDay,
+                filterPosture = state.filterPosture,
+                filterAudio = state.filterAudio,
+                onLungVolumeChange = { viewModel.setFilterLungVolume(it) },
+                onPrepTypeChange = { viewModel.setFilterPrepType(it) },
+                onTimeOfDayChange = { viewModel.setFilterTimeOfDay(it) },
+                onPostureChange = { viewModel.setFilterPosture(it) },
+                onAudioChange = { viewModel.setFilterAudio(it) },
+                onReset = { viewModel.resetFilters() },
+                onDismiss = { showFilterDialog = false }
             )
         }
 
@@ -212,7 +245,14 @@ fun MinBreathScreen(
             SessionHistorySection(
                 history = state.pastDurations,
                 currentDurationSec = state.sessionDurationSec,
-                onSelectDuration = { viewModel.setSessionDurationSec(it) }
+                filterSummary = buildMinBreathFilterSummary(state),
+                onSelectDuration = { viewModel.setSessionDurationSec(it) },
+                onLongClickDuration = { recordId ->
+                    if (recordId > 0) {
+                        navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
+                    }
+                },
+                onFilterClick = { showFilterDialog = true }
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -377,18 +417,43 @@ private fun SessionDurationSection(
 // Session History Section
 // ─────────────────────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SessionHistorySection(
     history: List<DurationHistory>,
     currentDurationSec: Int,
-    onSelectDuration: (Int) -> Unit
+    filterSummary: String,
+    onSelectDuration: (Int) -> Unit,
+    onLongClickDuration: (Long) -> Unit = {},
+    onFilterClick: () -> Unit = {}
 ) {
-    Text(
-        text = "Session History",
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold,
-        color = TextPrimary
-    )
+    // Header row with title + filter button
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Session History",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = TextPrimary
+        )
+        OutlinedButton(
+            onClick = onFilterClick,
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+            shape = RoundedCornerShape(8.dp),
+            border = BorderStroke(1.dp, TextSecondary),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
+        ) {
+            Text(
+                text = filterSummary,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
 
     if (history.isEmpty()) {
         Text(
@@ -407,7 +472,10 @@ private fun SessionHistorySection(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
                         .background(bgColor)
-                        .clickable { onSelectDuration(item.durationSec) }
+                        .combinedClickable(
+                            onClick = { onSelectDuration(item.durationSec) },
+                            onLongClick = { onLongClickDuration(item.bestRecordId) }
+                        )
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
