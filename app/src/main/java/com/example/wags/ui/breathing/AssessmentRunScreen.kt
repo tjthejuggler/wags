@@ -46,13 +46,14 @@ private const val ASM_CHART_WINDOW_MS = 20_000.0
 // ---------------------------------------------------------------------------
 
 private fun RfProtocol.displayName(): String = when (this) {
-    RfProtocol.EXPRESS       -> "Express Sweep"
+    RfProtocol.EXPRESS        -> "Express Sweep"
     RfProtocol.STANDARD      -> "Standard Sweep"
     RfProtocol.DEEP          -> "Deep Calibration"
     RfProtocol.TARGETED      -> "Targeted Sweep"
     RfProtocol.CONTINUOUS    -> "Continuous Sweep"
     RfProtocol.SLIDING_WINDOW -> "Sliding Window"
     RfProtocol.CUSTOM        -> "Custom Assessment"
+    RfProtocol.BEST_RATES    -> "Best Rates"
 }
 
 private fun RfProtocol.isStepped(): Boolean = this != RfProtocol.SLIDING_WINDOW

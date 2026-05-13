@@ -175,195 +175,207 @@ private fun RfGraphsContent(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
-    ) {
-        // ── Time period selector ───────────────────────────────────────────
-        RfTimePeriodSelector(
-            selected = uiState.timePeriod,
-            onSelect = onTimePeriodChange
-        )
-
-        // ── Step navigation (only shown when a finite period is selected) ──
-        if (uiState.timePeriod != RfChartTimePeriod.ALL) {
-            RfPeriodStepRow(
-                timePeriod = uiState.timePeriod,
-                canStepBack = uiState.canStepBack,
-                canStepForward = uiState.canStepForward,
-                onStepBack = onStepBack,
-                onStepForward = onStepForward
+    Column(modifier = Modifier.fillMaxSize()) {
+        // ── Pinned controls at the top ────────────────────────────────────
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(BackgroundDark)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            RfTimePeriodSelector(
+                selected = uiState.timePeriod,
+                onSelect = onTimePeriodChange
             )
-        }
 
-        val totalReadings = uiState.allAssessments.size + uiState.allSessions.size
-        Text(
-            "$totalReadings readings total · showing ${uiState.timePeriod.label}",
-            style = MaterialTheme.typography.labelMedium,
-            color = TextDisabled
-        )
+            if (uiState.timePeriod != RfChartTimePeriod.ALL) {
+                RfPeriodStepRow(
+                    timePeriod = uiState.timePeriod,
+                    canStepBack = uiState.canStepBack,
+                    canStepForward = uiState.canStepForward,
+                    onStepBack = onStepBack,
+                    onStepForward = onStepForward
+                )
+            }
 
-        // ── ASSESSMENT GRAPHS ───────────────────────────────────────────
-        if (uiState.allAssessments.isNotEmpty()) {
+            val totalReadings = uiState.allAssessments.size + uiState.allSessions.size
             Text(
-                "ASSESSMENT HISTORY",
-                style = MaterialTheme.typography.titleMedium,
-                color = TextPrimary,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 2.sp,
-                modifier = Modifier.padding(bottom = 8.dp)
+                "$totalReadings readings total · showing ${uiState.timePeriod.label}",
+                style = MaterialTheme.typography.labelMedium,
+                color = TextDisabled
             )
-
-            // Header summary
-            RfHistorySummaryCard(uiState = uiState)
-
-            // ── 1. Optimal BPM ──────────────────────────────────────────
-            RfGraphSection(
-                title = "Optimal Breathing Rate",
-                subtitle = "Your resonance frequency (BPM) over time · x-axis = date"
-            ) {
-                RfMetricChart(
-                    label = "Optimal BPM",
-                    points = uiState.chartData.optimalBpm,
-                    lineColor = TextPrimary,
-                    isLandscape = isLandscape
-                )
-            }
-
-            // ── 2. Coherence Ratio ──────────────────────────────────────
-            RfGraphSection(
-                title = "Coherence Ratio",
-                subtitle = "Peak coherence achieved per assessment · x-axis = date"
-            ) {
-                RfMetricChart(
-                    label = "Coherence Ratio",
-                    points = uiState.chartData.coherenceRatio,
-                    lineColor = Color(0xFFD0D0D0),
-                    isLandscape = isLandscape
-                )
-            }
-
-            // ── 3. LF Power ────────────────────────────────────────────
-            RfGraphSection(
-                title = "LF Power",
-                subtitle = "Absolute low-frequency power at resonance (ms²/Hz) · x-axis = date"
-            ) {
-                RfMetricChart(
-                    label = "LF Power (ms²/Hz)",
-                    points = uiState.chartData.lfPower,
-                    lineColor = Color(0xFFB0B0B0),
-                    isLandscape = isLandscape
-                )
-            }
-
-            // ── 4. RMSSD ───────────────────────────────────────────────
-            RfGraphSection(
-                title = "RMSSD",
-                subtitle = "Root mean square of successive differences (ms) · x-axis = date"
-            ) {
-                RfMetricChart(
-                    label = "RMSSD (ms)",
-                    points = uiState.chartData.rmssd,
-                    lineColor = Color(0xFF909090),
-                    isLandscape = isLandscape
-                )
-            }
-
-            // ── 5. SDNN ────────────────────────────────────────────────
-            RfGraphSection(
-                title = "SDNN",
-                subtitle = "Standard deviation of NN intervals (ms) · x-axis = date"
-            ) {
-                RfMetricChart(
-                    label = "SDNN (ms)",
-                    points = uiState.chartData.sdnn,
-                    lineColor = Color(0xFF808080),
-                    isLandscape = isLandscape
-                )
-            }
-
-            // ── 6. Composite Score ─────────────────────────────────────
-            RfGraphSection(
-                title = "Composite Score",
-                subtitle = "Overall assessment quality score · x-axis = date"
-            ) {
-                RfScoreChart(
-                    points = uiState.chartData.compositeScore,
-                    isLandscape = isLandscape
-                )
-            }
         }
 
-        // ── SESSION GRAPHS ──────────────────────────────────────────────
-        if (uiState.allSessions.isNotEmpty()) {
-            HorizontalDivider(color = SurfaceDark, modifier = Modifier.padding(vertical = 8.dp))
+        HorizontalDivider(color = SurfaceDark, thickness = 1.dp)
 
-            Text(
-                "SESSION HISTORY",
-                style = MaterialTheme.typography.titleMedium,
-                color = TextPrimary,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 2.sp,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            // Session Coherence
-            RfGraphSection(
-                title = "Session Coherence",
-                subtitle = "Mean coherence ratio per session · x-axis = date"
-            ) {
-                RfMetricChart(
-                    label = "Coherence Ratio",
-                    points = uiState.sessionChartData.coherenceRatio,
-                    lineColor = Color(0xFFD0D0D0),
-                    isLandscape = isLandscape
+        // ── Scrollable chart area ─────────────────────────────────────────
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            // ── ASSESSMENT GRAPHS ─────────────────────────────────────────
+            if (uiState.allAssessments.isNotEmpty()) {
+                Text(
+                    "ASSESSMENT HISTORY",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp,
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
+
+                // Header summary
+                RfHistorySummaryCard(uiState = uiState)
+
+                // ── 1. Optimal BPM ──────────────────────────────────────
+                RfGraphSection(
+                    title = "Optimal Breathing Rate",
+                    subtitle = "Your resonance frequency (BPM) over time · x-axis = date"
+                ) {
+                    RfMetricChart(
+                        label = "Optimal BPM",
+                        points = uiState.chartData.optimalBpm,
+                        lineColor = TextPrimary,
+                        isLandscape = isLandscape
+                    )
+                }
+
+                // ── 2. Coherence Ratio ──────────────────────────────────
+                RfGraphSection(
+                    title = "Coherence Ratio",
+                    subtitle = "Peak coherence achieved per assessment · x-axis = date"
+                ) {
+                    RfMetricChart(
+                        label = "Coherence Ratio",
+                        points = uiState.chartData.coherenceRatio,
+                        lineColor = Color(0xFFD0D0D0),
+                        isLandscape = isLandscape
+                    )
+                }
+
+                // ── 3. LF Power ────────────────────────────────────────
+                RfGraphSection(
+                    title = "LF Power",
+                    subtitle = "Absolute low-frequency power at resonance (ms²/Hz) · x-axis = date"
+                ) {
+                    RfMetricChart(
+                        label = "LF Power (ms²/Hz)",
+                        points = uiState.chartData.lfPower,
+                        lineColor = Color(0xFFB0B0B0),
+                        isLandscape = isLandscape
+                    )
+                }
+
+                // ── 4. RMSSD ───────────────────────────────────────────
+                RfGraphSection(
+                    title = "RMSSD",
+                    subtitle = "Root mean square of successive differences (ms) · x-axis = date"
+                ) {
+                    RfMetricChart(
+                        label = "RMSSD (ms)",
+                        points = uiState.chartData.rmssd,
+                        lineColor = Color(0xFF909090),
+                        isLandscape = isLandscape
+                    )
+                }
+
+                // ── 5. SDNN ────────────────────────────────────────────
+                RfGraphSection(
+                    title = "SDNN",
+                    subtitle = "Standard deviation of NN intervals (ms) · x-axis = date"
+                ) {
+                    RfMetricChart(
+                        label = "SDNN (ms)",
+                        points = uiState.chartData.sdnn,
+                        lineColor = Color(0xFF808080),
+                        isLandscape = isLandscape
+                    )
+                }
+
+                // ── 6. Composite Score ─────────────────────────────────
+                RfGraphSection(
+                    title = "Composite Score",
+                    subtitle = "Overall assessment quality score · x-axis = date"
+                ) {
+                    RfScoreChart(
+                        points = uiState.chartData.compositeScore,
+                        isLandscape = isLandscape
+                    )
+                }
             }
 
-            // Session RMSSD
-            RfGraphSection(
-                title = "Session RMSSD",
-                subtitle = "Mean RMSSD per session (ms) · x-axis = date"
-            ) {
-                RfMetricChart(
-                    label = "RMSSD (ms)",
-                    points = uiState.sessionChartData.rmssd,
-                    lineColor = Color(0xFF909090),
-                    isLandscape = isLandscape
+            // ── SESSION GRAPHS ──────────────────────────────────────────
+            if (uiState.allSessions.isNotEmpty()) {
+                HorizontalDivider(color = SurfaceDark, modifier = Modifier.padding(vertical = 8.dp))
+
+                Text(
+                    "SESSION HISTORY",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp,
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
+
+                // Session Coherence
+                RfGraphSection(
+                    title = "Session Coherence",
+                    subtitle = "Mean coherence ratio per session · x-axis = date"
+                ) {
+                    RfMetricChart(
+                        label = "Coherence Ratio",
+                        points = uiState.sessionChartData.coherenceRatio,
+                        lineColor = Color(0xFFD0D0D0),
+                        isLandscape = isLandscape
+                    )
+                }
+
+                // Session RMSSD
+                RfGraphSection(
+                    title = "Session RMSSD",
+                    subtitle = "Mean RMSSD per session (ms) · x-axis = date"
+                ) {
+                    RfMetricChart(
+                        label = "RMSSD (ms)",
+                        points = uiState.sessionChartData.rmssd,
+                        lineColor = Color(0xFF909090),
+                        isLandscape = isLandscape
+                    )
+                }
+
+                // Session SDNN
+                RfGraphSection(
+                    title = "Session SDNN",
+                    subtitle = "Mean SDNN per session (ms) · x-axis = date"
+                ) {
+                    RfMetricChart(
+                        label = "SDNN (ms)",
+                        points = uiState.sessionChartData.sdnn,
+                        lineColor = Color(0xFF808080),
+                        isLandscape = isLandscape
+                    )
+                }
+
+                // Session Duration
+                RfGraphSection(
+                    title = "Session Duration",
+                    subtitle = "Duration per session (minutes) · x-axis = date"
+                ) {
+                    RfMetricChart(
+                        label = "Duration (min)",
+                        points = uiState.sessionChartData.duration,
+                        lineColor = Color(0xFFB0B0B0),
+                        isLandscape = isLandscape
+                    )
+                }
             }
 
-            // Session SDNN
-            RfGraphSection(
-                title = "Session SDNN",
-                subtitle = "Mean SDNN per session (ms) · x-axis = date"
-            ) {
-                RfMetricChart(
-                    label = "SDNN (ms)",
-                    points = uiState.sessionChartData.sdnn,
-                    lineColor = Color(0xFF808080),
-                    isLandscape = isLandscape
-                )
-            }
-
-            // Session Duration
-            RfGraphSection(
-                title = "Session Duration",
-                subtitle = "Duration per session (minutes) · x-axis = date"
-            ) {
-                RfMetricChart(
-                    label = "Duration (min)",
-                    points = uiState.sessionChartData.duration,
-                    lineColor = Color(0xFFB0B0B0),
-                    isLandscape = isLandscape
-                )
-            }
+            Spacer(Modifier.height(16.dp))
         }
-
-        Spacer(Modifier.height(16.dp))
     }
 }
 

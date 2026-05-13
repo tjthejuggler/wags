@@ -68,6 +68,13 @@ private val PROTOCOL_LIST = listOf(
         description = "Fine-tunes your personal optimal rate with 0.1 BPM granularity. Requires prior history."
     ),
     ProtocolInfo(
+        protocol    = RfProtocol.BEST_RATES,
+        label       = "Best Rates",
+        duration    = "~12 min",
+        subtitle    = "Top 3–4 rates × 3 min, shuffled",
+        description = "Compares the 3–4 highest-ranked rates from your history in a random order. Great for validating which rate truly works best for you. Requires prior history."
+    ),
+    ProtocolInfo(
         protocol    = RfProtocol.SLIDING_WINDOW,
         label       = "Sliding Window",
         duration    = "~16 min",
@@ -146,8 +153,8 @@ fun AssessmentPickerScreen(
             )
 
             PROTOCOL_LIST.forEach { info ->
-                val isTargeted = info.protocol == RfProtocol.TARGETED
-                val isDisabled = isTargeted && !state.targetedEnabled
+                val isHistoryRequired = info.protocol == RfProtocol.TARGETED || info.protocol == RfProtocol.BEST_RATES
+                val isDisabled = isHistoryRequired && !state.targetedEnabled
                 val isSelected = state.selectedProtocol == info.protocol
 
                 ProtocolCard(

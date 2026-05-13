@@ -25,6 +25,7 @@ class AssessmentPickerViewModel @Inject constructor(
         val selectedProtocol: RfProtocol = RfProtocol.EXPRESS,
         val customDurationMinutes: Int = 12,
         val targetedEnabled: Boolean = false,
+        val bestRatesEnabled: Boolean = false,
         val isLoading: Boolean = true,
         val isHrDeviceConnected: Boolean = false
     )
@@ -44,13 +45,14 @@ class AssessmentPickerViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             val hasSession = repository.hasAnySession()
-            _uiState.update { it.copy(targetedEnabled = hasSession, isLoading = false) }
+            _uiState.update { it.copy(targetedEnabled = hasSession, bestRatesEnabled = hasSession, isLoading = false) }
         }
     }
 
     fun selectProtocol(protocol: RfProtocol) {
-        // Guard: don't allow selecting TARGETED if not enabled
+        // Guard: don't allow selecting TARGETED or BEST_RATES if not enabled
         if (protocol == RfProtocol.TARGETED && !_uiState.value.targetedEnabled) return
+        if (protocol == RfProtocol.BEST_RATES && !_uiState.value.bestRatesEnabled) return
         _uiState.update { it.copy(selectedProtocol = protocol) }
     }
 

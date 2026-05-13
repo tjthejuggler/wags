@@ -104,24 +104,49 @@ class AssessmentRunViewModel @Inject constructor(
 
     init {
         pacerEngine.reset()
-        // For TARGETED protocol, fetch the current recommendation first so the
-        // orchestrator centers its fine-tune sweep on the recommended rate.
-        if (protocol == RfProtocol.TARGETED) {
-            viewModelScope.launch {
-                val recommendation = rateRecommender.recommend()
-                val optimalBpm = recommendation.recommendedBpm ?: 5.5f
+        when (protocol) {
+            // For TARGETED protocol, fetch the current recommendation first so the
+            // orchestrator centers its fine-tune sweep on the recommended rate.
+            RfProtocol.TARGETED -> {
+                viewModelScope.launch {
+                    val recommendation = rateRecommender.recommend()
+                    val optimalBpm = recommendation.recommendedBpm ?: 5.5f
+                    orchestrator.start(
+                        protocol = protocol,
+                        scope = viewModelScope,
+                        optimalBpm = optimalBpm
+                    )
+                }
+            }
+            // For BEST_RATES protocol, fetch the top 3–4 rates from the recommender
+            // and pass them to the orchestrator for a shuffled comparison.
+            RfProtocol.BEST_RATES -> {
+                viewModelScope.launch {
+                    val recommendation = rateRecommender.recommend()
+                    val topRates = recommendation.buckets
+                        .sortedByDescending { it.finalScore }
+                        .take(4)
+                        .map { it.rateBpm }
+                    val rates = if (topRates.size < 3) {
+                        // Not enough history — fall back to standard 5-rate sweep
+                        listOf(4.5f, 5.0f, 5.5f, 6.0f, 6.5f)
+                    } else {
+                        topRates
+                    }
+                    orchestrator.start(
+                        protocol = protocol,
+                        scope = viewModelScope,
+                        bestRatesBpm = rates
+                    )
+                }
+            }
+            else -> {
                 orchestrator.start(
                     protocol = protocol,
                     scope = viewModelScope,
-                    optimalBpm = optimalBpm
+                    customDurationMinutes = customDurationMinutes
                 )
             }
-        } else {
-            orchestrator.start(
-                protocol = protocol,
-                scope = viewModelScope,
-                customDurationMinutes = customDurationMinutes
-            )
         }
         collectOrchestratorState()
         startRrPolling()

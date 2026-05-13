@@ -29,6 +29,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -64,9 +66,18 @@ fun AdviceDialog(
     onDelete: (Long) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val clipboardManager = LocalClipboardManager.current
     var newText by remember { mutableStateOf("") }
     var editingId by remember { mutableStateOf<Long?>(null) }
     var editText by remember { mutableStateOf("") }
+
+    // Auto-paste clipboard contents when dialog opens
+    LaunchedEffect(Unit) {
+        val clip = clipboardManager.getText()
+        if (!clip.isNullOrBlank()) {
+            newText = clip.toString()
+        }
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
