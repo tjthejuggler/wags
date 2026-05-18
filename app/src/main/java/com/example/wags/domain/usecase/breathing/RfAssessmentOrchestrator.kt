@@ -416,9 +416,9 @@ class RfAssessmentOrchestrator @Inject constructor(
      * assessments don't always test the exact same BPM values.
      */
     private fun randomPeriodOffsetSec(): Float {
-        // 19 possible values: -9..+9 tenths → -0.9..+0.9 seconds
-        val tenths = (-9..9).random()
-        return tenths / 10f
+        // 37 possible values: -18..+18 twentieths → -0.90..+0.90 seconds in 0.05s steps
+        val twentieths = (-18..18).random()
+        return twentieths / 20f
     }
 
     /**
@@ -469,8 +469,8 @@ class RfAssessmentOrchestrator @Inject constructor(
             RfProtocol.TARGETED -> Triple(
                 listOf(
                     offsetBpm(optimalBpm, offset) to 1.0f,
-                    offsetBpm(optimalBpm + 0.1f, offset) to 1.0f,
-                    offsetBpm(optimalBpm - 0.1f, offset) to 1.0f
+                    offsetBpm(optimalBpm + 0.05f, offset) to 1.0f,
+                    offsetBpm(optimalBpm - 0.05f, offset) to 1.0f
                 ).shuffled(),
                 180_000L, 60_000L
             )

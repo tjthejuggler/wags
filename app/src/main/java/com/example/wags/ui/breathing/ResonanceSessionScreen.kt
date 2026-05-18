@@ -1,8 +1,10 @@
 package com.example.wags.ui.breathing
 
+import android.content.res.Configuration
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -16,7 +18,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -30,7 +39,6 @@ import com.example.wags.ui.common.RmssdChart
 import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.common.StripChartColors
 import com.example.wags.ui.common.WagsFeedback
-import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.theme.*
 
@@ -92,6 +100,9 @@ fun ResonanceSessionScreen(
     val apneaPrefs = remember {
         context.getSharedPreferences("apnea_prefs", android.content.Context.MODE_PRIVATE)
     }
+
+    // Color mode toggle — persisted to SharedPreferences
+    var useColors by remember { mutableStateOf(apneaPrefs.getBoolean("breathing_colors", false)) }
 
     val isActive = state.sessionPhase == BreathingSessionPhase.PREPARING ||
             state.sessionPhase == BreathingSessionPhase.BREATHING
@@ -155,6 +166,17 @@ fun ResonanceSessionScreen(
                     }
                 },
                 actions = {
+                    // Color mode toggle for inhale/exhale peripheral vision
+                    IconButton(onClick = {
+                        useColors = !useColors
+                        apneaPrefs.edit().putBoolean("breathing_colors", useColors).apply()
+                    }) {
+                        Text(
+                            text = "🎨",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (useColors) PacerInhaleColor else TextDisabled
+                        )
+                    }
                     LiveSensorActionsCallback(onNavigateToSettings)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
@@ -165,8 +187,7 @@ fun ResonanceSessionScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .verticalScroll(rememberScrollState()),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -188,81 +209,208 @@ fun ResonanceSessionScreen(
                         }
                     } else null
 
-                    // ── Pacer circle ──────────────────────────────────────────
-                    BreathingPacerCircle(
-                        progress = state.pacerRadius,
-                        isInhaling = state.isInhaling,
-                        size = 200.dp,
-                        onPhaseTransition = vibrationCallback
-                    )
+                    val isLandscape = LocalConfiguration.current.orientation ==
+                            Configuration.ORIENTATION_LANDSCAPE
 
-                    // ── Stats row (rate / time / coherence) ─────────────────
-                    RsSessionStatsRow(
-                        breathingRateBpm = state.breathingRateBpm,
-                        elapsedSeconds = state.sessionElapsedSeconds,
-                        coherenceRatio = state.liveCoherenceRatio
-                    )
+                    if (isLandscape) {
+                        // ── Landscape: pacer left, charts right ────────────────
+                        Row(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            // Left: Pacer + stats
+                            Column(
+                                modifier = Modifier
+                                    .weight(0.4f)
+                                    .fillMaxHeight(),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                // Pacer with coherence chart behind
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.size(180.dp)
+                                ) {
+                                    if (state.coherenceHistory.size >= 2) {
+                                        RsCoherenceChart(
+                                            history = state.coherenceHistory,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
+                                    BreathingPacerCircle(
+                                        progress = state.pacerRadius,
+                                        isInhaling = state.isInhaling,
+                                        size = 160.dp,
+                                        useColors = useColors,
+                                        onPhaseTransition = vibrationCallback
+                                    )
+                                }
 
-                    // ── Remaining time + progress bar (when timer is active) ─
-                    if (!state.infinityMode) {
-                        val totalSeconds = durationMinutes * 60
-                        val progress = if (totalSeconds > 0)
-                            (state.sessionElapsedSeconds.toFloat() / totalSeconds).coerceIn(0f, 1f)
-                        else 0f
+                                RsSessionStatsRow(
+                                    breathingRateBpm = state.breathingRateBpm,
+                                    elapsedSeconds = state.sessionElapsedSeconds,
+                                    coherenceRatio = state.liveCoherenceRatio
+                                )
 
-                        LinearProgressIndicator(
-                            progress         = { progress },
-                            modifier         = Modifier.fillMaxWidth(),
-                            color            = TextSecondary,
-                            trackColor       = SurfaceVariant
-                        )
+                                RsHrvMetricsRow(
+                                    hrBpm  = state.liveHr,
+                                    rmssd  = state.liveRmssd?.toDouble(),
+                                    sdnn   = state.liveSdnn?.toDouble(),
+                                    rrCount = state.rrCount
+                                )
 
-                        if (state.sessionRemainingSeconds > 0) {
-                            Text(
-                                text = "${rsFmtDuration(state.sessionRemainingSeconds)} remaining",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = RsAsh,
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = TextAlign.Center
+                                OutlinedButton(
+                                    onClick = { viewModel.stopSession() },
+                                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
+                                ) { Text("End Session") }
+                            }
+
+                            // Right: Charts (scrollable)
+                            Column(
+                                modifier = Modifier
+                                    .weight(0.6f)
+                                    .fillMaxHeight()
+                                    .verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // Progress bar
+                                if (!state.infinityMode) {
+                                    val totalSeconds = durationMinutes * 60
+                                    val progress = if (totalSeconds > 0)
+                                        (state.sessionElapsedSeconds.toFloat() / totalSeconds).coerceIn(0f, 1f)
+                                    else 0f
+
+                                    LinearProgressIndicator(
+                                        progress = { progress },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        color = TextSecondary,
+                                        trackColor = SurfaceVariant
+                                    )
+
+                                    if (state.sessionRemainingSeconds > 0) {
+                                        Text(
+                                            text = "${rsFmtDuration(state.sessionRemainingSeconds)} remaining",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = RsAsh,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
+
+                                RsChartLabel("RR INTERVAL")
+                                RrIntervalChart(
+                                    rrIntervals = state.liveRrIntervals,
+                                    windowMs = RS_CHART_WINDOW_MS,
+                                    modifier = Modifier.fillMaxWidth().height(100.dp)
+                                )
+
+                                RsChartLabel("RMSSD")
+                                RmssdChart(
+                                    rrIntervals = state.liveRrIntervals,
+                                    windowMs = RS_CHART_WINDOW_MS,
+                                    colors = RmssdColors,
+                                    modifier = Modifier.fillMaxWidth().height(100.dp)
+                                )
+                            }
+                        }
+                    } else {
+                        // ── Portrait: pacer on top with coherence chart behind ──
+                        Column(
+                            modifier = Modifier.verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            // Pacer with coherence chart overlay
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.size(220.dp)
+                            ) {
+                                if (state.coherenceHistory.size >= 2) {
+                                    RsCoherenceChart(
+                                        history = state.coherenceHistory,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                                BreathingPacerCircle(
+                                    progress = state.pacerRadius,
+                                    isInhaling = state.isInhaling,
+                                    size = 200.dp,
+                                    useColors = useColors,
+                                    onPhaseTransition = vibrationCallback
+                                )
+                            }
+
+                            // ── Stats row (rate / time / coherence) ─────────────
+                            RsSessionStatsRow(
+                                breathingRateBpm = state.breathingRateBpm,
+                                elapsedSeconds = state.sessionElapsedSeconds,
+                                coherenceRatio = state.liveCoherenceRatio
                             )
+
+                            // ── Remaining time + progress bar ──────────────────
+                            if (!state.infinityMode) {
+                                val totalSeconds = durationMinutes * 60
+                                val progress = if (totalSeconds > 0)
+                                    (state.sessionElapsedSeconds.toFloat() / totalSeconds).coerceIn(0f, 1f)
+                                else 0f
+
+                                LinearProgressIndicator(
+                                    progress         = { progress },
+                                    modifier         = Modifier.fillMaxWidth(),
+                                    color            = TextSecondary,
+                                    trackColor       = SurfaceVariant
+                                )
+
+                                if (state.sessionRemainingSeconds > 0) {
+                                    Text(
+                                        text = "${rsFmtDuration(state.sessionRemainingSeconds)} remaining",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = RsAsh,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+
+                            // ── Live HRV metrics ──────────────────────────────────
+                            RsHrvMetricsRow(
+                                hrBpm  = state.liveHr,
+                                rmssd  = state.liveRmssd?.toDouble(),
+                                sdnn   = state.liveSdnn?.toDouble(),
+                                rrCount = state.rrCount
+                            )
+
+                            // ── RR interval scrolling chart ──────────────────────
+                            RsChartLabel("RR INTERVAL")
+                            RrIntervalChart(
+                                rrIntervals = state.liveRrIntervals,
+                                windowMs = RS_CHART_WINDOW_MS,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(100.dp)
+                            )
+
+                            // ── RMSSD scrolling chart ─────────────────────────────
+                            RsChartLabel("RMSSD")
+                            RmssdChart(
+                                rrIntervals = state.liveRrIntervals,
+                                windowMs = RS_CHART_WINDOW_MS,
+                                colors = RmssdColors,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(100.dp)
+                            )
+
+                            // ── End Session button (saves the session) ───────────
+                            OutlinedButton(
+                                onClick = { viewModel.stopSession() },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
+                            ) { Text("End Session") }
                         }
                     }
-
-                    // ── Live HRV metrics ──────────────────────────────────────
-                    RsHrvMetricsRow(
-                        hrBpm  = state.liveHr,
-                        rmssd  = state.liveRmssd?.toDouble(),
-                        sdnn   = state.liveSdnn?.toDouble(),
-                        rrCount = state.rrCount
-                    )
-
-                    // ── RR interval scrolling chart (top) ─────────────────────
-                    RsChartLabel("RR INTERVAL")
-                    RrIntervalChart(
-                        rrIntervals = state.liveRrIntervals,
-                        windowMs = RS_CHART_WINDOW_MS,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(100.dp)
-                    )
-
-                    // ── RMSSD scrolling chart (bottom) ────────────────────────
-                    RsChartLabel("RMSSD")
-                    RmssdChart(
-                        rrIntervals = state.liveRrIntervals,
-                        windowMs = RS_CHART_WINDOW_MS,
-                        colors = RmssdColors,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(100.dp)
-                    )
-
-                    // ── End Session button (saves the session) ───────────────
-                    OutlinedButton(
-                        onClick = { viewModel.stopSession() },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
-                    ) { Text("End Session") }
                 }
 
                 BreathingSessionPhase.COMPLETE -> {
@@ -553,6 +701,84 @@ private fun RsChartLabel(text: String) {
             .fillMaxWidth()
             .padding(start = 4.dp, top = 2.dp)
     )
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  COHERENCE CHART (behind pacer circle)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/**
+ * Semi-transparent coherence ratio chart designed to sit behind the
+ * breathing pacer circle. Uses the same rendering logic as
+ * [CoherenceHistoryChart] in BreathingScreen but with lower opacity
+ * so the pacer circle remains clearly visible on top.
+ */
+@Composable
+private fun RsCoherenceChart(
+    history: List<Float>,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                Brush.verticalGradient(
+                    listOf(RsInk, RsCharcoal.copy(alpha = 0.3f), RsInk)
+                )
+            )
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize().padding(8.dp)) {
+            if (history.size < 2) return@Canvas
+            val w = size.width
+            val h = size.height
+            val maxVal = history.max().coerceAtLeast(1f)
+
+            // Zone threshold lines
+            val highY = h - (3f / maxVal * h).coerceIn(0f, h)
+            val medY = h - (1f / maxVal * h).coerceIn(0f, h)
+            drawLine(Color(0xFF505050), Offset(0f, highY), Offset(w, highY), strokeWidth = 1f)
+            drawLine(Color(0xFF383838), Offset(0f, medY), Offset(w, medY), strokeWidth = 1f)
+
+            // Coherence line
+            val path = Path()
+            history.forEachIndexed { idx, value ->
+                val x = idx.toFloat() / (history.size - 1) * w
+                val y = h - (value / maxVal * h).coerceIn(0f, h)
+                if (idx == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+            drawPath(
+                path,
+                EcgCyan.copy(alpha = 0.5f),
+                style = Stroke(
+                    width = 2.dp.toPx(),
+                    cap = StrokeCap.Round,
+                    join = StrokeJoin.Round
+                )
+            )
+
+            // Dots at each sample (semi-transparent)
+            history.forEachIndexed { idx, value ->
+                val x = idx.toFloat() / (history.size - 1) * w
+                val y = h - (value / maxVal * h).coerceIn(0f, h)
+                val dotColor = when {
+                    value >= 3f -> RsZoneGreen.copy(alpha = 0.5f)
+                    value >= 1f -> RsZoneBlue.copy(alpha = 0.5f)
+                    else -> RsZoneRed.copy(alpha = 0.5f)
+                }
+                drawCircle(dotColor, radius = 3.dp.toPx(), center = Offset(x, y))
+            }
+        }
+
+        // Label
+        Text(
+            text = "Coherence",
+            style = MaterialTheme.typography.labelSmall,
+            color = RsAsh.copy(alpha = 0.6f),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 2.dp)
+        )
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

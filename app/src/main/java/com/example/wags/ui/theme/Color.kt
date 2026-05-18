@@ -37,6 +37,10 @@ val TextDisabled  = Color(0xFF505050)
 val PacerInhale = Color(0xFFD0D0D0)   // light grey (inhale)
 val PacerExhale = Color(0xFF606060)   // dark grey (exhale)
 
+// Breathing pacer — colored variants for peripheral vision
+val PacerInhaleColor = Color(0xFF4FC3F7)   // light blue (inhale)
+val PacerExhaleColor = Color(0xFFFF8A65)   // warm orange (exhale)
+
 // Apnea states — greyscale
 val ApneaVentilation = Color(0xFFE0E0E0)
 val ApneaHold        = Color(0xFF808080)

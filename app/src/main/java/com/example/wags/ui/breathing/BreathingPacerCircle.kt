@@ -15,7 +15,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.wags.ui.theme.BackgroundDark
 import com.example.wags.ui.theme.PacerExhale
+import com.example.wags.ui.theme.PacerExhaleColor
 import com.example.wags.ui.theme.PacerInhale
+import com.example.wags.ui.theme.PacerInhaleColor
 import com.example.wags.ui.theme.TextPrimary
 
 /**
@@ -54,6 +56,7 @@ fun BreathingPacerCircle(
     size: Dp = 260.dp,
     showLabel: Boolean = true,
     overlayLabel: String? = null,
+    useColors: Boolean = false,
     onPhaseTransition: ((isInhaling: Boolean) -> Unit)? = null
 ) {
     // Fire the callback exactly once per phase change
@@ -72,10 +75,12 @@ fun BreathingPacerCircle(
     val isAtPeak = isInhaling && clampedProgress >= 0.95f
 
     // Base color: light for inhale, dark for exhale; white flash at peak
+    val inhaleColor = if (useColors) PacerInhaleColor else PacerInhale
+    val exhaleColor = if (useColors) PacerExhaleColor else PacerExhale
     val baseColor = when {
         isAtPeak    -> Color.White
-        isInhaling  -> PacerInhale
-        else        -> PacerExhale
+        isInhaling  -> inhaleColor
+        else        -> exhaleColor
     }
     val color by animateColorAsState(
         targetValue = baseColor,
@@ -89,7 +94,7 @@ fun BreathingPacerCircle(
     val targetTextColor = when {
         isAtPeak && clampedProgress > 0.45f -> BackgroundDark   // dark text on white circle
         clampedProgress > 0.45f             -> TextPrimary      // light text on filled circle
-        else                                -> if (isInhaling) PacerInhale else PacerExhale
+        else                                -> if (isInhaling) inhaleColor else exhaleColor
     }
     val animatedTextColor by animateColorAsState(
         targetValue = targetTextColor,

@@ -212,7 +212,7 @@ private fun RecommendationContent(rec: RateRecommendation, modifier: Modifier = 
                         title = "OVERALL SCORE BY RATE",
                         entries = sortedByRate.map {
                             BarEntry(
-                                label = "%.1f".format(it.rateBpm),
+                                label = "%.2f".format(it.rateBpm),
                                 value = it.finalScore,
                                 isHighlighted = it.isRecommended
                             )
@@ -226,7 +226,7 @@ private fun RecommendationContent(rec: RateRecommendation, modifier: Modifier = 
                         title = "WEIGHTED AVG SCORE BY RATE",
                         entries = sortedByRate.map {
                             BarEntry(
-                                label = "%.1f".format(it.rateBpm),
+                                label = "%.2f".format(it.rateBpm),
                                 value = it.weightedAvgScore,
                                 isHighlighted = it.isRecommended
                             )
@@ -240,7 +240,7 @@ private fun RecommendationContent(rec: RateRecommendation, modifier: Modifier = 
                         title = "CONFIDENCE BY RATE",
                         entries = sortedByRate.map {
                             BarEntry(
-                                label = "%.1f".format(it.rateBpm),
+                                label = "%.2f".format(it.rateBpm),
                                 value = it.confidenceMultiplier,
                                 isHighlighted = it.isRecommended
                             )
@@ -255,7 +255,7 @@ private fun RecommendationContent(rec: RateRecommendation, modifier: Modifier = 
                         title = "DATA POINTS BY RATE",
                         entries = sortedByRate.map {
                             BarEntry(
-                                label = "%.1f".format(it.rateBpm),
+                                label = "%.2f".format(it.rateBpm),
                                 value = it.dataPointCount.toFloat(),
                                 isHighlighted = it.isRecommended
                             )
@@ -320,7 +320,7 @@ private fun BucketCard(bucket: RateBucket) {
                         )
                     }
                     Text(
-                        text = "%.1f BPM".format(bucket.rateBpm),
+                        text = "%.2f BPM".format(bucket.rateBpm),
                         style = MaterialTheme.typography.titleMedium,
                         color = if (bucket.isRecommended) RecGold else TextPrimary,
                         fontWeight = FontWeight.Bold

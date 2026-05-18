@@ -64,7 +64,7 @@ private val PROTOCOL_LIST = listOf(
         protocol    = RfProtocol.TARGETED,
         label       = "Targeted",
         duration    = "~10 min",
-        subtitle    = "Optimal ±0.1 BPM × 3 min",
+        subtitle    = "Optimal ±0.05 BPM × 3 min",
         description = "Fine-tunes your personal optimal rate with 0.1 BPM granularity. Requires prior history."
     ),
     ProtocolInfo(

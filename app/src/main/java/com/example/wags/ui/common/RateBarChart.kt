@@ -2,7 +2,9 @@ package com.example.wags.ui.common
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -77,6 +79,11 @@ fun RateBarChart(
     var selectedBar by remember { mutableIntStateOf(-1) }
     var canvasSize by remember { mutableStateOf(Size.Zero) }
 
+    // Horizontal scroll when many bars would be too narrow
+    val needsScroll = entries.size > 15
+    val scrollState = rememberScrollState()
+    val minChartWidthDp = if (needsScroll) (entries.size * 32).dp + 48.dp else 0.dp
+
     // Layout constants — padBottom increased from 24f to 40f for x-axis labels
     val padLeft = 36f
     val padRight = 8f
@@ -108,10 +115,13 @@ fun RateBarChart(
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
-        Box(modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = Modifier
+            .fillMaxWidth()
+            .then(if (needsScroll) Modifier.horizontalScroll(scrollState) else Modifier)
+        ) {
             Canvas(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .then(if (needsScroll) Modifier.width(minChartWidthDp) else Modifier.fillMaxWidth())
                     .height(200.dp)          // increased from 160.dp
                     .clip(RoundedCornerShape(8.dp))
                     .onSizeChanged { canvasSize = Size(it.width.toFloat(), it.height.toFloat()) }
@@ -226,7 +236,8 @@ fun RateBarChart(
                     (rect.bottom + 8f).toInt()
                 }
 
-                val tooltipX: Int = (barCenterX - tooltipWidthPx / 2f)
+                val scrollOffsetPx = if (needsScroll) scrollState.value else 0
+                val tooltipX: Int = (barCenterX - tooltipWidthPx / 2f - scrollOffsetPx)
                     .toInt()
                     .coerceIn(0, (canvasSize.width - tooltipWidthPx).toInt().coerceAtLeast(0))
 

@@ -28,10 +28,10 @@ data class RateRecommendation(
 )
 
 /**
- * One rate bucket (0.1 BPM granularity) with its aggregated scores.
+ * One rate bucket (0.05 BPM granularity) with its aggregated scores.
  */
 data class RateBucket(
-    /** The rate in BPM (rounded to 0.1). */
+    /** The rate in BPM (rounded to 0.05). */
     val rateBpm: Float,
     /** Number of data points in this bucket. */
     val dataPointCount: Int,
@@ -170,8 +170,8 @@ class ResonanceRateRecommender @Inject constructor(
             )
         }
 
-        // ── Group into 0.1 BPM buckets (round to nearest) ──────────────────
-        val grouped = dataPoints.groupBy { roundToTenth(it.rateBpm) }
+        // ── Group into 0.05 BPM buckets (round to nearest) ─────────────────
+        val grouped = dataPoints.groupBy { roundToTwentieth(it.rateBpm) }
 
         val buckets = grouped.map { (rate, points) ->
             // Weighted average: assessments count 3×, sessions count 1×
@@ -224,8 +224,8 @@ class ResonanceRateRecommender @Inject constructor(
         )
     }
 
-    /** Round to nearest 0.1 BPM. */
-    private fun roundToTenth(value: Float): Float {
-        return (value * 10).roundToInt() / 10f
+    /** Round to nearest 0.05 BPM. */
+    private fun roundToTwentieth(value: Float): Float {
+        return (value * 20).roundToInt() / 20f
     }
 }
