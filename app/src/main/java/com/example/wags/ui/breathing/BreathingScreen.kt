@@ -86,9 +86,10 @@ fun BreathingScreen(
     val deviceId = "PLACEHOLDER_H10_ID"
     val context = LocalContext.current
 
-    // Vibration toggle — persisted to SharedPreferences so it survives app restarts
+    // Vibration & color toggles — persisted to SharedPreferences so they survive app restarts
     val prefs = remember { context.getSharedPreferences("apnea_prefs", android.content.Context.MODE_PRIVATE) }
     var vibrationEnabled by remember { mutableStateOf(prefs.getBoolean("breathing_vibration", false)) }
+    var colorsEnabled by remember { mutableStateOf(prefs.getBoolean("breathing_colors", false)) }
 
     // Restore last-used session duration from prefs so it survives app restarts
     LaunchedEffect(Unit) {
@@ -204,7 +205,7 @@ fun BreathingScreen(
                 )
             }
 
-            // Start session row — button + vibration toggle
+            // Start session row — button + vibration toggle + color toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -216,6 +217,7 @@ fun BreathingScreen(
                     enabled = state.isHrDeviceConnected
                 ) { Text("Start Session") }
 
+                // Vibration toggle
                 IconButton(
                     onClick = {
                         vibrationEnabled = !vibrationEnabled
@@ -226,6 +228,20 @@ fun BreathingScreen(
                         text = "〰",
                         color = if (vibrationEnabled) TextPrimary else TextDisabled,
                         style = MaterialTheme.typography.titleLarge
+                    )
+                }
+
+                // Color mode toggle
+                IconButton(
+                    onClick = {
+                        colorsEnabled = !colorsEnabled
+                        prefs.edit().putBoolean("breathing_colors", colorsEnabled).apply()
+                    }
+                ) {
+                    Text(
+                        text = "🎨",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (colorsEnabled) TextPrimary else TextDisabled
                     )
                 }
             }

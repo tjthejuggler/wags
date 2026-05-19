@@ -246,7 +246,9 @@ class RfAssessmentOrchestrator @Inject constructor(
     ) {
         val (grid, testDurationMs, washoutDurationMs) = protocolParams(protocol, optimalBpm, customDurationMinutes, bestRatesBpm)
         val totalEpochs = grid.size
-        val totalMs = BASELINE_DURATION_MS + totalEpochs * (testDurationMs + washoutDurationMs)
+        // Last epoch has no washout — always end with an actual resonance breathing test
+        val totalMs = BASELINE_DURATION_MS + totalEpochs * testDurationMs +
+                (totalEpochs - 1).coerceAtLeast(0) * washoutDurationMs
 
         // --- BASELINE ---
         _phase.value = RfPhase.BASELINE
@@ -273,7 +275,9 @@ class RfAssessmentOrchestrator @Inject constructor(
             val progress = elapsedMs.toFloat() / totalMs
             emitActive(RfPhase.TEST_BLOCK, rateBpm, ieRatio, 0L, progress, epoch)
 
-            if (washoutDurationMs > 0) {
+            // Skip washout after the last test block — always end with a resonance test
+            val isLastEpoch = idx == grid.size - 1
+            if (washoutDurationMs > 0 && !isLastEpoch) {
                 _phase.value = RfPhase.WASHOUT
                 runCountdown(washoutDurationMs, totalMs, elapsedMs)
                 elapsedMs += washoutDurationMs
@@ -435,6 +439,34 @@ class RfAssessmentOrchestrator @Inject constructor(
     }
 
     /**
+     * Ensures no two entries in the grid share the exact same breathing rate.
+     * If a duplicate BPM is found, it is nudged by +0.01 BPM repeatedly
+     * until it becomes unique (clamped to 3.0–8.0 BPM range).
+     * This guarantees every test in an assessment tests a distinct rate.
+     */
+    private fun deduplicateGrid(
+        grid: List<Pair<Float, Float>>
+    ): List<Pair<Float, Float>> {
+        val seenBpm = mutableSetOf<Float>()
+        return grid.map { (bpm, ie) ->
+            var uniqueBpm = bpm
+            while (!seenBpm.add(uniqueBpm)) {
+                uniqueBpm = ((uniqueBpm + 0.01f) * 100f).roundToInt() / 100f
+                if (uniqueBpm > 8.0f) {
+                    // If nudging up overflows, nudge down instead
+                    uniqueBpm = bpm
+                    while (!seenBpm.add(uniqueBpm)) {
+                        uniqueBpm = ((uniqueBpm - 0.01f) * 100f).roundToInt() / 100f
+                        uniqueBpm = uniqueBpm.coerceAtLeast(3.0f)
+                    }
+                    break
+                }
+            }
+            uniqueBpm.coerceIn(3.0f, 8.0f) to ie
+        }
+    }
+
+    /**
      * Returns (grid, testDurationMs, washoutDurationMs).
      * Grid is a list of (rateBpm, ieRatio) pairs.
      *
@@ -455,32 +487,32 @@ class RfAssessmentOrchestrator @Inject constructor(
 
         return when (protocol) {
             RfProtocol.EXPRESS -> Triple(
-                EXPRESS_POOL_BPM.shuffled().take(5).map { offsetBpm(it, offset) to 1.0f },
+                deduplicateGrid(EXPRESS_POOL_BPM.shuffled().take(5).map { offsetBpm(it, offset) to 1.0f }),
                 60_000L, 30_000L
             )
             RfProtocol.STANDARD -> Triple(
-                STANDARD_RATES_BPM.shuffled().map { offsetBpm(it, offset) to 1.0f },
+                deduplicateGrid(STANDARD_RATES_BPM.shuffled().map { offsetBpm(it, offset) to 1.0f }),
                 120_000L, 60_000L
             )
             RfProtocol.DEEP -> Triple(
-                DEEP_GRID.shuffled().map { (bpm, ie) -> offsetBpm(bpm, offset) to ie },
+                deduplicateGrid(DEEP_GRID.shuffled().map { (bpm, ie) -> offsetBpm(bpm, offset) to ie }),
                 180_000L, 60_000L
             )
             RfProtocol.TARGETED -> Triple(
-                listOf(
+                deduplicateGrid(listOf(
                     offsetBpm(optimalBpm, offset) to 1.0f,
                     offsetBpm(optimalBpm + 0.05f, offset) to 1.0f,
                     offsetBpm(optimalBpm - 0.05f, offset) to 1.0f
-                ).shuffled(),
+                ).shuffled()),
                 180_000L, 60_000L
             )
             RfProtocol.CONTINUOUS -> Triple(
-                STANDARD_RATES_BPM.shuffled().map { offsetBpm(it, offset) to 1.0f },
+                deduplicateGrid(STANDARD_RATES_BPM.shuffled().map { offsetBpm(it, offset) to 1.0f }),
                 120_000L, 0L
             )
             RfProtocol.CUSTOM -> customProtocolParams(offset, customDurationMinutes)
             RfProtocol.BEST_RATES -> Triple(
-                bestRatesBpm.shuffled().map { offsetBpm(it, offset) to 1.0f },
+                deduplicateGrid(bestRatesBpm.shuffled().map { offsetBpm(it, offset) to 1.0f }),
                 180_000L, 30_000L
             )
             RfProtocol.SLIDING_WINDOW -> Triple(emptyList(), 0L, 0L) // handled separately
@@ -516,8 +548,8 @@ class RfAssessmentOrchestrator @Inject constructor(
             bestTestSec = testSec.coerceAtMost(300L) // up to 5 min per block
         }
 
-        val grid = EXPRESS_POOL_BPM.shuffled().take(bestN)
-            .map { offsetBpm(it, offset) to 1.0f }
+        val grid = deduplicateGrid(EXPRESS_POOL_BPM.shuffled().take(bestN)
+            .map { offsetBpm(it, offset) to 1.0f })
 
         return Triple(grid, bestTestSec * 1000L, washoutSec * 1000L)
     }

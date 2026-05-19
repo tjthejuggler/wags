@@ -56,14 +56,8 @@ data class HrvReadinessHistoryUiState(
      * - Size >1 → history screen should show the multi-session picker list
      */
     val selectedDayReadings: List<DailyReadingEntity> = emptyList(),
-    /** Currently selected time period filter for graphs. */
+    /** Currently selected time period — controls zoom level (how many points visible on screen). */
     val timePeriod: HrvChartTimePeriod = HrvChartTimePeriod.ALL,
-    /** Step offset from the present (0 = current period, -1 = one step back, etc.). */
-    val periodOffset: Int = 0,
-    /** Whether stepping further back is possible (no data before the window). */
-    val canStepBack: Boolean = true,
-    /** Whether stepping forward is possible (not already at the present). */
-    val canStepForward: Boolean = false,
 )
 
 @HiltViewModel
@@ -73,14 +67,12 @@ class HrvReadinessHistoryViewModel @Inject constructor(
 
     private val _selectedDate = MutableStateFlow<LocalDate?>(null)
     private val _timePeriod = MutableStateFlow(HrvChartTimePeriod.ALL)
-    private val _periodOffset = MutableStateFlow(0)
 
     val uiState: StateFlow<HrvReadinessHistoryUiState> = combine(
         repository.observeAll(),
         _selectedDate,
-        _timePeriod,
-        _periodOffset
-    ) { readings, selectedDate, timePeriod, periodOffset ->
+        _timePeriod
+    ) { readings, selectedDate, timePeriod ->
         val zone = ZoneId.systemDefault()
 
         // Build date → readings map (newest first within each day)
@@ -93,10 +85,9 @@ class HrvReadinessHistoryViewModel @Inject constructor(
             byDate[selectedDate] ?: emptyList()
         } else emptyList()
 
-        // Build chart data from chronological order (oldest first), filtered by time period
+        // Build chart data from ALL data (time period is now just a zoom control)
         val chronological = readings.reversed()
-        val (filtered, canBack, canFwd) = filterByPeriod(chronological, timePeriod, periodOffset, zone)
-        val chartData = buildChartData(filtered, zone)
+        val chartData = buildChartData(chronological, zone)
 
         HrvReadinessHistoryUiState(
             allReadings = readings,
@@ -106,9 +97,6 @@ class HrvReadinessHistoryViewModel @Inject constructor(
             selectedDate = selectedDate,
             selectedDayReadings = selectedDayReadings,
             timePeriod = timePeriod,
-            periodOffset = periodOffset,
-            canStepBack = canBack,
-            canStepForward = canFwd,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -126,22 +114,9 @@ class HrvReadinessHistoryViewModel @Inject constructor(
         _selectedDate.value = null
     }
 
-    /** Called when user selects a time period filter. Resets offset to 0. */
+    /** Called when user selects a time period filter. */
     fun setTimePeriod(period: HrvChartTimePeriod) {
         _timePeriod.value = period
-        _periodOffset.value = 0
-    }
-
-    /** Step backward in time by one period. */
-    fun stepBack() {
-        _periodOffset.value = _periodOffset.value - 1
-    }
-
-    /** Step forward in time by one period. */
-    fun stepForward() {
-        if (_periodOffset.value < 0) {
-            _periodOffset.value = _periodOffset.value + 1
-        }
     }
 
     // ── Filtering ─────────────────────────────────────────────────────────────

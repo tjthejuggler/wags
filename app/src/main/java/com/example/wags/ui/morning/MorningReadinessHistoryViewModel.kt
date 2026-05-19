@@ -69,16 +69,10 @@ data class MorningReadinessHistoryUiState(
     /** The reading selected by tapping a calendar day, null if none selected. */
     val selectedReading: MorningReadinessEntity? = null,
     val selectedDate: LocalDate? = null,
-    /** Pre-computed chart series (chronological order, oldest → newest). */
+    /** Pre-computed chart series (chronological order, oldest → newest). Always built from ALL data. */
     val chartData: MorningReadinessChartData = MorningReadinessChartData(),
-    /** Currently selected time period filter for graphs. */
+    /** Currently selected time period — controls zoom level (how many points visible on screen). */
     val timePeriod: ChartTimePeriod = ChartTimePeriod.ALL,
-    /** Step offset from the present (0 = current period, -1 = one step back, etc.). */
-    val periodOffset: Int = 0,
-    /** Whether stepping further back is possible (no data before the window). */
-    val canStepBack: Boolean = true,
-    /** Whether stepping forward is possible (not already at the present). */
-    val canStepForward: Boolean = false,
 )
 
 @HiltViewModel
@@ -88,14 +82,12 @@ class MorningReadinessHistoryViewModel @Inject constructor(
 
     private val _selectedDate = MutableStateFlow<LocalDate?>(null)
     private val _timePeriod = MutableStateFlow(ChartTimePeriod.ALL)
-    private val _periodOffset = MutableStateFlow(0)
 
     val uiState: StateFlow<MorningReadinessHistoryUiState> = combine(
         repository.observeAll(),
         _selectedDate,
-        _timePeriod,
-        _periodOffset
-    ) { readings, selectedDate, timePeriod, periodOffset ->
+        _timePeriod
+    ) { readings, selectedDate, timePeriod ->
         val zone = ZoneId.systemDefault()
         val dates = readings
             .map { Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate() }
@@ -106,10 +98,9 @@ class MorningReadinessHistoryViewModel @Inject constructor(
             }
         } else null
 
-        // Build chart data from chronological order (oldest first), filtered by time period
+        // Build chart data from ALL data (time period is now just a zoom control)
         val chronological = readings.reversed()
-        val (filtered, canBack, canFwd) = filterByPeriod(chronological, timePeriod, periodOffset, zone)
-        val chartData = buildChartData(filtered, zone)
+        val chartData = buildChartData(chronological, zone)
 
         MorningReadinessHistoryUiState(
             allReadings = readings,
@@ -118,9 +109,6 @@ class MorningReadinessHistoryViewModel @Inject constructor(
             selectedDate = selectedDate,
             chartData = chartData,
             timePeriod = timePeriod,
-            periodOffset = periodOffset,
-            canStepBack = canBack,
-            canStepForward = canFwd,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -138,25 +126,12 @@ class MorningReadinessHistoryViewModel @Inject constructor(
         _selectedDate.value = null
     }
 
-    /** Called when user selects a time period filter. Resets offset to 0. */
+    /** Called when user selects a time period filter. */
     fun setTimePeriod(period: ChartTimePeriod) {
         _timePeriod.value = period
-        _periodOffset.value = 0
     }
 
-    /** Step backward in time by one period. */
-    fun stepBack() {
-        _periodOffset.value = _periodOffset.value - 1
-    }
-
-    /** Step forward in time by one period. */
-    fun stepForward() {
-        if (_periodOffset.value < 0) {
-            _periodOffset.value = _periodOffset.value + 1
-        }
-    }
-
-    // ── Filtering ─────────────────────────────────────────────────────────────
+    // ── Filtering (kept for calendar date selection only) ────────────────────
 
     private data class FilterResult(
         val readings: List<MorningReadinessEntity>,

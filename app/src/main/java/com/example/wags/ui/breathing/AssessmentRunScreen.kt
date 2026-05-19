@@ -70,6 +70,7 @@ fun AssessmentRunScreen(
     onNavigateToSettings: () -> Unit = {},
     onSessionComplete: (sessionId: Long) -> Unit,
     vibrationEnabled: Boolean = false,
+    colorsEnabled: Boolean = false,
     customDurationMinutes: Int = 0,
     viewModel: AssessmentRunViewModel = hiltViewModel()
 ) {
@@ -156,6 +157,7 @@ fun AssessmentRunScreen(
                     isInhaling = uiState.isInhaling,
                     size = 200.dp,
                     overlayLabel = overlayLabel,
+                    useColors = colorsEnabled,
                     onPhaseTransition = vibrationCallback
                 )
             } else {
@@ -163,6 +165,7 @@ fun AssessmentRunScreen(
                     progress = uiState.refWave,
                     isInhaling = uiState.isInhaling,
                     size = 200.dp,
+                    useColors = colorsEnabled,
                     onPhaseTransition = vibrationCallback
                 )
             }

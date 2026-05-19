@@ -99,15 +99,16 @@ private val PROTOCOL_LIST = listOf(
 fun AssessmentPickerScreen(
     onNavigateBack: () -> Unit,
     onNavigateToSettings: () -> Unit = {},
-    onStartAssessment: (RfProtocol, Boolean, Int) -> Unit,
+    onStartAssessment: (RfProtocol, Boolean, Boolean, Int) -> Unit,
     viewModel: AssessmentPickerViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    // Vibration toggle — persisted to SharedPreferences so it survives app restarts
+    // Vibration & color toggles — persisted to SharedPreferences so they survive app restarts
     val prefs = remember { context.getSharedPreferences("apnea_prefs", android.content.Context.MODE_PRIVATE) }
     var vibrationEnabled by remember { mutableStateOf(prefs.getBoolean("breathing_vibration", false)) }
+    var colorsEnabled by remember { mutableStateOf(prefs.getBoolean("breathing_colors", false)) }
 
     Scaffold(
         containerColor = com.example.wags.ui.theme.BackgroundDark,
@@ -196,6 +197,7 @@ fun AssessmentPickerScreen(
                         onStartAssessment(
                             state.selectedProtocol,
                             vibrationEnabled,
+                            colorsEnabled,
                             state.customDurationMinutes
                         )
                     },
@@ -205,6 +207,7 @@ fun AssessmentPickerScreen(
                     Text("Start Assessment")
                 }
 
+                // Vibration toggle
                 IconButton(
                     onClick = {
                         vibrationEnabled = !vibrationEnabled
@@ -215,6 +218,20 @@ fun AssessmentPickerScreen(
                         text = "〰",
                         color = if (vibrationEnabled) TextPrimary else TextDisabled,
                         style = MaterialTheme.typography.titleLarge
+                    )
+                }
+
+                // Color mode toggle
+                IconButton(
+                    onClick = {
+                        colorsEnabled = !colorsEnabled
+                        prefs.edit().putBoolean("breathing_colors", colorsEnabled).apply()
+                    }
+                ) {
+                    Text(
+                        text = "🎨",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (colorsEnabled) TextPrimary else TextDisabled
                     )
                 }
             }

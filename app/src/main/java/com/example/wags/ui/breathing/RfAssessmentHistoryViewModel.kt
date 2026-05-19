@@ -71,14 +71,8 @@ data class RfAssessmentHistoryUiState(
     val selectedDayAssessments: List<RfAssessmentEntity> = emptyList(),
     /** Sessions for the selected date. */
     val selectedDaySessions: List<ResonanceSessionEntity> = emptyList(),
-    /** Currently selected time period filter for graphs. */
+    /** Currently selected time period — controls zoom level (how many points visible on screen). */
     val timePeriod: RfChartTimePeriod = RfChartTimePeriod.ALL,
-    /** Step offset from the present (0 = current period, -1 = one step back, etc.). */
-    val periodOffset: Int = 0,
-    /** Whether stepping further back is possible. */
-    val canStepBack: Boolean = true,
-    /** Whether stepping forward is possible (not already at the present). */
-    val canStepForward: Boolean = false,
 )
 
 @HiltViewModel
@@ -89,15 +83,13 @@ class RfAssessmentHistoryViewModel @Inject constructor(
 
     private val _selectedDate = MutableStateFlow<LocalDate?>(null)
     private val _timePeriod = MutableStateFlow(RfChartTimePeriod.ALL)
-    private val _periodOffset = MutableStateFlow(0)
 
     val uiState: StateFlow<RfAssessmentHistoryUiState> = combine(
         repository.observeAll(),
         sessionRepository.observeAll(),
         _selectedDate,
-        _timePeriod,
-        _periodOffset
-    ) { assessments, sessions, selectedDate, timePeriod, periodOffset ->
+        _timePeriod
+    ) { assessments, sessions, selectedDate, timePeriod ->
         val zone = ZoneId.systemDefault()
 
         // Build date → assessments map
@@ -119,23 +111,15 @@ class RfAssessmentHistoryViewModel @Inject constructor(
             sessionsByDate[selectedDate] ?: emptyList()
         } else emptyList()
 
-        // Chronological order (oldest → newest) for charts
+        // Build chart data from ALL data (time period is now just a zoom control)
         val chronologicalAssessments = assessments.reversed()
         val chronologicalSessions = sessions.reversed()
-
-        // Filter by time period and compute stepping state
-        val (filteredAssessments, canBack, canFwd) = filterAssessmentsByPeriod(
-            chronologicalAssessments, timePeriod, periodOffset, zone
-        )
-        val (filteredSessions, _, _) = filterSessionsByPeriod(
-            chronologicalSessions, timePeriod, periodOffset, zone
-        )
 
         RfAssessmentHistoryUiState(
             allAssessments = assessments,
             allSessions = sessions,
-            chartData = buildChartData(filteredAssessments, zone),
-            sessionChartData = buildSessionChartData(filteredSessions, zone),
+            chartData = buildChartData(chronologicalAssessments, zone),
+            sessionChartData = buildSessionChartData(chronologicalSessions, zone),
             datesWithAssessments = assessmentDates,
             datesWithSessions = sessionDates,
             assessmentsByDate = assessmentsByDate,
@@ -144,9 +128,6 @@ class RfAssessmentHistoryViewModel @Inject constructor(
             selectedDayAssessments = selectedDayAssessments,
             selectedDaySessions = selectedDaySessions,
             timePeriod = timePeriod,
-            periodOffset = periodOffset,
-            canStepBack = canBack,
-            canStepForward = canFwd,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -164,86 +145,9 @@ class RfAssessmentHistoryViewModel @Inject constructor(
         _selectedDate.value = null
     }
 
-    /** Called when user selects a time period filter. Resets offset to 0. */
+    /** Called when user selects a time period filter. */
     fun setTimePeriod(period: RfChartTimePeriod) {
         _timePeriod.value = period
-        _periodOffset.value = 0
-    }
-
-    /** Step backward in time by one period. */
-    fun stepBack() {
-        _periodOffset.value = _periodOffset.value - 1
-    }
-
-    /** Step forward in time by one period. */
-    fun stepForward() {
-        if (_periodOffset.value < 0) {
-            _periodOffset.value = _periodOffset.value + 1
-        }
-    }
-
-    // ── Filtering ─────────────────────────────────────────────────────────────
-
-    private data class FilterResult<T>(
-        val readings: List<T>,
-        val canStepBack: Boolean,
-        val canStepForward: Boolean
-    )
-
-    private fun filterAssessmentsByPeriod(
-        chronological: List<RfAssessmentEntity>,
-        period: RfChartTimePeriod,
-        offset: Int,
-        zone: ZoneId
-    ): FilterResult<RfAssessmentEntity> {
-        val days = period.days
-        if (days == null) {
-            return FilterResult(chronological, canStepBack = false, canStepForward = false)
-        }
-
-        val today = LocalDate.now(zone)
-        val windowEnd = today.minusDays((-offset).toLong() * days)
-        val windowStart = windowEnd.minusDays(days.toLong())
-
-        val filtered = chronological.filter { entity ->
-            val date = Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate()
-            date > windowStart && date <= windowEnd
-        }
-
-        val canBack = chronological.any { entity ->
-            Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate() <= windowStart
-        }
-        val canFwd = offset < 0
-
-        return FilterResult(filtered, canStepBack = canBack, canStepForward = canFwd)
-    }
-
-    private fun filterSessionsByPeriod(
-        chronological: List<ResonanceSessionEntity>,
-        period: RfChartTimePeriod,
-        offset: Int,
-        zone: ZoneId
-    ): FilterResult<ResonanceSessionEntity> {
-        val days = period.days
-        if (days == null) {
-            return FilterResult(chronological, canStepBack = false, canStepForward = false)
-        }
-
-        val today = LocalDate.now(zone)
-        val windowEnd = today.minusDays((-offset).toLong() * days)
-        val windowStart = windowEnd.minusDays(days.toLong())
-
-        val filtered = chronological.filter { session ->
-            val date = Instant.ofEpochMilli(session.timestamp).atZone(zone).toLocalDate()
-            date > windowStart && date <= windowEnd
-        }
-
-        val canBack = chronological.any { session ->
-            Instant.ofEpochMilli(session.timestamp).atZone(zone).toLocalDate() <= windowStart
-        }
-        val canFwd = offset < 0
-
-        return FilterResult(filtered, canStepBack = canBack, canStepForward = canFwd)
     }
 
     // ── Chart builders ─────────────────────────────────────────────────────────
