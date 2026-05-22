@@ -63,6 +63,12 @@ data class ProgressiveO2UiState(
     val timeOfDay: String = "DAY",
     val posture: String = "LAYING",
     val audio: String = "SILENCE",
+    // Filter state ("" = all, specific value = filter to that value)
+    val filterLungVolume: String = "",
+    val filterPrepType: String = "",
+    val filterTimeOfDay: String = "",
+    val filterPosture: String = "",
+    val filterAudio: String = "",
     // ── Voice / vibration toggles ─────────────────────────────────────────────
     val voiceEnabled: Boolean = true,
     val vibrationEnabled: Boolean = true,
@@ -377,13 +383,47 @@ class ProgressiveO2ViewModel @Inject constructor(
         return result
     }
 
+    // ── Filter methods ────────────────────────────────────────────────────────
+
+    fun setFilterLungVolume(v: String) { _uiState.update { it.copy(filterLungVolume = v) }; loadBreathPeriodHistory() }
+    fun setFilterPrepType(v: String)   { _uiState.update { it.copy(filterPrepType = v) }; loadBreathPeriodHistory() }
+    fun setFilterTimeOfDay(v: String) { _uiState.update { it.copy(filterTimeOfDay = v) }; loadBreathPeriodHistory() }
+    fun setFilterPosture(v: String)   { _uiState.update { it.copy(filterPosture = v) }; loadBreathPeriodHistory() }
+    fun setFilterAudio(v: String)     { _uiState.update { it.copy(filterAudio = v) }; loadBreathPeriodHistory() }
+
+    fun resetFilters() {
+        val s = _uiState.value
+        _uiState.update {
+            it.copy(
+                filterLungVolume = s.lungVolume,
+                filterPrepType   = s.prepType,
+                filterTimeOfDay  = s.timeOfDay,
+                filterPosture    = s.posture,
+                filterAudio      = s.audio
+            )
+        }
+        loadBreathPeriodHistory()
+    }
+
     // ── Public API ──────────────────────────────────────────────────────────
 
     fun loadBreathPeriodHistory() {
         viewModelScope.launch {
             try {
-                val sessions = sessionRepository.getSessionsByType("PROGRESSIVE_O2")
-                val history = buildBreathPeriodHistory(sessions)
+                val allRecords = apneaRepository.getAllRecordsOnce()
+                val s = _uiState.value
+                val filtered = allRecords
+                    .filter { it.tableType == "PROGRESSIVE_O2" }
+                    .let { records ->
+                        var result = records
+                        if (s.filterLungVolume.isNotEmpty()) result = result.filter { it.lungVolume == s.filterLungVolume }
+                        if (s.filterPrepType.isNotEmpty()) result = result.filter { it.prepType == s.filterPrepType }
+                        if (s.filterTimeOfDay.isNotEmpty()) result = result.filter { it.timeOfDay == s.filterTimeOfDay }
+                        if (s.filterPosture.isNotEmpty()) result = result.filter { it.posture == s.filterPosture }
+                        if (s.filterAudio.isNotEmpty()) result = result.filter { it.audio == s.filterAudio }
+                        result
+                    }
+                val history = buildBreathPeriodHistoryFromRecords(filtered)
                 _uiState.update { it.copy(pastBreathPeriods = history) }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to load breath period history", e)
@@ -720,6 +760,25 @@ class ProgressiveO2ViewModel @Inject constructor(
         }
         root.put("rounds", roundsArray)
         return root.toString()
+    }
+
+    private fun buildBreathPeriodHistoryFromRecords(
+        records: List<ApneaRecordEntity>
+    ): List<BreathPeriodHistory> {
+        // Each record has drillParamValue = breathPeriodSec and durationMs = longest completed hold
+        return records
+            .filter { it.drillParamValue != null && it.drillParamValue > 0 }
+            .groupBy { it.drillParamValue!! }
+            .map { (bp, group) ->
+                val maxEntry = group.maxByOrNull { it.durationMs }
+                BreathPeriodHistory(
+                    breathPeriodSec = bp,
+                    maxHoldReachedSec = if (maxEntry != null) (maxEntry.durationMs / 1000).toInt() else 0,
+                    sessionCount = group.size,
+                    maxHoldRecordId = maxEntry?.recordId ?: -1L
+                )
+            }
+            .sortedBy { it.breathPeriodSec }
     }
 
     private suspend fun buildBreathPeriodHistory(

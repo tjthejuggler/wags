@@ -14,9 +14,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.domain.model.AudioSetting
@@ -35,6 +39,18 @@ fun ProgressiveO2Screen(
     viewModel: ProgressiveO2ViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // Reset filters to current settings every time this screen is entered
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.resetFilters()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.loadBreathPeriodHistory()
@@ -65,6 +81,25 @@ fun ProgressiveO2Screen(
         var showSettingsDialog by remember { mutableStateOf(false) }
         // Song picker dialog state
         var showSongPicker by remember { mutableStateOf(false) }
+        // Filter dialog state
+        var showFilterDialog by remember { mutableStateOf(false) }
+
+        if (showFilterDialog) {
+            ProgressiveO2FilterDialog(
+                filterLungVolume = state.filterLungVolume,
+                filterPrepType = state.filterPrepType,
+                filterTimeOfDay = state.filterTimeOfDay,
+                filterPosture = state.filterPosture,
+                filterAudio = state.filterAudio,
+                onLungVolumeChange = { viewModel.setFilterLungVolume(it) },
+                onPrepTypeChange = { viewModel.setFilterPrepType(it) },
+                onTimeOfDayChange = { viewModel.setFilterTimeOfDay(it) },
+                onPostureChange = { viewModel.setFilterPosture(it) },
+                onAudioChange = { viewModel.setFilterAudio(it) },
+                onReset = { viewModel.resetFilters() },
+                onDismiss = { showFilterDialog = false }
+            )
+        }
 
         if (showSettingsDialog) {
             FreeHoldSettingsDialog(
@@ -212,9 +247,11 @@ fun ProgressiveO2Screen(
             BreathPeriodHistorySection(
                 history = state.pastBreathPeriods,
                 currentBreathPeriodSec = state.breathPeriodSec,
+                filterSummary = buildProgressiveO2FilterSummary(state),
                 onViewSessionDetail = { recordId ->
                     navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
-                }
+                },
+                onFilterClick = { showFilterDialog = true }
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -331,14 +368,37 @@ private fun BreathPeriodSection(
 private fun BreathPeriodHistorySection(
     history: List<BreathPeriodHistory>,
     currentBreathPeriodSec: Int,
-    onViewSessionDetail: (Long) -> Unit
+    filterSummary: String,
+    onViewSessionDetail: (Long) -> Unit,
+    onFilterClick: () -> Unit = {}
 ) {
-    Text(
-        text = "Past Breath Periods",
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold,
-        color = TextPrimary
-    )
+    // Header row with title + filter button
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Past Breath Periods",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = TextPrimary
+        )
+        OutlinedButton(
+            onClick = onFilterClick,
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+            shape = RoundedCornerShape(8.dp),
+            border = BorderStroke(1.dp, TextSecondary),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
+        ) {
+            Text(
+                text = filterSummary,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
 
     if (history.isEmpty()) {
         Text(
