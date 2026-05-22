@@ -102,6 +102,14 @@ class AssessmentRunViewModel @Inject constructor(
     private val allSessionRrIntervals = mutableListOf<Double>()
     private val sessionStartTimeMs = System.currentTimeMillis()
 
+    // Index into allSessionRrIntervals marking the start of the current phase.
+    // The live coherence loop only uses RR intervals from this index onward so
+    // that baseline data does not contaminate the coherence display during tests.
+    @Volatile private var currentPhaseRrStartIndex: Int = 0
+
+    // Whether the current phase is BASELINE — coherence is suppressed during baseline.
+    @Volatile private var isBaselinePhase: Boolean = true
+
     init {
         pacerEngine.reset()
         when (protocol) {
@@ -178,6 +186,19 @@ class AssessmentRunViewModel @Inject constructor(
                                 pacerRateBpm = orchState.rateBpm.takeIf { it > 0f } ?: 5.5f
                                 pacerIeRatio = orchState.ieRatio.takeIf { it > 0f } ?: 1.0f
                                 pacerActive = true
+                                // Reset the coherence window so baseline data doesn't
+                                // contaminate the live coherence display for this test block.
+                                if (isBaselinePhase) {
+                                    synchronized(allSessionRrIntervals) {
+                                        currentPhaseRrStartIndex = allSessionRrIntervals.size
+                                    }
+                                    isBaselinePhase = false
+                                }
+                            }
+                            RfPhase.BASELINE -> {
+                                pacerActive = false
+                                isBaselinePhase = true
+                                currentPhaseRrStartIndex = 0
                             }
                             else -> {
                                 pacerActive = false
@@ -458,9 +479,19 @@ class AssessmentRunViewModel @Inject constructor(
         coherenceJob = viewModelScope.launch {
             while (isActive) {
                 delay(5_000L)
+                // Suppress coherence during BASELINE — the user breathes freely and
+                // the metric is meaningless there. Also, using baseline RR data would
+                // contaminate the coherence display at the start of the first test block.
+                if (isBaselinePhase) {
+                    _uiState.value = _uiState.value.copy(liveCoherenceRatio = 0f)
+                    continue
+                }
                 val rrSnapshot = synchronized(allSessionRrIntervals) {
-                    if (allSessionRrIntervals.size >= 32) allSessionRrIntervals.takeLast(256).toDoubleArray()
-                    else null
+                    val startIdx = currentPhaseRrStartIndex
+                    val phaseRr = if (startIdx < allSessionRrIntervals.size)
+                        allSessionRrIntervals.subList(startIdx, allSessionRrIntervals.size).toList()
+                    else emptyList()
+                    if (phaseRr.size >= 32) phaseRr.takeLast(256).toDoubleArray() else null
                 }
                 if (rrSnapshot != null) {
                     val result = coherenceCalc.calculateCoherenceRatio(rrSnapshot)

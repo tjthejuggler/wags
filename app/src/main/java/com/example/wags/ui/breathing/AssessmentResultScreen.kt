@@ -414,7 +414,7 @@ private fun ResonanceCurveChart(
             sorted.forEach { pt ->
                 val x = xAt(pt.bpm)
                 drawContext.canvas.nativeCanvas.drawText(
-                    "%.1f".format(pt.bpm), x, h + 14.dp.toPx(), xLabelPaint
+                    "%.2f".format(pt.bpm), x, h + 14.dp.toPx(), xLabelPaint
                 )
             }
 
