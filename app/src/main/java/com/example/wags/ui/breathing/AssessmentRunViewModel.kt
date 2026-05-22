@@ -221,7 +221,7 @@ class AssessmentRunViewModel @Inject constructor(
                         val prevWave = _uiState.value.refWave
                         val newWave = orchState.pacerState.refWave
                         _uiState.value = _uiState.value.copy(
-                            phase            = "TESTING %.1f BPM".format(orchState.pacerState.instantBpm),
+                            phase            = "TESTING %.2f BPM".format(orchState.pacerState.instantBpm),
                             currentBpm       = orchState.pacerState.instantBpm,
                             progress         = orchState.progress,
                             lastRefWave      = prevWave,
@@ -566,7 +566,7 @@ class AssessmentRunViewModel @Inject constructor(
     private fun phaseLabel(phase: RfPhase, rateBpm: Float): String = when (phase) {
         RfPhase.IDLE      -> "IDLE"
         RfPhase.BASELINE  -> "BASELINE"
-        RfPhase.TEST_BLOCK -> "TESTING %.1f BPM".format(rateBpm)
+        RfPhase.TEST_BLOCK -> "TESTING %.2f BPM".format(rateBpm)
         RfPhase.WASHOUT   -> "BREATHE NATURALLY"
         RfPhase.COMPLETE  -> "COMPLETE"
     }

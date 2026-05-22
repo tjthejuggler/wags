@@ -328,7 +328,7 @@ private fun AssessmentHud(
         )
         if (currentBpm > 0f) {
             Text(
-                text  = "%.1f BPM".format(currentBpm),
+                text  = "%.2f BPM".format(currentBpm),
                 style = MaterialTheme.typography.titleMedium,
                 color = TextPrimary
             )

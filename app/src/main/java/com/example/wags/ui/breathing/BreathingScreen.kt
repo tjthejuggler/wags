@@ -38,6 +38,7 @@ import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.common.RrIntervalChart
+import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.domain.usecase.breathing.ResonanceRateRecommender
 import com.example.wags.ui.theme.*
@@ -241,6 +242,7 @@ fun BreathingScreen(
                     Text(
                         text = "🎨",
                         style = MaterialTheme.typography.titleMedium,
+                        modifier = if (!colorsEnabled) Modifier.grayscale() else Modifier,
                         color = if (colorsEnabled) TextPrimary else TextDisabled
                     )
                 }
@@ -306,7 +308,7 @@ private fun SessionCompleteContent(
                 color = Silver
             )
             Text(
-                text = "%.1f BPM  •  %s".format(
+                text = "%.2f BPM  •  %s".format(
                     summary.breathingRateBpm,
                     formatDuration(summary.durationSeconds)
                 ),
@@ -701,7 +703,7 @@ private fun PreparationContent(
                 )
                 Text(
                     "Breathe normally until the countdown ends.\n" +
-                        "Rate: ${String.format("%.1f", breathingRateBpm)} BPM",
+                        "Rate: ${String.format("%.2f", breathingRateBpm)} BPM",
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextSecondary,
                     textAlign = TextAlign.Center

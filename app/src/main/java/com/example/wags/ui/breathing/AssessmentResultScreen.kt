@@ -288,7 +288,7 @@ private fun RecommendedRateCard(
 
             if (isValid && optimalBpm > 0f) {
                 Text(
-                    text = "%.1f".format(optimalBpm),
+                    text = "%.2f".format(optimalBpm),
                     style = MaterialTheme.typography.displayLarge.copy(
                         fontSize = 64.sp,
                         fontWeight = FontWeight.Bold
@@ -682,9 +682,9 @@ private fun MetricsTable(session: com.example.wags.data.db.entity.RfAssessmentEn
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            MetricRow("Optimal Breathing Rate", "%.1f BPM".format(session.optimalBpm), "Target pace for future sessions")
+            MetricRow("Optimal Breathing Rate", "%.2f BPM".format(session.optimalBpm), "Target pace for future sessions")
             HorizontalDivider(color = SurfaceVariant, modifier = Modifier.padding(vertical = 4.dp))
-            MetricRow("Peak-to-Trough Amplitude", "%.1f BPM".format(session.peakToTroughBpm), "Vagal response strength")
+            MetricRow("Peak-to-Trough Amplitude", "%.2f BPM".format(session.peakToTroughBpm), "Vagal response strength")
             HorizontalDivider(color = SurfaceVariant, modifier = Modifier.padding(vertical = 4.dp))
             MetricRow("Max LF Power", "%.0f ms²/Hz".format(session.maxLfPowerMs2), "Baroreflex stimulation energy")
             HorizontalDivider(color = SurfaceVariant, modifier = Modifier.padding(vertical = 4.dp))
@@ -803,7 +803,7 @@ private fun LeaderboardRow(rank: Int, entry: LeaderboardEntry, isOptimal: Boolea
                     )
                 }
                 Text(
-                    text = "%.1f BPM".format(entry.bpm),
+                    text = "%.2f BPM".format(entry.bpm),
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextPrimary,
                     fontWeight = if (isOptimal) FontWeight.Bold else FontWeight.Normal
@@ -856,7 +856,7 @@ private fun HistoryRow(
                     color = TextSecondary
                 )
                 Text(
-                    text = "${session.protocolType}  •  ${"%.1f".format(session.optimalBpm)} BPM",
+                    text = "${session.protocolType}  •  ${"%.2f".format(session.optimalBpm)} BPM",
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextPrimary
                 )

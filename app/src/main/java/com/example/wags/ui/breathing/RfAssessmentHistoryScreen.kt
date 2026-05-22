@@ -724,7 +724,7 @@ private fun RfAssessmentEventCard(
                 }
                 Text(
                     "${assessment.protocolType}  ·  " +
-                    "Coherence ${String.format("%.1f", assessment.maxCoherenceRatio)}  ·  " +
+                    "Coherence ${String.format("%.2f", assessment.maxCoherenceRatio)}  ·  " +
                     "Score ${String.format("%.0f", assessment.compositeScore)}",
                     style = MaterialTheme.typography.labelSmall,
                     color = TextSecondary
@@ -733,7 +733,7 @@ private fun RfAssessmentEventCard(
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    String.format("%.1f", assessment.optimalBpm),
+                    String.format("%.2f", assessment.optimalBpm),
                     style = MaterialTheme.typography.titleLarge,
                     color = TextPrimary,
                     fontWeight = FontWeight.ExtraBold
@@ -803,7 +803,7 @@ private fun RfSessionEventCard(
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    String.format("%.1f", session.breathingRateBpm),
+                    String.format("%.2f", session.breathingRateBpm),
                     style = MaterialTheme.typography.titleLarge,
                     color = TextPrimary,
                     fontWeight = FontWeight.ExtraBold
@@ -853,14 +853,14 @@ private fun RfHistorySummaryCard(uiState: RfAssessmentHistoryUiState) {
                 latestBpm?.let {
                     RfSummaryChip(
                         label = "Latest BPM",
-                        value = String.format("%.1f", it),
+                        value = String.format("%.2f", it),
                         color = TextPrimary
                     )
                 }
                 avgBpm?.let {
                     RfSummaryChip(
                         label = "Avg BPM",
-                        value = String.format("%.1f", it),
+                        value = String.format("%.2f", it),
                         color = TextSecondary
                     )
                 }

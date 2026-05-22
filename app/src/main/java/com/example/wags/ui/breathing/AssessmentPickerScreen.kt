@@ -24,6 +24,7 @@ import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.theme.SurfaceDark
 import com.example.wags.ui.theme.SurfaceVariant
 import com.example.wags.ui.theme.TextDisabled
+import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.theme.TextPrimary
 
 // ---------------------------------------------------------------------------
@@ -231,6 +232,7 @@ fun AssessmentPickerScreen(
                     Text(
                         text = "🎨",
                         style = MaterialTheme.typography.titleMedium,
+                        modifier = if (!colorsEnabled) Modifier.grayscale() else Modifier,
                         color = if (colorsEnabled) TextPrimary else TextDisabled
                     )
                 }

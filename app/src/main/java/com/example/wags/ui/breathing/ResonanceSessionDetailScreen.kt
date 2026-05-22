@@ -240,7 +240,7 @@ private fun SessionDetailContent(
                     textAlign = TextAlign.Center
                 )
                 Text(
-                    text = "%.1f BPM  •  %d:%02d".format(
+                    text = "%.2f BPM  •  %d:%02d".format(
                         session.breathingRateBpm, durationMin, durationSec
                     ),
                     style = MaterialTheme.typography.bodyMedium,

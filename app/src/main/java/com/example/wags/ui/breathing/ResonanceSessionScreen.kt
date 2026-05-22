@@ -40,6 +40,7 @@ import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.common.StripChartColors
 import com.example.wags.ui.common.WagsFeedback
 import com.example.wags.ui.common.LiveSensorActionsCallback
+import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.theme.*
 
 // ── Monochrome palette ────────────────────────────────────────────────────────
@@ -174,6 +175,7 @@ fun ResonanceSessionScreen(
                         Text(
                             text = "🎨",
                             style = MaterialTheme.typography.titleMedium,
+                            modifier = if (!useColors) Modifier.grayscale() else Modifier,
                             color = if (useColors) PacerInhaleColor else TextDisabled
                         )
                     }
@@ -473,7 +475,7 @@ private fun RsSessionCompleteContent(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 RsStatCell(value = rsFmtDuration(elapsedSeconds), label = "DURATION", color = RsBone)
-                RsStatCell(value = "%.1f".format(breathingRateBpm), label = "BREATHING RATE", color = RsGold)
+                RsStatCell(value = "%.2f".format(breathingRateBpm), label = "BREATHING RATE", color = RsGold)
                 RsStatCell(value = "%.1f".format(coherenceRatio), label = "COHERENCE", color = EcgCyan)
             }
         }
@@ -556,7 +558,7 @@ private fun RsPreparationContent(
                 )
                 Text(
                     "Breathe normally until the countdown ends.\n" +
-                        "Rate: ${String.format("%.1f", breathingRateBpm)} BPM",
+                        "Rate: ${String.format("%.2f", breathingRateBpm)} BPM",
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextSecondary,
                     textAlign = TextAlign.Center
@@ -592,7 +594,7 @@ private fun RsSessionStatsRow(breathingRateBpm: Float, elapsedSeconds: Int, cohe
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        RsStatCell(value = "%.1f".format(breathingRateBpm), label = "BPM",       color = RsGold)
+        RsStatCell(value = "%.2f".format(breathingRateBpm), label = "BPM",       color = RsGold)
         RsStatCell(value = rsFmtDuration(elapsedSeconds),   label = "TIME",      color = RsBone)
         RsStatCell(value = "%.1f".format(coherenceRatio),   label = "COHERENCE", color = EcgCyan)
     }
