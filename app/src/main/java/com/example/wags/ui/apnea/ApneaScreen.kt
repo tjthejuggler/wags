@@ -51,6 +51,7 @@ import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.InfoHelpBubble
 import com.example.wags.ui.common.LiveSensorActions
+import com.example.wags.ui.common.LockPortrait
 import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
@@ -62,6 +63,8 @@ fun ApneaScreen(
     viewModel: ApneaViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LockPortrait()
 
     // Re-read drill params (breath period, session duration) every time this screen is shown
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current

@@ -33,6 +33,7 @@ import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.LiveSensorActions
+import com.example.wags.ui.common.LockPortrait
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.common.RrIntervalChart
 import com.example.wags.ui.common.SessionBackHandler
@@ -61,6 +62,8 @@ fun ReadinessScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val deviceId = "PLACEHOLDER_H10_ID"
+
+    LockPortrait()
 
     val isActive = state.sessionState == ReadinessSessionState.PREPARING ||
             state.sessionState == ReadinessSessionState.RECORDING ||

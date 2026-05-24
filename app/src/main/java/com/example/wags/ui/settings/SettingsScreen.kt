@@ -35,6 +35,7 @@ import com.example.wags.ui.common.AdviceDialog
 import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.AdviceViewModel
 import com.example.wags.ui.common.LiveSensorActionsNav
+import com.example.wags.ui.common.LockPortrait
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 
@@ -48,6 +49,9 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val adviceState by adviceViewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+
+    LockPortrait()
+
     var permissionDenied by remember { mutableStateOf(false) }
     var showImportConfirmDialog by remember { mutableStateOf(false) }
     var pendingImportUri by remember { mutableStateOf<Uri?>(null) }

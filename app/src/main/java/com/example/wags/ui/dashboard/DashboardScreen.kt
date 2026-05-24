@@ -19,6 +19,7 @@ import com.example.wags.data.db.entity.MorningReadinessEntity
 import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.LiveSensorActionsNav
+import com.example.wags.ui.common.LockPortrait
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 
@@ -29,6 +30,8 @@ fun DashboardScreen(
     viewModel: DashboardViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LockPortrait()
 
     Scaffold(
         containerColor = BackgroundDark,

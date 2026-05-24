@@ -36,6 +36,7 @@ import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.LiveSensorActions
+import com.example.wags.ui.common.LockPortrait
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.common.RrIntervalChart
 import com.example.wags.ui.common.grayscale
@@ -86,6 +87,8 @@ fun BreathingScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val deviceId = "PLACEHOLDER_H10_ID"
     val context = LocalContext.current
+
+    LockPortrait()
 
     // Vibration & color toggles — persisted to SharedPreferences so they survive app restarts
     val prefs = remember { context.getSharedPreferences("apnea_prefs", android.content.Context.MODE_PRIVATE) }

@@ -27,6 +27,7 @@ import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.LiveSensorActions
+import com.example.wags.ui.common.LockPortrait
 import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.navigation.WagsRoutes
@@ -48,6 +49,7 @@ fun MeditationScreen(
 
     var showAudioPicker by remember { mutableStateOf(false) }
 
+    LockPortrait()
     SessionBackHandler(enabled = isActive) { navController.popBackStack() }
     KeepScreenOn(enabled = keepScreenOn)
 

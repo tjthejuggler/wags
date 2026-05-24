@@ -1,13 +1,14 @@
 package com.example.wags.ui.common
 
+import android.content.pm.ActivityInfo
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
+import androidx.activity.ComponentActivity
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
-import androidx.activity.ComponentActivity
 
 /**
  * Intercepts the system back gesture / button while [enabled] is true and shows
@@ -75,6 +76,27 @@ fun KeepScreenOn(enabled: Boolean) {
             if (enabled) {
                 window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
+        }
+    }
+}
+
+/**
+ * Locks the screen to portrait orientation for the duration of this composable's
+ * lifetime, then restores the previous orientation on disposal.
+ *
+ * Use on all non-active-session screens so the UI is always portrait when the
+ * user is navigating menus / settings.
+ */
+@Composable
+fun LockPortrait() {
+    val context = LocalContext.current
+    DisposableEffect(Unit) {
+        val activity = context as? ComponentActivity
+        val original = activity?.requestedOrientation
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        onDispose {
+            activity?.requestedOrientation =
+                original ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
     }
 }

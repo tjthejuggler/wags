@@ -35,6 +35,7 @@ import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.LiveSensorActionsCallback
+import com.example.wags.ui.common.LockPortrait
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.common.RrIntervalChart
 import com.example.wags.ui.common.SessionBackHandler
@@ -73,6 +74,7 @@ fun MorningReadinessScreen(
     // Keep screen on during COMPLETE too so the user can review results
     val keepScreenOn = isActive || uiState.fsmState == MorningReadinessState.COMPLETE
 
+    LockPortrait()
     SessionBackHandler(enabled = isActive, onConfirm = onNavigateBack)
     KeepScreenOn(enabled = keepScreenOn)
 

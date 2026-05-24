@@ -29,6 +29,7 @@ import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.LiveSensorActions
+import com.example.wags.ui.common.LockPortrait
 import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
@@ -57,6 +58,7 @@ fun RapidHrScreen(
     val isActive = state.phase == RapidHrPhase.WAITING_FIRST ||
             state.phase == RapidHrPhase.TRANSITIONING
 
+    LockPortrait()
     SessionBackHandler(enabled = isActive) { navController.popBackStack() }
     KeepScreenOn(enabled = isActive || state.phase == RapidHrPhase.COMPLETE)
 

@@ -19,6 +19,7 @@ import androidx.navigation.NavController
 import com.example.wags.data.garmin.GarminConnectionState
 import com.example.wags.data.garmin.GarminManager
 import com.example.wags.ui.common.LiveSensorActionsNav
+import com.example.wags.ui.common.LockPortrait
 import com.example.wags.ui.theme.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -93,6 +94,8 @@ fun GarminScreen(
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
     val syncLog by viewModel.syncLog.collectAsStateWithLifecycle()
     var showSyncLog by remember { mutableStateOf(false) }
+
+    LockPortrait()
 
     Scaffold(
         containerColor = BackgroundDark,
