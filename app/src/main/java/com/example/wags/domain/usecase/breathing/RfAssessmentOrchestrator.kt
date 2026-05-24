@@ -434,13 +434,13 @@ class RfAssessmentOrchestrator @Inject constructor(
         val periodSec = 60f / baseBpm + offsetSec
         if (periodSec <= 0f) return baseBpm          // safety guard
         val newBpm = 60f / periodSec
-        // Round to nearest 0.01 to avoid floating-point noise
-        return ((newBpm * 100f).roundToInt() / 100f).coerceIn(3.0f, 8.0f)
+        // Round to nearest 0.05 BPM — rates must align to 0.05 increments
+        return ((newBpm * 20f).roundToInt() / 20f).coerceIn(3.0f, 8.0f)
     }
 
     /**
      * Ensures no two entries in the grid share the exact same breathing rate.
-     * If a duplicate BPM is found, it is nudged by +0.01 BPM repeatedly
+     * If a duplicate BPM is found, it is nudged by +0.05 BPM repeatedly
      * until it becomes unique (clamped to 3.0–8.0 BPM range).
      * This guarantees every test in an assessment tests a distinct rate.
      */
@@ -451,12 +451,12 @@ class RfAssessmentOrchestrator @Inject constructor(
         return grid.map { (bpm, ie) ->
             var uniqueBpm = bpm
             while (!seenBpm.add(uniqueBpm)) {
-                uniqueBpm = ((uniqueBpm + 0.01f) * 100f).roundToInt() / 100f
+                uniqueBpm = ((uniqueBpm + 0.05f) * 20f).roundToInt() / 20f
                 if (uniqueBpm > 8.0f) {
                     // If nudging up overflows, nudge down instead
                     uniqueBpm = bpm
                     while (!seenBpm.add(uniqueBpm)) {
-                        uniqueBpm = ((uniqueBpm - 0.01f) * 100f).roundToInt() / 100f
+                        uniqueBpm = ((uniqueBpm - 0.05f) * 20f).roundToInt() / 20f
                         uniqueBpm = uniqueBpm.coerceAtLeast(3.0f)
                     }
                     break

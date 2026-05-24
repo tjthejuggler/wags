@@ -1,24 +1,19 @@
-## ADR: Trophy Chart Per-Duration Drill Contexts + Debug Queue Persistence + Debug Bubble Rotation Fix
+# ADR: Breathing Rate 0.05 BPM Increment Alignment
 
-**Date**: 2026-05-10
+**Date:** 2026-05-24
+**Status:** Accepted
 
-### Bug 1: Trophy chart missing min breath / progressive O2 trophies
-**Root cause**: `TrophyChartViewModel.computeDays()` used `MIN_BREATH_ANY` and `PROGRESSIVE_O2_ANY` which pool all session durations together. A 2-min min breath PB wouldn't appear if a better 5-min record existed, because the "any" query only returns the single best across all durations.
+## Context
+RF Assessment protocols apply a random period offset (±0.9s) to breathing rates, then convert back to BPM. The `offsetBpm()` function was rounding to 0.01 BPM increments, and `deduplicateGrid()` was nudging duplicates by 0.01 BPM. This produced rates like 4.44 and 4.49 BPM, which violate the 0.05 BPM increment rule the app enforces elsewhere (e.g., `ResonanceRateRecommender.roundToTwentieth()`).
 
-**Fix**: Changed `computeDays()` to discover distinct `drillParamValue` values from existing records and create per-duration `DrillContext` instances (e.g. `DrillContext.minBreath(120)`, `DrillContext.progressiveO2(60)`). This matches the PersonalBests screen behavior where each duration gets its own trophy hierarchy. Falls back to `*_ANY` only when no records with `drillParamValue` exist yet.
+## Decision
+All breathing rates in the system must align to 0.05 BPM increments (1/20th BPM). Changed:
+1. `RfAssessmentOrchestrator.offsetBpm()`: Round to 0.05 (`* 20 / 20`) instead of 0.01 (`* 100 / 100`)
+2. `RfAssessmentOrchestrator.deduplicateGrid()`: Nudge by 0.05 instead of 0.01
+3. `SlidingWindowAnalytics`: Round `resonanceFrequencyBpm` to 0.05 before returning
 
-**Files changed**: `TrophyChartViewModel.kt`
-
-### Bug 2: Debug bubble invisible on Trophy Chart (landscape) screen
-**Root cause**: `DebugBubbleOverlay` initialized `offsetX`/`offsetY` with `remember` which doesn't update when screen configuration changes. When TrophyChartScreen forces landscape rotation, the bubble's Y position (calculated from portrait height) goes off-screen.
-
-**Fix**: Added `LaunchedEffect(screenWidthPx, screenHeightPx)` that re-clamps `offsetX` and `offsetY` to valid screen bounds whenever dimensions change.
-
-**Files changed**: `DebugBubbleOverlay.kt`
-
-### Bug 3: Queued debug notes lost on app restart
-**Root cause**: `DebugNoteRepository._queue` was a `MutableStateFlow(emptyList())` — purely in-memory. Saved notes were persisted to SharedPreferences, but queued notes were not.
-
-**Fix**: Added `loadQueuedNotes()` and `saveQueuedNotes()` to `DebugPreferences`, initialized `_queue` from persisted data, and added `debugPrefs.saveQueuedNotes()` calls after every queue mutation (`enqueueNote`, `removeFromQueue`, `queueSavedNote`, `submitQueue`).
-
-**Files changed**: `DebugPreferences.kt`, `DebugNoteRepository.kt`
+## Consequences
+- All stepped protocol rates (EXPRESS, STANDARD, DEEP, TARGETED, CONTINUOUS, CUSTOM, BEST_RATES) now produce 0.05-aligned BPM values
+- Sliding Window protocol's resonance frequency result is also 0.05-aligned
+- Downstream consumers (ResonanceRateRecommender, pacer, UI) are compatible — they already expect or round to 0.05
+- Slightly less rate diversity per session (0.05 vs 0.01 granularity), but this matches the intended UX constraint

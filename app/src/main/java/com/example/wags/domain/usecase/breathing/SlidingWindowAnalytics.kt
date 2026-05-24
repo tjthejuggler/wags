@@ -5,6 +5,7 @@ import com.example.wags.domain.usecase.hrv.PchipResampler
 import com.example.wags.domain.usecase.hrv.PsdBandIntegrator
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -104,7 +105,8 @@ object SlidingWindowAnalytics {
         // Step 4 — Peak detection
         val peakIdx = resonanceIndex.indices.maxByOrNull { resonanceIndex[it] } ?: 0
         val peakResonanceIndex = resonanceIndex[peakIdx]
-        val resonanceFrequencyBpm = pacingBpmSeries[peakIdx]
+        // Round to nearest 0.05 BPM — rates must align to 0.05 increments
+        val resonanceFrequencyBpm = (pacingBpmSeries[peakIdx] * 20f).roundToInt() / 20f
         val peakPlv = plvRaw[peakIdx]
 
         // Step 5 — Quality gates
