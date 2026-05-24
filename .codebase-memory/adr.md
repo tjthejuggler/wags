@@ -1,19 +1,25 @@
-# ADR: Breathing Rate 0.05 BPM Increment Alignment
+# ADR: Guided Hyperventilation for Min Breath Drill
 
-**Date:** 2026-05-24
-**Status:** Accepted
+**Date**: 2026-05-24
+**Status**: Accepted
 
 ## Context
-RF Assessment protocols apply a random period offset (±0.9s) to breathing rates, then convert back to BPM. The `offsetBpm()` function was rounding to 0.01 BPM increments, and `deduplicateGrid()` was nudging duplicates by 0.01 BPM. This produced rates like 4.44 and 4.49 BPM, which violate the 0.05 BPM increment rule the app enforces elsewhere (e.g., `ResonanceRateRecommender.roundToTwentieth()`).
+The Free Hold drill had a "Guided Hyperventilation" checkbox with configurable phase durations (relaxed exhale, purge exhale, transition) and a countdown dialog. The Min Breath drill lacked this feature despite having the same HYPER prep type option.
 
 ## Decision
-All breathing rates in the system must align to 0.05 BPM increments (1/20th BPM). Changed:
-1. `RfAssessmentOrchestrator.offsetBpm()`: Round to 0.05 (`* 20 / 20`) instead of 0.01 (`* 100 / 100`)
-2. `RfAssessmentOrchestrator.deduplicateGrid()`: Nudge by 0.05 instead of 0.01
-3. `SlidingWindowAnalytics`: Round `resonanceFrequencyBpm` to 0.05 before returning
+Add guided hyperventilation support to the Min Breath drill, mirroring the Free Hold implementation:
+
+1. **Shared composables**: Extract `GuidedHyperSection`, `GuidedHyperEditSheet`, and `GuidedHyperPhaseRow` from `FreeHoldActiveScreen.kt` into a new `GuidedHyperSection.kt` file with public visibility, so both screens can reuse them.
+
+2. **MinBreathUiState**: Add `isHyperPrep`, `guidedHyperEnabled`, `guidedRelaxedExhaleSec`, `guidedPurgeExhaleSec`, `guidedTransitionSec`, `showGuidedCountdown`, `guidedCountdownComplete`, `startMp3WithHyper` fields.
+
+3. **MinBreathViewModel**: Add setter methods (`setGuidedHyperEnabled`, `setGuidedRelaxedExhaleSec`, etc.), countdown lifecycle methods (`showGuidedCountdown`, `onGuidedCountdownComplete`, `onGuidedCountdownCancelled`), and persist guided hyper data in `saveSession` via `ApneaRecordEntity.guidedHyper`, `guidedRelaxedExhaleSec`, `guidedPurgeExhaleSec`, `guidedTransitionSec` columns.
+
+4. **MinBreathScreen**: Show `GuidedHyperSection` when prep type is HYPER. When the user taps Start with guided hyper enabled, show `GuidedHyperCountdownDialog`. On countdown completion, auto-navigate to the active screen (which auto-starts the session).
+
+5. **Data persistence**: Uses the same `ApneaRecordEntity` columns already present for Free Hold — no DB migration needed.
 
 ## Consequences
-- All stepped protocol rates (EXPRESS, STANDARD, DEEP, TARGETED, CONTINUOUS, CUSTOM, BEST_RATES) now produce 0.05-aligned BPM values
-- Sliding Window protocol's resonance frequency result is also 0.05-aligned
-- Downstream consumers (ResonanceRateRecommender, pacer, UI) are compatible — they already expect or round to 0.05
-- Slightly less rate diversity per session (0.05 vs 0.01 granularity), but this matches the intended UX constraint
+- Min Breath now has feature parity with Free Hold for guided hyperventilation
+- The shared composables reduce code duplication
+- History details for Min Breath sessions will show guided hyper usage and timing, same as Free Hold

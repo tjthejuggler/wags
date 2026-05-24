@@ -25,6 +25,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.example.wags.domain.model.PrepType
 import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
@@ -51,6 +52,13 @@ fun MinBreathScreen(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // Auto-navigate to active screen when guided hyperventilation countdown completes
+    LaunchedEffect(state.guidedCountdownComplete) {
+        if (state.guidedCountdownComplete) {
+            navController.navigate("min_breath_active")
+        }
     }
 
     Scaffold(
@@ -194,6 +202,47 @@ fun MinBreathScreen(
                 )
             }
 
+            // 0e. Guided hyperventilation section — shown when prep is HYPER
+            var showGuidedHyperEditSheet by remember { mutableStateOf(false) }
+            if (state.isHyperPrep) {
+                GuidedHyperSection(
+                    enabled = state.guidedHyperEnabled,
+                    relaxedExhaleSec = state.guidedRelaxedExhaleSec,
+                    purgeExhaleSec = state.guidedPurgeExhaleSec,
+                    transitionSec = state.guidedTransitionSec,
+                    showStartMp3WithHyper = state.isGuidedMode,
+                    startMp3WithHyper = state.startMp3WithHyper,
+                    onEnabledChange = { viewModel.setGuidedHyperEnabled(it) },
+                    onStartMp3WithHyperChange = { viewModel.setStartMp3WithHyper(it) },
+                    onEditClick = { showGuidedHyperEditSheet = true }
+                )
+            }
+
+            if (showGuidedHyperEditSheet) {
+                GuidedHyperEditSheet(
+                    relaxedExhaleSec = state.guidedRelaxedExhaleSec,
+                    purgeExhaleSec = state.guidedPurgeExhaleSec,
+                    transitionSec = state.guidedTransitionSec,
+                    onRelaxedExhaleChange = { viewModel.setGuidedRelaxedExhaleSec(it) },
+                    onPurgeExhaleChange = { viewModel.setGuidedPurgeExhaleSec(it) },
+                    onTransitionChange = { viewModel.setGuidedTransitionSec(it) },
+                    onDismiss = { showGuidedHyperEditSheet = false }
+                )
+            }
+
+            // Guided hyperventilation countdown dialog
+            if (state.showGuidedCountdown) {
+                GuidedHyperCountdownDialog(
+                    phases = GuidedHyperPhases(
+                        relaxedExhaleSec = state.guidedRelaxedExhaleSec,
+                        purgeExhaleSec = state.guidedPurgeExhaleSec,
+                        transitionSec = state.guidedTransitionSec
+                    ),
+                    onComplete = { viewModel.onGuidedCountdownComplete() },
+                    onCancel = { viewModel.onGuidedCountdownCancelled() }
+                )
+            }
+
             // 1. Explanation card
             MinBreathExplanationCard()
 
@@ -203,9 +252,19 @@ fun MinBreathScreen(
                 onSetSessionDuration = { viewModel.setSessionDurationSec(it) }
             )
 
-            // 3. Start button
+            // 3. Start button — triggers guided countdown if applicable
+            val useGuidedStart = state.isHyperPrep
+                    && state.guidedHyperEnabled
+                    && !state.guidedCountdownComplete
+
             Button(
-                onClick = { navController.navigate("min_breath_active") },
+                onClick = {
+                    if (useGuidedStart) {
+                        viewModel.showGuidedCountdown()
+                    } else {
+                        navController.navigate("min_breath_active")
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
