@@ -2,6 +2,7 @@ package com.example.wags.domain.usecase.breathing
 
 import kotlin.math.PI
 import kotlin.math.cos
+import kotlin.math.round
 
 /**
  * Analytically-integrated chirp pacer for the Sliding Window RF protocol.
@@ -71,7 +72,7 @@ object SlidingWindowPacerEngine {
 
         val phaseRadians = ((elapsedSeconds - breathStart) / period * 2f * PI).toFloat()
         val refWave = (1f - cos(phaseRadians)) / 2f
-        val instantBpm = 60f / period
+        val instantBpm = round(60f / period * 20f) / 20f  // snap to 0.05 BPM increments
 
         return PacerState(
             instantBpm = instantBpm,
