@@ -205,8 +205,12 @@ data class ApneaUiState(
     /** Guided audio completion status keyed by audioId. */
     val guidedCompletionStatuses: Map<Long, GuidedCompletionStatus> = emptyMap(),
     // ── Record-breaking forecast ──────────────────────────────────────────────
-    /** Forecast for the current settings combination. Null when insufficient data. */
+    /** Forecast for the current settings combination (Free Hold). Null when insufficient data. */
     val recordForecast: RecordForecast? = null,
+    /** Forecast for Progressive O₂ with the current settings. Null when insufficient data. */
+    val progO2RecordForecast: RecordForecast? = null,
+    /** Forecast for Min Breath with the current settings. Null when insufficient data. */
+    val minBreathRecordForecast: RecordForecast? = null,
 )
 
 @HiltViewModel
@@ -539,6 +543,56 @@ class ApneaViewModel @Inject constructor(
                     _uiState.update { it.copy(recordForecast = if (forecast.status == ForecastStatus.Ready) forecast else null) }
                 } catch (e: Exception) {
                     Log.w("ApneaVM", "Forecast computation failed", e)
+                }
+            }
+        }
+
+        // ── Progressive O₂ forecast: recompute when settings change ──────────
+        viewModelScope.launch {
+            combine(
+                combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud ->
+                    ForecastSettings(lv, pt.name, tod.name, pos.name, aud.name)
+                },
+                _forecastRefreshTrigger
+            ) { settings, _ -> settings }
+            .collectLatest { settings ->
+                delay(150) // debounce
+                try {
+                    val records = apneaRepository.getAllProgressiveO2Once()
+                    val forecast = RecordForecastCalculator.compute(
+                        records = records,
+                        settings = settings,
+                        nowEpochMs = System.currentTimeMillis(),
+                        recordLabel = "rounds"
+                    )
+                    _uiState.update { it.copy(progO2RecordForecast = if (forecast.status == ForecastStatus.Ready) forecast else null) }
+                } catch (e: Exception) {
+                    Log.w("ApneaVM", "Progressive O₂ forecast computation failed", e)
+                }
+            }
+        }
+
+        // ── Min Breath forecast: recompute when settings change ──────────────
+        viewModelScope.launch {
+            combine(
+                combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud ->
+                    ForecastSettings(lv, pt.name, tod.name, pos.name, aud.name)
+                },
+                _forecastRefreshTrigger
+            ) { settings, _ -> settings }
+            .collectLatest { settings ->
+                delay(150) // debounce
+                try {
+                    val records = apneaRepository.getAllMinBreathOnce()
+                    val forecast = RecordForecastCalculator.compute(
+                        records = records,
+                        settings = settings,
+                        nowEpochMs = System.currentTimeMillis(),
+                        recordLabel = "sessions"
+                    )
+                    _uiState.update { it.copy(minBreathRecordForecast = if (forecast.status == ForecastStatus.Ready) forecast else null) }
+                } catch (e: Exception) {
+                    Log.w("ApneaVM", "Min Breath forecast computation failed", e)
                 }
             }
         }
@@ -981,7 +1035,7 @@ class ApneaViewModel @Inject constructor(
                         timeOfDay = state.timeOfDay.name,
                         posture = state.posture.name,
                         audio = state.audio.name,
-                        totalFreeHolds = forecast.totalFreeHolds,
+                        totalFreeHolds = forecast.totalRecords,
                         confidence = forecast.confidence.name,
                         predictions = predictions
                     )

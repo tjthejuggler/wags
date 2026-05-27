@@ -257,6 +257,7 @@ fun ApneaScreen(
                         paramLabel = "${state.progO2BreathPeriodSec}s breath period",
                         description = "Endless breath-hold drill: 15s → 30s → 45s → … with a configurable breathing period between holds.",
                         buttonLabel = "Open Progressive O₂",
+                        recordForecast = state.progO2RecordForecast,
                         onOpenDrill = { navController.navigate(WagsRoutes.PROGRESSIVE_O2) },
                         onTrophyClick = {
                             navController.navigate(
@@ -287,6 +288,7 @@ fun ApneaScreen(
                             "You control when to hold and when to breathe.",
                         buttonLabel = "Open Min Breath",
                         buttonColor = ButtonPrimary,
+                        recordForecast = state.minBreathRecordForecast,
                         onOpenDrill = { navController.navigate(WagsRoutes.MIN_BREATH) },
                         onTrophyClick = {
                             navController.navigate(
@@ -824,6 +826,7 @@ private fun DrillSectionContent(
     description: String,
     buttonLabel: String,
     buttonColor: Color = ButtonDefaults.buttonColors().containerColor,
+    recordForecast: RecordForecast? = null,
     onOpenDrill: () -> Unit,
     onTrophyClick: () -> Unit = {}
 ) {
@@ -862,6 +865,9 @@ private fun DrillSectionContent(
                 )
             }
         }
+
+        // ── Record-breaking forecast ──────────────────────────────────────────
+        RecordForecastSummary(forecast = recordForecast, showAutoSet = false)
 
         Text(
             description,

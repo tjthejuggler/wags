@@ -70,6 +70,16 @@ class ApneaRepository @Inject constructor(
         dao.getAllOnce().filter { it.tableType == null }
     }
 
+    /** One-shot: all Progressive O₂ records (tableType == "PROGRESSIVE_O2"), oldest first — used for forecast model. */
+    suspend fun getAllProgressiveO2Once(): List<ApneaRecordEntity> = withContext(ioDispatcher) {
+        dao.getAllOnce().filter { it.tableType == "PROGRESSIVE_O2" }
+    }
+
+    /** One-shot: all Min Breath records (tableType == "MIN_BREATH"), oldest first — used for forecast model. */
+    suspend fun getAllMinBreathOnce(): List<ApneaRecordEntity> = withContext(ioDispatcher) {
+        dao.getAllOnce().filter { it.tableType == "MIN_BREATH" }
+    }
+
     /** The [limit] most recent records for a given 5-setting combination, across ALL event types. */
     fun getRecentBySettings(
         lungVolume: String,

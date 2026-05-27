@@ -57,17 +57,19 @@ data class CategoryForecast(
  * Complete forecast result for the current settings.
  *
  * @property status           Ready or InsufficientData.
- * @property exactProbability  The single % shown on the Free Hold card (exact-combo chance).
+ * @property exactProbability  The single % shown on the card (exact-combo chance).
  * @property categories        All 32 sub-categories, sorted by probability descending.
- * @property totalFreeHolds    N used to fit the model.
+ * @property totalRecords     N used to fit the model.
  * @property confidence        Overall confidence tier.
+ * @property recordLabel       Label for records in the dialog (e.g. "holds", "sessions").
  */
 data class RecordForecast(
     val status: ForecastStatus,
     val exactProbability: Float,
     val categories: List<CategoryForecast>,
-    val totalFreeHolds: Int,
-    val confidence: ForecastConfidence
+    val totalRecords: Int,
+    val confidence: ForecastConfidence,
+    val recordLabel: String = "holds"
 )
 
 /**

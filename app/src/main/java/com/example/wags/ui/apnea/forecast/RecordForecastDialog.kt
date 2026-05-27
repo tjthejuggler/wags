@@ -76,7 +76,7 @@ fun RecordForecastDialog(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        "${forecast.totalFreeHolds} holds",
+                        "${forecast.totalRecords} ${forecast.recordLabel}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

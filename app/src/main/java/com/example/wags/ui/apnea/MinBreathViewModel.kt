@@ -30,6 +30,10 @@ import com.example.wags.domain.usecase.apnea.MinBreathHoldResult
 import com.example.wags.domain.usecase.apnea.MinBreathPhase
 import com.example.wags.domain.usecase.apnea.MinBreathState
 import com.example.wags.domain.usecase.apnea.MinBreathStateMachine
+import com.example.wags.domain.usecase.apnea.forecast.ForecastSettings
+import com.example.wags.domain.usecase.apnea.forecast.ForecastStatus
+import com.example.wags.domain.usecase.apnea.forecast.RecordForecast
+import com.example.wags.domain.usecase.apnea.forecast.RecordForecastCalculator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -37,6 +41,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -102,7 +107,10 @@ data class MinBreathUiState(
     /** True when the user wants the guided MP3 to start playing during the hyper countdown. */
     val startMp3WithHyper: Boolean = false,
     // ── Personal best celebration ──────────────────────────────────────────────
-    val newPersonalBest: PersonalBestResult? = null
+    val newPersonalBest: PersonalBestResult? = null,
+    // ── Record-breaking forecast ──────────────────────────────────────────────
+    /** Forecast for the current settings combination. Null when insufficient data. */
+    val recordForecast: RecordForecast? = null
 )
 
 data class DurationHistory(
@@ -167,6 +175,12 @@ class MinBreathViewModel @Inject constructor(
 
     // Spotify tracks played during the session (captured at stop time)
     private var trackedSongs: List<SpotifySong> = emptyList()
+
+    /** Bumped when settings change — triggers forecast recompute. */
+    private val _forecastRefreshTrigger = MutableStateFlow(0)
+
+    /** Call after any settings change to recompute the forecast. */
+    private fun refreshForecast() { _forecastRefreshTrigger.value++ }
 
     init {
         // Restore persisted session duration
@@ -256,6 +270,31 @@ class MinBreathViewModel @Inject constructor(
                 previousPhase = state.phase
             }
         }
+
+        // ── Record-breaking forecast: recompute when settings change ──────────
+        viewModelScope.launch {
+            _forecastRefreshTrigger.collectLatest {
+                delay(150) // debounce
+                try {
+                    val s = _uiState.value
+                    val records = apneaRepository.getAllMinBreathOnce()
+                    val settings = ForecastSettings(
+                        lungVolume = s.lungVolume,
+                        prepType = s.prepType,
+                        timeOfDay = s.timeOfDay,
+                        posture = s.posture,
+                        audio = s.audio
+                    )
+                    val forecast = RecordForecastCalculator.compute(
+                        records = records,
+                        settings = settings,
+                        nowEpochMs = System.currentTimeMillis(),
+                        recordLabel = "sessions"
+                    )
+                    _uiState.update { it.copy(recordForecast = if (forecast.status == ForecastStatus.Ready) forecast else null) }
+                } catch (_: Exception) { }
+            }
+        }
     }
 
     // ── Settings setters ────────────────────────────────────────────────────
@@ -268,6 +307,7 @@ class MinBreathViewModel @Inject constructor(
     fun setLungVolume(v: String) {
         prefs.edit().putString("setting_lung_volume", v).apply()
         _uiState.update { it.copy(lungVolume = v) }
+        refreshForecast()
     }
 
     fun setPrepType(v: String) {
@@ -280,16 +320,19 @@ class MinBreathViewModel @Inject constructor(
                 guidedHyperEnabled = if (isHyper) it.guidedHyperEnabled else false
             )
         }
+        refreshForecast()
     }
 
     fun setTimeOfDay(v: String) {
         prefs.edit().putString("setting_time_of_day", v).apply()
         _uiState.update { it.copy(timeOfDay = v) }
+        refreshForecast()
     }
 
     fun setPosture(v: String) {
         prefs.edit().putString("setting_posture", v).apply()
         _uiState.update { it.copy(posture = v) }
+        refreshForecast()
     }
 
     fun setAudio(v: String) {
@@ -316,6 +359,7 @@ class MinBreathViewModel @Inject constructor(
         } else {
             _uiState.update { it.copy(guidedSelectedName = "") }
         }
+        refreshForecast()
     }
 
     // ── Filter methods ────────────────────────────────────────────────────────

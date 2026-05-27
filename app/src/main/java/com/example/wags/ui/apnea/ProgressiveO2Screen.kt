@@ -24,6 +24,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.domain.model.AudioSetting
+import com.example.wags.ui.apnea.forecast.RecordForecastSummary
 import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
@@ -187,6 +188,12 @@ fun ProgressiveO2Screen(
                     onDismiss = { showGuidedPicker = false }
                 )
             }
+
+            // 0d. Record-breaking forecast
+            RecordForecastSummary(
+                forecast = state.recordForecast,
+                showAutoSet = false
+            )
 
             // 1. Explanation card
             ExplanationCard()

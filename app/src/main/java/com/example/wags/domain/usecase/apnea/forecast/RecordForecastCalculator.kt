@@ -8,16 +8,19 @@ import kotlin.math.max
 import kotlin.math.sqrt
 
 /**
- * Orchestrator: takes all free-hold records + current settings, fits the
+ * Orchestrator: takes records + current settings, fits the
  * log-linear regression, and computes P(next hold > PB) for each of the
  * 32 sub-combinations of the 5 settings.
+ *
+ * Works for any apnea record type (Free Hold, Progressive O₂, Min Breath)
+ * — the caller is responsible for filtering records to the desired type.
  *
  * Public entry point: [compute].
  */
 object RecordForecastCalculator {
 
-    /** Minimum total free holds to produce a forecast (user-set to 5). */
-    private const val MIN_TOTAL_HOLDS = 5
+    /** Minimum total records to produce a forecast (user-set to 5). */
+    private const val MIN_TOTAL_RECORDS = 5
 
     /** Minimum hold duration to include in the model (ms). */
     private const val MIN_DURATION_MS = 10_000L
@@ -35,26 +38,29 @@ object RecordForecastCalculator {
     /**
      * Compute the record-breaking forecast for the current settings.
      *
-     * @param records  All free-hold records (caller should filter tableType == null).
+     * @param records  Records of the desired type (caller should filter by tableType).
      * @param settings The 5 settings currently selected on the apnea screen.
      * @param nowEpochMs  Current epoch-ms (used to compute the trend term for the pending hold).
+     * @param recordLabel  Label for records in the dialog (e.g. "holds", "sessions").
      * @return RecordForecast with all 32 category probabilities.
      */
     fun compute(
         records: List<ApneaRecordEntity>,
         settings: ForecastSettings,
-        nowEpochMs: Long
+        nowEpochMs: Long,
+        recordLabel: String = "holds"
     ): RecordForecast {
         val filtered = records.filter { it.durationMs >= MIN_DURATION_MS }
         val n = filtered.size
 
-        if (n < MIN_TOTAL_HOLDS) {
+        if (n < MIN_TOTAL_RECORDS) {
             return RecordForecast(
                 status = ForecastStatus.InsufficientData,
                 exactProbability = 0f,
                 categories = emptyList(),
-                totalFreeHolds = n,
-                confidence = ForecastConfidence.LOW
+                totalRecords = n,
+                confidence = ForecastConfidence.LOW,
+                recordLabel = recordLabel
             )
         }
 
@@ -63,11 +69,11 @@ object RecordForecastCalculator {
 
         // ── Fit OLS model ─────────────────────────────────────────────────────
         val designResult = FreeHoldFeatureExtractor.buildDesignMatrix(filtered, firstTs)
-            ?: return insufficientData(n)
+            ?: return insufficientData(n, recordLabel)
 
         val (X, y) = designResult
         val fit = OlsRegression.fit(X, y)
-            ?: return insufficientData(n)
+            ?: return insufficientData(n, recordLabel)
 
         // ── Predict for the pending hold ──────────────────────────────────────
         val xPending = FreeHoldFeatureExtractor.encodePendingHold(settings, daysSinceFirst)
@@ -149,8 +155,9 @@ object RecordForecastCalculator {
             status = ForecastStatus.Ready,
             exactProbability = exactProb,
             categories = categories,
-            totalFreeHolds = n,
-            confidence = confidence
+            totalRecords = n,
+            confidence = confidence,
+            recordLabel = recordLabel
         )
     }
 
@@ -159,7 +166,7 @@ object RecordForecastCalculator {
      * (with time-of-day fixed), returning them sorted by probability descending.
      * Used by the "auto set" feature to find the best settings to use.
      *
-     * @param records  All free-hold records (tableType == null).
+     * @param records  Records of the desired type (caller should filter by tableType).
      * @param fixedTimeOfDay  Time-of-day to keep fixed (cannot be changed by auto-set).
      * @param nowEpochMs  Current epoch-ms.
      * @return List of [SettingsWithProbability] sorted by probability descending.
@@ -170,7 +177,7 @@ object RecordForecastCalculator {
         nowEpochMs: Long
     ): List<SettingsWithProbability> {
         val filtered = records.filter { it.durationMs >= MIN_DURATION_MS }
-        if (filtered.size < MIN_TOTAL_HOLDS) return emptyList()
+        if (filtered.size < MIN_TOTAL_RECORDS) return emptyList()
 
         val firstTs = filtered.minOf { it.timestamp }
         val daysSinceFirst = max(0.0, (nowEpochMs - firstTs) / 86_400_000.0)
@@ -233,12 +240,13 @@ object RecordForecastCalculator {
     // Internal helpers
     // ─────────────────────────────────────────────────────────────────────────
 
-    private fun insufficientData(n: Int) = RecordForecast(
+    private fun insufficientData(n: Int, recordLabel: String = "holds") = RecordForecast(
         status = ForecastStatus.InsufficientData,
         exactProbability = 0f,
         categories = emptyList(),
-        totalFreeHolds = n,
-        confidence = ForecastConfidence.LOW
+        totalRecords = n,
+        confidence = ForecastConfidence.LOW,
+        recordLabel = recordLabel
     )
 
     /**

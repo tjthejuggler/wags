@@ -26,6 +26,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.domain.model.PrepType
+import com.example.wags.ui.apnea.forecast.RecordForecastSummary
 import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
@@ -242,6 +243,12 @@ fun MinBreathScreen(
                     onCancel = { viewModel.onGuidedCountdownCancelled() }
                 )
             }
+
+            // 0f. Record-breaking forecast
+            RecordForecastSummary(
+                forecast = state.recordForecast,
+                showAutoSet = false
+            )
 
             // 1. Explanation card
             MinBreathExplanationCard()

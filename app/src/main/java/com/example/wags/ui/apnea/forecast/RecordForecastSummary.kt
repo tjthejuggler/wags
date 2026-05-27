@@ -22,7 +22,8 @@ import com.example.wags.domain.usecase.apnea.forecast.RecordForecast
 fun RecordForecastSummary(
     forecast: RecordForecast?,
     onAutoSet: () -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showAutoSet: Boolean = true
 ) {
     val showDialog = remember { mutableStateOf(false) }
 
@@ -69,8 +70,8 @@ fun RecordForecastSummary(
             }
         }
 
-        // Auto-set button — only shown when forecast is available
-        if (forecast != null) {
+        // Auto-set button — only shown when forecast is available and auto-set is enabled
+        if (forecast != null && showAutoSet) {
             Text(
                 "auto set",
                 style = MaterialTheme.typography.labelSmall,

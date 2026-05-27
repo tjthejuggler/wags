@@ -29,6 +29,10 @@ import com.example.wags.domain.usecase.apnea.ProgressiveO2Phase
 import com.example.wags.domain.usecase.apnea.ProgressiveO2RoundResult
 import com.example.wags.domain.usecase.apnea.ProgressiveO2State
 import com.example.wags.domain.usecase.apnea.ProgressiveO2StateMachine
+import com.example.wags.domain.usecase.apnea.forecast.ForecastSettings
+import com.example.wags.domain.usecase.apnea.forecast.ForecastStatus
+import com.example.wags.domain.usecase.apnea.forecast.RecordForecast
+import com.example.wags.domain.usecase.apnea.forecast.RecordForecastCalculator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -38,6 +42,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -85,7 +90,10 @@ data class ProgressiveO2UiState(
     val selectedSong: SpotifyTrackDetail? = null,
     val loadingSelectedSong: Boolean = false,
     // ── Personal best celebration ──────────────────────────────────────────────
-    val newPersonalBest: PersonalBestResult? = null
+    val newPersonalBest: PersonalBestResult? = null,
+    // ── Record-breaking forecast ──────────────────────────────────────────────
+    /** Forecast for the current settings combination. Null when insufficient data. */
+    val recordForecast: RecordForecast? = null
 )
 
 data class BreathPeriodHistory(
@@ -149,6 +157,12 @@ class ProgressiveO2ViewModel @Inject constructor(
     // Spotify tracks played during the session (captured at stop time)
     private var trackedSongs: List<SpotifySong> = emptyList()
 
+    /** Bumped when settings change — triggers forecast recompute. */
+    private val _forecastRefreshTrigger = MutableStateFlow(0)
+
+    /** Call after any settings change to recompute the forecast. */
+    private fun refreshForecast() { _forecastRefreshTrigger.value++ }
+
     init {
         // Restore persisted breath period
         val savedBreathPeriod = prefs.getInt("prog_o2_breath_period_sec", 60)
@@ -197,6 +211,31 @@ class ProgressiveO2ViewModel @Inject constructor(
                 previousPhase = state.phase
             }
         }
+
+        // ── Record-breaking forecast: recompute when settings change ──────────
+        viewModelScope.launch {
+            _forecastRefreshTrigger.collectLatest {
+                delay(150) // debounce
+                try {
+                    val s = _uiState.value
+                    val records = apneaRepository.getAllProgressiveO2Once()
+                    val settings = ForecastSettings(
+                        lungVolume = s.lungVolume,
+                        prepType = s.prepType,
+                        timeOfDay = s.timeOfDay,
+                        posture = s.posture,
+                        audio = s.audio
+                    )
+                    val forecast = RecordForecastCalculator.compute(
+                        records = records,
+                        settings = settings,
+                        nowEpochMs = System.currentTimeMillis(),
+                        recordLabel = "sessions"
+                    )
+                    _uiState.update { it.copy(recordForecast = if (forecast.status == ForecastStatus.Ready) forecast else null) }
+                } catch (_: Exception) { }
+            }
+        }
     }
 
     // ── Settings setters ────────────────────────────────────────────────────
@@ -204,21 +243,25 @@ class ProgressiveO2ViewModel @Inject constructor(
     fun setLungVolume(v: String) {
         prefs.edit().putString("setting_lung_volume", v).apply()
         _uiState.update { it.copy(lungVolume = v) }
+        refreshForecast()
     }
 
     fun setPrepType(v: String) {
         prefs.edit().putString("setting_prep_type", v).apply()
         _uiState.update { it.copy(prepType = v) }
+        refreshForecast()
     }
 
     fun setTimeOfDay(v: String) {
         prefs.edit().putString("setting_time_of_day", v).apply()
         _uiState.update { it.copy(timeOfDay = v) }
+        refreshForecast()
     }
 
     fun setPosture(v: String) {
         prefs.edit().putString("setting_posture", v).apply()
         _uiState.update { it.copy(posture = v) }
+        refreshForecast()
     }
 
     fun setAudio(v: String) {
@@ -242,6 +285,7 @@ class ProgressiveO2ViewModel @Inject constructor(
         } else {
             _uiState.update { it.copy(guidedSelectedName = "") }
         }
+        refreshForecast()
     }
 
     fun setVoiceEnabled(enabled: Boolean) {
