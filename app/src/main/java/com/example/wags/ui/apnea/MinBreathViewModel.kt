@@ -21,6 +21,7 @@ import com.example.wags.data.spotify.SpotifyTrackDetail
 import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.DrillContext
 import com.example.wags.domain.model.PersonalBestResult
+import com.example.wags.domain.model.trophyCount
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.SpotifySong
 import com.example.wags.domain.model.TimeOfDay
@@ -30,6 +31,9 @@ import com.example.wags.domain.usecase.apnea.MinBreathHoldResult
 import com.example.wags.domain.usecase.apnea.MinBreathPhase
 import com.example.wags.domain.usecase.apnea.MinBreathState
 import com.example.wags.domain.usecase.apnea.MinBreathStateMachine
+import com.example.wags.domain.model.PersonalBestCategory
+import com.example.wags.domain.usecase.apnea.forecast.CategoryForecast
+import com.example.wags.domain.usecase.apnea.forecast.ForecastConfidence
 import com.example.wags.domain.usecase.apnea.forecast.ForecastSettings
 import com.example.wags.domain.usecase.apnea.forecast.ForecastStatus
 import com.example.wags.domain.usecase.apnea.forecast.RecordForecast
@@ -277,7 +281,10 @@ class MinBreathViewModel @Inject constructor(
                 delay(150) // debounce
                 try {
                     val s = _uiState.value
-                    val records = apneaRepository.getAllMinBreathOnce()
+                    val allMinBreathRecords = apneaRepository.getAllMinBreathOnce()
+                    // Filter to only records matching the selected session duration
+                    val records = allMinBreathRecords.filter { it.drillParamValue == s.sessionDurationSec }
+
                     val settings = ForecastSettings(
                         lungVolume = s.lungVolume,
                         prepType = s.prepType,
@@ -285,13 +292,35 @@ class MinBreathViewModel @Inject constructor(
                         posture = s.posture,
                         audio = s.audio
                     )
-                    val forecast = RecordForecastCalculator.compute(
-                        records = records,
-                        settings = settings,
-                        nowEpochMs = System.currentTimeMillis(),
-                        recordLabel = "sessions"
-                    )
-                    _uiState.update { it.copy(recordForecast = if (forecast.status == ForecastStatus.Ready) forecast else null) }
+
+                    // If no records exist for this duration, chance to beat is 100%
+                    if (records.isEmpty()) {
+                        _uiState.update { it.copy(recordForecast = noRecordForecast()) }
+                    } else {
+                        val forecast = RecordForecastCalculator.compute(
+                            records = records,
+                            settings = settings,
+                            nowEpochMs = System.currentTimeMillis(),
+                            recordLabel = "sessions"
+                        )
+                        if (forecast.status == ForecastStatus.Ready) {
+                            _uiState.update { it.copy(recordForecast = forecast) }
+                        } else {
+                            // Insufficient data for regression — check if exact-match PB exists
+                            val hasExactPb = records.any { r ->
+                                r.lungVolume == s.lungVolume &&
+                                r.prepType == s.prepType &&
+                                r.timeOfDay == s.timeOfDay &&
+                                r.posture == s.posture &&
+                                r.audio == s.audio
+                            }
+                            if (!hasExactPb) {
+                                _uiState.update { it.copy(recordForecast = noRecordForecast()) }
+                            } else {
+                                _uiState.update { it.copy(recordForecast = null) }
+                            }
+                        }
+                    }
                 } catch (_: Exception) { }
             }
         }
@@ -302,6 +331,7 @@ class MinBreathViewModel @Inject constructor(
     fun setSessionDurationSec(sec: Int) {
         _uiState.update { it.copy(sessionDurationSec = sec) }
         prefs.edit().putInt("min_breath_session_duration_sec", sec).apply()
+        refreshForecast()
     }
 
     fun setLungVolume(v: String) {
@@ -1009,6 +1039,38 @@ class MinBreathViewModel @Inject constructor(
             } catch (_: Exception) {}
         }
         super.onCleared()
+    }
+
+    /**
+     * Builds a forecast that shows 100% chance to beat for every category,
+     * used when no records exist for the selected duration+settings combo.
+     */
+    private fun noRecordForecast(): RecordForecast {
+        val categories = PersonalBestCategory.entries.map { cat ->
+            CategoryForecast(
+                category = cat,
+                trophyCount = cat.trophyCount(),
+                label = when (cat) {
+                    PersonalBestCategory.EXACT -> "Exact settings"
+                    PersonalBestCategory.FOUR_SETTINGS -> "4 settings"
+                    PersonalBestCategory.THREE_SETTINGS -> "3 settings"
+                    PersonalBestCategory.TWO_SETTINGS -> "2 settings"
+                    PersonalBestCategory.ONE_SETTING -> "1 setting"
+                    PersonalBestCategory.GLOBAL -> "All settings"
+                },
+                recordMs = null,
+                probability = 1.0f,
+                confidence = ForecastConfidence.LOW
+            )
+        }
+        return RecordForecast(
+            status = ForecastStatus.Ready,
+            exactProbability = 1.0f,
+            categories = categories,
+            totalRecords = 0,
+            confidence = ForecastConfidence.LOW,
+            recordLabel = "sessions"
+        )
     }
 
     companion object {
