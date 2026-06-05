@@ -550,15 +550,18 @@ class ApneaViewModel @Inject constructor(
         // ── Progressive O₂ forecast: recompute when settings change ──────────
         viewModelScope.launch {
             combine(
-                combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud ->
-                    ForecastSettings(lv, pt.name, tod.name, pos.name, aud.name)
-                },
+                combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio, _progO2BreathPeriodSec) { args -> args },
                 _forecastRefreshTrigger
-            ) { settings, _ -> settings }
-            .collectLatest { settings ->
+            ) { arr, _ -> arr }
+            .collectLatest { arr ->
                 delay(150) // debounce
                 try {
+                    val lv = arr[0] as String; val pt = (arr[1] as PrepType).name
+                    val tod = (arr[2] as TimeOfDay).name; val pos = (arr[3] as Posture).name
+                    val aud = (arr[4] as AudioSetting).name; val bp = arr[5] as Int
+                    val settings = ForecastSettings(lv, pt, tod, pos, aud)
                     val records = apneaRepository.getAllProgressiveO2Once()
+                        .filter { it.drillParamValue == bp }
                     val forecast = RecordForecastCalculator.compute(
                         records = records,
                         settings = settings,
@@ -575,20 +578,24 @@ class ApneaViewModel @Inject constructor(
         // ── Min Breath forecast: recompute when settings change ──────────────
         viewModelScope.launch {
             combine(
-                combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud ->
-                    ForecastSettings(lv, pt.name, tod.name, pos.name, aud.name)
-                },
+                combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio, _minBreathSessionDurationSec) { args -> args },
                 _forecastRefreshTrigger
-            ) { settings, _ -> settings }
-            .collectLatest { settings ->
+            ) { arr, _ -> arr }
+            .collectLatest { arr ->
                 delay(150) // debounce
                 try {
+                    val lv = arr[0] as String; val pt = (arr[1] as PrepType).name
+                    val tod = (arr[2] as TimeOfDay).name; val pos = (arr[3] as Posture).name
+                    val aud = (arr[4] as AudioSetting).name; val sd = arr[5] as Int
+                    val settings = ForecastSettings(lv, pt, tod, pos, aud)
                     val records = apneaRepository.getAllMinBreathOnce()
+                        .filter { it.drillParamValue == sd }
                     val forecast = RecordForecastCalculator.compute(
                         records = records,
                         settings = settings,
                         nowEpochMs = System.currentTimeMillis(),
-                        recordLabel = "sessions"
+                        recordLabel = "sessions",
+                        ceilingMs = sd * 1000L  // Min Breath: max hold = entire session duration
                     )
                     _uiState.update { it.copy(minBreathRecordForecast = if (forecast.status == ForecastStatus.Ready) forecast else null) }
                 } catch (e: Exception) {

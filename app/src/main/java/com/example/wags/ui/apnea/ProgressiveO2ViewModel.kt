@@ -219,6 +219,7 @@ class ProgressiveO2ViewModel @Inject constructor(
                 try {
                     val s = _uiState.value
                     val records = apneaRepository.getAllProgressiveO2Once()
+                        .filter { it.drillParamValue == s.breathPeriodSec }
                     val settings = ForecastSettings(
                         lungVolume = s.lungVolume,
                         prepType = s.prepType,

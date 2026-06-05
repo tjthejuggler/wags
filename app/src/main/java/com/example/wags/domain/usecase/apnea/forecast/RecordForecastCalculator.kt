@@ -38,20 +38,34 @@ object RecordForecastCalculator {
     /**
      * Compute the record-breaking forecast for the current settings.
      *
-     * @param records  Records of the desired type (caller should filter by tableType).
+     * @param records  Records of the desired type (caller should filter by tableType and drillParamValue).
      * @param settings The 5 settings currently selected on the apnea screen.
      * @param nowEpochMs  Current epoch-ms (used to compute the trend term for the pending hold).
      * @param recordLabel  Label for records in the dialog (e.g. "holds", "sessions").
+     * @param ceilingMs  Optional physical maximum for durationMs (e.g. session duration for Min Breath).
+     *                   When a category's PB equals or exceeds the ceiling, its probability is 0%
+     *                   because it cannot be beaten. Also allows a definitive 0% forecast even with
+     *                   fewer than [MIN_TOTAL_RECORDS] records.
      * @return RecordForecast with all 32 category probabilities.
      */
     fun compute(
         records: List<ApneaRecordEntity>,
         settings: ForecastSettings,
         nowEpochMs: Long,
-        recordLabel: String = "holds"
+        recordLabel: String = "holds",
+        ceilingMs: Long? = null
     ): RecordForecast {
         val filtered = records.filter { it.durationMs >= MIN_DURATION_MS }
         val n = filtered.size
+
+        // If a ceiling exists and the global best has reached it, we can return
+        // a definitive 0% forecast without needing MIN_TOTAL_RECORDS records.
+        if (ceilingMs != null && filtered.isNotEmpty()) {
+            val globalBest = filtered.maxOf { it.durationMs }
+            if (globalBest >= ceilingMs) {
+                return ceilingReachedForecast(filtered, settings, ceilingMs, recordLabel)
+            }
+        }
 
         if (n < MIN_TOTAL_RECORDS) {
             return RecordForecast(
@@ -125,13 +139,15 @@ object RecordForecastCalculator {
             // This guarantees monotonicity: exact probability ≥ broader probability,
             // because broader PB thresholds are always ≥ exact PB thresholds
             // (more records included → best is at least as high).
-            val probability = if (bestMs == null) {
-                1.0f  // no record → 100%
-            } else {
-                val recordLogSec = ln(bestMs / 1000.0)
-                val z = (recordLogSec - muLogSec) / sigmaPred
-                val p = NormalCdf.upperTail(z)
-                p.coerceIn(0.0, 1.0).toFloat()
+            val probability = when {
+                bestMs == null -> 1.0f  // no record → 100%
+                ceilingMs != null && bestMs >= ceilingMs -> 0.0f  // hit ceiling → impossible to beat
+                else -> {
+                    val recordLogSec = ln(bestMs / 1000.0)
+                    val z = (recordLogSec - muLogSec) / sigmaPred
+                    val p = NormalCdf.upperTail(z)
+                    p.coerceIn(0.0, 1.0).toFloat()
+                }
             }
 
             categories.add(CategoryForecast(
@@ -248,6 +264,80 @@ object RecordForecastCalculator {
         confidence = ForecastConfidence.LOW,
         recordLabel = recordLabel
     )
+
+    /**
+     * Build a forecast where the global best has reached the physical ceiling
+     * (e.g. 100% hold time in a Min Breath session). Every category whose PB
+     * equals or exceeds the ceiling gets 0% probability; categories with no
+     * record at all still get 100% (no prior record to beat).
+     */
+    private fun ceilingReachedForecast(
+        records: List<ApneaRecordEntity>,
+        settings: ForecastSettings,
+        ceilingMs: Long,
+        recordLabel: String
+    ): RecordForecast {
+        val settingValues = listOf(
+            settings.lungVolume, settings.prepType, settings.timeOfDay,
+            settings.posture, settings.audio
+        )
+
+        val categories = mutableListOf<CategoryForecast>()
+
+        for (mask in 0..31) {
+            val fixedIndices = mutableSetOf<Int>()
+            for (i in 0..4) {
+                if (mask and (1 shl i) != 0) fixedIndices.add(i)
+            }
+
+            val fixedCount = fixedIndices.size
+            val category = when (fixedCount) {
+                5 -> PersonalBestCategory.EXACT
+                4 -> PersonalBestCategory.FOUR_SETTINGS
+                3 -> PersonalBestCategory.THREE_SETTINGS
+                2 -> PersonalBestCategory.TWO_SETTINGS
+                1 -> PersonalBestCategory.ONE_SETTING
+                0 -> PersonalBestCategory.GLOBAL
+                else -> continue
+            }
+
+            val label = if (fixedCount == 0) "All settings"
+            else fixedIndices.sorted().map { i ->
+                SETTING_DISPLAYS[i][settingValues[i]] ?: settingValues[i]
+            }.joinToString(" · ")
+
+            val bestMs = findBestForSubCombo(records, fixedIndices, settingValues)
+
+            val probability = when {
+                bestMs == null -> 1.0f
+                bestMs >= ceilingMs -> 0.0f
+                else -> 1.0f  // below ceiling but insufficient data for regression → optimistic
+            }
+
+            categories.add(CategoryForecast(
+                category = category,
+                trophyCount = category.trophyCount(),
+                label = label,
+                recordMs = bestMs,
+                probability = probability,
+                confidence = ForecastConfidence.LOW
+            ))
+        }
+
+        categories.sortWith(compareByDescending<CategoryForecast> { it.probability }.thenBy { it.trophyCount })
+
+        val exactEntry = categories.find { it.category == PersonalBestCategory.EXACT }
+        val exactProb = exactEntry?.probability ?: 0.0f
+
+        return RecordForecast(
+            status = ForecastStatus.Ready,
+            exactProbability = exactProb,
+            categories = categories,
+            totalRecords = records.size,
+            confidence = ForecastConfidence.LOW,
+            recordLabel = recordLabel
+        )
+    }
 
     /**
      * Find the best (longest) duration among records that match the fixed

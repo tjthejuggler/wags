@@ -301,7 +301,8 @@ class MinBreathViewModel @Inject constructor(
                             records = records,
                             settings = settings,
                             nowEpochMs = System.currentTimeMillis(),
-                            recordLabel = "sessions"
+                            recordLabel = "sessions",
+                            ceilingMs = s.sessionDurationSec * 1000L  // max hold = entire session
                         )
                         if (forecast.status == ForecastStatus.Ready) {
                             _uiState.update { it.copy(recordForecast = forecast) }

@@ -1,25 +1,18 @@
-# ADR: Guided Hyperventilation for Min Breath Drill
+ADR: Drill forecast must filter records by drillParamValue + ceilingMs for bounded drills
 
-**Date**: 2026-05-24
-**Status**: Accepted
+Date: 2026-06-01 (updated)
 
-## Context
-The Free Hold drill had a "Guided Hyperventilation" checkbox with configurable phase durations (relaxed exhale, purge exhale, transition) and a countdown dialog. The Min Breath drill lacked this feature despite having the same HYPER prep type option.
+Context: The record-breaking forecast (RecordForecastCalculator) predicts P(next hold > PB) using OLS regression on historical records. For drill types (Min Breath, Progressive O₂), records from different drill parameter values (session duration / breath period) have fundamentally different duration distributions. A 5-minute Min Breath session naturally produces longer total hold times than a 2-minute session.
 
-## Decision
-Add guided hyperventilation support to the Min Breath drill, mirroring the Free Hold implementation:
+Additionally, Min Breath has a physical ceiling: total hold time cannot exceed the session duration. If a user achieves 100% hold time, the probability of beating that record is 0% — not "insufficient data".
 
-1. **Shared composables**: Extract `GuidedHyperSection`, `GuidedHyperEditSheet`, and `GuidedHyperPhaseRow` from `FreeHoldActiveScreen.kt` into a new `GuidedHyperSection.kt` file with public visibility, so both screens can reuse them.
+Problem (Part 1): ApneaViewModel and ProgressiveO2ViewModel were passing ALL records of the drill type to RecordForecastCalculator without filtering by drillParamValue. This meant a 2-minute Min Breath session's forecast was computed against records from 5-minute sessions, making the PB threshold impossibly high and the probability absurdly low (e.g. 7% after a perfect session).
 
-2. **MinBreathUiState**: Add `isHyperPrep`, `guidedHyperEnabled`, `guidedRelaxedExhaleSec`, `guidedPurgeExhaleSec`, `guidedTransitionSec`, `showGuidedCountdown`, `guidedCountdownComplete`, `startMp3WithHyper` fields.
+Problem (Part 2): After fixing Part 1, filtering by drillParamValue reduced the record count below MIN_TOTAL_RECORDS (5), causing "insufficient data" even when the user had achieved 100% hold time — which should definitively show 0%.
 
-3. **MinBreathViewModel**: Add setter methods (`setGuidedHyperEnabled`, `setGuidedRelaxedExhaleSec`, etc.), countdown lifecycle methods (`showGuidedCountdown`, `onGuidedCountdownComplete`, `onGuidedCountdownCancelled`), and persist guided hyper data in `saveSession` via `ApneaRecordEntity.guidedHyper`, `guidedRelaxedExhaleSec`, `guidedPurgeExhaleSec`, `guidedTransitionSec` columns.
+Decision: 
+1. Filter records by drillParamValue before passing to RecordForecastCalculator, matching the pattern already used in MinBreathViewModel.
+2. Add a `ceilingMs` parameter to RecordForecastCalculator.compute(). When the global best record equals or exceeds the ceiling, return a definitive 0% forecast via `ceilingReachedForecast()` — bypassing the MIN_TOTAL_RECORDS requirement. In the main probability loop, categories whose PB hits the ceiling also get 0%.
+3. Min Breath callers pass `ceilingMs = sessionDurationSec * 1000L`. Free hold and Progressive O₂ pass no ceiling (null).
 
-4. **MinBreathScreen**: Show `GuidedHyperSection` when prep type is HYPER. When the user taps Start with guided hyper enabled, show `GuidedHyperCountdownDialog`. On countdown completion, auto-navigate to the active screen (which auto-starts the session).
-
-5. **Data persistence**: Uses the same `ApneaRecordEntity` columns already present for Free Hold — no DB migration needed.
-
-## Consequences
-- Min Breath now has feature parity with Free Hold for guided hyperventilation
-- The shared composables reduce code duplication
-- History details for Min Breath sessions will show guided hyper usage and timing, same as Free Hold
+Consequences: Forecast probabilities for drill types now reflect only records with the same drill parameter. When 100% hold time is achieved, the forecast correctly shows 0% instead of "insufficient data".
