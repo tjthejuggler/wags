@@ -251,14 +251,21 @@ fun ProgressiveO2Screen(
             }
 
             // 4. Breath period history
+            val isFiltered = state.filterLungVolume.isNotEmpty()
+                    || state.filterPrepType.isNotEmpty()
+                    || state.filterTimeOfDay.isNotEmpty()
+                    || state.filterPosture.isNotEmpty()
+                    || state.filterAudio.isNotEmpty()
             BreathPeriodHistorySection(
                 history = state.pastBreathPeriods,
                 currentBreathPeriodSec = state.breathPeriodSec,
                 filterSummary = buildProgressiveO2FilterSummary(state),
+                isFiltered = isFiltered,
                 onViewSessionDetail = { recordId ->
                     navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
                 },
-                onFilterClick = { showFilterDialog = true }
+                onFilterClick = { showFilterDialog = true },
+                onClearAllFilters = { viewModel.clearAllFilters() }
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -376,10 +383,12 @@ private fun BreathPeriodHistorySection(
     history: List<BreathPeriodHistory>,
     currentBreathPeriodSec: Int,
     filterSummary: String,
+    isFiltered: Boolean = false,
     onViewSessionDetail: (Long) -> Unit,
-    onFilterClick: () -> Unit = {}
+    onFilterClick: () -> Unit = {},
+    onClearAllFilters: () -> Unit = {}
 ) {
-    // Header row with title + filter button
+    // Header row with title + filter buttons
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -391,19 +400,37 @@ private fun BreathPeriodHistorySection(
             fontWeight = FontWeight.Bold,
             color = TextPrimary
         )
-        OutlinedButton(
-            onClick = onFilterClick,
-            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-            shape = RoundedCornerShape(8.dp),
-            border = BorderStroke(1.dp, TextSecondary),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
-        ) {
-            Text(
-                text = filterSummary,
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            // Quick "All" chip — single tap to clear all filters
+            if (isFiltered) {
+                OutlinedButton(
+                    onClick = onClearAllFilters,
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, ButtonPrimary),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = ButtonPrimary)
+                ) {
+                    Text(
+                        text = "All",
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1
+                    )
+                }
+            }
+            OutlinedButton(
+                onClick = onFilterClick,
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                shape = RoundedCornerShape(8.dp),
+                border = BorderStroke(1.dp, TextSecondary),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
+            ) {
+                Text(
+                    text = filterSummary,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 

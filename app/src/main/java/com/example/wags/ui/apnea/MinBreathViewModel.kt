@@ -78,6 +78,9 @@ data class MinBreathUiState(
     val filterTimeOfDay: String = "",
     val filterPosture: String = "",
     val filterAudio: String = "",
+    // ── Voice / vibration toggles ─────────────────────────────────────────────
+    val voiceEnabled: Boolean = true,
+    val vibrationEnabled: Boolean = true,
     // Spotify
     val spotifyConnected: Boolean = false,
     val isMusicMode: Boolean = false,
@@ -216,7 +219,9 @@ class MinBreathViewModel @Inject constructor(
                 guidedHyperEnabled = if (isHyperPrep) prefs.getBoolean("guided_hyper_enabled", false) else false,
                 guidedRelaxedExhaleSec = prefs.getInt("guided_relaxed_exhale_sec", 0),
                 guidedPurgeExhaleSec = prefs.getInt("guided_purge_exhale_sec", 0),
-                guidedTransitionSec = prefs.getInt("guided_transition_sec", 0)
+                guidedTransitionSec = prefs.getInt("guided_transition_sec", 0),
+                voiceEnabled = audioHapticEngine.voiceEnabled,
+                vibrationEnabled = audioHapticEngine.vibrationEnabled
             )
         }
 
@@ -393,6 +398,18 @@ class MinBreathViewModel @Inject constructor(
         refreshForecast()
     }
 
+    // ── Voice / vibration toggles ────────────────────────────────────────────
+
+    fun setVoiceEnabled(enabled: Boolean) {
+        audioHapticEngine.voiceEnabled = enabled
+        _uiState.update { it.copy(voiceEnabled = enabled) }
+    }
+
+    fun setVibrationEnabled(enabled: Boolean) {
+        audioHapticEngine.vibrationEnabled = enabled
+        _uiState.update { it.copy(vibrationEnabled = enabled) }
+    }
+
     // ── Filter methods ────────────────────────────────────────────────────────
 
     fun setFilterLungVolume(v: String) { _uiState.update { it.copy(filterLungVolume = v) }; loadPastSessions() }
@@ -411,6 +428,20 @@ class MinBreathViewModel @Inject constructor(
                 filterPosture    = s.posture,
                 filterAudio      = s.audio,
                 guidedCountdownComplete = false
+            )
+        }
+        loadPastSessions()
+    }
+
+    /** Clear all filters to show sessions across every setting combination. */
+    fun clearAllFilters() {
+        _uiState.update {
+            it.copy(
+                filterLungVolume = "",
+                filterPrepType   = "",
+                filterTimeOfDay  = "",
+                filterPosture    = "",
+                filterAudio      = ""
             )
         }
         loadPastSessions()
@@ -1014,7 +1045,7 @@ class MinBreathViewModel @Inject constructor(
                 val bestRecord = group.maxByOrNull { it.durationMs }
                 val sessionDurationMs = durSec * 1000L
                 val bestHoldPct = if (sessionDurationMs > 0)
-                    (bestRecord?.durationMs?.toDouble() ?: 0.0) / sessionDurationMs * 100.0
+                    ((bestRecord?.durationMs?.toDouble() ?: 0.0) / sessionDurationMs * 100.0).coerceAtMost(100.0)
                 else 0.0
                 DurationHistory(
                     durationSec = durSec,

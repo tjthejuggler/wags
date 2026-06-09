@@ -259,6 +259,14 @@ fun MinBreathScreen(
                 onSetSessionDuration = { viewModel.setSessionDurationSec(it) }
             )
 
+            // 2b. Voice / vibration toggles
+            VoiceVibrationToggles(
+                voiceEnabled = state.voiceEnabled,
+                vibrationEnabled = state.vibrationEnabled,
+                onVoiceToggle = { viewModel.setVoiceEnabled(it) },
+                onVibrationToggle = { viewModel.setVibrationEnabled(it) }
+            )
+
             // 3. Start button — triggers guided countdown if applicable
             val useGuidedStart = state.isHyperPrep
                     && state.guidedHyperEnabled
@@ -308,17 +316,24 @@ fun MinBreathScreen(
             }
 
             // 4. Session history
+            val isFiltered = state.filterLungVolume.isNotEmpty()
+                    || state.filterPrepType.isNotEmpty()
+                    || state.filterTimeOfDay.isNotEmpty()
+                    || state.filterPosture.isNotEmpty()
+                    || state.filterAudio.isNotEmpty()
             SessionHistorySection(
                 history = state.pastDurations,
                 currentDurationSec = state.sessionDurationSec,
                 filterSummary = buildMinBreathFilterSummary(state),
+                isFiltered = isFiltered,
                 onSelectDuration = { viewModel.setSessionDurationSec(it) },
                 onLongClickDuration = { recordId ->
                     if (recordId > 0) {
                         navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
                     }
                 },
-                onFilterClick = { showFilterDialog = true }
+                onFilterClick = { showFilterDialog = true },
+                onClearAllFilters = { viewModel.clearAllFilters() }
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -489,11 +504,13 @@ private fun SessionHistorySection(
     history: List<DurationHistory>,
     currentDurationSec: Int,
     filterSummary: String,
+    isFiltered: Boolean = false,
     onSelectDuration: (Int) -> Unit,
     onLongClickDuration: (Long) -> Unit = {},
-    onFilterClick: () -> Unit = {}
+    onFilterClick: () -> Unit = {},
+    onClearAllFilters: () -> Unit = {}
 ) {
-    // Header row with title + filter button
+    // Header row with title + filter buttons
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -505,19 +522,37 @@ private fun SessionHistorySection(
             fontWeight = FontWeight.Bold,
             color = TextPrimary
         )
-        OutlinedButton(
-            onClick = onFilterClick,
-            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-            shape = RoundedCornerShape(8.dp),
-            border = BorderStroke(1.dp, TextSecondary),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
-        ) {
-            Text(
-                text = filterSummary,
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            // Quick "All" chip — single tap to clear all filters
+            if (isFiltered) {
+                OutlinedButton(
+                    onClick = onClearAllFilters,
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, ButtonPrimary),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = ButtonPrimary)
+                ) {
+                    Text(
+                        text = "All",
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1
+                    )
+                }
+            }
+            OutlinedButton(
+                onClick = onFilterClick,
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                shape = RoundedCornerShape(8.dp),
+                border = BorderStroke(1.dp, TextSecondary),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
+            ) {
+                Text(
+                    text = filterSummary,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 

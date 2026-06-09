@@ -450,6 +450,20 @@ class ProgressiveO2ViewModel @Inject constructor(
         loadBreathPeriodHistory()
     }
 
+    /** Clear all filters to show sessions across every setting combination. */
+    fun clearAllFilters() {
+        _uiState.update {
+            it.copy(
+                filterLungVolume = "",
+                filterPrepType   = "",
+                filterTimeOfDay  = "",
+                filterPosture    = "",
+                filterAudio      = ""
+            )
+        }
+        loadBreathPeriodHistory()
+    }
+
     // ── Public API ──────────────────────────────────────────────────────────
 
     fun loadBreathPeriodHistory() {
