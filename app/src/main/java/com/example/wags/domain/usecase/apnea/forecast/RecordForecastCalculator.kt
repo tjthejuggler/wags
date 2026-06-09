@@ -38,7 +38,11 @@ object RecordForecastCalculator {
     /**
      * Compute the record-breaking forecast for the current settings.
      *
-     * @param records  Records of the desired type (caller should filter by tableType and drillParamValue).
+     * @param records  Records of the desired type. For Free Hold, the caller filters by
+     *                  tableType only. For parameterized drills (Progressive O₂, Min Breath)
+     *                  the caller should pass ALL records of that drill type (NOT pre-filtered
+     *                  by drillParamValue) and supply [drillParam]; the parameter is then a
+     *                  regression feature so the whole history feeds one fit.
      * @param settings The 5 settings currently selected on the apnea screen.
      * @param nowEpochMs  Current epoch-ms (used to compute the trend term for the pending hold).
      * @param recordLabel  Label for records in the dialog (e.g. "holds", "sessions").
@@ -46,6 +50,12 @@ object RecordForecastCalculator {
      *                   When a category's PB equals or exceeds the ceiling, its probability is 0%
      *                   because it cannot be beaten. Also allows a definitive 0% forecast even with
      *                   fewer than [MIN_TOTAL_RECORDS] records.
+     * @param drillParam  Optional drill parameter (breath-period sec / session-duration sec).
+     *                   When non-null: (1) it is added as a regression feature so all parameter
+     *                   buckets share one fit, (2) the pending-hold prediction is made at this
+     *                   value, and (3) per-category PB lookups only consider records whose
+     *                   drillParamValue matches this value — because a record at one parameter
+     *                   is a different record than at another.
      * @return RecordForecast with all 32 category probabilities.
      */
     fun compute(
@@ -53,44 +63,50 @@ object RecordForecastCalculator {
         settings: ForecastSettings,
         nowEpochMs: Long,
         recordLabel: String = "holds",
-        ceilingMs: Long? = null
+        ceilingMs: Long? = null,
+        drillParam: Int? = null
     ): RecordForecast {
-        val filtered = records.filter { it.durationMs >= MIN_DURATION_MS }
-        val n = filtered.size
+        // Records eligible for the regression fit (duration filter only).
+        val regressionRecords = records.filter { it.durationMs >= MIN_DURATION_MS }
+        // Records used for per-category PB lookups. For parameterized drills, a PB is
+        // specific to the selected parameter, so only same-param records count.
+        val pbRecords = if (drillParam != null) {
+            regressionRecords.filter { it.drillParamValue == drillParam }
+        } else {
+            regressionRecords
+        }
+        val n = regressionRecords.size
 
-        // If a ceiling exists and the global best has reached it, we can return
+        // If a ceiling exists and the best at this parameter has reached it, we can return
         // a definitive 0% forecast without needing MIN_TOTAL_RECORDS records.
-        if (ceilingMs != null && filtered.isNotEmpty()) {
-            val globalBest = filtered.maxOf { it.durationMs }
+        if (ceilingMs != null && pbRecords.isNotEmpty()) {
+            val globalBest = pbRecords.maxOf { it.durationMs }
             if (globalBest >= ceilingMs) {
-                return ceilingReachedForecast(filtered, settings, ceilingMs, recordLabel)
+                return ceilingReachedForecast(pbRecords, settings, ceilingMs, recordLabel)
             }
         }
 
         if (n < MIN_TOTAL_RECORDS) {
-            return RecordForecast(
-                status = ForecastStatus.InsufficientData,
-                exactProbability = 0f,
-                categories = emptyList(),
-                totalRecords = n,
-                confidence = ForecastConfidence.LOW,
-                recordLabel = recordLabel
-            )
+            // Not enough data for regression, but we can still give useful forecasts:
+            // categories with no record → 100% (any hold sets a new PB),
+            // categories with a record → 100% (optimistic; LOW confidence signals uncertainty).
+            return insufficientDataForecast(pbRecords, settings, recordLabel)
         }
 
-        val firstTs = filtered.minOf { it.timestamp }
+        val firstTs = regressionRecords.minOf { it.timestamp }
         val daysSinceFirst = max(0.0, (nowEpochMs - firstTs) / 86_400_000.0)
 
         // ── Fit OLS model ─────────────────────────────────────────────────────
-        val designResult = FreeHoldFeatureExtractor.buildDesignMatrix(filtered, firstTs)
-            ?: return insufficientData(n, recordLabel)
+        val designResult = FreeHoldFeatureExtractor.buildDesignMatrix(
+            regressionRecords, firstTs, includeDrillParam = drillParam != null
+        ) ?: return insufficientDataForecast(pbRecords, settings, recordLabel)
 
         val (X, y) = designResult
         val fit = OlsRegression.fit(X, y)
-            ?: return insufficientData(n, recordLabel)
+            ?: return insufficientDataForecast(pbRecords, settings, recordLabel)
 
         // ── Predict for the pending hold ──────────────────────────────────────
-        val xPending = FreeHoldFeatureExtractor.encodePendingHold(settings, daysSinceFirst)
+        val xPending = FreeHoldFeatureExtractor.encodePendingHold(settings, daysSinceFirst, drillParam)
         val (muLogSec, predVariance) = OlsRegression.predict(xPending, fit)
         val sigmaPred = sqrt(max(1e-6, predVariance))
 
@@ -131,8 +147,9 @@ object RecordForecastCalculator {
                 SETTING_DISPLAYS[i][settingValues[i]] ?: settingValues[i]
             }.joinToString(" · ")
 
-            // Find best record matching this sub-combination
-            val bestMs = findBestForSubCombo(filtered, fixedIndices, settingValues)
+            // Find best record matching this sub-combination (within the selected
+            // drill parameter for parameterized drills — see pbRecords).
+            val bestMs = findBestForSubCombo(pbRecords, fixedIndices, settingValues)
 
             // Compute probability
             // All categories use the same regression prediction (muLogSec).
@@ -256,14 +273,77 @@ object RecordForecastCalculator {
     // Internal helpers
     // ─────────────────────────────────────────────────────────────────────────
 
-    private fun insufficientData(n: Int, recordLabel: String = "holds") = RecordForecast(
-        status = ForecastStatus.InsufficientData,
-        exactProbability = 0f,
-        categories = emptyList(),
-        totalRecords = n,
-        confidence = ForecastConfidence.LOW,
-        recordLabel = recordLabel
-    )
+    /**
+     * Build a forecast when there aren't enough records for regression.
+     * Categories with no existing record get 100% (any hold sets a new PB);
+     * categories with an existing record also get 100% (optimistic, LOW confidence).
+     * This ensures the UI never shows "not enough data" when the user has
+     * never attempted the current settings — they always have a 100% chance
+     * to set a new PB.
+     */
+    private fun insufficientDataForecast(
+        records: List<ApneaRecordEntity>,
+        settings: ForecastSettings,
+        recordLabel: String
+    ): RecordForecast {
+        val settingValues = listOf(
+            settings.lungVolume, settings.prepType, settings.timeOfDay,
+            settings.posture, settings.audio
+        )
+
+        val categories = mutableListOf<CategoryForecast>()
+
+        for (mask in 0..31) {
+            val fixedIndices = mutableSetOf<Int>()
+            for (i in 0..4) {
+                if (mask and (1 shl i) != 0) fixedIndices.add(i)
+            }
+
+            val fixedCount = fixedIndices.size
+            val category = when (fixedCount) {
+                5 -> PersonalBestCategory.EXACT
+                4 -> PersonalBestCategory.FOUR_SETTINGS
+                3 -> PersonalBestCategory.THREE_SETTINGS
+                2 -> PersonalBestCategory.TWO_SETTINGS
+                1 -> PersonalBestCategory.ONE_SETTING
+                0 -> PersonalBestCategory.GLOBAL
+                else -> continue
+            }
+
+            val label = if (fixedCount == 0) "All settings"
+            else fixedIndices.sorted().map { i ->
+                SETTING_DISPLAYS[i][settingValues[i]] ?: settingValues[i]
+            }.joinToString(" · ")
+
+            val bestMs = findBestForSubCombo(records, fixedIndices, settingValues)
+
+            // No record → 100% (any hold is a new PB); record exists → 100% optimistic
+            val probability = 1.0f
+
+            categories.add(CategoryForecast(
+                category = category,
+                trophyCount = category.trophyCount(),
+                label = label,
+                recordMs = bestMs,
+                probability = probability,
+                confidence = ForecastConfidence.LOW
+            ))
+        }
+
+        categories.sortWith(compareByDescending<CategoryForecast> { it.probability }.thenBy { it.trophyCount })
+
+        val exactEntry = categories.find { it.category == PersonalBestCategory.EXACT }
+        val exactProb = exactEntry?.probability ?: 1.0f
+
+        return RecordForecast(
+            status = ForecastStatus.Ready,
+            exactProbability = exactProb,
+            categories = categories,
+            totalRecords = records.size,
+            confidence = ForecastConfidence.LOW,
+            recordLabel = recordLabel
+        )
+    }
 
     /**
      * Build a forecast where the global best has reached the physical ceiling

@@ -218,8 +218,11 @@ class ProgressiveO2ViewModel @Inject constructor(
                 delay(150) // debounce
                 try {
                     val s = _uiState.value
+                    // Pass ALL Progressive O₂ records (not pre-filtered by breath period).
+                    // The breath period is supplied as drillParam so the whole history feeds
+                    // one regression; pre-filtering starved the fit and pinned every
+                    // probability at 100%.
                     val records = apneaRepository.getAllProgressiveO2Once()
-                        .filter { it.drillParamValue == s.breathPeriodSec }
                     val settings = ForecastSettings(
                         lungVolume = s.lungVolume,
                         prepType = s.prepType,
@@ -231,7 +234,8 @@ class ProgressiveO2ViewModel @Inject constructor(
                         records = records,
                         settings = settings,
                         nowEpochMs = System.currentTimeMillis(),
-                        recordLabel = "sessions"
+                        recordLabel = "sessions",
+                        drillParam = s.breathPeriodSec
                     )
                     _uiState.update { it.copy(recordForecast = if (forecast.status == ForecastStatus.Ready) forecast else null) }
                 } catch (_: Exception) { }
@@ -493,6 +497,7 @@ class ProgressiveO2ViewModel @Inject constructor(
     fun setBreathPeriod(seconds: Int) {
         _uiState.update { it.copy(breathPeriodSec = seconds) }
         prefs.edit().putInt("prog_o2_breath_period_sec", seconds).apply()
+        refreshForecast()
     }
 
     fun startSession() {

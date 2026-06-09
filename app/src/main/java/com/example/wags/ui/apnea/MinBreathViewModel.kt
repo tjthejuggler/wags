@@ -286,9 +286,12 @@ class MinBreathViewModel @Inject constructor(
                 delay(150) // debounce
                 try {
                     val s = _uiState.value
-                    val allMinBreathRecords = apneaRepository.getAllMinBreathOnce()
-                    // Filter to only records matching the selected session duration
-                    val records = allMinBreathRecords.filter { it.drillParamValue == s.sessionDurationSec }
+                    // Pass ALL Min Breath records (not pre-filtered by session duration).
+                    // The session duration is supplied as drillParam so the whole history
+                    // feeds one regression; pre-filtering starved the fit and pinned every
+                    // probability at 100%. Per-parameter PB lookups still only count
+                    // records at the selected duration (handled inside compute()).
+                    val records = apneaRepository.getAllMinBreathOnce()
 
                     val settings = ForecastSettings(
                         lungVolume = s.lungVolume,
@@ -298,34 +301,18 @@ class MinBreathViewModel @Inject constructor(
                         audio = s.audio
                     )
 
-                    // If no records exist for this duration, chance to beat is 100%
-                    if (records.isEmpty()) {
-                        _uiState.update { it.copy(recordForecast = noRecordForecast()) }
+                    val forecast = RecordForecastCalculator.compute(
+                        records = records,
+                        settings = settings,
+                        nowEpochMs = System.currentTimeMillis(),
+                        recordLabel = "sessions",
+                        ceilingMs = s.sessionDurationSec * 1000L,  // max hold = entire session
+                        drillParam = s.sessionDurationSec
+                    )
+                    if (forecast.status == ForecastStatus.Ready) {
+                        _uiState.update { it.copy(recordForecast = forecast) }
                     } else {
-                        val forecast = RecordForecastCalculator.compute(
-                            records = records,
-                            settings = settings,
-                            nowEpochMs = System.currentTimeMillis(),
-                            recordLabel = "sessions",
-                            ceilingMs = s.sessionDurationSec * 1000L  // max hold = entire session
-                        )
-                        if (forecast.status == ForecastStatus.Ready) {
-                            _uiState.update { it.copy(recordForecast = forecast) }
-                        } else {
-                            // Insufficient data for regression — check if exact-match PB exists
-                            val hasExactPb = records.any { r ->
-                                r.lungVolume == s.lungVolume &&
-                                r.prepType == s.prepType &&
-                                r.timeOfDay == s.timeOfDay &&
-                                r.posture == s.posture &&
-                                r.audio == s.audio
-                            }
-                            if (!hasExactPb) {
-                                _uiState.update { it.copy(recordForecast = noRecordForecast()) }
-                            } else {
-                                _uiState.update { it.copy(recordForecast = null) }
-                            }
-                        }
+                        _uiState.update { it.copy(recordForecast = null) }
                     }
                 } catch (_: Exception) { }
             }

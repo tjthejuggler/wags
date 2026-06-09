@@ -560,13 +560,15 @@ class ApneaViewModel @Inject constructor(
                     val tod = (arr[2] as TimeOfDay).name; val pos = (arr[3] as Posture).name
                     val aud = (arr[4] as AudioSetting).name; val bp = arr[5] as Int
                     val settings = ForecastSettings(lv, pt, tod, pos, aud)
+                    // Pass ALL Progressive O₂ records; breath period is a regression
+                    // feature via drillParam (pre-filtering starved the fit → always 100%).
                     val records = apneaRepository.getAllProgressiveO2Once()
-                        .filter { it.drillParamValue == bp }
                     val forecast = RecordForecastCalculator.compute(
                         records = records,
                         settings = settings,
                         nowEpochMs = System.currentTimeMillis(),
-                        recordLabel = "rounds"
+                        recordLabel = "rounds",
+                        drillParam = bp
                     )
                     _uiState.update { it.copy(progO2RecordForecast = if (forecast.status == ForecastStatus.Ready) forecast else null) }
                 } catch (e: Exception) {
@@ -588,14 +590,16 @@ class ApneaViewModel @Inject constructor(
                     val tod = (arr[2] as TimeOfDay).name; val pos = (arr[3] as Posture).name
                     val aud = (arr[4] as AudioSetting).name; val sd = arr[5] as Int
                     val settings = ForecastSettings(lv, pt, tod, pos, aud)
+                    // Pass ALL Min Breath records; session duration is a regression
+                    // feature via drillParam (pre-filtering starved the fit → always 100%).
                     val records = apneaRepository.getAllMinBreathOnce()
-                        .filter { it.drillParamValue == sd }
                     val forecast = RecordForecastCalculator.compute(
                         records = records,
                         settings = settings,
                         nowEpochMs = System.currentTimeMillis(),
                         recordLabel = "sessions",
-                        ceilingMs = sd * 1000L  // Min Breath: max hold = entire session duration
+                        ceilingMs = sd * 1000L,  // Min Breath: max hold = entire session duration
+                        drillParam = sd
                     )
                     _uiState.update { it.copy(minBreathRecordForecast = if (forecast.status == ForecastStatus.Ready) forecast else null) }
                 } catch (e: Exception) {
