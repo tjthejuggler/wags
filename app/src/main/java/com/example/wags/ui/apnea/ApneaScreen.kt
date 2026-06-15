@@ -283,7 +283,7 @@ fun ApneaScreen(
                     DrillSectionContent(
                         bestTimeMs = state.minBreathBestMs,
                         trophyCategory = state.minBreathTrophyCategory,
-                        paramLabel = "${state.minBreathSessionDurationSec / 60}min session",
+                        paramLabel = "${state.minBreathSessionDurationSec / 60.0}min session",
                         description = "Choose a session duration, then minimize your breathing time. " +
                             "You control when to hold and when to breathe.",
                         buttonLabel = "Open Min Breath",

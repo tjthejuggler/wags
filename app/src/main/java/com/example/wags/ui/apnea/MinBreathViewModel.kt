@@ -531,8 +531,8 @@ class MinBreathViewModel @Inject constructor(
 
     fun onGuidedCountdownComplete() {
         _uiState.update { it.copy(showGuidedCountdown = false, guidedCountdownComplete = true) }
-        // The MinBreathScreen observes guidedCountdownComplete and navigates to the active screen,
-        // which auto-starts the session via LaunchedEffect.
+        // After guided hyper completes, the user must tap Start on the setup screen
+        // to navigate to the active screen (matching Free Hold behaviour).
     }
 
     fun onGuidedCountdownCancelled() {

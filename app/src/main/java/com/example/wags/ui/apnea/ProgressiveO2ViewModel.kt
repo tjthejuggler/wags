@@ -19,6 +19,7 @@ import com.example.wags.data.spotify.SpotifyAuthManager
 import com.example.wags.data.spotify.SpotifyManager
 import com.example.wags.data.spotify.SpotifyTrackDetail
 import com.example.wags.domain.model.AudioSetting
+import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.DrillContext
 import com.example.wags.domain.model.PersonalBestResult
 import com.example.wags.domain.model.SpotifySong
@@ -93,7 +94,24 @@ data class ProgressiveO2UiState(
     val newPersonalBest: PersonalBestResult? = null,
     // ── Record-breaking forecast ──────────────────────────────────────────────
     /** Forecast for the current settings combination. Null when insufficient data. */
-    val recordForecast: RecordForecast? = null
+    val recordForecast: RecordForecast? = null,
+    // ── Guided hyperventilation ──────────────────────────────────────────────
+    /** True when the prep type is HYPER — controls whether the guided hyper section is shown. */
+    val isHyperPrep: Boolean = false,
+    /** True when the user has checked the "Guided Hyperventilation" checkbox. */
+    val guidedHyperEnabled: Boolean = false,
+    /** Relaxed exhale phase duration in seconds. */
+    val guidedRelaxedExhaleSec: Int = 0,
+    /** Purge exhale phase duration in seconds. */
+    val guidedPurgeExhaleSec: Int = 0,
+    /** Transition phase duration in seconds. */
+    val guidedTransitionSec: Int = 0,
+    /** True while the guided hyper countdown dialog is showing. */
+    val showGuidedCountdown: Boolean = false,
+    /** True after the guided countdown has completed — button reverts to plain START. */
+    val guidedCountdownComplete: Boolean = false,
+    /** True when the user wants the guided MP3 to start playing during the hyper countdown. */
+    val startMp3WithHyper: Boolean = false
 )
 
 data class BreathPeriodHistory(
@@ -173,6 +191,8 @@ class ProgressiveO2ViewModel @Inject constructor(
         val savedPosture    = prefs.getString("setting_posture", "LAYING") ?: "LAYING"
         val savedAudio      = prefs.getString("setting_audio", "SILENCE") ?: "SILENCE"
 
+        val isHyperPrep = savedPrepType == PrepType.HYPER.name
+
         _uiState.update {
             it.copy(
                 breathPeriodSec = savedBreathPeriod,
@@ -184,6 +204,11 @@ class ProgressiveO2ViewModel @Inject constructor(
                 isMusicMode = savedAudio == AudioSetting.MUSIC.name,
                 isGuidedMode = savedAudio == AudioSetting.GUIDED.name,
                 guidedSelectedId = guidedAudioManager.selectedId,
+                isHyperPrep = isHyperPrep,
+                guidedHyperEnabled = if (isHyperPrep) prefs.getBoolean("guided_hyper_enabled", false) else false,
+                guidedRelaxedExhaleSec = prefs.getInt("guided_relaxed_exhale_sec", 0),
+                guidedPurgeExhaleSec = prefs.getInt("guided_purge_exhale_sec", 0),
+                guidedTransitionSec = prefs.getInt("guided_transition_sec", 0),
                 voiceEnabled = audioHapticEngine.voiceEnabled,
                 vibrationEnabled = audioHapticEngine.vibrationEnabled
             )
@@ -253,7 +278,14 @@ class ProgressiveO2ViewModel @Inject constructor(
 
     fun setPrepType(v: String) {
         prefs.edit().putString("setting_prep_type", v).apply()
-        _uiState.update { it.copy(prepType = v) }
+        val isHyper = v == PrepType.HYPER.name
+        _uiState.update {
+            it.copy(
+                prepType = v,
+                isHyperPrep = isHyper,
+                guidedHyperEnabled = if (isHyper) it.guidedHyperEnabled else false
+            )
+        }
         refreshForecast()
     }
 
@@ -349,6 +381,65 @@ class ProgressiveO2ViewModel @Inject constructor(
                 )
             }
             _uiState.update { it.copy(guidedCompletionStatuses = map) }
+        }
+    }
+
+    // ── Guided hyperventilation ──────────────────────────────────────────────
+
+    fun setGuidedHyperEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(guidedHyperEnabled = enabled, guidedCountdownComplete = false) }
+        prefs.edit().putBoolean("guided_hyper_enabled", enabled).apply()
+    }
+
+    fun setGuidedRelaxedExhaleSec(sec: Int) {
+        _uiState.update { it.copy(guidedRelaxedExhaleSec = sec) }
+        prefs.edit().putInt("guided_relaxed_exhale_sec", sec).apply()
+        val id = _uiState.value.guidedSelectedId
+        if (_uiState.value.isGuidedMode && id > 0) guidedAudioManager.saveRelaxedExhale(id, sec)
+    }
+
+    fun setGuidedPurgeExhaleSec(sec: Int) {
+        _uiState.update { it.copy(guidedPurgeExhaleSec = sec) }
+        prefs.edit().putInt("guided_purge_exhale_sec", sec).apply()
+        val id = _uiState.value.guidedSelectedId
+        if (_uiState.value.isGuidedMode && id > 0) guidedAudioManager.savePurgeExhale(id, sec)
+    }
+
+    fun setGuidedTransitionSec(sec: Int) {
+        _uiState.update { it.copy(guidedTransitionSec = sec) }
+        prefs.edit().putInt("guided_transition_sec", sec).apply()
+        val id = _uiState.value.guidedSelectedId
+        if (_uiState.value.isGuidedMode && id > 0) guidedAudioManager.saveTransitionSec(id, sec)
+    }
+
+    fun setStartMp3WithHyper(enabled: Boolean) {
+        _uiState.update { it.copy(startMp3WithHyper = enabled) }
+        val id = _uiState.value.guidedSelectedId
+        if (id > 0) guidedAudioManager.saveStartMp3WithHyper(id, enabled)
+    }
+
+    fun showGuidedCountdown() {
+        _uiState.update { it.copy(showGuidedCountdown = true) }
+        // If "Start MP3 with Hyper" is checked and we're in guided mode, start audio now
+        val state = _uiState.value
+        if (state.isGuidedMode && state.startMp3WithHyper) {
+            viewModelScope.launch {
+                guidedAudioManager.preparePlayback()
+                guidedAudioManager.startPlayback()
+            }
+        }
+    }
+
+    fun onGuidedCountdownComplete() {
+        _uiState.update { it.copy(showGuidedCountdown = false, guidedCountdownComplete = true) }
+        // After guided hyper completes, the user must tap Start to begin the session
+    }
+
+    fun onGuidedCountdownCancelled() {
+        _uiState.update { it.copy(showGuidedCountdown = false, guidedCountdownComplete = true) }
+        // Stop guided audio if it was started with hyper
+        if (_uiState.value.isGuidedMode && _uiState.value.startMp3WithHyper) {
+            guidedAudioManager.stopPlayback()
         }
     }
 
@@ -448,7 +539,8 @@ class ProgressiveO2ViewModel @Inject constructor(
                 filterPrepType   = s.prepType,
                 filterTimeOfDay  = s.timeOfDay,
                 filterPosture    = s.posture,
-                filterAudio      = s.audio
+                filterAudio      = s.audio,
+                guidedCountdownComplete = false
             )
         }
         loadBreathPeriodHistory()
@@ -512,8 +604,9 @@ class ProgressiveO2ViewModel @Inject constructor(
             spotifyManager.sendPlayCommand()
         }
 
-        // Start guided audio if GUIDED is selected
-        if (_uiState.value.isGuidedMode) {
+        // Start guided audio if GUIDED is selected — but skip if it was already
+        // started during the hyper countdown (startMp3WithHyper == true)
+        if (_uiState.value.isGuidedMode && !guidedAudioManager.isPlaying) {
             viewModelScope.launch {
                 guidedAudioManager.preparePlayback()
                 guidedAudioManager.startPlayback()
@@ -733,6 +826,9 @@ class ProgressiveO2ViewModel @Inject constructor(
             )
         } else null
 
+        // Capture guided hyper state at save time
+        val wasGuided = currentState.guidedHyperEnabled && currentState.isHyperPrep
+
         val recordId = apneaRepository.saveRecord(
             ApneaRecordEntity(
                 timestamp = now,
@@ -748,7 +844,11 @@ class ProgressiveO2ViewModel @Inject constructor(
                 posture = posture,
                 audio = effectiveAudio,
                 drillParamValue = breathPeriodSec,
-                guidedAudioName = if (effectiveAudio == AudioSetting.GUIDED.name) _uiState.value.guidedSelectedName else null
+                guidedAudioName = if (effectiveAudio == AudioSetting.GUIDED.name) _uiState.value.guidedSelectedName else null,
+                guidedHyper = wasGuided,
+                guidedRelaxedExhaleSec = if (wasGuided) currentState.guidedRelaxedExhaleSec else null,
+                guidedPurgeExhaleSec = if (wasGuided) currentState.guidedPurgeExhaleSec else null,
+                guidedTransitionSec = if (wasGuided) currentState.guidedTransitionSec else null
             )
         )
 

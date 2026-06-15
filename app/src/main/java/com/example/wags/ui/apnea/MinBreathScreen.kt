@@ -55,13 +55,6 @@ fun MinBreathScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // Auto-navigate to active screen when guided hyperventilation countdown completes
-    LaunchedEffect(state.guidedCountdownComplete) {
-        if (state.guidedCountdownComplete) {
-            navController.navigate("min_breath_active")
-        }
-    }
-
     Scaffold(
         containerColor = BackgroundDark,
         topBar = {
