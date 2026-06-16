@@ -14,11 +14,27 @@ import kotlinx.coroutines.flow.update
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 
 // ── Chart point ────────────────────────────────────────────────────────────────
 
-data class RapidHrChartPoint(val index: Float, val valueMs: Long, val sessionId: Long)
+data class RapidHrChartPoint(
+    val index: Float,
+    val valueMs: Long,
+    val sessionId: Long,
+    val timestamp: Long
+)
+
+// ── Time period ────────────────────────────────────────────────────────────────
+
+enum class ChartTimePeriod(val label: String, val durationDays: Int?) {
+    WEEK("1W", 7),
+    MONTH("1M", 30),
+    THREE_MONTHS("3M", 90),
+    YEAR("1Y", 365),
+    ALL("All", null)
+}
 
 // ── HR combo (start→end thresholds) ───────────────────────────────────────────
 
@@ -37,7 +53,10 @@ data class RapidHrHistoryUiState(
     val datesWithSessions: Set<LocalDate> = emptySet(),
     val selectedDate: LocalDate? = null,
     val selectedDaySessions: List<RapidHrSessionEntity> = emptyList(),
-    val selectedTab: RapidHrHistoryTab = RapidHrHistoryTab.GRAPHS
+    val selectedTab: RapidHrHistoryTab = RapidHrHistoryTab.GRAPHS,
+    val timePeriod: ChartTimePeriod = ChartTimePeriod.ALL,
+    val windowStart: Long? = null,  // For sliding window (timestamp in ms)
+    val windowEnd: Long? = null     // For sliding window (timestamp in ms)
 ) {
     val filteredSessions: List<RapidHrSessionEntity>
         get() {
@@ -45,6 +64,20 @@ data class RapidHrHistoryUiState(
             if (directionFilter != null) list = list.filter { it.direction == directionFilter.name }
             if (hrComboFilter != null) list = list.filter {
                 it.highThreshold == hrComboFilter.high && it.lowThreshold == hrComboFilter.low
+            }
+            // Apply time period filter
+            val now = System.currentTimeMillis()
+            val periodStart = when (timePeriod) {
+                ChartTimePeriod.ALL -> null
+                ChartTimePeriod.WEEK -> now - (7L * 24 * 60 * 60 * 1000)
+                ChartTimePeriod.MONTH -> now - (30L * 24 * 60 * 60 * 1000)
+                ChartTimePeriod.THREE_MONTHS -> now - (90L * 24 * 60 * 60 * 1000)
+                ChartTimePeriod.YEAR -> now - (365L * 24 * 60 * 60 * 1000)
+            }
+            if (periodStart != null) list = list.filter { it.timestamp >= periodStart }
+            // Apply sliding window if set (overrides time period)
+            if (windowStart != null && windowEnd != null) {
+                list = list.filter { it.timestamp in windowStart..windowEnd }
             }
             return list
         }
@@ -64,7 +97,10 @@ class RapidHrHistoryViewModel @Inject constructor(
             directionFilter = null,
             hrComboFilter = null,
             selectedTab = RapidHrHistoryTab.GRAPHS,
-            selectedDate = null
+            selectedDate = null,
+            timePeriod = ChartTimePeriod.ALL,
+            windowStart = null,
+            windowEnd = null
         )
     )
 
@@ -90,7 +126,7 @@ class RapidHrHistoryViewModel @Inject constructor(
         val chartPoints = filtered
             .sortedBy { it.timestamp }
             .mapIndexed { i, s ->
-                RapidHrChartPoint(i.toFloat(), s.transitionDurationMs, s.id)
+                RapidHrChartPoint(i.toFloat(), s.transitionDurationMs, s.id, s.timestamp)
             }
 
         val zone = ZoneId.systemDefault()
@@ -113,7 +149,10 @@ class RapidHrHistoryViewModel @Inject constructor(
             datesWithSessions = datesWithSessions,
             selectedDate = extra.selectedDate,
             selectedDaySessions = selectedDaySessions,
-            selectedTab = extra.selectedTab
+            selectedTab = extra.selectedTab,
+            timePeriod = extra.timePeriod,
+            windowStart = extra.windowStart,
+            windowEnd = extra.windowEnd
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RapidHrHistoryUiState())
 
@@ -132,11 +171,53 @@ class RapidHrHistoryViewModel @Inject constructor(
     fun selectDate(date: LocalDate?) {
         _extra.update { it.copy(selectedDate = date) }
     }
+
+    fun setTimePeriod(period: ChartTimePeriod) {
+        _extra.update {
+            it.copy(
+                timePeriod = period,
+                windowStart = null,
+                windowEnd = null
+            )
+        }
+    }
+
+    fun slideWindow(direction: Int) {
+        val current = _extra.value
+        val period = current.timePeriod
+        if (period == ChartTimePeriod.ALL) return
+
+        val now = System.currentTimeMillis()
+        val periodDurationMs = when (period) {
+            ChartTimePeriod.WEEK -> 7L * 24 * 60 * 60 * 1000
+            ChartTimePeriod.MONTH -> 30L * 24 * 60 * 60 * 1000
+            ChartTimePeriod.THREE_MONTHS -> 90L * 24 * 60 * 60 * 1000
+            ChartTimePeriod.YEAR -> 365L * 24 * 60 * 60 * 1000
+            ChartTimePeriod.ALL -> return
+        }
+
+        val shiftAmount = (periodDurationMs * 0.25).toLong() // Slide by 25% of period
+        val currentEnd = current.windowEnd ?: now
+        val currentStart = current.windowStart ?: (currentEnd - periodDurationMs)
+
+        val newStart = currentStart + (shiftAmount * direction)
+        val newEnd = newStart + periodDurationMs
+
+        _extra.update {
+            it.copy(
+                windowStart = newStart.coerceAtLeast(0),
+                windowEnd = newEnd
+            )
+        }
+    }
 }
 
 private data class ExtraHistoryState(
     val directionFilter: RapidHrDirection?,
     val hrComboFilter: HrCombo?,
     val selectedTab: RapidHrHistoryTab,
-    val selectedDate: LocalDate?
+    val selectedDate: LocalDate?,
+    val timePeriod: ChartTimePeriod,
+    val windowStart: Long?,
+    val windowEnd: Long?
 )

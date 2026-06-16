@@ -3,6 +3,7 @@ package com.example.wags.ui.rapidhr
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,9 +22,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -49,6 +55,8 @@ private fun formatMs(ms: Long): String {
 
 private val sessionDateFmt: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy")
 private val sessionTimeFmt: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a")
+private val chartDateFmt: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d")
+private val chartDateFmtYear: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM yyyy")
 
 // ── Screen ─────────────────────────────────────────────────────────────────────
 
@@ -115,7 +123,9 @@ fun RapidHrHistoryScreen(
                     onFilterHrCombo = viewModel::setHrComboFilter,
                     onSessionClick = { session ->
                         navController.navigate(WagsRoutes.rapidHrDetail(session.id))
-                    }
+                    },
+                    onSetTimePeriod = viewModel::setTimePeriod,
+                    onSlideWindow = viewModel::slideWindow
                 )
                 RapidHrHistoryTab.CALENDAR -> CalendarTab(
                     state = state,
@@ -137,7 +147,9 @@ private fun GraphsTab(
     state: RapidHrHistoryUiState,
     onFilterDirection: (RapidHrDirection?) -> Unit,
     onFilterHrCombo: (HrCombo?) -> Unit,
-    onSessionClick: (RapidHrSessionEntity) -> Unit
+    onSessionClick: (RapidHrSessionEntity) -> Unit,
+    onSetTimePeriod: (ChartTimePeriod) -> Unit = {},
+    onSlideWindow: (Int) -> Unit = {}
 ) {
     LazyColumn(
         modifier = Modifier
@@ -175,6 +187,22 @@ private fun GraphsTab(
             }
         }
 
+        // Time period filter buttons
+        item {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                ChartTimePeriod.entries.forEach { period ->
+                    FilterChip(
+                        selected = state.timePeriod == period,
+                        onClick = { onSetTimePeriod(period) },
+                        label = { Text(period.label) }
+                    )
+                }
+            }
+        }
+
         // Transition time chart
         if (state.chartPoints.size >= 2) {
             item {
@@ -183,17 +211,59 @@ private fun GraphsTab(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            "Transition Time",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = TextSecondary
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Transition Time",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = TextSecondary
+                            )
+                            // Show sliding controls hint if not "All" period
+                            if (state.timePeriod != ChartTimePeriod.ALL) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    IconButton(
+                                        onClick = { onSlideWindow(-1) },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.AutoMirrored.Filled.ArrowBack,
+                                            contentDescription = "Earlier",
+                                            tint = TextSecondary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                    Text(
+                                        "Slide",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = TextSecondary
+                                    )
+                                    IconButton(
+                                        onClick = { onSlideWindow(1) },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.AutoMirrored.Filled.ArrowForward,
+                                            contentDescription = "Later",
+                                            tint = TextSecondary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
                         Spacer(Modifier.height(8.dp))
                         TransitionTimeChart(
                             points = state.chartPoints,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(120.dp)
+                            modifier = Modifier.fillMaxWidth(),
+                            onSlideLeft = { onSlideWindow(1) },
+                            onSlideRight = { onSlideWindow(-1) },
+                            enableSliding = state.timePeriod != ChartTimePeriod.ALL
                         )
                     }
                 }
@@ -287,7 +357,10 @@ private fun HrComboDropdown(
 @Composable
 private fun TransitionTimeChart(
     points: List<RapidHrChartPoint>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onSlideLeft: () -> Unit = {},
+    onSlideRight: () -> Unit = {},
+    enableSliding: Boolean = false
 ) {
     if (points.size < 2) return
     val values = points.map { it.valueMs.toFloat() }
@@ -295,7 +368,29 @@ private fun TransitionTimeChart(
     val yMax = values.max()
     val yPad = ((yMax - yMin) * 0.15f).coerceAtLeast(100f)
 
-    Canvas(modifier = modifier) {
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+
+    val chartHeight = if (isLandscape) 200.dp else 120.dp
+
+    Canvas(
+        modifier = modifier
+            .height(chartHeight)
+            .then(
+                if (enableSliding) {
+                    Modifier.pointerInput(Unit) {
+                        detectHorizontalDragGestures { _, dragAmount ->
+                            when {
+                                dragAmount < -50 -> onSlideLeft()
+                                dragAmount > 50 -> onSlideRight()
+                            }
+                        }
+                    }
+                } else {
+                    Modifier
+                }
+            )
+    ) {
         val w = size.width
         val h = size.height
         val yRange = (yMax + yPad) - (yMin - yPad)
@@ -325,9 +420,58 @@ private fun TransitionTimeChart(
         }
         drawPath(linePath, color = Color(0xFFD0D0D0), style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
 
-        // Dots
+        // Dots and labels
+        val paint = android.graphics.Paint().apply {
+            color = android.graphics.Color.parseColor("#D0D0D0")
+            textSize = 24f
+            textAlign = android.graphics.Paint.Align.CENTER
+            isAntiAlias = true
+        }
+
+        val labelPaint = android.graphics.Paint().apply {
+            color = android.graphics.Color.parseColor("#888888")
+            textSize = 20f
+            textAlign = android.graphics.Paint.Align.CENTER
+            isAntiAlias = true
+        }
+
+        val zone = ZoneId.systemDefault()
+
         points.forEachIndexed { i, p ->
-            drawCircle(Color(0xFFD0D0D0), radius = 3.dp.toPx(), center = Offset(xOf(i), yOf(p.valueMs.toFloat())))
+            val x = xOf(i)
+            val y = yOf(p.valueMs.toFloat())
+
+            // Draw dot
+            drawCircle(Color(0xFFD0D0D0), radius = 3.dp.toPx(), center = Offset(x, y))
+
+            // Draw duration label above dot
+            val durationLabel = formatMs(p.valueMs)
+            drawContext.canvas.nativeCanvas.drawText(
+                durationLabel,
+                x,
+                y - 16.dp.toPx(),
+                paint
+            )
+
+            // Draw date label below dot (only for first, last, and some intermediate points)
+            val shouldShowDate = i == 0 || i == points.size - 1 ||
+                (points.size > 10 && i % (points.size / 5) == 0) ||
+                (points.size <= 10 && i % 2 == 0)
+            
+            if (shouldShowDate) {
+                val date = Instant.ofEpochMilli(p.timestamp).atZone(zone).toLocalDate()
+                val dateLabel = if (date.year != LocalDate.now().year) {
+                    date.format(chartDateFmtYear)
+                } else {
+                    date.format(chartDateFmt)
+                }
+                drawContext.canvas.nativeCanvas.drawText(
+                    dateLabel,
+                    x,
+                    h - 8.dp.toPx(),
+                    labelPaint
+                )
+            }
         }
     }
 }
