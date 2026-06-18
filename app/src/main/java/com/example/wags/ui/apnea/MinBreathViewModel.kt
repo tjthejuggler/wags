@@ -64,6 +64,9 @@ data class MinBreathUiState(
     // Live vitals
     val liveHr: Int? = null,
     val liveSpO2: Int? = null,
+    // Final vitals (captured at session completion - used in CompleteContent)
+    val finalHr: Int? = null,
+    val finalSpO2: Int? = null,
     // Past sessions
     val pastDurations: List<DurationHistory> = emptyList(),
     // 5 standard apnea settings
@@ -270,9 +273,14 @@ class MinBreathViewModel @Inject constructor(
                             persistSongHistory(trackedSongs)
                         }
                         val recordId = saveSession(state)
+                        // Capture final HR/SpO2 values for the completion screen
+                        val currentHr = hrDataSource.liveHr.value
+                        val currentSpO2 = hrDataSource.liveSpO2.value
                         _uiState.update { it.copy(
                             isSessionActive = false,
-                            completedRecordId = recordId
+                            completedRecordId = recordId,
+                            finalHr = currentHr,
+                            finalSpO2 = currentSpO2
                         ) }
                     }
                 }
@@ -660,7 +668,12 @@ class MinBreathViewModel @Inject constructor(
         val durationMs = _uiState.value.sessionDurationSec * 1000L
         sessionStartMs = System.currentTimeMillis()
         breathDurations.clear()
-        _uiState.update { it.copy(isSessionActive = true, completedRecordId = null) }
+        _uiState.update { it.copy(
+            isSessionActive = true,
+            completedRecordId = null,
+            finalHr = null,
+            finalSpO2 = null
+        ) }
 
         // Start Spotify if MUSIC is selected.
         // Song was pre-loaded in selectSong() — just resume playback.
@@ -743,7 +756,14 @@ class MinBreathViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val recordId = saveSession(finalState)
-                _uiState.update { it.copy(completedRecordId = recordId) }
+                // Capture final HR/SpO2 values for the completion screen
+                val currentHr = hrDataSource.liveHr.value
+                val currentSpO2 = hrDataSource.liveSpO2.value
+                _uiState.update { it.copy(
+                    completedRecordId = recordId,
+                    finalHr = currentHr,
+                    finalSpO2 = currentSpO2
+                ) }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to save session", e)
             }
@@ -812,7 +832,11 @@ class MinBreathViewModel @Inject constructor(
 
     /** Clears completedRecordId after the UI has navigated to the detail screen. */
     fun onSessionNavigated() {
-        _uiState.update { it.copy(completedRecordId = null) }
+        _uiState.update { it.copy(
+            completedRecordId = null,
+            finalHr = null,
+            finalSpO2 = null
+        ) }
     }
 
     /** Dismiss the PB celebration dialog. */

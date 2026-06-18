@@ -267,8 +267,8 @@ private fun CompleteContent(
                 SummaryRow("Number of holds", "${holds.size}")
                 SummaryRow("Longest hold", formatMmSs(longestMs))
                 SummaryRow("Average hold", formatMmSs(avgMs))
-                if (state.liveHr != null) SummaryRow("HR", "${state.liveHr} bpm")
-                if (state.liveSpO2 != null) SummaryRow("Lowest SpO₂", "${state.liveSpO2}%")
+                if (state.finalHr != null) SummaryRow("HR", "${state.finalHr} bpm")
+                if (state.finalSpO2 != null) SummaryRow("Lowest SpO₂", "${state.finalSpO2}%")
             }
         }
         Spacer(Modifier.height(12.dp))
