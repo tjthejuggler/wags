@@ -1,18 +1,52 @@
-ADR: Drill forecast must filter records by drillParamValue + ceilingMs for bounded drills
+# Fix: Min Breath Forecast 100% Bug
 
-Date: 2026-06-01 (updated)
+## Context
+The "chance to beat" percentage in the Min Breath screen was incorrectly showing 100% even when a record already existed for the current settings combination.
 
-Context: The record-breaking forecast (RecordForecastCalculator) predicts P(next hold > PB) using OLS regression on historical records. For drill types (Min Breath, Progressive O₂), records from different drill parameter values (session duration / breath period) have fundamentally different duration distributions. A 5-minute Min Breath session naturally produces longer total hold times than a 2-minute session.
+## Root Cause Analysis
 
-Additionally, Min Breath has a physical ceiling: total hold time cannot exceed the session duration. If a user achieves 100% hold time, the probability of beating that record is 0% — not "insufficient data".
+### Issue 1: Insufficient Data Path
+In [`RecordForecastCalculator.insufficientDataForecast()`](app/src/main/java/com/example/wags/domain/usecase/apnea/forecast/RecordForecastCalculator.kt:284-346), when there were fewer than `MIN_TOTAL_RECORDS` total records (insufficient data for regression), ALL categories were hardcoded to 100% probability regardless of whether a record existed for that category.
 
-Problem (Part 1): ApneaViewModel and ProgressiveO2ViewModel were passing ALL records of the drill type to RecordForecastCalculator without filtering by drillParamValue. This meant a 2-minute Min Breath session's forecast was computed against records from 5-minute sessions, making the PB threshold impossibly high and the probability absurdly low (e.g. 7% after a perfect session).
+### Issue 2: Regression Path (Main Bug)
+In [`RecordForecastCalculator.compute()`](app/src/main/java/com/example/wags/domain/usecase/apnea/forecast/RecordForecastCalculator.kt:61-195), for parameterized drills like Min Breath:
+- **`regressionRecords`** included ALL Min Breath records (across different session durations)
+- **`pbRecords`** was filtered to only include records with the SAME session duration
 
-Problem (Part 2): After fixing Part 1, filtering by drillParamValue reduced the record count below MIN_TOTAL_RECORDS (5), causing "insufficient data" even when the user had achieved 100% hold time — which should definitively show 0%.
+The regression model was trained on mixed-duration data but compared against same-duration records. When the model predicted better performance (because it learned from longer sessions), the probability calculation `P(X > record)` approached 100%.
 
-Decision: 
-1. Filter records by drillParamValue before passing to RecordForecastCalculator, matching the pattern already used in MinBreathViewModel.
-2. Add a `ceilingMs` parameter to RecordForecastCalculator.compute(). When the global best record equals or exceeds the ceiling, return a definitive 0% forecast via `ceilingReachedForecast()` — bypassing the MIN_TOTAL_RECORDS requirement. In the main probability loop, categories whose PB hits the ceiling also get 0%.
-3. Min Breath callers pass `ceilingMs = sessionDurationSec * 1000L`. Free hold and Progressive O₂ pass no ceiling (null).
+## Decision
 
-Consequences: Forecast probabilities for drill types now reflect only records with the same drill parameter. When 100% hold time is achieved, the forecast correctly shows 0% instead of "insufficient data".
+### Fix 1: Insufficient Data Path
+Changed probability calculation in `insufficientDataForecast()` to:
+- 100% when no record exists for the category (any hold sets a new PB)
+- 50% when a record exists (neutral estimate, since we can't compute a proper probability without sufficient data)
+
+### Fix 2: Regression Path
+Changed the record filtering logic to use only same-drillParam records for both regression training and PB lookups when `drillParam != null`:
+
+```kotlin
+// For parameterized drills, only use same-param records for both regression
+// and PB lookups. Training on mixed-param data makes predictions unreliable
+// when compared against same-param PB thresholds.
+val sameParamRecords = if (drillParam != null) {
+    records.filter { it.drillParamValue == drillParam }
+} else {
+    records
+}
+
+val regressionRecords = sameParamRecords.filter { it.durationMs >= MIN_DURATION_MS }
+val pbRecords = regressionRecords
+```
+
+This ensures the regression model is trained on the same subset of data that PB comparisons are made against, making predictions meaningful.
+
+## Impact
+- Min Breath screen now shows accurate "chance to beat" percentages
+- Users with existing records will no longer see misleading 100% forecasts
+- The change affects both the "insufficient data" and regression code paths
+- Free Hold (which passes `drillParam = null`) continues to work correctly as before
+- Progressive O₂ (also parameterized) benefits from the same fix
+
+## Date
+2025-06-18
