@@ -4,6 +4,10 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.media.MediaPlayer
 import android.net.Uri
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.provider.DocumentsContract
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -76,6 +80,8 @@ data class MeditationUiState(
     /** Remaining seconds when timer is active; null when timer is off or not started. */
     val timerRemainingSeconds: Long? = null,
     val timerChimeFired: Boolean = false,
+    val timerSoundEnabled: Boolean = true,
+    val timerVibrationEnabled: Boolean = true,
     // Post-session analytics
     val avgHrBpm: Float? = null,
     val hrSlopeBpmPerMin: Float? = null,
@@ -135,6 +141,8 @@ class MeditationViewModel @Inject constructor(
         private const val PREF_TIMER_MINUTES  = "timer_minutes"
         private const val PREF_TIMER_SECONDS  = "timer_seconds"
         private const val PREF_CHANNEL_FILTER = "channel_filter"
+        private const val PREF_TIMER_SOUND    = "timer_sound_enabled"
+        private const val PREF_TIMER_VIBRATION = "timer_vibration_enabled"
     }
 
     private val _uiState = MutableStateFlow(
@@ -147,7 +155,9 @@ class MeditationViewModel @Inject constructor(
             timerHours            = prefs.getInt(PREF_TIMER_HOURS, 0),
             timerMinutes          = prefs.getInt(PREF_TIMER_MINUTES, 20),
             timerSeconds          = prefs.getInt(PREF_TIMER_SECONDS, 0),
-            selectedChannelFilter = prefs.getString(PREF_CHANNEL_FILTER, null)
+            selectedChannelFilter = prefs.getString(PREF_CHANNEL_FILTER, null),
+            timerSoundEnabled     = prefs.getBoolean(PREF_TIMER_SOUND, true),
+            timerVibrationEnabled = prefs.getBoolean(PREF_TIMER_VIBRATION, true)
         )
     )
     val uiState: StateFlow<MeditationUiState> = combine(
@@ -337,6 +347,16 @@ class MeditationViewModel @Inject constructor(
         prefs.edit().putInt(PREF_TIMER_SECONDS, v).apply()
     }
 
+    fun setTimerSoundEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(timerSoundEnabled = enabled) }
+        prefs.edit().putBoolean(PREF_TIMER_SOUND, enabled).apply()
+    }
+
+    fun setTimerVibrationEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(timerVibrationEnabled = enabled) }
+        prefs.edit().putBoolean(PREF_TIMER_VIBRATION, enabled).apply()
+    }
+
     // ── Session lifecycle ──────────────────────────────────────────────────────
 
     fun startSession() {
@@ -518,12 +538,42 @@ class MeditationViewModel @Inject constructor(
     /** Plays the ending chime sound once. Uses chime_end.mp3 from raw resources. */
     private fun playChime() {
         stopChime()
+        
+        // Play sound if enabled
+        if (_uiState.value.timerSoundEnabled) {
+            try {
+                chimePlayer = MediaPlayer.create(appContext, R.raw.chime_end)?.apply {
+                    setOnCompletionListener { it.release(); chimePlayer = null }
+                    start()
+                }
+            } catch (_: Exception) { /* chime failure is non-fatal */ }
+        }
+        
+        // Vibrate if enabled
+        if (_uiState.value.timerVibrationEnabled) {
+            vibrate()
+        }
+    }
+    
+    /** Vibrates the device for a short duration. */
+    private fun vibrate() {
         try {
-            chimePlayer = MediaPlayer.create(appContext, R.raw.chime_end)?.apply {
-                setOnCompletionListener { it.release(); chimePlayer = null }
-                start()
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vibratorManager = appContext.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                vibratorManager.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                appContext.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
             }
-        } catch (_: Exception) { /* chime failure is non-fatal */ }
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                // Vibrate pattern: 200ms on, 100ms off, 200ms on
+                vibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(200, 100, 200), -1))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(longArrayOf(200, 100, 200), -1)
+            }
+        } catch (_: Exception) { /* vibration failure is non-fatal */ }
     }
 
     private fun stopChime() {

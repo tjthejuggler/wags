@@ -98,6 +98,8 @@ fun MeditationScreen(
                     onTimerHoursChange = { viewModel.setTimerHours(it) },
                     onTimerMinutesChange = { viewModel.setTimerMinutes(it) },
                     onTimerSecondsChange = { viewModel.setTimerSeconds(it) },
+                    onTimerSoundEnabledChange = { viewModel.setTimerSoundEnabled(it) },
+                    onTimerVibrationEnabledChange = { viewModel.setTimerVibrationEnabled(it) },
                     onStart = { viewModel.startSession() },
                     modifier = Modifier
                 )
@@ -163,6 +165,8 @@ private fun IdleContent(
     onTimerHoursChange: (Int) -> Unit,
     onTimerMinutesChange: (Int) -> Unit,
     onTimerSecondsChange: (Int) -> Unit,
+    onTimerSoundEnabledChange: (Boolean) -> Unit,
+    onTimerVibrationEnabledChange: (Boolean) -> Unit,
     onStart: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -238,10 +242,14 @@ private fun IdleContent(
                 hours = state.timerHours,
                 minutes = state.timerMinutes,
                 seconds = state.timerSeconds,
+                soundEnabled = state.timerSoundEnabled,
+                vibrationEnabled = state.timerVibrationEnabled,
                 onEnabledChange = onTimerEnabledChange,
                 onHoursChange = onTimerHoursChange,
                 onMinutesChange = onTimerMinutesChange,
-                onSecondsChange = onTimerSecondsChange
+                onSecondsChange = onTimerSecondsChange,
+                onSoundEnabledChange = onTimerSoundEnabledChange,
+                onVibrationEnabledChange = onTimerVibrationEnabledChange
             )
         }
 
@@ -268,10 +276,14 @@ private fun TimerOptionRow(
     hours: Int,
     minutes: Int,
     seconds: Int,
+    soundEnabled: Boolean,
+    vibrationEnabled: Boolean,
     onEnabledChange: (Boolean) -> Unit,
     onHoursChange: (Int) -> Unit,
     onMinutesChange: (Int) -> Unit,
-    onSecondsChange: (Int) -> Unit
+    onSecondsChange: (Int) -> Unit,
+    onSoundEnabledChange: (Boolean) -> Unit,
+    onVibrationEnabledChange: (Boolean) -> Unit
 ) {
     Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
         Column(
@@ -338,6 +350,53 @@ private fun TimerOptionRow(
                         onChange = onSecondsChange,
                         modifier = Modifier.weight(1f)
                     )
+                }
+                
+                // Sound and vibration toggles
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Sound toggle
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = soundEnabled,
+                            onCheckedChange = onSoundEnabledChange,
+                            modifier = Modifier.size(24.dp),
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = ButtonPrimary,
+                                uncheckedColor = TextSecondary,
+                                checkmarkColor = TextPrimary
+                            )
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            "🔊 Sound",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (soundEnabled) TextPrimary else TextSecondary
+                        )
+                    }
+                    
+                    // Vibration toggle
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = vibrationEnabled,
+                            onCheckedChange = onVibrationEnabledChange,
+                            modifier = Modifier.size(24.dp),
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = ButtonPrimary,
+                                uncheckedColor = TextSecondary,
+                                checkmarkColor = TextPrimary
+                            )
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            "📳 Vibration",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (vibrationEnabled) TextPrimary else TextSecondary
+                        )
+                    }
                 }
             }
         }
