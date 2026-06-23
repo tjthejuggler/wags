@@ -13,6 +13,7 @@ import com.example.wags.data.repository.MorningReadinessRepository
 import com.example.wags.di.IoDispatcher
 import com.example.wags.di.MathDispatcher
 import com.example.wags.domain.model.BleConnectionState
+import com.example.wags.domain.model.DeviceType
 import com.example.wags.domain.model.HooperIndex
 import com.example.wags.domain.model.MorningReadinessResult
 import com.example.wags.domain.model.RrInterval
@@ -76,6 +77,7 @@ class MorningReadinessViewModel @Inject constructor(
     // Captured at session-start so we record the device that was connected when the
     // assessment began, even if it disconnects before the result is saved.
     private var sessionHrDeviceLabel: String? = null
+    private var sessionDeviceType: DeviceType = DeviceType.GENERIC_BLE
 
     private val _uiState = MutableStateFlow(MorningReadinessUiState())
     val uiState: StateFlow<MorningReadinessUiState> = combine(
@@ -157,6 +159,7 @@ class MorningReadinessViewModel @Inject constructor(
         }
 
         sessionHrDeviceLabel = hrDataSource.activeHrDeviceLabel()
+        sessionDeviceType = deviceManager.connectedDeviceType() ?: DeviceType.GENERIC_BLE
         lastRrBufferSize = 0
         standDetector.reset()
 
@@ -300,7 +303,8 @@ class MorningReadinessViewModel @Inject constructor(
                     supineBuffer   = supineBuffer,
                     standingBuffer = standingBuffer,
                     peakStandHr    = fsm.peakStandHr,
-                    hooperIndex    = storedHooper
+                    hooperIndex    = storedHooper,
+                    deviceType     = sessionDeviceType
                 )
 
                 val result = withContext(mathDispatcher) {

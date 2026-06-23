@@ -1,52 +1,23 @@
-# Fix: Min Breath Forecast 100% Bug
+## Bug Fix: Morning Readiness "Need 2 NN Intervals" Error (Device-Aware)
 
-## Context
-The "chance to beat" percentage in the Min Breath screen was incorrectly showing 100% even when a record already existed for the current settings combination.
+**Date:** 2026-06-22
 
-## Root Cause Analysis
+**Issue:** Morning Readiness with Polar Verity Sense (optical sensor) failed with error "need 2 nn intervals" when attempting to calculate readiness scores.
 
-### Issue 1: Insufficient Data Path
-In [`RecordForecastCalculator.insufficientDataForecast()`](app/src/main/java/com/example/wags/domain/usecase/apnea/forecast/RecordForecastCalculator.kt:284-346), when there were fewer than `MIN_TOTAL_RECORDS` total records (insufficient data for regression), ALL categories were hardcoded to 100% probability regardless of whether a record existed for that category.
+**Root Cause Analysis:**
+1. The [`MorningReadinessOrchestrator.compute()`](app/src/main/java/com/example/wags/domain/usecase/readiness/MorningReadinessOrchestrator.kt:43) method had validation for the standing buffer (`MIN_STANDING_INTERVALS = 10`) but no equivalent check for the supine buffer.
+2. Optical sensors (Polar Verity Sense) provide PPI (pulse-to-pulse intervals) which are noisier than true RR intervals from electrical chest straps (H10, Garmin HRM-600).
+3. The system was treating all devices equally with a strict 10-interval minimum, which caused failures for optical sensors that may have data gaps or lower sample rates.
 
-### Issue 2: Regression Path (Main Bug)
-In [`RecordForecastCalculator.compute()`](app/src/main/java/com/example/wags/domain/usecase/apnea/forecast/RecordForecastCalculator.kt:61-195), for parameterized drills like Min Breath:
-- **`regressionRecords`** included ALL Min Breath records (across different session durations)
-- **`pbRecords`** was filtered to only include records with the SAME session duration
+**Solution Implemented:**
+1. **Device-aware validation:** Added `deviceType` parameter to [`MorningReadinessOrchestrator.Input`](app/src/main/java/com/example/wags/domain/usecase/readiness/MorningReadinessOrchestrator.kt:35)
+2. **Different minimum thresholds:**
+   - Electrical devices (H10, Garmin HRM-600): `MIN_SUPINE_INTERVALS_ELECTRICAL = 10` (unchanged behavior)
+   - Optical sensors (Polar Verity Sense, Oximeters): `MIN_SUPINE_INTERVALS_OPTICAL = 2` (relaxed threshold)
+3. **Device type detection:** Updated [`MorningReadinessViewModel`](app/src/main/java/com/example/wags/ui/morning/MorningReadinessViewModel.kt:159) to capture and pass `sessionDeviceType` from [`UnifiedDeviceManager.connectedDeviceType()`](app/src/main/java/com/example/wags/data/ble/UnifiedDeviceManager.kt:194)
+4. **Contextual error messages:** Error messages now indicate whether the user has an optical sensor and provide appropriate guidance.
 
-The regression model was trained on mixed-duration data but compared against same-duration records. When the model predicted better performance (because it learned from longer sessions), the probability calculation `P(X > record)` approached 100%.
-
-## Decision
-
-### Fix 1: Insufficient Data Path
-Changed probability calculation in `insufficientDataForecast()` to:
-- 100% when no record exists for the category (any hold sets a new PB)
-- 50% when a record exists (neutral estimate, since we can't compute a proper probability without sufficient data)
-
-### Fix 2: Regression Path
-Changed the record filtering logic to use only same-drillParam records for both regression training and PB lookups when `drillParam != null`:
-
-```kotlin
-// For parameterized drills, only use same-param records for both regression
-// and PB lookups. Training on mixed-param data makes predictions unreliable
-// when compared against same-param PB thresholds.
-val sameParamRecords = if (drillParam != null) {
-    records.filter { it.drillParamValue == drillParam }
-} else {
-    records
-}
-
-val regressionRecords = sameParamRecords.filter { it.durationMs >= MIN_DURATION_MS }
-val pbRecords = regressionRecords
-```
-
-This ensures the regression model is trained on the same subset of data that PB comparisons are made against, making predictions meaningful.
-
-## Impact
-- Min Breath screen now shows accurate "chance to beat" percentages
-- Users with existing records will no longer see misleading 100% forecasts
-- The change affects both the "insufficient data" and regression code paths
-- Free Hold (which passes `drillParam = null`) continues to work correctly as before
-- Progressive O₂ (also parameterized) benefits from the same fix
-
-## Date
-2025-06-18
+**Impact:**
+- **H10/Garmin HRM-600:** No change in behavior - maintains strict 10-interval requirement for accurate HRV metrics
+- **Optical sensors (Polar Verity Sense):** Now works with as few as 2 intervals, with clear messaging about data quality limitations
+- **User experience:** Users receive helpful, device-specific error messages rather than cryptic technical exceptions

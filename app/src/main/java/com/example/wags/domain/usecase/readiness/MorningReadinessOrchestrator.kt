@@ -1,6 +1,7 @@
 package com.example.wags.domain.usecase.readiness
 
 import com.example.wags.data.repository.MorningReadinessRepository
+import com.example.wags.domain.model.DeviceType
 import com.example.wags.domain.model.HooperIndex
 import com.example.wags.domain.model.HrvMetrics
 import com.example.wags.domain.model.MorningReadinessResult
@@ -23,6 +24,11 @@ import javax.inject.Inject
  *   5. Respiratory rate
  *   6. Fetch baselines from repository
  *   7. Score calculation → MorningReadinessResult
+ *
+ * Device-aware behavior:
+ *   - Electrical devices (H10, Garmin HRM-600): Use strict 10-interval minimum
+ *   - Optical devices (Polar Verity Sense): Use relaxed 2-interval minimum
+ *     since PPI data is noisier and may have gaps
  */
 class MorningReadinessOrchestrator @Inject constructor(
     private val artifactCorrection: ArtifactCorrectionUseCase,
@@ -37,10 +43,37 @@ class MorningReadinessOrchestrator @Inject constructor(
         val standingBuffer: List<RrInterval>,
         val peakStandHr: Int,
         val hooperIndex: HooperIndex?,
-        val userAgeYears: Int = 35
+        val userAgeYears: Int = 35,
+        val deviceType: DeviceType = DeviceType.GENERIC_BLE
     )
 
     suspend fun compute(input: Input): MorningReadinessResult {
+        // Determine minimum intervals based on device type.
+        // Electrical devices (H10, Garmin HRM-600) provide accurate RR intervals.
+        // Optical devices (Polar Verity Sense) provide PPI intervals which are noisier
+        // and may have gaps, so we use a more lenient threshold.
+        val minSupineIntervals = if (isOpticalSensor(input.deviceType)) {
+            MIN_SUPINE_INTERVALS_OPTICAL
+        } else {
+            MIN_SUPINE_INTERVALS_ELECTRICAL
+        }
+
+        // Validate supine buffer has enough intervals for HRV calculation.
+        // TimeDomainHrvCalculator requires >= 2 NN intervals, and artifact
+        // correction requires >= 10 for reliable filtering (electrical only).
+        if (input.supineBuffer.size < minSupineIntervals) {
+            val deviceDesc = if (isOpticalSensor(input.deviceType)) {
+                "optical sensor (PPI intervals are noisier - try keeping still and ensuring good contact)"
+            } else {
+                "heart rate monitor"
+            }
+            throw IllegalArgumentException(
+                "Insufficient supine HR data: need at least $minSupineIntervals RR intervals, " +
+                "but received ${input.supineBuffer.size}. Please ensure your $deviceDesc " +
+                "is properly connected and wait for the full 2-minute supine collection phase."
+            )
+        }
+
         // Standing is considered skipped if the buffer is empty OR has too few
         // intervals to produce meaningful HRV metrics. This handles the case
         // where the user pressed "Skip Standing" shortly after the standing
@@ -172,11 +205,35 @@ class MorningReadinessOrchestrator @Inject constructor(
 
     companion object {
         /**
+         * Minimum number of supine RR intervals required for electrical devices
+         * (H10, Garmin HRM-600). 10 matches the artifact correction minimum and
+         * ensures reliable HRV metrics from accurate RR intervals.
+         */
+        private const val MIN_SUPINE_INTERVALS_ELECTRICAL = 10
+
+        /**
+         * Minimum number of supine RR intervals required for optical sensors
+         * (Polar Verity Sense, etc.). 2 is the absolute minimum required by
+         * TimeDomainHrvCalculator. Optical sensors provide PPI intervals which
+         * are noisier than true RR intervals, so we accept fewer intervals but
+         * results will be less accurate.
+         */
+        private const val MIN_SUPINE_INTERVALS_OPTICAL = 2
+
+        /**
          * Minimum number of standing RR intervals required to treat the standing
          * phase as valid. Below this threshold the orchestrator treats standing as
          * skipped. 10 matches the artifact correction minimum and prevents
          * TimeDomainHrvCalculator from crashing on tiny buffers.
          */
         private const val MIN_STANDING_INTERVALS = 10
+
+        /**
+         * Returns true if the device type uses optical sensing (PPI intervals)
+         * rather than electrical ECG-based RR intervals.
+         */
+        private fun isOpticalSensor(deviceType: DeviceType): Boolean {
+            return deviceType == DeviceType.POLAR_VERITY || deviceType == DeviceType.OXIMETER
+        }
     }
 }
