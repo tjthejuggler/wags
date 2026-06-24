@@ -273,11 +273,13 @@ fun MeditationSessionDetailScreen(
                         }
 
                         val hrValues = telemetry.mapNotNull { it.hrBpm?.toFloat() }
-                        if (hrValues.size >= 2) {
+                        // Apply moving average smoothing to reduce noise (window size 7)
+                        val smoothedHrValues = applyMovingAverage(hrValues, windowSize = 7)
+                        if (smoothedHrValues.size >= 2) {
                             TelemetryChartCard(
                                 title         = "Heart Rate",
                                 subtitle      = "BPM over session",
-                                values        = hrValues,
+                                values        = smoothedHrValues,
                                 lineColor     = TextSecondary,
                                 unit          = "bpm",
                                 totalDurationMs = session.durationMs,
@@ -675,6 +677,61 @@ private fun MiniStat(label: String, value: String, color: Color) {
     }
 }
 
+// ── Helper: Apply moving average smoothing to reduce noise ─────────────────────
+private fun applyMovingAverage(values: List<Float>, windowSize: Int): List<Float> {
+    if (values.size <= windowSize) return values
+    
+    val smoothed = mutableListOf<Float>()
+    val halfWindow = windowSize / 2
+    
+    for (i in values.indices) {
+        val start = maxOf(0, i - halfWindow)
+        val end = minOf(values.size, i + halfWindow + 1)
+        val window = values.subList(start, end)
+        smoothed.add(window.average().toFloat())
+    }
+    
+    return smoothed
+}
+
+// ── Helper: Create smooth cubic Bézier path from data points ─────────────────────
+// Uses Catmull-Rom spline converted to cubic Bézier curves for smooth interpolation
+private fun createSmoothPath(
+    points: List<Offset>,
+    tension: Float = 0.3f
+): Path {
+    if (points.size < 2) return Path()
+    if (points.size == 2) {
+        return Path().apply {
+            moveTo(points[0].x, points[0].y)
+            lineTo(points[1].x, points[1].y)
+        }
+    }
+
+    return Path().apply {
+        moveTo(points[0].x, points[0].y)
+
+        for (i in 0 until points.size - 1) {
+            val p0 = points[maxOf(0, i - 1)]
+            val p1 = points[i]
+            val p2 = points[i + 1]
+            val p3 = points[minOf(points.size - 1, i + 2)]
+
+            // Calculate control points using Catmull-Rom spline formula
+            val cp1x = p1.x + (p2.x - p0.x) * tension / 6f
+            val cp1y = p1.y + (p2.y - p0.y) * tension / 6f
+            val cp2x = p2.x - (p3.x - p1.x) * tension / 6f
+            val cp2y = p2.y - (p3.y - p1.y) * tension / 6f
+
+            cubicTo(
+                cp1x, cp1y,
+                cp2x, cp2y,
+                p2.x, p2.y
+            )
+        }
+    }
+}
+
 // ── Canvas line chart with tap-to-inspect + timer marker ───────────────────────
 
 @Composable
@@ -774,23 +831,24 @@ private fun SessionLineChart(
                 )
             }
 
-            // Fill path
+            // Create smooth curve through all data points
+            val dataPoints = values.indices.map { i -> Offset(xOf(i), yOf(values[i])) }
+            val smoothLinePath = createSmoothPath(dataPoints, tension = 0.3f)
+
+            // Fill path (smooth curve + close at bottom)
             val fillPath = Path().apply {
                 moveTo(xOf(0), plotBot)
                 lineTo(xOf(0), yOf(values[0]))
-                for (i in 1 until values.size) lineTo(xOf(i), yOf(values[i]))
+                // Add the smooth curve
+                addPath(smoothLinePath)
                 lineTo(xOf(values.size - 1), plotBot)
                 close()
             }
             drawPath(fillPath, color = lineColor.copy(alpha = 0.12f))
 
-            // Line path
-            val linePath = Path().apply {
-                moveTo(xOf(0), yOf(values[0]))
-                for (i in 1 until values.size) lineTo(xOf(i), yOf(values[i]))
-            }
+            // Draw smooth line
             drawPath(
-                linePath,
+                smoothLinePath,
                 color = lineColor,
                 style = Stroke(width = 2.5f, cap = StrokeCap.Round, join = StrokeJoin.Round)
             )
