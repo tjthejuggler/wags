@@ -79,6 +79,15 @@
             android:exported="false" />
 
         <!--
+            MeditationService - handles guided meditation sessions in foreground
+            Ensures sessions are recorded even when app is closed or screen is off
+        -->
+        <service
+            android:name=".data.meditation.MeditationService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="false" />
+
+        <!--
             NotificationListenerService required for MediaSession access.
             Used by SpotifyManager to detect currently-playing track metadata
             and send play commands to Spotify.

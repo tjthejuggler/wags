@@ -1,6 +1,7 @@
 package com.example.wags.ui.meditation
 
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.media.MediaPlayer
 import android.net.Uri
@@ -9,6 +10,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.provider.DocumentsContract
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.R
@@ -19,6 +21,7 @@ import com.example.wags.data.db.entity.MeditationSessionEntity
 import com.example.wags.data.db.entity.MeditationTelemetryEntity
 import com.example.wags.data.ipc.HabitIntegrationRepository
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
+import com.example.wags.data.meditation.MeditationService
 import com.example.wags.data.repository.MeditationRepository
 import com.example.wags.data.repository.YouTubeMetadataFetcher
 import com.example.wags.di.IoDispatcher
@@ -401,6 +404,9 @@ class MeditationViewModel @Inject constructor(
             sonificationEngine.start(viewModelScope)
         }
 
+        // ── Start MeditationService for background session recording ──────────
+        startMeditationService(audio, timerTotal)
+
         sessionJob = viewModelScope.launch {
             while (isActive) {
                 delay(1_000L)
@@ -464,11 +470,49 @@ class MeditationViewModel @Inject constructor(
         sonificationEngine.stop()
         stopAudioPlayback()
         val durationMs = System.currentTimeMillis() - sessionStartMs
+        
+        // ── Stop MeditationService ─────────────────────────────────────────────
+        stopMeditationService()
+        
         // Signal Tail habit integration
         try {
             habitRepo.sendHabitIncrement(Slot.MEDITATION)
         } catch (_: Exception) { /* never crash */ }
         processSession(durationMs)
+    }
+
+    // ── MeditationService integration ─────────────────────────────────────────
+
+    private fun startMeditationService(audio: MeditationAudioEntity?, timerDurationSeconds: Long) {
+        try {
+            val intent = Intent(appContext, MeditationService::class.java).apply {
+                action = MeditationService.ACTION_START
+                putExtra(MeditationService.EXTRA_AUDIO_FILE_NAME, audio?.fileName)
+                putExtra(MeditationService.EXTRA_AUDIO_DIR_URI, _uiState.value.audioDirUri)
+                putExtra(MeditationService.EXTRA_DURATION_SECONDS, timerDurationSeconds)
+                putExtra(MeditationService.EXTRA_MONITOR_ID, _uiState.value.connectedDeviceId)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                appContext.startForegroundService(intent)
+            } else {
+                appContext.startService(intent)
+            }
+            Log.d("MeditationViewModel", "MeditationService started with monitor: ${_uiState.value.connectedDeviceId}")
+        } catch (e: Exception) {
+            Log.e("MeditationViewModel", "Failed to start MeditationService", e)
+        }
+    }
+
+    private fun stopMeditationService() {
+        try {
+            val intent = Intent(appContext, MeditationService::class.java).apply {
+                action = MeditationService.ACTION_STOP
+            }
+            appContext.startService(intent)
+            Log.d("MeditationViewModel", "MeditationService stopped")
+        } catch (e: Exception) {
+            Log.e("MeditationViewModel", "Failed to stop MeditationService", e)
+        }
     }
 
     fun reset() {

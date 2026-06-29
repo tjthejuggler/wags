@@ -1,23 +1,75 @@
-## Bug Fix: Morning Readiness "Need 2 NN Intervals" Error (Device-Aware)
+# Meditation Background Recording Fix
 
-**Date:** 2026-06-22
+## Context
+Users reported that guided meditation sessions were not being recorded when the screen was off and the app was closed. The root cause was that session recording logic was tied to the UI lifecycle, meaning when the app was killed or the screen turned off, the recording process would stop before saving the session data.
 
-**Issue:** Morning Readiness with Polar Verity Sense (optical sensor) failed with error "need 2 nn intervals" when attempting to calculate readiness scores.
+## Decision
+Implemented a foreground service architecture for meditation session recording to ensure sessions are saved even when the app is closed or the screen is off.
 
-**Root Cause Analysis:**
-1. The [`MorningReadinessOrchestrator.compute()`](app/src/main/java/com/example/wags/domain/usecase/readiness/MorningReadinessOrchestrator.kt:43) method had validation for the standing buffer (`MIN_STANDING_INTERVALS = 10`) but no equivalent check for the supine buffer.
-2. Optical sensors (Polar Verity Sense) provide PPI (pulse-to-pulse intervals) which are noisier than true RR intervals from electrical chest straps (H10, Garmin HRM-600).
-3. The system was treating all devices equally with a strict 10-interval minimum, which caused failures for optical sensors that may have data gaps or lower sample rates.
+## Implementation Details
 
-**Solution Implemented:**
-1. **Device-aware validation:** Added `deviceType` parameter to [`MorningReadinessOrchestrator.Input`](app/src/main/java/com/example/wags/domain/usecase/readiness/MorningReadinessOrchestrator.kt:35)
-2. **Different minimum thresholds:**
-   - Electrical devices (H10, Garmin HRM-600): `MIN_SUPINE_INTERVALS_ELECTRICAL = 10` (unchanged behavior)
-   - Optical sensors (Polar Verity Sense, Oximeters): `MIN_SUPINE_INTERVALS_OPTICAL = 2` (relaxed threshold)
-3. **Device type detection:** Updated [`MorningReadinessViewModel`](app/src/main/java/com/example/wags/ui/morning/MorningReadinessViewModel.kt:159) to capture and pass `sessionDeviceType` from [`UnifiedDeviceManager.connectedDeviceType()`](app/src/main/java/com/example/wags/data/ble/UnifiedDeviceManager.kt:194)
-4. **Contextual error messages:** Error messages now indicate whether the user has an optical sensor and provide appropriate guidance.
+### 1. Created MeditationService
+- **File**: [`app/src/main/java/com/example/wags/data/meditation/MeditationService.kt`](app/src/main/java/com/example/wags/data/meditation/MeditationService.kt)
+- **Type**: Foreground service with `mediaPlayback` service type
+- **Key Features**:
+  - Runs independently of UI lifecycle
+  - Acquires PARTIAL_WAKE_LOCK to keep CPU running
+  - Displays persistent notification showing meditation status
+  - Handles audio playback via MediaPlayer
+  - Manages timer countdown if configured
+  - Automatically stops and saves session when timer completes or user stops
 
-**Impact:**
-- **H10/Garmin HRM-600:** No change in behavior - maintains strict 10-interval requirement for accurate HRV metrics
-- **Optical sensors (Polar Verity Sense):** Now works with as few as 2 intervals, with clear messaging about data quality limitations
-- **User experience:** Users receive helpful, device-specific error messages rather than cryptic technical exceptions
+### 2. Created MeditationSessionRecorder
+- **File**: [`app/src/main/java/com/example/wags/data/meditation/MeditationSessionRecorder.kt`](app/src/main/java/com/example/wags/data/meditation/MeditationSessionRecorder.kt)
+- **Purpose**: Handles session data recording and persistence
+- **Key Functions**:
+  - `startSession()`: Initialize new session with timestamp and audio info
+  - `addTelemetrySample()`: Accumulate HR/RMSSD data during session
+  - `stopSession()`: Save session to database with analytics calculations
+
+### 3. Updated MeditationViewModel
+- **File**: [`app/src/main/java/com/example/wags/ui/meditation/MeditationViewModel.kt`](app/src/main/java/com/example/wags/ui/meditation/MeditationViewModel.kt)
+- **Changes**:
+  - Added `startMeditationService()` to launch foreground service when session starts
+  - Added `stopMeditationService()` to stop service when session ends
+  - Service receives audio file name, directory URI, and timer duration via Intent extras
+
+### 4. Updated AndroidManifest
+- **File**: [`app/src/main/AndroidManifest.xml`](app/src/main/AndroidManifest.xml)
+- **Added**: MeditationService declaration with `mediaPlayback` foreground service type
+
+## Technical Considerations
+
+### Wake Lock Management
+- Service acquires PARTIAL_WAKE_LOCK for 10 minutes max
+- Prevents CPU from sleeping during meditation session
+- Released when session stops
+
+### Notification Requirements
+- Foreground service requires persistent notification
+- Shows current meditation status and remaining time
+- Includes "Stop" action button for manual termination
+- Notification updates to show "session saved" when complete
+
+### Audio Playback
+- Service handles audio playback independently of UI
+- Uses MediaPlayer with looping enabled
+- Supports SAF (Storage Access Framework) file URIs
+- Gracefully handles audio file errors without crashing session
+
+### Data Persistence
+- Session data saved to database via MeditationSessionRecorder
+- Telemetry samples accumulated during session
+- Analytics calculated on session completion (HR, RMSSD, slopes)
+- Audio ID resolved from file name for session association
+
+## Testing
+- Build successful with `./gradlew assembleDebug`
+- APK installed successfully on device (SM-S918U1 - 16)
+- Service properly registered in manifest
+- Dependency injection configured with proper dispatcher qualifiers
+
+## Future Considerations
+- Could add telemetry data streaming from service to UI for real-time updates
+- Consider adding session recovery if service is unexpectedly killed
+- May need to handle device sleep modes more aggressively for very long sessions
