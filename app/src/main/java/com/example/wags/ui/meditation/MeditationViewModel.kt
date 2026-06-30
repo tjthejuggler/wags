@@ -538,6 +538,10 @@ class MeditationViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
+        // Stop the meditation session and service when user navigates away
+        if (_uiState.value.sessionState == MeditationSessionState.ACTIVE) {
+            stopSession()
+        }
         stopAudioPlayback()
         stopChime()
     }
