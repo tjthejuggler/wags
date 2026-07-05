@@ -60,5 +60,8 @@ data class ApneaRecordEntity(
     val guidedAudioName: String? = null,
     /** Whether the "New Record Indication" feature was enabled during this hold. */
     @ColumnInfo(defaultValue = "0")
-    val newRecordIndication: Boolean = false
+    val newRecordIndication: Boolean = false,
+    /** User notes associated with this record. Null if no notes were added. */
+    @ColumnInfo(defaultValue = "NULL")
+    val note: String? = null
 )

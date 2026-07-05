@@ -31,7 +31,7 @@ import com.example.wags.data.db.entity.*
         GuidedAudioEntity::class,
         ForecastCalibrationEntity::class
     ],
-    version = 35,
+    version = 36,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -958,5 +958,16 @@ abstract class WagsDatabase : RoomDatabase() {
                         """.trimIndent())
                     }
                 }
+
+            /**
+             * v35 → v36: Add note column to apnea_records.
+             * Stores user notes associated with each apnea record.
+             * Existing records default to NULL (no notes).
+             */
+            val MIGRATION_35_36 = object : Migration(35, 36) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE apnea_records ADD COLUMN note TEXT DEFAULT NULL")
+                }
+            }
         }
     }

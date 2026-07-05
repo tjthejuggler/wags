@@ -207,6 +207,7 @@ fun ApneaRecordDetailScreen(
                                 )
                             }
                         },
+                        onEditNote = { viewModel.openNoteDialog() },
                         modifier = Modifier
                     )
                 }
@@ -236,6 +237,40 @@ fun ApneaRecordDetailScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    // ── Note edit dialog ────────────────────────────────────────────────────────
+    if (state.showNoteDialog) {
+        var noteText by remember { mutableStateOf(state.editNote) }
+
+        AlertDialog(
+            onDismissRequest = { viewModel.closeNoteDialog() },
+            title = { Text("Edit Note") },
+            text = {
+                OutlinedTextField(
+                    value = noteText,
+                    onValueChange = {
+                        noteText = it
+                        viewModel.setEditNote(it)
+                    },
+                    placeholder = { Text("Add a note about this record...") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp),
+                    maxLines = 5,
+                    singleLine = false
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.saveNote() },
+                    colors = ButtonDefaults.textButtonColors(contentColor = TextPrimary)
+                ) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.closeNoteDialog() }) { Text("Cancel") }
             }
         )
     }
@@ -513,6 +548,7 @@ private fun RecordDetailContent(
     onRepeatHold: () -> Unit = {},
     onRecalculateSongs: () -> Unit = {},
     onTrophyClick: () -> Unit = {},
+    onEditNote: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val dateStr = remember(record.timestamp) {
@@ -649,6 +685,40 @@ private fun RecordDetailContent(
                         value = "On",
                         valueColor = TextPrimary,
                         valueBold = true
+                    )
+                }
+
+                // ── Note ─────────────────────────────────────────────────
+                HorizontalDivider(
+                    color = TextDisabled.copy(alpha = 0.3f),
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Note", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                    IconButton(onClick = onEditNote, modifier = Modifier.size(24.dp)) {
+                        Icon(
+                            imageVector = Icons.Outlined.Edit,
+                            contentDescription = if (record.note != null) "Edit note" else "Add note",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+                if (record.note != null) {
+                    Text(
+                        record.note,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextPrimary
+                    )
+                } else {
+                    Text(
+                        "No note added",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
                     )
                 }
 

@@ -43,6 +43,10 @@ data class ApneaRecordDetailUiState(
     val notFound: Boolean = false,
     /** True while the edit bottom-sheet is open. */
     val showEditSheet: Boolean = false,
+    /** True while the note edit dialog is open. */
+    val showNoteDialog: Boolean = false,
+    /** Editable copy of the note field — initialised from the record when dialog opens. */
+    val editNote: String = "",
     /** Editable copies of the settings fields — initialised from the record when sheet opens. */
     val editLungVolume: String = "FULL",
     val editPrepType: PrepType = PrepType.NO_PREP,
@@ -265,6 +269,38 @@ class ApneaRecordDetailViewModel @Inject constructor(
             val badges = apneaRepository.getRecordPbBadges(record.recordId)
             val trophyCount = computeTrophyCount(record.recordId, updated, badges)
             _uiState.update { it.copy(record = updated, pbBadges = badges, trophyCount = trophyCount, showEditSheet = false) }
+        }
+    }
+
+    // ── Note edit dialog ─────────────────────────────────────────────────────
+
+    /** Opens the note edit dialog, pre-populating the note field from the current record. */
+    fun openNoteDialog() {
+        val record = _uiState.value.record ?: return
+        _uiState.update {
+            it.copy(
+                showNoteDialog = true,
+                editNote = record.note ?: ""
+            )
+        }
+    }
+
+    fun closeNoteDialog() {
+        _uiState.update { it.copy(showNoteDialog = false) }
+    }
+
+    fun setEditNote(note: String) {
+        _uiState.update { it.copy(editNote = note) }
+    }
+
+    /** Persists the edited note to the DB and refreshes the displayed record. */
+    fun saveNote() {
+        val record = _uiState.value.record ?: return
+        val state  = _uiState.value
+        viewModelScope.launch {
+            val updated = record.copy(note = state.editNote.takeIf { it.isNotBlank() })
+            apneaRepository.updateRecord(updated)
+            _uiState.update { it.copy(record = updated, showNoteDialog = false) }
         }
     }
 
