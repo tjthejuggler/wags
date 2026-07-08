@@ -76,46 +76,12 @@ class DataExportImportRepository @Inject constructor(
      * @throws Exception if the export fails.
      */
     suspend fun exportData(uri: Uri): String = withContext(Dispatchers.IO) {
-        // Checkpoint the WAL to ensure all data is in the main DB file
-        database.runInTransaction {
-            database.openHelper.writableDatabase.execSQL("PRAGMA wal_checkpoint(FULL)")
-        }
-
-        val dbFile = context.getDatabasePath(DB_NAME)
-        if (!dbFile.exists()) {
-            throw IllegalStateException("Database file not found: ${dbFile.absolutePath}")
-        }
-
-        // Also grab the WAL and SHM files if they exist (for completeness)
-        val dbWalFile = File(dbFile.absolutePath + "-wal")
-        val dbShmFile = File(dbFile.absolutePath + "-shm")
-
-        val prefsDir = File(context.applicationInfo.dataDir, "shared_prefs")
-
-        context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-            ZipOutputStream(outputStream).use { zip ->
-                // ── Database file ────────────────────────────────────────────
-                addFileToZip(zip, ZIP_DB_ENTRY, dbFile)
-
-                // Include WAL/SHM if present (they should be empty after checkpoint, but just in case)
-                if (dbWalFile.exists()) {
-                    addFileToZip(zip, "$ZIP_DB_ENTRY-wal", dbWalFile)
-                }
-                if (dbShmFile.exists()) {
-                    addFileToZip(zip, "$ZIP_DB_ENTRY-shm", dbShmFile)
-                }
-
-                // ── SharedPreferences files ──────────────────────────────────
-                for (prefName in SHARED_PREFS_FILES) {
-                    val prefFile = File(prefsDir, "$prefName.xml")
-                    if (prefFile.exists()) {
-                        addFileToZip(zip, "$ZIP_PREFS_DIR$prefName.xml", prefFile)
-                    }
-                }
-            }
-        } ?: throw IllegalStateException("Could not open output stream for URI: $uri")
+        val outputStream = context.contentResolver.openOutputStream(uri)
+            ?: throw IllegalStateException("Could not open output stream for URI: $uri")
+        outputStream.use { writeBackupZip(it) }
 
         // Build summary
+        val prefsDir = File(context.applicationInfo.dataDir, "shared_prefs")
         val tableCount = countDatabaseRows()
         val prefsCount = SHARED_PREFS_FILES.count { name ->
             File(prefsDir, "$name.xml").exists()
@@ -129,6 +95,77 @@ class DataExportImportRepository @Inject constructor(
             }
             append("\nPreferences files: $prefsCount\n")
             append("Total rows: ${tableCount.values.sum()}")
+        }
+    }
+
+    /**
+     * Writes a full backup ZIP into [destFile] (an internal-storage File).
+     *
+     * Used by the automatic on-startup backup path so the same checkpointing
+     * and file-inclusion logic is guaranteed to match the manual export.
+     *
+     * @return the number of bytes written.
+     */
+    suspend fun exportToFile(destFile: File): Long = withContext(Dispatchers.IO) {
+        destFile.parentFile?.mkdirs()
+        FileOutputStream(destFile).use { writeBackupZip(it) }
+        destFile.length()
+    }
+
+    /**
+     * Shared backup-serialisation core used by both the URI export (user-visible
+     * "Export" in Settings) and the automatic on-startup daily backup.
+     *
+     * Checkpoints the SQLite WAL first (never inside a transaction — see
+     * [checkpointWalForExport]) and then writes the database, WAL/SHM safety-net,
+     * and every SharedPreferences file into the ZIP stream.
+     */
+    private fun writeBackupZip(outputStream: java.io.OutputStream) {
+        // Checkpoint the WAL so all committed data is flushed into the main DB file.
+        //
+        // IMPORTANT: `PRAGMA wal_checkpoint` must NOT be wrapped in a transaction —
+        // SQLite refuses to run a checkpoint while a transaction is open on the same
+        // connection and returns SQLITE_LOCKED ("database is locked"), which was the
+        // root cause of the original export failure.
+        //
+        // We use TRUNCATE (rather than FULL) because it additionally shrinks the WAL
+        // file back to zero bytes on success, guaranteeing the copied `wags.db` is
+        // fully self-contained. If concurrent readers/writers (e.g. BLE telemetry)
+        // prevent the checkpoint, `busy` will be 1; we retry once after a short
+        // delay, then fall through — the WAL/SHM files are still included in the ZIP
+        // as a safety net so no data can ever be lost by the export itself.
+        checkpointWalForExport()
+
+        val dbFile = context.getDatabasePath(DB_NAME)
+        if (!dbFile.exists()) {
+            throw IllegalStateException("Database file not found: ${dbFile.absolutePath}")
+        }
+
+        // Also grab the WAL and SHM files if they exist (for completeness)
+        val dbWalFile = File(dbFile.absolutePath + "-wal")
+        val dbShmFile = File(dbFile.absolutePath + "-shm")
+
+        val prefsDir = File(context.applicationInfo.dataDir, "shared_prefs")
+
+        ZipOutputStream(outputStream).use { zip ->
+            // ── Database file ────────────────────────────────────────────
+            addFileToZip(zip, ZIP_DB_ENTRY, dbFile)
+
+            // Include WAL/SHM if present (they should be empty after checkpoint, but just in case)
+            if (dbWalFile.exists()) {
+                addFileToZip(zip, "$ZIP_DB_ENTRY-wal", dbWalFile)
+            }
+            if (dbShmFile.exists()) {
+                addFileToZip(zip, "$ZIP_DB_ENTRY-shm", dbShmFile)
+            }
+
+            // ── SharedPreferences files ──────────────────────────────────
+            for (prefName in SHARED_PREFS_FILES) {
+                val prefFile = File(prefsDir, "$prefName.xml")
+                if (prefFile.exists()) {
+                    addFileToZip(zip, "$ZIP_PREFS_DIR$prefName.xml", prefFile)
+                }
+            }
         }
     }
 
@@ -232,6 +269,35 @@ class DataExportImportRepository @Inject constructor(
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────────
+
+    /**
+     * Checkpoints the SQLite WAL so all committed pages are written into the
+     * main database file, without ever holding a write transaction.
+     *
+     * Uses `PRAGMA wal_checkpoint(TRUNCATE)`, which returns a single row:
+     * `(busy, log, checkpointed)`.
+     *  - `busy = 1` means another connection prevented a full checkpoint;
+     *    in that case we sleep briefly and retry once. If it is still busy,
+     *    we log and continue — the export still succeeds because we also
+     *    include the WAL/SHM files in the ZIP as a safety net.
+     */
+    private fun checkpointWalForExport() {
+        val db = database.openHelper.writableDatabase
+        repeat(2) { attempt ->
+            val busy = try {
+                db.query("PRAGMA wal_checkpoint(TRUNCATE)").use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getInt(0) else 0
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "wal_checkpoint attempt ${attempt + 1} failed: ${e.message}")
+                return@repeat
+            }
+            if (busy == 0) return
+            Log.w(TAG, "wal_checkpoint busy on attempt ${attempt + 1}, retrying...")
+            Thread.sleep(100)
+        }
+        Log.w(TAG, "wal_checkpoint remained busy — WAL/SHM will be included in the backup ZIP")
+    }
 
     private fun addFileToZip(zip: ZipOutputStream, entryName: String, file: File) {
         zip.putNextEntry(ZipEntry(entryName))

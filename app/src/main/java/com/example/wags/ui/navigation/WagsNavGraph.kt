@@ -74,7 +74,7 @@ object WagsRoutes {
     const val SESSION_ANALYTICS = "session_analytics/{sessionId}"
     const val SESSION_ANALYTICS_HISTORY = "session_analytics_history"
     const val RF_ASSESSMENT_PICKER = "rf_assessment_picker"
-    const val RF_ASSESSMENT_RUN = "rf_assessment_run/{protocol}?vibration={vibration}&colors={colors}&customDuration={customDuration}"
+    const val RF_ASSESSMENT_RUN = "rf_assessment_run/{protocol}?vibration={vibration}&colors={colors}&customDuration={customDuration}&posture={posture}"
     const val RF_ASSESSMENT_RESULT = "rf_assessment_result/{sessionTimestamp}"
     const val RF_ASSESSMENT_HISTORY = "rf_assessment_history"
     const val RESONANCE_SESSION = "resonance_session?vibration={vibration}&duration={duration}&infinity={infinity}&rate={rate}"
@@ -122,8 +122,8 @@ object WagsRoutes {
     fun advancedApnea(modality: String, length: String) = "advanced_apnea/$modality/$length"
     fun session(type: String) = "session/$type"
     fun sessionAnalytics(sessionId: Long) = "session_analytics/$sessionId"
-    fun rfAssessmentRun(protocol: String, vibration: Boolean = false, colors: Boolean = false, customDuration: Int = 0) =
-        "rf_assessment_run/$protocol?vibration=$vibration&colors=$colors&customDuration=$customDuration"
+    fun rfAssessmentRun(protocol: String, vibration: Boolean = false, colors: Boolean = false, customDuration: Int = 0, posture: String = "LAYING") =
+        "rf_assessment_run/$protocol?vibration=$vibration&colors=$colors&customDuration=$customDuration&posture=$posture"
     fun rfAssessmentResult(sessionTimestamp: Long) = "rf_assessment_result/$sessionTimestamp"
     fun apneaHistory(
         lungVolume: String,
@@ -443,8 +443,8 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             AssessmentPickerScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) },
-                onStartAssessment = { protocol, vibration, colors, customDuration ->
-                    navController.navigate(WagsRoutes.rfAssessmentRun(protocol.name, vibration, colors, customDuration))
+                onStartAssessment = { protocol, vibration, colors, customDuration, posture ->
+                    navController.navigate(WagsRoutes.rfAssessmentRun(protocol.name, vibration, colors, customDuration, posture.name))
                 }
             )
         }
@@ -454,7 +454,8 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
                 navArgument("protocol") { type = NavType.StringType },
                 navArgument("vibration") { type = NavType.BoolType; defaultValue = false },
                 navArgument("colors") { type = NavType.BoolType; defaultValue = false },
-                navArgument("customDuration") { type = NavType.IntType; defaultValue = 0 }
+                navArgument("customDuration") { type = NavType.IntType; defaultValue = 0 },
+                navArgument("posture") { type = NavType.StringType; defaultValue = "LAYING" }
             )
         ) { backStackEntry ->
             val protocolStr = backStackEntry.arguments?.getString("protocol") ?: RfProtocol.EXPRESS.name
@@ -463,6 +464,7 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             val vibration = backStackEntry.arguments?.getBoolean("vibration") ?: false
             val colors = backStackEntry.arguments?.getBoolean("colors") ?: false
             val customDuration = backStackEntry.arguments?.getInt("customDuration") ?: 0
+            val postureStr = backStackEntry.arguments?.getString("posture") ?: "LAYING"
             AssessmentRunScreen(
                 protocol = protocol,
                 customDurationMinutes = customDuration,
@@ -474,7 +476,8 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
                     }
                 },
                 vibrationEnabled = vibration,
-                colorsEnabled = colors
+                colorsEnabled = colors,
+                initialPosture = postureStr
             )
         }
         composable(

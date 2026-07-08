@@ -173,6 +173,7 @@ fun ResonanceSessionDetailScreen(
                 else -> {
                     SessionDetailContent(
                         session = uiState.session!!,
+                        viewModel = viewModel,
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState())
@@ -189,6 +190,7 @@ fun ResonanceSessionDetailScreen(
 @Composable
 private fun SessionDetailContent(
     session: ResonanceSessionEntity,
+    viewModel: ResonanceSessionDetailViewModel,
     modifier: Modifier = Modifier
 ) {
     val zone = ZoneId.systemDefault()
@@ -240,8 +242,10 @@ private fun SessionDetailContent(
                     textAlign = TextAlign.Center
                 )
                 Text(
-                    text = "%.2f BPM  •  %d:%02d".format(
-                        session.breathingRateBpm, durationMin, durationSec
+                    text = "%.2f BPM  •  %d:%02d  •  %s".format(
+                        session.breathingRateBpm, durationMin, durationSec,
+                        try { com.example.wags.domain.model.Posture.valueOf(session.posture).displayName() }
+                        catch (e: Exception) { "Laying" }
                     ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = DetailAsh
@@ -319,6 +323,44 @@ private fun SessionDetailContent(
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Center
                     )
+                }
+            }
+        }
+
+        // ── Posture edit card ──────────────────────────────────────────────
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    "Posture",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = DetailSilver,
+                    letterSpacing = 2.sp
+                )
+                HorizontalDivider(color = SurfaceVariant)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    com.example.wags.domain.model.Posture.values().forEach { p ->
+                        val isSelected = try {
+                            com.example.wags.domain.model.Posture.valueOf(session.posture) == p
+                        } catch (e: Exception) {
+                            p == com.example.wags.domain.model.Posture.LAYING
+                        }
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { viewModel.updatePosture(p.name) },
+                            label = { Text(p.displayName()) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
             }
         }

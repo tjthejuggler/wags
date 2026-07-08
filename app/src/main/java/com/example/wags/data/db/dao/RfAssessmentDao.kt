@@ -32,4 +32,7 @@ interface RfAssessmentDao {
 
     @Query("SELECT * FROM rf_assessments WHERE timestamp >= :sinceMs ORDER BY timestamp DESC")
     suspend fun getSince(sinceMs: Long): List<RfAssessmentEntity>
+    
+    @Query("UPDATE rf_assessments SET posture = :posture WHERE timestamp = :timestamp")
+    suspend fun updatePosture(timestamp: Long, posture: String)
 }

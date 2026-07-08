@@ -17,6 +17,7 @@ import com.example.wags.domain.usecase.breathing.RfEpochResult
 import com.example.wags.domain.usecase.breathing.RfOrchestratorState
 import com.example.wags.domain.usecase.breathing.RfPhase
 import com.example.wags.domain.usecase.breathing.RfProtocol
+import com.example.wags.domain.model.Posture
 import com.example.wags.domain.usecase.breathing.SlidingWindowResult
 import com.example.wags.domain.usecase.hrv.ArtifactCorrectionUseCase
 import com.example.wags.domain.usecase.hrv.TimeDomainHrvCalculator
@@ -80,7 +81,9 @@ class AssessmentRunViewModel @Inject constructor(
         /** Live SDNN (ms) computed from recent RR intervals. */
         val liveSdnn: Float? = null,
         /** Number of test epochs completed so far (enables "End Early & Save"). */
-        val completedEpochCount: Int = 0
+        val completedEpochCount: Int = 0,
+        /** Posture for the assessment (SITTING or LAYING). */
+        val posture: Posture = Posture.LAYING
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -304,7 +307,8 @@ class AssessmentRunViewModel @Inject constructor(
             artifactPercent     = artifactPct,
             resonanceCurveJson  = resonanceCurveJson,
             hrWaveformJson      = hrWaveformJson,
-            powerSpectrumJson   = powerSpectrumJson
+            powerSpectrumJson   = powerSpectrumJson,
+            posture             = _uiState.value.posture.name
         )
         val id = saveEntity(entity)
         _uiState.value = _uiState.value.copy(
@@ -352,7 +356,8 @@ class AssessmentRunViewModel @Inject constructor(
             artifactPercent     = artifactPct,
             resonanceCurveJson  = resonanceCurveJson,
             hrWaveformJson      = hrWaveformJson,
-            powerSpectrumJson   = powerSpectrumJson
+            powerSpectrumJson   = powerSpectrumJson,
+            posture             = _uiState.value.posture.name
         )
     }
 
@@ -557,6 +562,10 @@ class AssessmentRunViewModel @Inject constructor(
         pacerJob?.cancel()
         coherenceJob?.cancel()
         orchestrator.stop()
+    }
+
+    fun setPosture(posture: Posture) {
+        _uiState.value = _uiState.value.copy(posture = posture)
     }
 
     // -------------------------------------------------------------------------

@@ -39,5 +39,8 @@ data class ResonanceSessionEntity(
     val coherenceHistoryJson: String = "",
     /** HR device identifier used. */
     @ColumnInfo(defaultValue = "NULL")
-    val hrDeviceId: String? = null
+    val hrDeviceId: String? = null,
+    /** One of Posture enum names: SITTING, LAYING */
+    @ColumnInfo(defaultValue = "LAYING")
+    val posture: String = "LAYING"
 )

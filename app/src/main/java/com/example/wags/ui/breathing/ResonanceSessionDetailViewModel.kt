@@ -94,4 +94,13 @@ class ResonanceSessionDetailViewModel @Inject constructor(
             ) }
         }
     }
+    
+    fun updatePosture(posture: String) {
+        val sessionId = _uiState.value.session?.sessionId ?: return
+        viewModelScope.launch {
+            repository.updatePosture(sessionId, posture)
+            val session = repository.getById(sessionId)
+            _uiState.update { it.copy(session = session) }
+        }
+    }
 }

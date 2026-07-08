@@ -55,7 +55,7 @@ interface MorningReadinessDao {
     @Query("DELETE FROM morning_readiness WHERE id = :id")
     suspend fun deleteById(id: Long)
 
-    // Cleanup: delete records older than retention period
-    @Query("DELETE FROM morning_readiness WHERE timestamp < :cutoffMs")
-    suspend fun deleteOlderThan(cutoffMs: Long)
+    // Intentionally NO time-based deletion query.
+    // Policy (2026-07-08): never delete data on a time basis.
+    // Historical rolling-window purge was removed to prevent data loss.
 }

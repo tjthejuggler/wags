@@ -3,6 +3,7 @@ package com.example.wags
 import android.app.Application
 import android.util.Log
 import android.widget.Toast
+import com.example.wags.data.backup.AutoBackupManager
 import com.example.wags.data.crash.CrashLogWriter
 import com.example.wags.data.garmin.GarminApneaRepository
 import com.example.wags.data.garmin.GarminManager
@@ -23,9 +24,18 @@ class WagsApplication : Application() {
     @Inject
     lateinit var scope: CoroutineScope
 
+    @Inject
+    lateinit var autoBackupManager: AutoBackupManager
+
     override fun onCreate() {
         super.onCreate()
         installCrashLogger()
+
+        // Kick off the automatic daily on-device backup. This writes a full
+        // app-data ZIP to internal storage (${filesDir}/auto_backups/) once
+        // per calendar day, keeping the last N days on rotation. Runs on IO
+        // dispatcher; never blocks startup and swallows its own errors.
+        autoBackupManager.runOnStartup()
 
         // Start listening for incoming Garmin Free Hold data.
         // This runs in the background and persists data as it arrives from the watch.

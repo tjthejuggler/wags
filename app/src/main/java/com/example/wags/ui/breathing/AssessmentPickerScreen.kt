@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wags.domain.usecase.breathing.RfProtocol
+import com.example.wags.domain.model.Posture
 import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.theme.SurfaceDark
 import com.example.wags.ui.theme.SurfaceVariant
@@ -100,7 +101,7 @@ private val PROTOCOL_LIST = listOf(
 fun AssessmentPickerScreen(
     onNavigateBack: () -> Unit,
     onNavigateToSettings: () -> Unit = {},
-    onStartAssessment: (RfProtocol, Boolean, Boolean, Int) -> Unit,
+    onStartAssessment: (RfProtocol, Boolean, Boolean, Int, Posture) -> Unit,
     viewModel: AssessmentPickerViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -183,6 +184,34 @@ fun AssessmentPickerScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            // ── Posture selector ─────────────────────────────────────────────
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        "Posture: ${state.posture.displayName()}",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Posture.values().forEach { p ->
+                            FilterChip(
+                                selected = state.posture == p,
+                                onClick = { viewModel.setPosture(p) },
+                                label = { Text(p.displayName()) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             // ── HR device gate ────────────────────────────────────────────────
             if (!state.isHrDeviceConnected) {
                 HrRequiredBanner()
@@ -199,7 +228,8 @@ fun AssessmentPickerScreen(
                             state.selectedProtocol,
                             vibrationEnabled,
                             colorsEnabled,
-                            state.customDurationMinutes
+                            state.customDurationMinutes,
+                            state.posture
                         )
                     },
                     modifier = Modifier.weight(1f),

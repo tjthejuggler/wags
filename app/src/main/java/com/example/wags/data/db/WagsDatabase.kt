@@ -31,7 +31,7 @@ import com.example.wags.data.db.entity.*
         GuidedAudioEntity::class,
         ForecastCalibrationEntity::class
     ],
-    version = 36,
+    version = 37,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -967,6 +967,22 @@ abstract class WagsDatabase : RoomDatabase() {
             val MIGRATION_35_36 = object : Migration(35, 36) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE apnea_records ADD COLUMN note TEXT DEFAULT NULL")
+                }
+            }
+    
+            /**
+             * v36 → v37: Add posture column to resonance_sessions and rf_assessments.
+             * Stores the posture (SITTING or LAYING) used during sessions/assessments.
+             * All existing records default to LAYING for retroactive compatibility.
+             */
+            val MIGRATION_36_37 = object : Migration(36, 37) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // NOTE: The NOT NULL constraint here matches the non-nullable Kotlin
+                    // property in the entity. Room's schema validator will reject a
+                    // nullable column against a non-null entity field, so both the
+                    // NOT NULL constraint AND the DEFAULT are required.
+                    db.execSQL("ALTER TABLE resonance_sessions ADD COLUMN posture TEXT NOT NULL DEFAULT 'LAYING'")
+                    db.execSQL("ALTER TABLE rf_assessments ADD COLUMN posture TEXT NOT NULL DEFAULT 'LAYING'")
                 }
             }
         }

@@ -42,6 +42,7 @@ import com.example.wags.ui.common.RrIntervalChart
 import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.domain.usecase.breathing.ResonanceRateRecommender
+import com.example.wags.domain.model.Posture
 import com.example.wags.ui.theme.*
 import kotlin.math.roundToInt
 
@@ -154,8 +155,10 @@ fun BreathingScreen(
             BreathingControls(
                 rateBpm = state.breathingRateBpm,
                 ieRatio = state.ieRatio,
+                posture = state.posture,
                 onRateChange = { viewModel.setBreathingRate(it) },
-                onIeRatioChange = { viewModel.setIeRatio(it) }
+                onIeRatioChange = { viewModel.setIeRatio(it) },
+                onPostureChange = { viewModel.setPosture(it) }
             )
 
             // ── Recommended rate info + link to explanation ──────────────────
@@ -757,8 +760,10 @@ private fun CoherenceDisplay(score: Float) {
 private fun BreathingControls(
     rateBpm: Float,
     ieRatio: Float,
+    posture: Posture,
     onRateChange: (Float) -> Unit,
-    onIeRatioChange: (Float) -> Unit
+    onIeRatioChange: (Float) -> Unit,
+    onPostureChange: (Posture) -> Unit
 ) {
     // Rate: 4.00–7.00 BPM in 0.05 steps → 60 intervals = 59 steps
     // Ratio: 0.5–3.0 in 0.1 steps → 25 intervals = 24 steps
@@ -795,6 +800,25 @@ private fun BreathingControls(
                 valueRange = 0.5f..3f,
                 steps = 24    // (3.0 - 0.5) / 0.1 - 1 = 24
             )
+            
+            // Posture selector
+            Text(
+                "Posture: ${posture.displayName()}",
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Posture.values().forEach { p ->
+                    FilterChip(
+                        selected = posture == p,
+                        onClick = { onPostureChange(p) },
+                        label = { Text(p.displayName()) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
         }
     }
 }

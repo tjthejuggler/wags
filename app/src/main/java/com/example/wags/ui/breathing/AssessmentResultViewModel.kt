@@ -64,4 +64,12 @@ class AssessmentResultViewModel @Inject constructor(
             _deleted.emit(Unit)
         }
     }
+    
+    fun updatePosture(posture: String) {
+        viewModelScope.launch {
+            repository.updatePosture(sessionTimestamp, posture)
+            val current = repository.getByTimestamp(sessionTimestamp)
+            _uiState.value = _uiState.value.copy(currentSession = current)
+        }
+    }
 }

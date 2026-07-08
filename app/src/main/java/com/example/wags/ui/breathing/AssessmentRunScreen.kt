@@ -72,10 +72,21 @@ fun AssessmentRunScreen(
     vibrationEnabled: Boolean = false,
     colorsEnabled: Boolean = false,
     customDurationMinutes: Int = 0,
+    initialPosture: String = "LAYING",
     viewModel: AssessmentRunViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    
+    // Set initial posture from navigation parameter
+    LaunchedEffect(Unit) {
+        try {
+            val posture = com.example.wags.domain.model.Posture.valueOf(initialPosture)
+            viewModel.setPosture(posture)
+        } catch (e: Exception) {
+            // If posture string is invalid, keep default LAYING
+        }
+    }
 
     val isActive = uiState.phase != "IDLE" && uiState.phase != "COMPLETE"
 

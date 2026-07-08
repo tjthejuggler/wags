@@ -29,4 +29,7 @@ interface ResonanceSessionDao {
 
     @Query("DELETE FROM resonance_sessions WHERE sessionId = :sessionId")
     suspend fun deleteById(sessionId: Long)
+    
+    @Query("UPDATE resonance_sessions SET posture = :posture WHERE sessionId = :sessionId")
+    suspend fun updatePosture(sessionId: Long, posture: String)
 }

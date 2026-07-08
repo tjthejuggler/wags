@@ -226,6 +226,37 @@ fun AssessmentResultScreen(
             }
 
             // ═══════════════════════════════════════════════════════════════
+            // 5.5. POSTURE EDIT
+            // ═══════════════════════════════════════════════════════════════
+            if (session != null) {
+                SectionHeader("Posture")
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        com.example.wags.domain.model.Posture.values().forEach { p ->
+                            val isSelected = try {
+                                com.example.wags.domain.model.Posture.valueOf(session.posture) == p
+                            } catch (e: Exception) {
+                                p == com.example.wags.domain.model.Posture.LAYING
+                            }
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { viewModel.updatePosture(p.name) },
+                                label = { Text(p.displayName()) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ═══════════════════════════════════════════════════════════════
             // 6. LEADERBOARD (for stepped protocols)
             // ═══════════════════════════════════════════════════════════════
             if (session != null && session.leaderboardJson.startsWith("[")) {
@@ -695,6 +726,8 @@ private fun MetricsTable(session: com.example.wags.data.db.entity.RfAssessmentEn
             MetricRow("Mean SDNN", "%.1f ms".format(session.meanSdnnMs), "Overall HRV")
             HorizontalDivider(color = SurfaceVariant, modifier = Modifier.padding(vertical = 4.dp))
             MetricRow("Duration", formatDuration(session.durationSeconds), "Assessment length")
+            HorizontalDivider(color = SurfaceVariant, modifier = Modifier.padding(vertical = 4.dp))
+            MetricRow("Posture", try { com.example.wags.domain.model.Posture.valueOf(session.posture).displayName() } catch (e: Exception) { "Laying" }, "Body position during assessment")
             HorizontalDivider(color = SurfaceVariant, modifier = Modifier.padding(vertical = 4.dp))
             MetricRow("Total Beats", "${session.totalBeats}", "RR intervals collected")
             HorizontalDivider(color = SurfaceVariant, modifier = Modifier.padding(vertical = 4.dp))

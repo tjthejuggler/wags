@@ -30,6 +30,6 @@ interface DailyReadingDao {
     @Query("DELETE FROM daily_readings WHERE readingId = :id")
     suspend fun deleteById(id: Long)
 
-    @Query("DELETE FROM daily_readings WHERE timestamp < :beforeTimestamp")
-    suspend fun deleteOlderThan(beforeTimestamp: Long)
+    // Intentionally NO time-based deletion query.
+    // Policy (2026-07-08): never delete data on a time basis.
 }

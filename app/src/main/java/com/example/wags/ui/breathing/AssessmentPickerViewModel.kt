@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.HrDataSource
 import com.example.wags.data.repository.RfAssessmentRepository
+import com.example.wags.domain.model.Posture
 import com.example.wags.domain.usecase.breathing.RfProtocol
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,7 +28,8 @@ class AssessmentPickerViewModel @Inject constructor(
         val targetedEnabled: Boolean = false,
         val bestRatesEnabled: Boolean = false,
         val isLoading: Boolean = true,
-        val isHrDeviceConnected: Boolean = false
+        val isHrDeviceConnected: Boolean = false,
+        val posture: Posture = Posture.LAYING
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -60,5 +62,9 @@ class AssessmentPickerViewModel @Inject constructor(
         // Snap to even (2-min increments), range 6–60
         val snapped = if (minutes % 2 != 0) minutes + 1 else minutes
         _uiState.update { it.copy(customDurationMinutes = snapped.coerceIn(6, 60)) }
+    }
+
+    fun setPosture(posture: Posture) {
+        _uiState.update { it.copy(posture = posture) }
     }
 }

@@ -21,6 +21,7 @@ import com.example.wags.domain.usecase.breathing.RfOrchestratorState
 import com.example.wags.domain.usecase.breathing.RfPhase
 import com.example.wags.domain.usecase.breathing.RfProtocol
 import com.example.wags.domain.usecase.breathing.SlidingWindowResult
+import com.example.wags.domain.model.Posture
 import com.example.wags.domain.usecase.hrv.ArtifactCorrectionUseCase
 import com.example.wags.domain.usecase.hrv.TimeDomainHrvCalculator
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -99,6 +100,10 @@ data class BreathingUiState(
     /** Remaining seconds on the session timer (only used when not in infinity mode). */
     val sessionRemainingSeconds: Int = 0,
 
+    // ── Posture selection ─────────────────────────────────────────────────────
+    /** Posture for the session (SITTING or LAYING). */
+    val posture: Posture = Posture.LAYING,
+
     // ── Session complete data ────────────────────────────────────────────────
     /** Summary data available when sessionPhase == COMPLETE. */
     val sessionSummary: SessionSummary? = null
@@ -121,7 +126,8 @@ data class SessionSummary(
     val totalPoints: Float,
     val coherenceHistory: List<Float>,
     val breathingRateBpm: Float,
-    val ieRatio: Float
+    val ieRatio: Float,
+    val posture: Posture
 )
 
 @HiltViewModel
@@ -230,6 +236,10 @@ class BreathingViewModel @Inject constructor(
 
     fun setInfinityMode(enabled: Boolean) {
         _uiState.update { it.copy(infinityMode = enabled) }
+    }
+
+    fun setPosture(posture: Posture) {
+        _uiState.update { it.copy(posture = posture) }
     }
 
     fun startSession(deviceId: String) {
@@ -365,7 +375,8 @@ class BreathingViewModel @Inject constructor(
             artifactPercent = summary.artifactPercent,
             totalPoints = summary.totalPoints,
             coherenceHistoryJson = coherenceHistoryJson,
-            hrDeviceId = hrDataSource.activeHrDeviceLabel()
+            hrDeviceId = hrDataSource.activeHrDeviceLabel(),
+            posture = summary.posture.name
         )
         resonanceSessionRepo.save(entity)
     }
@@ -409,7 +420,8 @@ class BreathingViewModel @Inject constructor(
             totalPoints = sessionPoints,
             coherenceHistory = coherenceHistory,
             breathingRateBpm = currentState.breathingRateBpm,
-            ieRatio = currentState.ieRatio
+            ieRatio = currentState.ieRatio,
+            posture = currentState.posture
         )
     }
 

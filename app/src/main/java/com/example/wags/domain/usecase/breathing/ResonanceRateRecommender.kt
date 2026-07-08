@@ -2,6 +2,7 @@ package com.example.wags.domain.usecase.breathing
 
 import com.example.wags.data.repository.ResonanceSessionRepository
 import com.example.wags.data.repository.RfAssessmentRepository
+import com.example.wags.domain.model.Posture
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.roundToInt
@@ -123,15 +124,20 @@ class ResonanceRateRecommender @Inject constructor(
             if (a.isValid && a.optimalBpm in 4f..7f) {
                 validAssessmentCount++
                 val normalized = (a.compositeScore / ASSESSMENT_SCORE_CEILING).coerceIn(0f, 1f)
+                val posture = try { Posture.valueOf(a.posture) } catch (e: Exception) { Posture.LAYING }
+                // Sitting assessments get 1.5x weight, laying assessments get 1x
+                val postureWeightMultiplier = if (posture == Posture.SITTING) 1.5f else 1.0f
+                val adjustedWeight = (ASSESSMENT_WEIGHT * postureWeightMultiplier).toInt()
+                val postureLabel = posture.displayName()
                 dataPoints.add(
                     RateDataPoint(
                         source = DataPointSource.ASSESSMENT,
                         rateBpm = a.optimalBpm,
                         normalizedScore = normalized,
                         rawDisplayValue = a.compositeScore,
-                        sourceWeight = ASSESSMENT_WEIGHT,
+                        sourceWeight = adjustedWeight,
                         timestamp = a.timestamp,
-                        label = "Assessment (score %.1f)".format(a.compositeScore)
+                        label = "Assessment (score %.1f, $postureLabel)".format(a.compositeScore)
                     )
                 )
             }
@@ -144,15 +150,20 @@ class ResonanceRateRecommender @Inject constructor(
                 validSessionCount++
                 val normalized = (s.meanCoherenceRatio / COHERENCE_RATIO_CEILING).coerceIn(0f, 1f)
                 val durationLabel = "%d:%02d".format(s.durationSeconds / 60, s.durationSeconds % 60)
+                val posture = try { Posture.valueOf(s.posture) } catch (e: Exception) { Posture.LAYING }
+                // Sitting sessions get 1.5x weight, laying sessions get 1x
+                val postureWeightMultiplier = if (posture == Posture.SITTING) 1.5f else 1.0f
+                val adjustedWeight = (SESSION_WEIGHT * postureWeightMultiplier).toInt()
+                val postureLabel = posture.displayName()
                 dataPoints.add(
                     RateDataPoint(
                         source = DataPointSource.SESSION,
                         rateBpm = s.breathingRateBpm,
                         normalizedScore = normalized,
                         rawDisplayValue = s.meanCoherenceRatio,
-                        sourceWeight = SESSION_WEIGHT,
+                        sourceWeight = adjustedWeight,
                         timestamp = s.timestamp,
-                        label = "Session ($durationLabel)"
+                        label = "Session ($durationLabel, $postureLabel)"
                     )
                 )
             }

@@ -25,4 +25,6 @@ class ResonanceSessionRepository @Inject constructor(
     suspend fun deleteByTimestamp(timestamp: Long) = dao.deleteByTimestamp(timestamp)
 
     suspend fun deleteById(sessionId: Long) = dao.deleteById(sessionId)
+    
+    suspend fun updatePosture(sessionId: Long, posture: String) = dao.updatePosture(sessionId, posture)
 }

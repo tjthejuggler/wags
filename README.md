@@ -5,6 +5,31 @@
 ## Changelog
 
 
+### 2026-07-08 — Data-loss hardening: automatic daily backups + no time-based deletion
+
+**Fixed: Export "database is locked" error** ([`DataExportImportRepository.kt`](app/src/main/java/com/example/wags/data/repository/DataExportImportRepository.kt:78))
+- Root cause: `PRAGMA wal_checkpoint(FULL)` was wrapped in `database.runInTransaction { … }`. SQLite refuses to run a checkpoint while a transaction is open on the same connection and returns `SQLITE_LOCKED`, which surfaced to the user as "database is locked".
+- Fix: removed the `runInTransaction` wrapper and moved the checkpoint into a new helper [`checkpointWalForExport()`](app/src/main/java/com/example/wags/data/repository/DataExportImportRepository.kt:257) that runs `PRAGMA wal_checkpoint(TRUNCATE)` with a one-retry-on-busy loop. `TRUNCATE` (vs `FULL`) additionally shrinks the WAL to zero bytes on success so the copied `wags.db` is fully self-contained.
+
+**Added: Automatic daily on-device backup with rotation** ([`AutoBackupManager.kt`](app/src/main/java/com/example/wags/data/backup/AutoBackupManager.kt:29))
+- Writes one full-app-data ZIP per calendar day into `${filesDir}/auto_backups/wags_autobackup_YYYY-MM-DD.zip`.
+- Keeps the last **14** backups and prunes older ones automatically.
+- Runs from [`WagsApplication.onCreate`](app/src/main/java/com/example/wags/WagsApplication.kt:37) on the app-scoped `Dispatchers.IO` — never blocks UI startup, and any failure is swallowed and logged so a broken backup can never prevent the app from launching.
+- Skips silently if today's file already exists, so restarting the app multiple times on the same day is a no-op.
+- Reuses the exact same [`writeBackupZip()`](app/src/main/java/com/example/wags/data/repository/DataExportImportRepository.kt:127) core as the manual "Export" in Settings (DB + WAL + SHM + every SharedPreferences file, with the WAL checkpointed first), so backups are byte-for-byte compatible with manual exports.
+
+**Policy: No time-based data deletion, anywhere, ever** ([`MorningReadinessRepository.kt`](app/src/main/java/com/example/wags/data/repository/MorningReadinessRepository.kt:118), [`MorningReadinessDao.kt`](app/src/main/java/com/example/wags/data/db/dao/MorningReadinessDao.kt:55), [`DailyReadingDao.kt`](app/src/main/java/com/example/wags/data/db/dao/DailyReadingDao.kt:30))
+- `MorningReadinessRepository.pruneOldData()` was previously wired to delete `morning_readiness` rows older than 90 days. It is now a `@Deprecated` no-op and its two underlying `deleteOlderThan` DAO queries have been removed entirely (in `MorningReadinessDao` and `DailyReadingDao`) so they cannot be resurrected accidentally.
+- Verified via graph impact analysis: zero callers remained, and all other `DELETE FROM …` queries in the codebase are user-initiated ID-scoped deletes or CASCADE cleanups — none are time-based.
+
+#### Files Changed
+- **Modified**: [`DataExportImportRepository.kt`](app/src/main/java/com/example/wags/data/repository/DataExportImportRepository.kt) — Fixed checkpoint-inside-transaction bug; extracted [`writeBackupZip()`](app/src/main/java/com/example/wags/data/repository/DataExportImportRepository.kt:127) shared core; added [`exportToFile()`](app/src/main/java/com/example/wags/data/repository/DataExportImportRepository.kt:113) for the auto-backup path.
+- **Added**: [`AutoBackupManager.kt`](app/src/main/java/com/example/wags/data/backup/AutoBackupManager.kt) — new manager, one file, <150 lines.
+- **Modified**: [`WagsApplication.kt`](app/src/main/java/com/example/wags/WagsApplication.kt) — injects and triggers `autoBackupManager.runOnStartup()` from `onCreate`.
+- **Modified**: [`MorningReadinessRepository.kt`](app/src/main/java/com/example/wags/data/repository/MorningReadinessRepository.kt) — `pruneOldData()` neutered to a `@Deprecated` no-op.
+- **Modified**: [`MorningReadinessDao.kt`](app/src/main/java/com/example/wags/data/db/dao/MorningReadinessDao.kt) — removed `deleteOlderThan(cutoffMs)`.
+- **Modified**: [`DailyReadingDao.kt`](app/src/main/java/com/example/wags/data/db/dao/DailyReadingDao.kt) — removed `deleteOlderThan(beforeTimestamp)`.
+
 ### 2026-05-08 — Clean up Apnea History UI
 
 **Improved: Removed redundant top bar elements from Apnea History tabs** ([`ApneaHistoryScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaHistoryScreen.kt), [`AllApneaRecordsScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/AllApneaRecordsScreen.kt))

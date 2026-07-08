@@ -99,9 +99,24 @@ class MorningReadinessRepository @Inject constructor(
         return dao.getHooperTotalSince(since)
     }
 
-    // Cleanup old data (call periodically)
+    /**
+     * DISABLED: We never automatically delete user data.
+     *
+     * This function used to purge morning_readiness rows older than 90 days.
+     * It was retained by mistake and could silently destroy historical data if
+     * ever wired up. It is now a no-op and kept only so any old caller (there
+     * are currently none in the codebase) still compiles. The corresponding
+     * DAO query has also been removed — see MorningReadinessDao.
+     *
+     * User-initiated deletion of individual rows via `deleteById` remains
+     * available as normal.
+     */
+    @Deprecated(
+        "Time-based purging is disabled — the app must never automatically " +
+            "delete historical data. Use deleteById for user-initiated deletion.",
+        level = DeprecationLevel.WARNING
+    )
     suspend fun pruneOldData() {
-        val cutoff90Days = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(90)
-        dao.deleteOlderThan(cutoff90Days)
+        // Intentionally does nothing.
     }
 }

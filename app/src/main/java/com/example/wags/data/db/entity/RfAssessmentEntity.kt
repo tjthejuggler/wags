@@ -77,5 +77,8 @@ data class RfAssessmentEntity(
      * Used to render the power spectrum overlay on the result screen.
      */
     @ColumnInfo(defaultValue = "")
-    val powerSpectrumJson: String = ""
+    val powerSpectrumJson: String = "",
+    /** One of Posture enum names: SITTING, LAYING */
+    @ColumnInfo(defaultValue = "LAYING")
+    val posture: String = "LAYING"
 )
