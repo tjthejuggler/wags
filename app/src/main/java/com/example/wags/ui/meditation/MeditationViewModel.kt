@@ -507,9 +507,10 @@ class MeditationViewModel @Inject constructor(
         try {
             val intent = Intent(appContext, MeditationService::class.java).apply {
                 action = MeditationService.ACTION_STOP
+                putExtra(MeditationService.EXTRA_SHOULD_SAVE, false)
             }
             appContext.startService(intent)
-            Log.d("MeditationViewModel", "MeditationService stopped")
+            Log.d("MeditationViewModel", "MeditationService stopped (ViewModel handles save)")
         } catch (e: Exception) {
             Log.e("MeditationViewModel", "Failed to stop MeditationService", e)
         }

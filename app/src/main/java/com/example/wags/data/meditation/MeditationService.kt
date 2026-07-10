@@ -43,6 +43,7 @@ class MeditationService : Service() {
         const val EXTRA_AUDIO_DIR_URI = "audio_dir_uri"
         const val EXTRA_DURATION_SECONDS = "duration_seconds"
         const val EXTRA_MONITOR_ID = "monitor_id"
+        const val EXTRA_SHOULD_SAVE = "should_save"
     }
 
     @Inject
@@ -86,7 +87,8 @@ class MeditationService : Service() {
                 startSession(audioFileName, audioDirUri, monitorId, if (durationSeconds > 0) durationSeconds else null)
             }
             ACTION_STOP -> {
-                stopSession()
+                val shouldSave = intent.getBooleanExtra(EXTRA_SHOULD_SAVE, true)
+                stopSession(shouldSave)
             }
         }
         return START_STICKY
@@ -157,7 +159,7 @@ class MeditationService : Service() {
         Log.d("MeditationService", "Meditation session started")
     }
 
-    private fun stopSession() {
+    private fun stopSession(shouldSave: Boolean = true) {
         if (!isSessionActive) {
             Log.w("MeditationService", "No active session to stop")
             return
@@ -191,22 +193,30 @@ class MeditationService : Service() {
             }
         }
 
-        // Stop and process session
-        serviceScope.launch {
-            sessionRecorder.stopSession(durationMs) { savedId ->
-                Log.d("MeditationService", "Session saved with ID: $savedId")
-                // Update notification to show completion
-                val notification = buildNotification("Meditation session saved")
-                val manager = getSystemService(NotificationManager::class.java)
-                manager.notify(NOTIFICATION_ID, notification)
-                
-                // Stop foreground service after a short delay
-                serviceScope.launch {
-                    delay(2000)
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                    stopSelf()
+        // Stop and process session only if shouldSave is true
+        // (false means the ViewModel is handling the save)
+        if (shouldSave) {
+            serviceScope.launch {
+                sessionRecorder.stopSession(durationMs) { savedId ->
+                    Log.d("MeditationService", "Session saved with ID: $savedId")
+                    // Update notification to show completion
+                    val notification = buildNotification("Meditation session saved")
+                    val manager = getSystemService(NotificationManager::class.java)
+                    manager.notify(NOTIFICATION_ID, notification)
+                    
+                    // Stop foreground service after a short delay
+                    serviceScope.launch {
+                        delay(2000)
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                        stopSelf()
+                    }
                 }
             }
+        } else {
+            Log.d("MeditationService", "Session stopped without saving (ViewModel handles save)")
+            // Stop foreground service immediately
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
         }
 
         Log.d("MeditationService", "Meditation session stopped, duration: ${durationMs}ms")
