@@ -637,11 +637,9 @@ class ApneaViewModel @Inject constructor(
                     // Signal the Habit app that a full O2/CO2 table session was completed
                     habitRepo.sendHabitIncrement(Slot.TABLE_TRAINING)
                     val uiSnap = _uiState.value
-                    val tableEffectiveAudio = if (uiSnap.audio == AudioSetting.MUSIC && tableTracksPlayed.isEmpty()) {
-                        AudioSetting.SILENCE.name
-                    } else {
-                        uiSnap.audio.name
-                    }
+                    // Honor the user's explicit audio choice; never downgrade MUSIC
+                    // to SILENCE based on unreliable Spotify track tracking.
+                    val tableEffectiveAudio = uiSnap.audio.name
                     habitRepo.sendMusicHabitIncrementIfNeeded(tableEffectiveAudio, uiSnap.timeOfDay.name)
                 }
                 tableSessionCancelled = false
@@ -709,12 +707,9 @@ class ApneaViewModel @Inject constructor(
             //    so it appears in All Records, Stats, and Calendar.
             //    Duration = total hold time (sum of all hold durations).
             val totalHoldMs = table.steps.sumOf { it.apneaDurationMs }
-            // If MUSIC was selected but no song actually played, record as SILENCE.
-            val tableEffectiveAudio = if (state.audio == AudioSetting.MUSIC && tableTracksPlayed.isEmpty()) {
-                AudioSetting.SILENCE.name
-            } else {
-                state.audio.name
-            }
+            // Honor the user's explicit audio choice; never downgrade MUSIC to
+            // SILENCE based on unreliable Spotify track tracking.
+            val tableEffectiveAudio = state.audio.name
             val recordId = apneaRepository.saveRecord(
                 ApneaRecordEntity(
                     timestamp = now,
@@ -1115,12 +1110,9 @@ class ApneaViewModel @Inject constructor(
         if (state.audio == AudioSetting.GUIDED) {
             guidedAudioManager.stopPlayback()
         }
-        // If MUSIC was selected but no song played, treat as SILENCE for PB/save purposes.
-        val fhEffectiveAudio = if (state.audio == AudioSetting.MUSIC && tracksPlayed.isEmpty()) {
-            AudioSetting.SILENCE.name
-        } else {
-            state.audio.name
-        }
+        // Honor the user's explicit audio choice; never downgrade MUSIC to SILENCE
+        // based on unreliable Spotify track tracking.
+        val fhEffectiveAudio = state.audio.name
         // Signal the Habit app that a free breath hold was successfully completed
         habitRepo.sendHabitIncrement(Slot.FREE_HOLD)
         habitRepo.sendMusicHabitIncrementIfNeeded(fhEffectiveAudio, state.timeOfDay.name)
@@ -1195,12 +1187,9 @@ class ApneaViewModel @Inject constructor(
             val state = _uiState.value
             val now = System.currentTimeMillis()
 
-            // If MUSIC was selected but no song actually played, record as SILENCE.
-            val fhEffectiveAudio = if (state.audio == AudioSetting.MUSIC && tracksPlayed.isEmpty()) {
-                AudioSetting.SILENCE.name
-            } else {
-                state.audio.name
-            }
+            // Honor the user's explicit audio choice; never downgrade MUSIC to
+            // SILENCE based on unreliable Spotify track tracking.
+            val fhEffectiveAudio = state.audio.name
 
             // ── Save summary record ───────────────────────────────────────────
             val recordId = apneaRepository.saveRecord(

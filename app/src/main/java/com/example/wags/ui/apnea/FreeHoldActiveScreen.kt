@@ -1004,13 +1004,10 @@ class FreeHoldActiveViewModel @Inject constructor(
             val guidedState = _uiState.value
             val wasGuided = guidedState.guidedHyperEnabled && isHyperPrep
 
-            // If MUSIC was selected but no song actually played, record as SILENCE
-            // so the session is not mis-categorised in history/stats.
-            val effectiveAudio = if (audio == AudioSetting.MUSIC.name && tracksPlayed.isEmpty()) {
-                AudioSetting.SILENCE.name
-            } else {
-                audio
-            }
+            // Honor the user's explicit audio choice; never downgrade MUSIC to
+            // SILENCE based on unreliable Spotify track tracking. The user's setting
+            // is authoritative.
+            val effectiveAudio = audio
 
             // Use the settings that were baked in at navigation time — guaranteed correct
             // Capture PB indication state at save time

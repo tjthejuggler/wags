@@ -811,12 +811,10 @@ class ProgressiveO2ViewModel @Inject constructor(
         val posture = currentState.posture
         val audio = currentState.audio
 
-        // If MUSIC was selected but no song actually played, record as SILENCE.
-        val effectiveAudio = if (audio == AudioSetting.MUSIC.name && trackedSongs.isEmpty()) {
-            AudioSetting.SILENCE.name
-        } else {
-            audio
-        }
+        // Honor the user's explicit audio choice. Never downgrade MUSIC to SILENCE
+        // based on Spotify track tracking, which is unreliable and caused music
+        // sessions to be mis-recorded as silent. The user's setting is authoritative.
+        val effectiveAudio = audio
 
         // Check broader PB BEFORE saving so queries compare against prior records only
         val drill = DrillContext.progressiveO2(breathPeriodSec)
