@@ -57,6 +57,7 @@ fun BreathingPacerCircle(
     showLabel: Boolean = true,
     overlayLabel: String? = null,
     useColors: Boolean = false,
+    breathCycleCount: Int = 0,
     onPhaseTransition: ((isInhaling: Boolean) -> Unit)? = null
 ) {
     // Fire the callback exactly once per phase change
@@ -127,7 +128,9 @@ fun BreathingPacerCircle(
         // Label is always visible and never removed from the composition tree.
         // The color animates smoothly between the phase color (when the inner
         // circle is small) and a contrasting color (when the inner circle is large).
-        if (showLabel) {
+        // Hide label after 4 breath cycles (8 phase transitions)
+        val shouldShowLabel = showLabel && (breathCycleCount < 4 || overlayLabel != null)
+        if (shouldShowLabel) {
             Text(
                 text = label,
                 style = MaterialTheme.typography.titleLarge.copy(

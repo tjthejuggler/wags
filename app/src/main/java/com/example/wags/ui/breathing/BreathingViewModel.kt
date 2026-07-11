@@ -77,12 +77,22 @@ data class BreathingUiState(
     val rrCount: Int = 0,
     /** Recent RR intervals (ms) for the scrolling chart — last ~45 values. */
     val liveRrIntervals: List<Double> = emptyList(),
+    /** All RR intervals collected during the session for long-term chart. */
+    val allSessionRrIntervals: List<Double> = emptyList(),
 
     // ── Coherence ratio (real-time) ──────────────────────────────────────────
     /** Live coherence ratio updated every 5 seconds during session. */
     val liveCoherenceRatio: Float = 0f,
     /** History of coherence ratio samples for the coherence-over-time chart. */
     val coherenceHistory: List<Float> = emptyList(),
+
+    // ── RMSSD history ─────────────────────────────────────────────────────────
+    /** History of RMSSD values for the long-term chart. */
+    val rmssdHistory: List<Float> = emptyList(),
+
+    // ── Breath cycle tracking ────────────────────────────────────────────────
+    /** Number of completed breath cycles (for hiding labels after initial cycles). */
+    val breathCycleCount: Int = 0,
 
     // ── Session points / gamification ────────────────────────────────────────
     /** Accumulated session points (1 pt per second in high coherence, 0.5 in medium). */
@@ -427,17 +437,29 @@ class BreathingViewModel @Inject constructor(
 
     private fun startPacerLoop() {
         pacerJob = viewModelScope.launch {
+            var lastInhalingState = _uiState.value.isInhaling
+            var cycleCount = 0
+            
             while (isActive) {
                 delay(16L) // ~60 FPS
                 val state = _uiState.value
                 pacerEngine.tick(state.breathingRateBpm, state.ieRatio)
                 val radius = pacerEngine.getPacerRadius(state.ieRatio)
                 val label = pacerEngine.breathPhaseLabel.value
+                val currentInhaling = label == "INHALE"
+                
+                // Count breath cycles (phase transitions)
+                if (currentInhaling != lastInhalingState) {
+                    cycleCount++
+                    lastInhalingState = currentInhaling
+                }
+                
                 _uiState.update {
                     it.copy(
                         pacerRadius = radius,
-                        isInhaling = label == "INHALE",
-                        breathPhaseLabel = label
+                        isInhaling = currentInhaling,
+                        breathPhaseLabel = label,
+                        breathCycleCount = cycleCount
                     )
                 }
             }
@@ -572,12 +594,32 @@ class BreathingViewModel @Inject constructor(
                 val liveRmssd = computeLiveRmssd(snapshot)
                 val liveSdnn = computeLiveSdnn(snapshot)
                 val chartRr = if (totalNew > 0) deviceManager.rrBuffer.readLast(45.coerceAtMost(totalNew)) else emptyList()
+                
+                // Get all session RR intervals for long-term chart (sampled to avoid too many points)
+                val allRr = synchronized(allSessionRrIntervals) { allSessionRrIntervals.toList() }
+                val sampledAllRr = if (allRr.size > 200) {
+                    // Sample every Nth point to keep chart performant
+                    val step = (allRr.size / 200).coerceAtLeast(1)
+                    allRr.filterIndexed { index, _ -> index % step == 0 }
+                } else {
+                    allRr
+                }
+                
+                // Track RMSSD history for long-term chart
+                val rmssdHistory = if (liveRmssd != null) {
+                    _uiState.value.rmssdHistory + liveRmssd
+                } else {
+                    _uiState.value.rmssdHistory
+                }
+                
                 _uiState.update {
                     it.copy(
                         liveRmssd = liveRmssd,
                         liveSdnn = liveSdnn,
                         rrCount = allSessionRrIntervals.size,
-                        liveRrIntervals = chartRr
+                        liveRrIntervals = chartRr,
+                        allSessionRrIntervals = sampledAllRr,
+                        rmssdHistory = rmssdHistory
                     )
                 }
             }
