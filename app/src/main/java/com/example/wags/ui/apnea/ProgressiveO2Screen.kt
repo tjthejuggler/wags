@@ -516,7 +516,7 @@ private fun BreathPeriodHistorySection(
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "Max hold: ${formatSeconds(item.maxHoldReachedSec)}",
+                            text = "Total hold: ${formatSeconds(item.maxHoldReachedSec)}",
                             style = MaterialTheme.typography.bodyMedium,
                             color = TextSecondary
                         )

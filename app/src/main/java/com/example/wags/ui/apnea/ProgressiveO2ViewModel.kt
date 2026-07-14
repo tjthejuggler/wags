@@ -566,6 +566,10 @@ class ProgressiveO2ViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val allRecords = apneaRepository.getAllRecordsOnce()
+                val allSessions = sessionRepository.getAllSessionsOnce()
+                // Create a map of timestamp -> session for quick lookup
+                val sessionMap = allSessions.associateBy { it.timestamp }
+                
                 val s = _uiState.value
                 val filtered = allRecords
                     .filter { it.tableType == "PROGRESSIVE_O2" }
@@ -578,7 +582,7 @@ class ProgressiveO2ViewModel @Inject constructor(
                         if (s.filterAudio.isNotEmpty()) result = result.filter { it.audio == s.filterAudio }
                         result
                     }
-                val history = buildBreathPeriodHistoryFromRecords(filtered)
+                val history = buildBreathPeriodHistoryFromRecords(filtered, sessionMap)
                 _uiState.update { it.copy(pastBreathPeriods = history) }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to load breath period history", e)
@@ -798,10 +802,8 @@ class ProgressiveO2ViewModel @Inject constructor(
         )
         val sessionId = sessionRepository.saveSession(sessionEntity)
 
-        // 2. Save ApneaRecordEntity (longest completed hold as durationMs)
-        val longestCompletedHoldMs = finalState.roundResults
-            .filter { it.completed }
-            .maxOfOrNull { it.targetHoldMs } ?: 0L
+        // 2. Save ApneaRecordEntity (total hold time across all rounds as durationMs)
+        val totalHoldTimeMs = finalState.totalHoldTimeMs
 
         // Use settings from UI state (already in sync with SharedPreferences)
         val currentState = _uiState.value
@@ -818,9 +820,9 @@ class ProgressiveO2ViewModel @Inject constructor(
 
         // Check broader PB BEFORE saving so queries compare against prior records only
         val drill = DrillContext.progressiveO2(breathPeriodSec)
-        val pbResult = if (longestCompletedHoldMs > 0L) {
+        val pbResult = if (totalHoldTimeMs > 0L) {
             apneaRepository.checkBroaderPersonalBest(
-                drill, longestCompletedHoldMs, lungVolume, prepType, timeOfDay, posture, effectiveAudio
+                drill, totalHoldTimeMs, lungVolume, prepType, timeOfDay, posture, effectiveAudio
             )
         } else null
 
@@ -830,7 +832,7 @@ class ProgressiveO2ViewModel @Inject constructor(
         val recordId = apneaRepository.saveRecord(
             ApneaRecordEntity(
                 timestamp = now,
-                durationMs = longestCompletedHoldMs,
+                durationMs = totalHoldTimeMs,
                 lungVolume = lungVolume,
                 prepType = prepType,
                 minHrBpm = minHr?.toFloat() ?: 0f,
@@ -925,19 +927,44 @@ class ProgressiveO2ViewModel @Inject constructor(
     }
 
     private fun buildBreathPeriodHistoryFromRecords(
-        records: List<ApneaRecordEntity>
+        records: List<ApneaRecordEntity>,
+        sessionMap: Map<Long, ApneaSessionEntity>
     ): List<BreathPeriodHistory> {
-        // Each record has drillParamValue = breathPeriodSec and durationMs = longest completed hold
-        return records
-            .filter { it.drillParamValue != null && it.drillParamValue > 0 }
-            .groupBy { it.drillParamValue!! }
+        // Calculate total hold time from session data for each record
+        data class RecordWithTotalHold(
+            val record: ApneaRecordEntity,
+            val totalHoldMs: Long
+        )
+        
+        val recordsWithTotalHold = records.mapNotNull { record ->
+            val session = sessionMap[record.timestamp]
+            if (session == null) null else {
+                val totalHoldMs = try {
+                    val json = org.json.JSONObject(session.tableParamsJson)
+                    val roundsArray = json.optJSONArray("rounds") ?: return@mapNotNull null
+                    var total = 0L
+                    for (i in 0 until roundsArray.length()) {
+                        val r = roundsArray.getJSONObject(i)
+                        total += r.optLong("actualMs", 0L)
+                    }
+                    total
+                } catch (e: Exception) {
+                    0L
+                }
+                RecordWithTotalHold(record, totalHoldMs)
+            }
+        }
+        
+        return recordsWithTotalHold
+            .filter { it.record.drillParamValue != null && it.record.drillParamValue > 0 }
+            .groupBy { it.record.drillParamValue!! }
             .map { (bp, group) ->
-                val maxEntry = group.maxByOrNull { it.durationMs }
+                val maxEntry = group.maxByOrNull { it.totalHoldMs }
                 BreathPeriodHistory(
                     breathPeriodSec = bp,
-                    maxHoldReachedSec = if (maxEntry != null) (maxEntry.durationMs / 1000).toInt() else 0,
+                    maxHoldReachedSec = if (maxEntry != null) (maxEntry.totalHoldMs / 1000).toInt() else 0,
                     sessionCount = group.size,
-                    maxHoldRecordId = maxEntry?.recordId ?: -1L
+                    maxHoldRecordId = maxEntry?.record?.recordId ?: -1L
                 )
             }
             .sortedBy { it.breathPeriodSec }
@@ -946,8 +973,8 @@ class ProgressiveO2ViewModel @Inject constructor(
     private suspend fun buildBreathPeriodHistory(
         sessions: List<ApneaSessionEntity>
     ): List<BreathPeriodHistory> {
-        // Parse each session's tableParamsJson to extract breathPeriodSec and max completed hold
-        data class Parsed(val breathPeriodSec: Int, val maxCompletedHoldSec: Int, val sessionId: Long, val timestamp: Long)
+        // Parse each session's tableParamsJson to extract breathPeriodSec and total hold time
+        data class Parsed(val breathPeriodSec: Int, val totalHoldSec: Int, val sessionId: Long, val timestamp: Long)
 
         val parsed = sessions.mapNotNull { entity ->
             try {
@@ -955,32 +982,31 @@ class ProgressiveO2ViewModel @Inject constructor(
                 val breathPeriod = json.optInt("breathPeriodSec", 60)
                 val roundsArray = json.optJSONArray("rounds") ?: JSONArray()
 
-                var maxHoldMs = 0L
+                var totalHoldMs = 0L
                 for (i in 0 until roundsArray.length()) {
                     val r = roundsArray.getJSONObject(i)
-                    if (r.optBoolean("completed", false)) {
-                        val targetMs = r.optLong("targetMs", 0L)
-                        if (targetMs > maxHoldMs) maxHoldMs = targetMs
-                    }
+                    // Sum actual hold time from all rounds (both completed and partial)
+                    val actualMs = r.optLong("actualMs", 0L)
+                    totalHoldMs += actualMs
                 }
-                Parsed(breathPeriod, (maxHoldMs / 1000).toInt(), entity.sessionId, entity.timestamp)
+                Parsed(breathPeriod, (totalHoldMs / 1000).toInt(), entity.sessionId, entity.timestamp)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to parse session ${entity.sessionId}", e)
                 null
             }
         }
 
-        // Group by breath period, compute max hold and session count
+        // Group by breath period, compute max total hold and session count
         return parsed.groupBy { it.breathPeriodSec }
             .map { (bp, group) ->
-                val maxEntry = group.maxByOrNull { it.maxCompletedHoldSec }
+                val maxEntry = group.maxByOrNull { it.totalHoldSec }
                 // Resolve the record ID from the session's timestamp + table type
                 val recordId = if (maxEntry != null) {
                     apneaRepository.getRecordByTimestampAndType(maxEntry.timestamp, "PROGRESSIVE_O2")?.recordId ?: -1L
                 } else -1L
                 BreathPeriodHistory(
                     breathPeriodSec = bp,
-                    maxHoldReachedSec = maxEntry?.maxCompletedHoldSec ?: 0,
+                    maxHoldReachedSec = maxEntry?.totalHoldSec ?: 0,
                     sessionCount = group.size,
                     maxHoldRecordId = recordId
                 )

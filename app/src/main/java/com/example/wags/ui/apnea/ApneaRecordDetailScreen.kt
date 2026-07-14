@@ -595,9 +595,19 @@ private fun RecordDetailContent(
                 DetailRow(label = "Date", value = dateStr)
                 if (record.tableType == null || record.tableType == "PROGRESSIVE_O2" ||
                     record.tableType == "WONKA_FIRST_CONTRACTION" || record.tableType == "WONKA_ENDURANCE") {
+                    val durationLabel = when (record.tableType) {
+                        "PROGRESSIVE_O2" -> "Total Hold Time"
+                        else -> "Duration"
+                    }
+                    // For Progressive O2, calculate total hold time from session data
+                    val displayDurationMs = if (record.tableType == "PROGRESSIVE_O2" && tableSession != null) {
+                        calculateProgressiveO2TotalHoldTime(tableSession.tableParamsJson)
+                    } else {
+                        record.durationMs
+                    }
                     DetailRow(
-                        label = "Duration",
-                        value = formatMsDetail(record.durationMs),
+                        label = durationLabel,
+                        value = formatMsDetail(displayDurationMs),
                         valueColor = TextPrimary,
                         valueBold = true
                     )
@@ -1415,6 +1425,26 @@ private fun formatMsDetail(ms: Long): String {
         "${minutes}m ${seconds}s ${centis}cs"
     else
         "${seconds}.${centis.toString().padStart(2, '0')}s"
+}
+
+/**
+ * Calculate total hold time from Progressive O₂ tableParamsJson.
+ * Sums up all actualMs values from the rounds array.
+ */
+private fun calculateProgressiveO2TotalHoldTime(jsonStr: String): Long {
+    return try {
+        val root = JSONObject(jsonStr)
+        val roundsArray = root.optJSONArray("rounds") ?: return 0L
+        var totalHoldMs = 0L
+        for (i in 0 until roundsArray.length()) {
+            val r = roundsArray.getJSONObject(i)
+            val actualMs = r.optLong("actualMs", 0L)
+            totalHoldMs += actualMs
+        }
+        totalHoldMs
+    } catch (_: Exception) {
+        0L
+    }
 }
 
 /**
