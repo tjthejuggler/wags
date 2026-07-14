@@ -96,6 +96,9 @@ dependencies {
     // Vico Charts
     implementation(libs.vico.compose)
 
+    // Material Icons Extended
+    implementation("androidx.compose.material:material-icons-extended:1.7.6")
+
     // OkHttp – used for Spotify Web API calls (PKCE token exchange, playback control)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 

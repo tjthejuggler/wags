@@ -5,6 +5,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material.icons.filled.PhoneVibrate
+import androidx.compose.material.icons.outlined.PhoneVibrate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -107,6 +112,7 @@ private fun ProgressiveO2ActiveScreenContent(
             ProgressiveO2Phase.BREATHING -> ActiveContent(
                 modifier = Modifier.padding(padding),
                 state = state,
+                viewModel = viewModel,
                 onFirstContraction = { viewModel.logFirstContraction() },
                 onStop = { viewModel.stopSession() }
             )
@@ -147,6 +153,7 @@ private fun IdleContent(modifier: Modifier) {
 private fun ActiveContent(
     modifier: Modifier,
     state: ProgressiveO2UiState,
+    viewModel: ProgressiveO2ViewModel,
     onFirstContraction: () -> Unit,
     onStop: () -> Unit
 ) {
@@ -215,6 +222,59 @@ private fun ActiveContent(
 
         // ── Live HR / SpO₂ ──────────────────────────────────────────────
         LiveVitals(hr = state.liveHr, spo2 = state.liveSpO2)
+
+        // ── Voice / Vibration toggles ────────────────────────────────────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Voice toggle
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = state.voiceEnabled,
+                    onCheckedChange = { viewModel.setVoiceEnabled(it) },
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = ButtonPrimary,
+                        uncheckedColor = TextSecondary
+                    )
+                )
+                Spacer(Modifier.width(8.dp))
+                Icon(
+                    imageVector = if (state.voiceEnabled) Icons.Filled.Notifications else Icons.Filled.NotificationsOff,
+                    contentDescription = null,
+                    tint = if (state.voiceEnabled) ButtonPrimary else TextSecondary
+                )
+            }
+
+            // Vibration toggle
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = state.vibrationEnabled,
+                    onCheckedChange = { viewModel.setVibrationEnabled(it) },
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = ButtonPrimary,
+                        uncheckedColor = TextSecondary
+                    )
+                )
+                Spacer(Modifier.width(8.dp))
+                Icon(
+                    imageVector = if (state.vibrationEnabled) Icons.Filled.PhoneVibrate else Icons.Outlined.PhoneVibrate,
+                    contentDescription = null,
+                    tint = if (state.vibrationEnabled) ButtonPrimary else TextSecondary
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
 
         // ── Large "First Contraction" button during HOLD phase ──────────
         if (phase == ProgressiveO2Phase.HOLD) {
