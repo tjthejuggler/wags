@@ -8,8 +8,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
-import androidx.compose.material.icons.filled.PhoneVibrate
-import androidx.compose.material.icons.outlined.PhoneVibrate
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -267,7 +267,7 @@ private fun ActiveContent(
                 )
                 Spacer(Modifier.width(8.dp))
                 Icon(
-                    imageVector = if (state.vibrationEnabled) Icons.Filled.PhoneVibrate else Icons.Outlined.PhoneVibrate,
+                    imageVector = if (state.vibrationEnabled) Icons.Filled.Settings else Icons.Outlined.Settings,
                     contentDescription = null,
                     tint = if (state.vibrationEnabled) ButtonPrimary else TextSecondary
                 )
