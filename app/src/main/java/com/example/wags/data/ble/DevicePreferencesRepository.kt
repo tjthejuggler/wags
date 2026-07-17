@@ -2,6 +2,7 @@ package com.example.wags.data.ble
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.example.wags.domain.model.Posture
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -112,6 +113,12 @@ class DevicePreferencesRepository @Inject constructor(
         get() = prefs.getString(KEY_MEDITATION_DIR_URI, "") ?: ""
         set(value) = prefs.edit().putString(KEY_MEDITATION_DIR_URI, value).apply()
 
+    // ── Resonance breathing posture ────────────────────────────────────────────
+
+    var resonanceBreathingPosture: String
+        get() = prefs.getString(KEY_RESONANCE_POSTURE, Posture.LAYING.name) ?: Posture.LAYING.name
+        set(value) = prefs.edit().putString(KEY_RESONANCE_POSTURE, value).apply()
+
     // ── Reactive snapshot for UI ───────────────────────────────────────────────
 
     private val _snapshot = MutableStateFlow(buildSnapshot())
@@ -124,7 +131,8 @@ class DevicePreferencesRepository @Inject constructor(
     private fun buildSnapshot() = DevicePrefsSnapshot(
         savedPolarId          = savedPolarId,
         savedOximeterAddress  = savedOximeterAddress,
-        meditationAudioDirUri = meditationAudioDirUri
+        meditationAudioDirUri = meditationAudioDirUri,
+        resonanceBreathingPosture = resonanceBreathingPosture
     )
 
     // ── Internal helpers ───────────────────────────────────────────────────────
@@ -187,6 +195,7 @@ class DevicePreferencesRepository @Inject constructor(
         private const val KEY_OXIMETER_ADDR_LEGACY = "oximeter_address"
 
         const val KEY_MEDITATION_DIR_URI = "meditation_audio_dir_uri"
+        const val KEY_RESONANCE_POSTURE = "resonance_breathing_posture"
 
         private const val KEY_LABEL_MIGRATION_VERSION = "device_label_migration_version"
         private const val KEY_UNIFIED_MIGRATION_DONE = "unified_device_migration_done"
@@ -294,7 +303,8 @@ data class SavedDevice(
 data class DevicePrefsSnapshot(
     val savedPolarId: String,
     val savedOximeterAddress: String,
-    val meditationAudioDirUri: String = ""
+    val meditationAudioDirUri: String = "",
+    val resonanceBreathingPosture: String = Posture.LAYING.name
 ) {
     val savedH10Id: String get() = savedPolarId
     val savedVerityId: String get() = ""

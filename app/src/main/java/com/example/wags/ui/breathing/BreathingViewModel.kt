@@ -3,6 +3,7 @@ package com.example.wags.ui.breathing
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.AccRespirationEngine
+import com.example.wags.data.ble.DevicePreferencesRepository
 import com.example.wags.data.ble.HrDataSource
 import com.example.wags.data.ble.UnifiedDeviceManager
 import com.example.wags.data.db.entity.ResonanceSessionEntity
@@ -154,6 +155,7 @@ class BreathingViewModel @Inject constructor(
     private val rfAssessmentRepo: RfAssessmentRepository,
     private val resonanceSessionRepo: ResonanceSessionRepository,
     private val rateRecommender: ResonanceRateRecommender,
+    private val devicePrefs: DevicePreferencesRepository,
     @MathDispatcher private val mathDispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
@@ -201,6 +203,7 @@ class BreathingViewModel @Inject constructor(
 
     init {
         loadBestBreathingRate()
+        loadSavedPosture()
     }
 
     /**
@@ -250,6 +253,17 @@ class BreathingViewModel @Inject constructor(
 
     fun setPosture(posture: Posture) {
         _uiState.update { it.copy(posture = posture) }
+        devicePrefs.resonanceBreathingPosture = posture.name
+    }
+
+    private fun loadSavedPosture() {
+        val savedPostureName = devicePrefs.resonanceBreathingPosture
+        val savedPosture = try {
+            Posture.valueOf(savedPostureName)
+        } catch (e: IllegalArgumentException) {
+            Posture.LAYING
+        }
+        _uiState.update { it.copy(posture = savedPosture) }
     }
 
     fun startSession(deviceId: String) {
