@@ -187,7 +187,7 @@ class DebugNoteRepository @Inject constructor(
         val queued = _queue.value
         if (queued.isEmpty()) return@withContext
         _queue.value = emptyList()
-        debugPrefs.saveQueuedNotes(_queue.value)
+        debugPrefs.saveQueuedNotes(queued)
 
         // Write ONLY the newly submitted notes — replace the file entirely
         val entries = queued.map { qn ->
@@ -315,6 +315,7 @@ class DebugNoteRepository @Inject constructor(
             val jsonText = JSONObject().apply { put("notes", arr) }.toString(2)
 
             val dirUri = debugPrefs.debugFileDirUri
+            Log.d(TAG, "Writing ${entries.size} debug note(s). debugFileDirUri is ${if (dirUri.isBlank()) "blank (will use internal storage)" else "set to: $dirUri"}")
             if (dirUri.isNotBlank()) {
                 writeToSaf(dirUri, jsonText)
             } else {
@@ -327,26 +328,41 @@ class DebugNoteRepository @Inject constructor(
 
     private fun writeToInternal(jsonText: String) {
         val file = File(context.filesDir, FILE_NAME)
+        Log.d(TAG, "Writing to internal storage: ${file.absolutePath}")
         file.writeText(jsonText)
+        Log.d(TAG, "Successfully wrote ${jsonText.length} bytes to ${file.absolutePath}")
     }
 
     private fun writeToSaf(dirUriString: String, jsonText: String) {
         val dirUri = Uri.parse(dirUriString)
+        Log.d(TAG, "Attempting to write to SAF directory: $dirUriString")
         val docFile = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, dirUri)
             ?: run {
                 Log.e(TAG, "Cannot access SAF directory, falling back to internal")
                 writeToInternal(jsonText)
                 return
             }
-        docFile.findFile(FILE_NAME)?.delete()
-        val newFile = docFile.createFile("application/json", FILE_NAME) ?: run {
-            Log.e(TAG, "Cannot create file in SAF directory, falling back to internal")
-            writeToInternal(jsonText)
-            return
+        
+        // Try to find existing file first
+        val existingFile = docFile.findFile(FILE_NAME)
+        val targetFile = if (existingFile != null) {
+            Log.d(TAG, "Found existing SAF file: ${existingFile.uri}")
+            existingFile
+        } else {
+            // Create new file if it doesn't exist
+            Log.d(TAG, "Creating new SAF file")
+            docFile.createFile("application/json", FILE_NAME) ?: run {
+                Log.e(TAG, "Cannot create file in SAF directory, falling back to internal")
+                writeToInternal(jsonText)
+                return
+            }
         }
-        context.contentResolver.openOutputStream(newFile.uri)?.use { os ->
+        
+        Log.d(TAG, "Writing to SAF file: ${targetFile.uri}")
+        context.contentResolver.openOutputStream(targetFile.uri)?.use { os ->
             os.write(jsonText.toByteArray(Charsets.UTF_8))
             os.flush()
+            Log.d(TAG, "Successfully wrote ${jsonText.length} bytes to SAF file: ${targetFile.uri}")
         } ?: run {
             Log.e(TAG, "Cannot open output stream, falling back to internal")
             writeToInternal(jsonText)
