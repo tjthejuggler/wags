@@ -5,11 +5,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.NotificationsOff
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,6 +21,7 @@ import com.example.wags.ui.apnea.pip.ProgressiveO2PipContent
 import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.LiveSensorActionsNav
 import com.example.wags.ui.common.SessionBackHandler
+import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.common.pip.PipSessionHost
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
@@ -220,59 +216,15 @@ private fun ActiveContent(
             color = TextSecondary
         )
 
-        // ── Live HR / SpO₂ ──────────────────────────────────────────────
-        LiveVitals(hr = state.liveHr, spo2 = state.liveSpO2)
-
-        // ── Voice / Vibration toggles ────────────────────────────────────
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Voice toggle
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Checkbox(
-                    checked = state.voiceEnabled,
-                    onCheckedChange = { viewModel.setVoiceEnabled(it) },
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = ButtonPrimary,
-                        uncheckedColor = TextSecondary
-                    )
-                )
-                Spacer(Modifier.width(8.dp))
-                Icon(
-                    imageVector = if (state.voiceEnabled) Icons.Filled.Notifications else Icons.Filled.NotificationsOff,
-                    contentDescription = null,
-                    tint = if (state.voiceEnabled) ButtonPrimary else TextSecondary
-                )
-            }
-
-            // Vibration toggle
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Checkbox(
-                    checked = state.vibrationEnabled,
-                    onCheckedChange = { viewModel.setVibrationEnabled(it) },
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = ButtonPrimary,
-                        uncheckedColor = TextSecondary
-                    )
-                )
-                Spacer(Modifier.width(8.dp))
-                Icon(
-                    imageVector = if (state.vibrationEnabled) Icons.Filled.Settings else Icons.Outlined.Settings,
-                    contentDescription = null,
-                    tint = if (state.vibrationEnabled) ButtonPrimary else TextSecondary
-                )
-            }
-        }
+        // ── Live HR / SpO₂ with Voice/Vibration toggles ─────────────────
+        LiveVitals(
+            hr = state.liveHr,
+            spo2 = state.liveSpO2,
+            voiceEnabled = state.voiceEnabled,
+            vibrationEnabled = state.vibrationEnabled,
+            onVoiceToggle = { viewModel.setVoiceEnabled(!state.voiceEnabled) },
+            onVibrationToggle = { viewModel.setVibrationEnabled(!state.vibrationEnabled) }
+        )
 
         Spacer(Modifier.height(16.dp))
 
@@ -415,17 +367,49 @@ private fun CompleteContent(
 // ── Shared sub-composables ──────────────────────────────────────────────────
 
 @Composable
-private fun LiveVitals(hr: Int?, spo2: Int?) {
-    if (hr == null && spo2 == null) return
+private fun LiveVitals(
+    hr: Int?,
+    spo2: Int?,
+    voiceEnabled: Boolean,
+    vibrationEnabled: Boolean,
+    onVoiceToggle: () -> Unit,
+    onVibrationToggle: () -> Unit
+) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(24.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.padding(top = 8.dp)
     ) {
         if (hr != null) {
-            Text("❤️ $hr bpm", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+            Text("❤️ $hr", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
         }
         if (spo2 != null) {
             Text("SpO₂ $spo2%", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+        }
+        
+        // Voice toggle
+        IconButton(
+            onClick = onVoiceToggle,
+            modifier = Modifier.size(32.dp)
+        ) {
+            Text(
+                text = "🔊",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = if (!voiceEnabled) Modifier.grayscale() else Modifier,
+                color = if (voiceEnabled) TextPrimary else TextDisabled
+            )
+        }
+        
+        // Vibration toggle
+        IconButton(
+            onClick = onVibrationToggle,
+            modifier = Modifier.size(32.dp)
+        ) {
+            Text(
+                text = "〰",
+                style = MaterialTheme.typography.titleLarge,
+                color = if (vibrationEnabled) TextPrimary else TextDisabled
+            )
         }
     }
 }
