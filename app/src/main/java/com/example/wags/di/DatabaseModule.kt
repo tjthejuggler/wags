@@ -75,7 +75,8 @@ object DatabaseModule {
                 WagsDatabase.MIGRATION_33_34,
                 WagsDatabase.MIGRATION_34_35,
                 WagsDatabase.MIGRATION_35_36,
-                WagsDatabase.MIGRATION_36_37
+                WagsDatabase.MIGRATION_36_37,
+                WagsDatabase.MIGRATION_37_38
             )
             .build()
 

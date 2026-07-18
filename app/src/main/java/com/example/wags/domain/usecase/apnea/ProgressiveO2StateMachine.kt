@@ -28,8 +28,10 @@ data class ProgressiveO2State(
     val holdDurationMs: Long = 0L,
     /** User-configured breath period (ms). */
     val breathDurationMs: Long = 0L,
-    /** Cumulative time spent holding across all rounds (ms). */
+    /** Cumulative time spent holding across all completed rounds (ms). */
     val totalHoldTimeMs: Long = 0L,
+    /** Real-time total hold time including current in-progress hold (ms). Updated frequently during countdown. */
+    val realTimeTotalHoldTimeMs: Long = 0L,
     /** Completed round data for serialisation into tableParamsJson. */
     val roundResults: List<ProgressiveO2RoundResult> = emptyList(),
     /** Epoch ms when first contraction was logged (null if not yet). */
@@ -71,7 +73,7 @@ class ProgressiveO2StateMachine @Inject constructor() {
      */
     fun start(breathPeriodMs: Long, scope: CoroutineScope) {
         this.scope = scope
-        _state.value = ProgressiveO2State(breathDurationMs = breathPeriodMs)
+        _state.value = ProgressiveO2State(breathDurationMs = breathPeriodMs, realTimeTotalHoldTimeMs = 0L)
         startHoldRound(1)
     }
 
@@ -102,14 +104,21 @@ class ProgressiveO2StateMachine @Inject constructor() {
                 _state.value = current.copy(
                     phase = ProgressiveO2Phase.COMPLETE,
                     totalHoldTimeMs = current.totalHoldTimeMs + elapsed,
+                    realTimeTotalHoldTimeMs = current.totalHoldTimeMs + elapsed,
                     roundResults = current.roundResults + partialResult
                 )
             }
             ProgressiveO2Phase.BREATHING -> {
-                _state.value = current.copy(phase = ProgressiveO2Phase.COMPLETE)
+                _state.value = current.copy(
+                    phase = ProgressiveO2Phase.COMPLETE,
+                    realTimeTotalHoldTimeMs = current.totalHoldTimeMs
+                )
             }
             else -> {
-                _state.value = current.copy(phase = ProgressiveO2Phase.COMPLETE)
+                _state.value = current.copy(
+                    phase = ProgressiveO2Phase.COMPLETE,
+                    realTimeTotalHoldTimeMs = current.totalHoldTimeMs
+                )
             }
         }
     }
@@ -135,7 +144,8 @@ class ProgressiveO2StateMachine @Inject constructor() {
             holdDurationMs = holdMs,
             timerMs = holdMs,
             firstContractionMs = null,  // reset so button is available each hold
-            holdStartEpochMs = System.currentTimeMillis()
+            holdStartEpochMs = System.currentTimeMillis(),
+            realTimeTotalHoldTimeMs = _state.value.totalHoldTimeMs  // Start of new hold, real-time equals completed
         )
         runCountdown(holdMs) { onHoldComplete(round, holdMs) }
     }
@@ -153,10 +163,12 @@ class ProgressiveO2StateMachine @Inject constructor() {
             contractionElapsedMs = contractionElapsed
         )
         val breathMs = current.breathDurationMs
+        val newTotalHoldTimeMs = current.totalHoldTimeMs + holdMs
         _state.value = current.copy(
             phase = ProgressiveO2Phase.BREATHING,
             timerMs = breathMs,
-            totalHoldTimeMs = current.totalHoldTimeMs + holdMs,
+            totalHoldTimeMs = newTotalHoldTimeMs,
+            realTimeTotalHoldTimeMs = newTotalHoldTimeMs,
             roundResults = current.roundResults + result
         )
         runCountdown(breathMs) { startHoldRound(round + 1) }
@@ -166,10 +178,25 @@ class ProgressiveO2StateMachine @Inject constructor() {
         timerJob?.cancel()
         timerJob = scope?.launch {
             var remaining = durationMs
+            val startTime = System.currentTimeMillis()
             while (remaining > 0) {
-                delay(1000L)
-                remaining -= 1000L
-                _state.value = _state.value.copy(timerMs = remaining.coerceAtLeast(0L))
+                delay(100L)  // Update more frequently for smooth real-time display
+                val elapsed = System.currentTimeMillis() - startTime
+                remaining = (durationMs - elapsed).coerceAtLeast(0L)
+                
+                val current = _state.value
+                val newRealTimeTotal = if (current.phase == ProgressiveO2Phase.HOLD) {
+                    // During HOLD: completed holds + elapsed time of current hold
+                    current.totalHoldTimeMs + (durationMs - remaining)
+                } else {
+                    // During BREATHING: just the completed holds
+                    current.totalHoldTimeMs
+                }
+                
+                _state.value = current.copy(
+                    timerMs = remaining,
+                    realTimeTotalHoldTimeMs = newRealTimeTotal
+                )
             }
             onComplete()
         }

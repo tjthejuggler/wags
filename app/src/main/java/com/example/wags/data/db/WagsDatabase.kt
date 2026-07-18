@@ -31,7 +31,7 @@ import com.example.wags.data.db.entity.*
         GuidedAudioEntity::class,
         ForecastCalibrationEntity::class
     ],
-    version = 37,
+    version = 38,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -983,6 +983,41 @@ abstract class WagsDatabase : RoomDatabase() {
                     // NOT NULL constraint AND the DEFAULT are required.
                     db.execSQL("ALTER TABLE resonance_sessions ADD COLUMN posture TEXT NOT NULL DEFAULT 'LAYING'")
                     db.execSQL("ALTER TABLE rf_assessments ADD COLUMN posture TEXT NOT NULL DEFAULT 'LAYING'")
+                }
+            }
+    
+            /**
+             * v37 → v38: Backfill durationMs for old Progressive O₂ records.
+             * Old records have durationMs set to the longest single hold instead of
+             * the total hold time (sum of all holds). This migration calculates the
+             * total hold time by summing all actualMs values from the rounds array
+             * in tableParamsJson.
+             */
+            val MIGRATION_37_38 = object : Migration(37, 38) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("""
+                        UPDATE apnea_records
+                        SET durationMs = (
+                            SELECT (
+                                SELECT SUM(CAST(json_extract(r.value, '$.actualMs') AS INTEGER))
+                                FROM json_each(
+                                    (SELECT json_extract(s.tableParamsJson, '$.rounds')
+                                     FROM apnea_sessions s
+                                     WHERE s.tableType = 'PROGRESSIVE_O2'
+                                       AND s.timestamp = apnea_records.timestamp
+                                     LIMIT 1)
+                                ) r
+                            )
+                        )
+                        WHERE tableType = 'PROGRESSIVE_O2'
+                          AND (
+                              SELECT json_extract(s.tableParamsJson, '$.rounds')
+                              FROM apnea_sessions s
+                              WHERE s.tableType = 'PROGRESSIVE_O2'
+                                AND s.timestamp = apnea_records.timestamp
+                              LIMIT 1
+                          ) IS NOT NULL
+                    """.trimIndent())
                 }
             }
         }

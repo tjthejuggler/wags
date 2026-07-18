@@ -1,6 +1,8 @@
 package com.example.wags.ui.apnea
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -209,22 +212,94 @@ private fun ActiveContent(
 
         Spacer(Modifier.height(12.dp))
 
-        // ── Total hold time ─────────────────────────────────────────────
-        Text(
-            text = "Total hold: ${formatMmSs(session.totalHoldTimeMs)}",
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary
-        )
+        // ── Total hold times with personal bests ────────────────────────
+        val currentTime = formatMmSs(session.realTimeTotalHoldTimeMs)
+        val currentSettingsPb = state.personalBestCurrentSettingsMs?.let { formatMmSs(it) } ?: "--:--"
+        val breathPeriodPb = state.personalBestBreathPeriodMs?.let { formatMmSs(it) } ?: "--:--"
+        val globalPb = state.personalBestGlobalMs?.let { formatMmSs(it) } ?: "--:--"
+        
+        // State for tooltip visibility
+        var showTooltip by remember { mutableStateOf(false) }
+        var tooltipText by remember { mutableStateOf("") }
+        
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Current total hold time
+            HoldTimeWithTooltip(
+                time = currentTime,
+                tooltipText = "Current total hold time",
+                showTooltip = showTooltip && tooltipText == "Current total hold time",
+                onShowTooltip = { showTooltip = true; tooltipText = "Current total hold time" },
+                onHideTooltip = { showTooltip = false }
+            )
+            
+            Text("/", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+            
+            // Personal best for current breath period + current 5 settings
+            HoldTimeWithTooltip(
+                time = currentSettingsPb,
+                tooltipText = "Personal best for current breath period and settings",
+                showTooltip = showTooltip && tooltipText == "Personal best for current breath period and settings",
+                onShowTooltip = { showTooltip = true; tooltipText = "Personal best for current breath period and settings" },
+                onHideTooltip = { showTooltip = false }
+            )
+            
+            Text("/", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+            
+            // Personal best for current breath period across all 5 settings
+            HoldTimeWithTooltip(
+                time = breathPeriodPb,
+                tooltipText = "Personal best for current breath period across all settings",
+                showTooltip = showTooltip && tooltipText == "Personal best for current breath period across all settings",
+                onShowTooltip = { showTooltip = true; tooltipText = "Personal best for current breath period across all settings" },
+                onHideTooltip = { showTooltip = false }
+            )
+            
+            Text("/", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+            
+            // Global personal best (all breath periods, all settings)
+            HoldTimeWithTooltip(
+                time = globalPb,
+                tooltipText = "Personal best across all breath periods and settings",
+                showTooltip = showTooltip && tooltipText == "Personal best across all breath periods and settings",
+                onShowTooltip = { showTooltip = true; tooltipText = "Personal best across all breath periods and settings" },
+                onHideTooltip = { showTooltip = false }
+            )
+        }
 
-        // ── Live HR / SpO₂ with Voice/Vibration toggles ─────────────────
-        LiveVitals(
-            hr = state.liveHr,
-            spo2 = state.liveSpO2,
-            voiceEnabled = state.voiceEnabled,
-            vibrationEnabled = state.vibrationEnabled,
-            onVoiceToggle = { viewModel.setVoiceEnabled(!state.voiceEnabled) },
-            onVibrationToggle = { viewModel.setVibrationEnabled(!state.vibrationEnabled) }
-        )
+        // ── Voice/Vibration toggles ──────────────────────────────────────
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(top = 8.dp)
+        ) {
+            // Voice toggle
+            IconButton(
+                onClick = { viewModel.setVoiceEnabled(!state.voiceEnabled) },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Text(
+                    text = "🔊",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = if (!state.voiceEnabled) Modifier.grayscale() else Modifier,
+                    color = if (state.voiceEnabled) TextPrimary else TextDisabled
+                )
+            }
+            
+            // Vibration toggle
+            IconButton(
+                onClick = { viewModel.setVibrationEnabled(!state.vibrationEnabled) },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Text(
+                    text = "〰",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = if (state.vibrationEnabled) TextPrimary else TextDisabled
+                )
+            }
+        }
 
         Spacer(Modifier.height(16.dp))
 
@@ -367,49 +442,44 @@ private fun CompleteContent(
 // ── Shared sub-composables ──────────────────────────────────────────────────
 
 @Composable
-private fun LiveVitals(
-    hr: Int?,
-    spo2: Int?,
-    voiceEnabled: Boolean,
-    vibrationEnabled: Boolean,
-    onVoiceToggle: () -> Unit,
-    onVibrationToggle: () -> Unit
+private fun HoldTimeWithTooltip(
+    time: String,
+    tooltipText: String,
+    showTooltip: Boolean,
+    onShowTooltip: () -> Unit,
+    onHideTooltip: () -> Unit
 ) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(top = 8.dp)
-    ) {
-        if (hr != null) {
-            Text("❤️ $hr", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-        }
-        if (spo2 != null) {
-            Text("SpO₂ $spo2%", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-        }
+    Box {
+        Text(
+            text = time,
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextSecondary,
+            modifier = Modifier
+                .combinedClickable(
+                    onClick = {},
+                    onLongClick = onShowTooltip
+                )
+        )
         
-        // Voice toggle
-        IconButton(
-            onClick = onVoiceToggle,
-            modifier = Modifier.size(32.dp)
-        ) {
-            Text(
-                text = "🔊",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = if (!voiceEnabled) Modifier.grayscale() else Modifier,
-                color = if (voiceEnabled) TextPrimary else TextDisabled
-            )
-        }
-        
-        // Vibration toggle
-        IconButton(
-            onClick = onVibrationToggle,
-            modifier = Modifier.size(32.dp)
-        ) {
-            Text(
-                text = "〰",
-                style = MaterialTheme.typography.titleLarge,
-                color = if (vibrationEnabled) TextPrimary else TextDisabled
-            )
+        // Tooltip popup
+        if (showTooltip) {
+            Popup(
+                alignment = Alignment.TopCenter,
+                onDismissRequest = onHideTooltip
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = SurfaceVariant,
+                    modifier = Modifier.padding(8.dp)
+                ) {
+                    Text(
+                        text = tooltipText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextPrimary,
+                        modifier = Modifier.padding(8.dp)
+                    )
+                }
+            }
         }
     }
 }

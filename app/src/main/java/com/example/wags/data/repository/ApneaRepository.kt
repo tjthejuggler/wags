@@ -1613,4 +1613,58 @@ class ApneaRepository @Inject constructor(
                 )
             }
     }
+
+    // ── Progressive O2 specific personal best methods ─────────────────────────────
+
+    /**
+     * Get the best Progressive O2 total hold time (sum of all holds) for the current
+     * breath period AND current 5-setting combination. Returns null if no records exist.
+     */
+    suspend fun getProgressiveO2BestForCurrentSettings(
+        breathPeriodSec: Int,
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        posture: String,
+        audio: String
+    ): Long? = withContext(ioDispatcher) {
+        dao.getBestDrillRecordRaw(
+            buildBestDrillRecordQuery(
+                DrillContext.progressiveO2(breathPeriodSec),
+                lungVolume,
+                prepType,
+                timeOfDay,
+                posture,
+                audio
+            )
+        )?.durationMs
+    }
+
+    /**
+     * Get the best Progressive O2 total hold time (sum of all holds) for the current
+     * breath period across ALL 5-setting combinations. Returns null if no records exist.
+     */
+    suspend fun getProgressiveO2BestForBreathPeriod(
+        breathPeriodSec: Int
+    ): Long? = withContext(ioDispatcher) {
+        dao.getBestDrillRecordRaw(
+            buildBestDrillRecordQuery(
+                DrillContext.progressiveO2(breathPeriodSec),
+                "", "", "", "", ""  // Empty strings to relax all 5 settings constraints
+            )
+        )?.durationMs
+    }
+
+    /**
+     * Get the best Progressive O2 total hold time (sum of all holds) across ALL
+     * breath periods AND ALL 5-setting combinations. Returns null if no records exist.
+     */
+    suspend fun getProgressiveO2BestGlobal(): Long? = withContext(ioDispatcher) {
+        dao.getBestDrillRecordRaw(
+            buildBestDrillRecordQuery(
+                DrillContext.PROGRESSIVE_O2_ANY,  // Matches all breath periods
+                "", "", "", "", ""  // Empty strings to relax all 5 settings constraints
+            )
+        )?.durationMs
+    }
 }

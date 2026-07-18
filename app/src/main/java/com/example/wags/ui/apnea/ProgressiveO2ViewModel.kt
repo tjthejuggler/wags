@@ -92,6 +92,13 @@ data class ProgressiveO2UiState(
     val loadingSelectedSong: Boolean = false,
     // ── Personal best celebration ──────────────────────────────────────────────
     val newPersonalBest: PersonalBestResult? = null,
+    // ── Progressive O2 personal bests ───────────────────────────────────────────
+    /** Best total hold time for current breath period + current 5 settings (ms). Null if no records. */
+    val personalBestCurrentSettingsMs: Long? = null,
+    /** Best total hold time for current breath period across all 5 settings (ms). Null if no records. */
+    val personalBestBreathPeriodMs: Long? = null,
+    /** Best total hold time across all breath periods and all settings (ms). Null if no records. */
+    val personalBestGlobalMs: Long? = null,
     // ── Record-breaking forecast ──────────────────────────────────────────────
     /** Forecast for the current settings combination. Null when insufficient data. */
     val recordForecast: RecordForecast? = null,
@@ -229,6 +236,9 @@ class ProgressiveO2ViewModel @Inject constructor(
             ) }
         }
 
+        // Load personal bests for Progressive O2
+        loadPersonalBests()
+
         // Observe state machine for audio/haptic cues
         viewModelScope.launch {
             stateMachine.state.collect { state ->
@@ -274,6 +284,7 @@ class ProgressiveO2ViewModel @Inject constructor(
         prefs.edit().putString("setting_lung_volume", v).apply()
         _uiState.update { it.copy(lungVolume = v) }
         refreshForecast()
+        loadPersonalBests()
     }
 
     fun setPrepType(v: String) {
@@ -287,18 +298,21 @@ class ProgressiveO2ViewModel @Inject constructor(
             )
         }
         refreshForecast()
+        loadPersonalBests()
     }
 
     fun setTimeOfDay(v: String) {
         prefs.edit().putString("setting_time_of_day", v).apply()
         _uiState.update { it.copy(timeOfDay = v) }
         refreshForecast()
+        loadPersonalBests()
     }
 
     fun setPosture(v: String) {
         prefs.edit().putString("setting_posture", v).apply()
         _uiState.update { it.copy(posture = v) }
         refreshForecast()
+        loadPersonalBests()
     }
 
     fun setAudio(v: String) {
@@ -323,6 +337,33 @@ class ProgressiveO2ViewModel @Inject constructor(
             _uiState.update { it.copy(guidedSelectedName = "") }
         }
         refreshForecast()
+        loadPersonalBests()
+    }
+
+    /** Load personal bests for Progressive O2. */
+    private fun loadPersonalBests() {
+        viewModelScope.launch {
+            val s = _uiState.value
+            val currentSettingsBest = apneaRepository.getProgressiveO2BestForCurrentSettings(
+                breathPeriodSec = s.breathPeriodSec,
+                lungVolume = s.lungVolume,
+                prepType = s.prepType,
+                timeOfDay = s.timeOfDay,
+                posture = s.posture,
+                audio = s.audio
+            )
+            val breathPeriodBest = apneaRepository.getProgressiveO2BestForBreathPeriod(
+                breathPeriodSec = s.breathPeriodSec
+            )
+            val globalBest = apneaRepository.getProgressiveO2BestGlobal()
+            _uiState.update {
+                it.copy(
+                    personalBestCurrentSettingsMs = currentSettingsBest,
+                    personalBestBreathPeriodMs = breathPeriodBest,
+                    personalBestGlobalMs = globalBest
+                )
+            }
+        }
     }
 
     fun setVoiceEnabled(enabled: Boolean) {
