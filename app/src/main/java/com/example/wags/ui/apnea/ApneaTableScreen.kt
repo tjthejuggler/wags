@@ -2,7 +2,9 @@ package com.example.wags.ui.apnea
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -108,11 +110,31 @@ fun ApneaTableScreen(
         if (state.personalBestMs <= 0L) {
             NoPbContent(modifier = Modifier.padding(padding))
         } else {
-            Box(modifier = Modifier.fillMaxSize()) {
+            // State for table steps scroll position
+            val tableStepsListState = rememberLazyListState()
+            
+            // Auto-scroll to active step when currentRound changes
+            LaunchedEffect(state.currentRound, state.apneaState) {
+                state.currentTable?.let { table ->
+                    val activeIndex = table.steps.indexOfFirst {
+                        it.roundNumber == state.currentRound
+                    }
+                    if (activeIndex >= 0 && state.apneaState != ApneaState.IDLE) {
+                        tableStepsListState.animateScrollToItem(activeIndex)
+                    }
+                }
+            }
+            
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            ) {
+                // Upper content section - scrolls separately
                 LazyColumn(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
+                        .weight(1f)
+                        .fillMaxWidth()
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -211,27 +233,42 @@ fun ApneaTableScreen(
                             onStop = { viewModel.stopTableSession() }
                         )
                     }
-                    state.currentTable?.let { table ->
-                        item {
-                            Text(
-                                "Table Steps (PB: ${table.personalBestMs / 1000L}s)",
-                                style = MaterialTheme.typography.titleLarge
-                            )
-                        }
-                        itemsIndexed(table.steps) { index, step ->
-                            TableStepRow(
-                                step = step,
-                                isActive = state.apneaState != ApneaState.IDLE &&
-                                        state.currentRound == step.roundNumber,
-                                isComplete = state.currentRound > step.roundNumber,
-                                isEditable = state.apneaState == ApneaState.IDLE,
-                                onHoldChanged = { newSec ->
-                                    viewModel.updateTableStep(step.roundNumber, newHoldMs = newSec * 1000L)
-                                },
-                                onBreathChanged = { newSec ->
-                                    viewModel.updateTableStep(step.roundNumber, newBreathMs = newSec * 1000L)
-                                }
-                            )
+                }
+                
+                // Table steps section - separate scrolling with auto-scroll
+                state.currentTable?.let { table ->
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                    ) {
+                        Text(
+                            "Table Steps (PB: ${table.personalBestMs / 1000L}s)",
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.padding(16.dp, 8.dp, 16.dp, 4.dp)
+                        )
+                        LazyColumn(
+                            state = tableStepsListState,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            itemsIndexed(table.steps) { index, step ->
+                                TableStepRow(
+                                    step = step,
+                                    isActive = state.apneaState != ApneaState.IDLE &&
+                                            state.currentRound == step.roundNumber,
+                                    isComplete = state.currentRound > step.roundNumber,
+                                    isEditable = state.apneaState == ApneaState.IDLE,
+                                    onHoldChanged = { newSec ->
+                                        viewModel.updateTableStep(step.roundNumber, newHoldMs = newSec * 1000L)
+                                    },
+                                    onBreathChanged = { newSec ->
+                                        viewModel.updateTableStep(step.roundNumber, newBreathMs = newSec * 1000L)
+                                    }
+                                )
+                            }
                         }
                     }
                 }

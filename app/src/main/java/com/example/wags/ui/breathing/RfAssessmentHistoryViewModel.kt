@@ -118,8 +118,8 @@ class RfAssessmentHistoryViewModel @Inject constructor(
         RfAssessmentHistoryUiState(
             allAssessments = assessments,
             allSessions = sessions,
-            chartData = buildChartData(chronologicalAssessments, zone),
-            sessionChartData = buildSessionChartData(chronologicalSessions, zone),
+            chartData = buildChartData(chronologicalAssessments, zone, timePeriod),
+            sessionChartData = buildSessionChartData(chronologicalSessions, zone, timePeriod),
             datesWithAssessments = assessmentDates,
             datesWithSessions = sessionDates,
             assessmentsByDate = assessmentsByDate,
@@ -154,9 +154,13 @@ class RfAssessmentHistoryViewModel @Inject constructor(
 
     private fun buildChartData(
         chronological: List<RfAssessmentEntity>,
-        zone: ZoneId
+        zone: ZoneId,
+        timePeriod: RfChartTimePeriod
     ): RfHistoryChartData {
         if (chronological.isEmpty()) return RfHistoryChartData()
+
+        // For YEAR and ALL time periods, aggregate by month
+        val shouldAggregateByMonth = timePeriod == RfChartTimePeriod.YEAR || timePeriod == RfChartTimePeriod.ALL
 
         val optimalBpm = mutableListOf<RfChartPoint>()
         val coherenceRatio = mutableListOf<RfChartPoint>()
@@ -165,18 +169,52 @@ class RfAssessmentHistoryViewModel @Inject constructor(
         val sdnn = mutableListOf<RfChartPoint>()
         val compositeScore = mutableListOf<RfChartPoint>()
 
-        chronological.forEachIndexed { idx, e ->
-            val x = idx.toFloat()
-            val label = Instant.ofEpochMilli(e.timestamp)
-                .atZone(zone).toLocalDate().toString()
+        if (shouldAggregateByMonth) {
+            // Group by year-month and calculate averages
+            val byMonth: Map<String, List<RfAssessmentEntity>> = chronological.groupBy { entity ->
+                val date = Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate()
+                "${date.year}-${date.monthValue.toString().padStart(2, '0')}"
+            }
 
-            optimalBpm.add(RfChartPoint(x, e.optimalBpm, label))
-            // Clamp historical data to 100.0 to fix existing "billions" bug
-            coherenceRatio.add(RfChartPoint(x, e.maxCoherenceRatio.coerceIn(0f, 100f), label))
-            lfPower.add(RfChartPoint(x, e.maxLfPowerMs2, label))
-            rmssd.add(RfChartPoint(x, e.meanRmssdMs, label))
-            sdnn.add(RfChartPoint(x, e.meanSdnnMs, label))
-            compositeScore.add(RfChartPoint(x, e.compositeScore, label))
+            // Sort by month key (chronological order)
+            val sortedMonths = byMonth.keys.sorted()
+            
+            sortedMonths.forEachIndexed { idx, monthKey ->
+                val monthData = byMonth[monthKey]!!
+                
+                // Calculate averages for each metric
+                val avgOptimalBpm = monthData.map { it.optimalBpm }.average().toFloat()
+                val avgCoherenceRatio = monthData.map { it.maxCoherenceRatio.coerceIn(0f, 100f) }.average().toFloat()
+                val avgLfPower = monthData.map { it.maxLfPowerMs2 }.average().toFloat()
+                val avgRmssd = monthData.map { it.meanRmssdMs }.average().toFloat()
+                val avgSdnn = monthData.map { it.meanSdnnMs }.average().toFloat()
+                val avgCompositeScore = monthData.map { it.compositeScore }.average().toFloat()
+
+                val x = idx.toFloat()
+                val label = monthKey // Use "YYYY-MM" as label
+
+                optimalBpm.add(RfChartPoint(x, avgOptimalBpm, label))
+                coherenceRatio.add(RfChartPoint(x, avgCoherenceRatio, label))
+                lfPower.add(RfChartPoint(x, avgLfPower, label))
+                rmssd.add(RfChartPoint(x, avgRmssd, label))
+                sdnn.add(RfChartPoint(x, avgSdnn, label))
+                compositeScore.add(RfChartPoint(x, avgCompositeScore, label))
+            }
+        } else {
+            // Use daily data for shorter time periods
+            chronological.forEachIndexed { idx, e ->
+                val x = idx.toFloat()
+                val label = Instant.ofEpochMilli(e.timestamp)
+                    .atZone(zone).toLocalDate().toString()
+
+                optimalBpm.add(RfChartPoint(x, e.optimalBpm, label))
+                // Clamp historical data to 100.0 to fix existing "billions" bug
+                coherenceRatio.add(RfChartPoint(x, e.maxCoherenceRatio.coerceIn(0f, 100f), label))
+                lfPower.add(RfChartPoint(x, e.maxLfPowerMs2, label))
+                rmssd.add(RfChartPoint(x, e.meanRmssdMs, label))
+                sdnn.add(RfChartPoint(x, e.meanSdnnMs, label))
+                compositeScore.add(RfChartPoint(x, e.compositeScore, label))
+            }
         }
 
         return RfHistoryChartData(
@@ -191,9 +229,13 @@ class RfAssessmentHistoryViewModel @Inject constructor(
 
     private fun buildSessionChartData(
         chronological: List<ResonanceSessionEntity>,
-        zone: ZoneId
+        zone: ZoneId,
+        timePeriod: RfChartTimePeriod
     ): SessionHistoryChartData {
         if (chronological.isEmpty()) return SessionHistoryChartData()
+
+        // For YEAR and ALL time periods, aggregate by month
+        val shouldAggregateByMonth = timePeriod == RfChartTimePeriod.YEAR || timePeriod == RfChartTimePeriod.ALL
 
         val coherenceRatio = mutableListOf<RfChartPoint>()
         val rmssd = mutableListOf<RfChartPoint>()
@@ -201,17 +243,49 @@ class RfAssessmentHistoryViewModel @Inject constructor(
         val totalPoints = mutableListOf<RfChartPoint>()
         val duration = mutableListOf<RfChartPoint>()
 
-        chronological.forEachIndexed { idx, s ->
-            val x = idx.toFloat()
-            val label = Instant.ofEpochMilli(s.timestamp)
-                .atZone(zone).toLocalDate().toString()
+        if (shouldAggregateByMonth) {
+            // Group by year-month and calculate averages
+            val byMonth: Map<String, List<ResonanceSessionEntity>> = chronological.groupBy { entity ->
+                val date = Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate()
+                "${date.year}-${date.monthValue.toString().padStart(2, '0')}"
+            }
 
-            // Clamp historical data to 100.0 to fix existing "billions" bug
-            coherenceRatio.add(RfChartPoint(x, s.meanCoherenceRatio.coerceIn(0f, 100f), label))
-            rmssd.add(RfChartPoint(x, s.meanRmssdMs, label))
-            sdnn.add(RfChartPoint(x, s.meanSdnnMs, label))
-            totalPoints.add(RfChartPoint(x, s.totalPoints, label))
-            duration.add(RfChartPoint(x, s.durationSeconds.toFloat() / 60f, label))
+            // Sort by month key (chronological order)
+            val sortedMonths = byMonth.keys.sorted()
+            
+            sortedMonths.forEachIndexed { idx, monthKey ->
+                val monthData = byMonth[monthKey]!!
+                
+                // Calculate averages for each metric
+                val avgCoherenceRatio = monthData.map { it.meanCoherenceRatio.coerceIn(0f, 100f) }.average().toFloat()
+                val avgRmssd = monthData.map { it.meanRmssdMs }.average().toFloat()
+                val avgSdnn = monthData.map { it.meanSdnnMs }.average().toFloat()
+                val avgTotalPoints = monthData.map { it.totalPoints }.average().toFloat()
+                val avgDuration = monthData.map { it.durationSeconds.toFloat() / 60f }.average().toFloat()
+
+                val x = idx.toFloat()
+                val label = monthKey // Use "YYYY-MM" as label
+
+                coherenceRatio.add(RfChartPoint(x, avgCoherenceRatio, label))
+                rmssd.add(RfChartPoint(x, avgRmssd, label))
+                sdnn.add(RfChartPoint(x, avgSdnn, label))
+                totalPoints.add(RfChartPoint(x, avgTotalPoints, label))
+                duration.add(RfChartPoint(x, avgDuration, label))
+            }
+        } else {
+            // Use daily data for shorter time periods
+            chronological.forEachIndexed { idx, s ->
+                val x = idx.toFloat()
+                val label = Instant.ofEpochMilli(s.timestamp)
+                    .atZone(zone).toLocalDate().toString()
+
+                // Clamp historical data to 100.0 to fix existing "billions" bug
+                coherenceRatio.add(RfChartPoint(x, s.meanCoherenceRatio.coerceIn(0f, 100f), label))
+                rmssd.add(RfChartPoint(x, s.meanRmssdMs, label))
+                sdnn.add(RfChartPoint(x, s.meanSdnnMs, label))
+                totalPoints.add(RfChartPoint(x, s.totalPoints, label))
+                duration.add(RfChartPoint(x, s.durationSeconds.toFloat() / 60f, label))
+            }
         }
 
         return SessionHistoryChartData(

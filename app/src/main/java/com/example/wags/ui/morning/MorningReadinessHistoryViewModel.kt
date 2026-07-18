@@ -100,7 +100,7 @@ class MorningReadinessHistoryViewModel @Inject constructor(
 
         // Build chart data from ALL data (time period is now just a zoom control)
         val chronological = readings.reversed()
-        val chartData = buildChartData(chronological, zone)
+        val chartData = buildChartData(chronological, zone, timePeriod)
 
         MorningReadinessHistoryUiState(
             allReadings = readings,
@@ -176,9 +176,13 @@ class MorningReadinessHistoryViewModel @Inject constructor(
 
     private fun buildChartData(
         chronological: List<MorningReadinessEntity>,
-        zone: ZoneId
+        zone: ZoneId,
+        timePeriod: ChartTimePeriod
     ): MorningReadinessChartData {
         if (chronological.isEmpty()) return MorningReadinessChartData()
+
+        // For YEAR and ALL time periods, aggregate by month
+        val shouldAggregateByMonth = timePeriod == ChartTimePeriod.YEAR || timePeriod == ChartTimePeriod.ALL
 
         val readinessScore   = mutableListOf<ChartPoint>()
         val supineRmssd      = mutableListOf<ChartPoint>()
@@ -198,28 +202,86 @@ class MorningReadinessHistoryViewModel @Inject constructor(
         val hooperSoreness   = mutableListOf<ChartPoint>()
         val hooperStress     = mutableListOf<ChartPoint>()
 
-        chronological.forEachIndexed { idx, e ->
-            val x = idx.toFloat()
-            val label = Instant.ofEpochMilli(e.timestamp)
-                .atZone(zone).toLocalDate().toString()
+        if (shouldAggregateByMonth) {
+            // Group by year-month and calculate averages
+            val byMonth: Map<String, List<MorningReadinessEntity>> = chronological.groupBy { entity ->
+                val date = Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate()
+                "${date.year}-${date.monthValue.toString().padStart(2, '0')}"
+            }
 
-            readinessScore.add(ChartPoint(x, e.readinessScore.toFloat(), label))
-            supineRmssd.add(ChartPoint(x, e.supineRmssdMs.toFloat(), label))
-            supineHrvScore.add(ChartPoint(x, (e.supineLnRmssd * 20).toFloat(), label))
-            supineSdnn.add(ChartPoint(x, e.supineSdnnMs.toFloat(), label))
-            restingHr.add(ChartPoint(x, e.supineRhr.toFloat(), label))
-            e.standingRmssdMs?.let { standingRmssd.add(ChartPoint(x, it.toFloat(), label)) }
-            e.standingLnRmssd?.let { standingHrvScore.add(ChartPoint(x, (it * 20).toFloat(), label)) }
-            e.standingSdnnMs?.let { standingSdnn.add(ChartPoint(x, it.toFloat(), label)) }
-            e.peakStandHr?.let { peakStandHr.add(ChartPoint(x, it.toFloat(), label)) }
-            e.thirtyFifteenRatio?.let { thirtyFifteen.add(ChartPoint(x, it, label)) }
-            e.ohrrAt60sPercent?.let { ohrr60s.add(ChartPoint(x, it, label)) }
-            e.respiratoryRateBpm?.let { respRate.add(ChartPoint(x, it, label)) }
-            e.hooperTotal?.let { hooperTotal.add(ChartPoint(x, it, label)) }
-            e.hooperSleep?.let { hooperSleep.add(ChartPoint(x, it.toFloat(), label)) }
-            e.hooperFatigue?.let { hooperFatigue.add(ChartPoint(x, it.toFloat(), label)) }
-            e.hooperSoreness?.let { hooperSoreness.add(ChartPoint(x, it.toFloat(), label)) }
-            e.hooperStress?.let { hooperStress.add(ChartPoint(x, it.toFloat(), label)) }
+            // Sort by month key (chronological order)
+            val sortedMonths = byMonth.keys.sorted()
+            
+            sortedMonths.forEachIndexed { idx, monthKey ->
+                val monthData = byMonth[monthKey]!!
+                
+                // Calculate averages for each metric
+                val avgReadinessScore = monthData.map { it.readinessScore.toFloat() }.average().toFloat()
+                val avgSupineRmssd = monthData.map { it.supineRmssdMs.toFloat() }.average().toFloat()
+                val avgSupineHrvScore = monthData.map { (it.supineLnRmssd * 20).toFloat() }.average().toFloat()
+                val avgSupineSdnn = monthData.map { it.supineSdnnMs.toFloat() }.average().toFloat()
+                val avgRestingHr = monthData.map { it.supineRhr.toFloat() }.average().toFloat()
+                
+                // For optional fields, only average if we have data
+                val avgStandingRmssd = monthData.mapNotNull { it.standingRmssdMs?.toFloat() }.takeIf { it.isNotEmpty() }?.average()?.toFloat()
+                val avgStandingHrvScore = monthData.mapNotNull { it.standingLnRmssd?.let { (it * 20).toFloat() } }.takeIf { it.isNotEmpty() }?.average()?.toFloat()
+                val avgStandingSdnn = monthData.mapNotNull { it.standingSdnnMs?.toFloat() }.takeIf { it.isNotEmpty() }?.average()?.toFloat()
+                val avgPeakStandHr = monthData.mapNotNull { it.peakStandHr?.toFloat() }.takeIf { it.isNotEmpty() }?.average()?.toFloat()
+                val avgThirtyFifteen = monthData.mapNotNull { it.thirtyFifteenRatio }.takeIf { it.isNotEmpty() }?.average()?.toFloat()
+                val avgOhrr60s = monthData.mapNotNull { it.ohrrAt60sPercent }.takeIf { it.isNotEmpty() }?.average()?.toFloat()
+                val avgRespRate = monthData.mapNotNull { it.respiratoryRateBpm }.takeIf { it.isNotEmpty() }?.average()?.toFloat()
+                val avgHooperTotal = monthData.mapNotNull { it.hooperTotal }.takeIf { it.isNotEmpty() }?.average()?.toFloat()
+                val avgHooperSleep = monthData.mapNotNull { it.hooperSleep?.toFloat() }.takeIf { it.isNotEmpty() }?.average()?.toFloat()
+                val avgHooperFatigue = monthData.mapNotNull { it.hooperFatigue?.toFloat() }.takeIf { it.isNotEmpty() }?.average()?.toFloat()
+                val avgHooperSoreness = monthData.mapNotNull { it.hooperSoreness?.toFloat() }.takeIf { it.isNotEmpty() }?.average()?.toFloat()
+                val avgHooperStress = monthData.mapNotNull { it.hooperStress?.toFloat() }.takeIf { it.isNotEmpty() }?.average()?.toFloat()
+
+                val x = idx.toFloat()
+                val label = monthKey // Use "YYYY-MM" as label
+
+                readinessScore.add(ChartPoint(x, avgReadinessScore, label))
+                supineRmssd.add(ChartPoint(x, avgSupineRmssd, label))
+                supineHrvScore.add(ChartPoint(x, avgSupineHrvScore, label))
+                supineSdnn.add(ChartPoint(x, avgSupineSdnn, label))
+                restingHr.add(ChartPoint(x, avgRestingHr, label))
+                avgStandingRmssd?.let { standingRmssd.add(ChartPoint(x, it, label)) }
+                avgStandingHrvScore?.let { standingHrvScore.add(ChartPoint(x, it, label)) }
+                avgStandingSdnn?.let { standingSdnn.add(ChartPoint(x, it, label)) }
+                avgPeakStandHr?.let { peakStandHr.add(ChartPoint(x, it, label)) }
+                avgThirtyFifteen?.let { thirtyFifteen.add(ChartPoint(x, it, label)) }
+                avgOhrr60s?.let { ohrr60s.add(ChartPoint(x, it, label)) }
+                avgRespRate?.let { respRate.add(ChartPoint(x, it, label)) }
+                avgHooperTotal?.let { hooperTotal.add(ChartPoint(x, it, label)) }
+                avgHooperSleep?.let { hooperSleep.add(ChartPoint(x, it, label)) }
+                avgHooperFatigue?.let { hooperFatigue.add(ChartPoint(x, it, label)) }
+                avgHooperSoreness?.let { hooperSoreness.add(ChartPoint(x, it, label)) }
+                avgHooperStress?.let { hooperStress.add(ChartPoint(x, it, label)) }
+            }
+        } else {
+            // Use daily data for shorter time periods
+            chronological.forEachIndexed { idx, e ->
+                val x = idx.toFloat()
+                val label = Instant.ofEpochMilli(e.timestamp)
+                    .atZone(zone).toLocalDate().toString()
+
+                readinessScore.add(ChartPoint(x, e.readinessScore.toFloat(), label))
+                supineRmssd.add(ChartPoint(x, e.supineRmssdMs.toFloat(), label))
+                supineHrvScore.add(ChartPoint(x, (e.supineLnRmssd * 20).toFloat(), label))
+                supineSdnn.add(ChartPoint(x, e.supineSdnnMs.toFloat(), label))
+                restingHr.add(ChartPoint(x, e.supineRhr.toFloat(), label))
+                e.standingRmssdMs?.let { standingRmssd.add(ChartPoint(x, it.toFloat(), label)) }
+                e.standingLnRmssd?.let { standingHrvScore.add(ChartPoint(x, (it * 20).toFloat(), label)) }
+                e.standingSdnnMs?.let { standingSdnn.add(ChartPoint(x, it.toFloat(), label)) }
+                e.peakStandHr?.let { peakStandHr.add(ChartPoint(x, it.toFloat(), label)) }
+                e.thirtyFifteenRatio?.let { thirtyFifteen.add(ChartPoint(x, it, label)) }
+                e.ohrrAt60sPercent?.let { ohrr60s.add(ChartPoint(x, it, label)) }
+                e.respiratoryRateBpm?.let { respRate.add(ChartPoint(x, it, label)) }
+                e.hooperTotal?.let { hooperTotal.add(ChartPoint(x, it, label)) }
+                e.hooperSleep?.let { hooperSleep.add(ChartPoint(x, it.toFloat(), label)) }
+                e.hooperFatigue?.let { hooperFatigue.add(ChartPoint(x, it.toFloat(), label)) }
+                e.hooperSoreness?.let { hooperSoreness.add(ChartPoint(x, it.toFloat(), label)) }
+                e.hooperStress?.let { hooperStress.add(ChartPoint(x, it.toFloat(), label)) }
+            }
         }
 
         return MorningReadinessChartData(

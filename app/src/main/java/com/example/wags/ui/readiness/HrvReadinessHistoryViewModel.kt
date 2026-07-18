@@ -87,7 +87,7 @@ class HrvReadinessHistoryViewModel @Inject constructor(
 
         // Build chart data from ALL data (time period is now just a zoom control)
         val chronological = readings.reversed()
-        val chartData = buildChartData(chronological, zone)
+        val chartData = buildChartData(chronological, zone, timePeriod)
 
         HrvReadinessHistoryUiState(
             allReadings = readings,
@@ -164,9 +164,13 @@ class HrvReadinessHistoryViewModel @Inject constructor(
 
     private fun buildChartData(
         chronological: List<DailyReadingEntity>,
-        zone: ZoneId
+        zone: ZoneId,
+        timePeriod: HrvChartTimePeriod
     ): HrvHistoryChartData {
         if (chronological.isEmpty()) return HrvHistoryChartData()
+
+        // For YEAR and ALL time periods, aggregate by month
+        val shouldAggregateByMonth = timePeriod == HrvChartTimePeriod.YEAR || timePeriod == HrvChartTimePeriod.ALL
 
         val readinessScore = mutableListOf<HrvChartPoint>()
         val rmssd          = mutableListOf<HrvChartPoint>()
@@ -174,16 +178,48 @@ class HrvReadinessHistoryViewModel @Inject constructor(
         val sdnn           = mutableListOf<HrvChartPoint>()
         val restingHr      = mutableListOf<HrvChartPoint>()
 
-        chronological.forEachIndexed { idx, e ->
-            val x = idx.toFloat()
-            val label = Instant.ofEpochMilli(e.timestamp)
-                .atZone(zone).toLocalDate().toString()
+        if (shouldAggregateByMonth) {
+            // Group by year-month and calculate averages
+            val byMonth: Map<String, List<DailyReadingEntity>> = chronological.groupBy { entity ->
+                val date = Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate()
+                "${date.year}-${date.monthValue.toString().padStart(2, '0')}"
+            }
 
-            readinessScore.add(HrvChartPoint(x, e.readinessScore.toFloat(), label))
-            rmssd.add(HrvChartPoint(x, e.rawRmssdMs, label))
-            lnRmssd.add(HrvChartPoint(x, e.lnRmssd, label))
-            sdnn.add(HrvChartPoint(x, e.sdnnMs, label))
-            restingHr.add(HrvChartPoint(x, e.restingHrBpm, label))
+            // Sort by month key (chronological order)
+            val sortedMonths = byMonth.keys.sorted()
+            
+            sortedMonths.forEachIndexed { idx, monthKey ->
+                val monthData = byMonth[monthKey]!!
+                
+                // Calculate averages for each metric
+                val avgReadinessScore = monthData.map { it.readinessScore.toFloat() }.average().toFloat()
+                val avgRmssd = monthData.map { it.rawRmssdMs }.average().toFloat()
+                val avgLnRmssd = monthData.map { it.lnRmssd }.average().toFloat()
+                val avgSdnn = monthData.map { it.sdnnMs }.average().toFloat()
+                val avgRestingHr = monthData.map { it.restingHrBpm }.average().toFloat()
+
+                val x = idx.toFloat()
+                val label = monthKey // Use "YYYY-MM" as label
+
+                readinessScore.add(HrvChartPoint(x, avgReadinessScore, label))
+                rmssd.add(HrvChartPoint(x, avgRmssd, label))
+                lnRmssd.add(HrvChartPoint(x, avgLnRmssd, label))
+                sdnn.add(HrvChartPoint(x, avgSdnn, label))
+                restingHr.add(HrvChartPoint(x, avgRestingHr, label))
+            }
+        } else {
+            // Use daily data for shorter time periods
+            chronological.forEachIndexed { idx, e ->
+                val x = idx.toFloat()
+                val label = Instant.ofEpochMilli(e.timestamp)
+                    .atZone(zone).toLocalDate().toString()
+
+                readinessScore.add(HrvChartPoint(x, e.readinessScore.toFloat(), label))
+                rmssd.add(HrvChartPoint(x, e.rawRmssdMs, label))
+                lnRmssd.add(HrvChartPoint(x, e.lnRmssd, label))
+                sdnn.add(HrvChartPoint(x, e.sdnnMs, label))
+                restingHr.add(HrvChartPoint(x, e.restingHrBpm, label))
+            }
         }
 
         return HrvHistoryChartData(
