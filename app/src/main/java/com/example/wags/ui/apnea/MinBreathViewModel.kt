@@ -687,8 +687,9 @@ class MinBreathViewModel @Inject constructor(
             spotifyManager.sendRemotePlayCommand()
         }
 
-        // Start guided audio if GUIDED is selected
-        if (_uiState.value.isGuidedMode) {
+        // Start guided audio if GUIDED is selected — but skip if it was already
+        // started during the hyper countdown (startMp3WithHyper == true)
+        if (_uiState.value.isGuidedMode && !guidedAudioManager.isPlaying) {
             viewModelScope.launch {
                 guidedAudioManager.preparePlayback()
                 guidedAudioManager.startPlayback()
