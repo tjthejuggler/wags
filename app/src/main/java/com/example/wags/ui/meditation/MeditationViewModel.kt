@@ -539,12 +539,16 @@ class MeditationViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        // Stop the meditation session and service when user navigates away
-        if (_uiState.value.sessionState == MeditationSessionState.ACTIVE) {
-            stopSession()
-        }
+        // NOTE: We do NOT stop the meditation session here. The MeditationService
+        // runs independently in the foreground and will continue recording even when
+        // the ViewModel is cleared (e.g., when user navigates away or screen is off).
+        // The session will continue until:
+        // 1. User explicitly stops it (via the UI or notification)
+        // 2. The timer completes (if set)
+        // 3. The system kills the service (which should be prevented by foreground service + wake lock)
         stopAudioPlayback()
         stopChime()
+        sonificationEngine.stop()
     }
 
     // ── Private helpers ────────────────────────────────────────────────────────

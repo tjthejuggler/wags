@@ -280,7 +280,7 @@ class MeditationService : Service() {
             PowerManager.PARTIAL_WAKE_LOCK,
             "wags:MeditationWakeLock"
         ).apply {
-            acquire(10 * 60 * 1000L) // 10 minutes max
+            acquire() // No timeout - held until explicitly released in stopSession()
         }
     }
 

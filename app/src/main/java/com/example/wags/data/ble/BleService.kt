@@ -103,7 +103,7 @@ class BleService : LifecycleService() {
             PowerManager.PARTIAL_WAKE_LOCK,
             "wags:BleWakeLock"
         ).apply {
-            acquire(10 * 60 * 1000L) // 10 minutes max; renewed on demand
+            acquire() // No timeout - held until explicitly released in onDestroy()
         }
     }
 
