@@ -125,6 +125,7 @@ fun AdviceDialog(
                 onClick = {
                     onAdd(newText)
                     newText = ""
+                    onDismiss()
                 },
                 enabled = newText.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
