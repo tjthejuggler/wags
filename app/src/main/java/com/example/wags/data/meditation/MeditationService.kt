@@ -10,9 +10,11 @@ import android.content.Intent
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Binder
+import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.provider.DocumentsContract
+import android.provider.Settings
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.wags.data.ble.UnifiedDeviceManager
@@ -44,6 +46,8 @@ class MeditationService : Service() {
         const val EXTRA_DURATION_SECONDS = "duration_seconds"
         const val EXTRA_MONITOR_ID = "monitor_id"
         const val EXTRA_SHOULD_SAVE = "should_save"
+        
+        private const val WAKE_LOCK_TIMEOUT_MS = 10 * 60 * 1000L // 10 minutes
     }
 
     @Inject
@@ -62,6 +66,7 @@ class MeditationService : Service() {
     private var timerDurationSeconds: Long? = null
     private var activeMonitorId: String? = null
     private var isSessionActive = false
+    private var wakeLockAcquired = false
 
     inner class LocalBinder : Binder() {
         fun getService(): MeditationService = this@MeditationService
@@ -70,6 +75,7 @@ class MeditationService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        requestBatteryOptimizationExemption()
         Log.d("MeditationService", "MeditationService created")
     }
 
@@ -139,6 +145,9 @@ class MeditationService : Service() {
 
         // Acquire wake lock to keep CPU running
         acquireWakeLock()
+
+        // Start wake lock renewal job to prevent timeout
+        startWakeLockRenewalJob()
 
         // Start foreground service with notification
         startForeground(NOTIFICATION_ID, buildNotification("Meditation in progress..."))
@@ -242,6 +251,31 @@ class MeditationService : Service() {
         }
     }
 
+    private fun startWakeLockRenewalJob() {
+        serviceScope.launch {
+            while (isActive && isSessionActive) {
+                delay(5 * 60 * 1000L) // Every 5 minutes
+                if (wakeLockAcquired && isSessionActive) {
+                    try {
+                        // Release and re-acquire wake lock to prevent timeout
+                        wakeLock?.let {
+                            if (it.isHeld) {
+                                it.release()
+                            }
+                        }
+                        wakeLock?.acquire(WAKE_LOCK_TIMEOUT_MS)
+                        Log.d("MeditationService", "WakeLock renewed")
+                    } catch (e: Exception) {
+                        Log.e("MeditationService", "Failed to renew WakeLock", e)
+                        // Try to acquire a new wake lock if renewal failed
+                        releaseWakeLock()
+                        acquireWakeLock()
+                    }
+                }
+            }
+        }
+    }
+
     private fun startAudioPlayback(fileName: String, dirUriString: String) {
         stopAudioPlayback()
         try {
@@ -275,22 +309,36 @@ class MeditationService : Service() {
     }
 
     private fun acquireWakeLock() {
-        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-        wakeLock = pm.newWakeLock(
-            PowerManager.PARTIAL_WAKE_LOCK,
-            "wags:MeditationWakeLock"
-        ).apply {
-            acquire() // No timeout - held until explicitly released in stopSession()
+        try {
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            wakeLock = pm.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "wags:MeditationWakeLock"
+            ).apply {
+                setReferenceCounted(false)
+                acquire(WAKE_LOCK_TIMEOUT_MS) // Timeout to prevent battery drain if service hangs
+            }
+            wakeLockAcquired = true
+            Log.d("MeditationService", "WakeLock acquired with ${WAKE_LOCK_TIMEOUT_MS / 1000}s timeout")
+        } catch (e: Exception) {
+            Log.e("MeditationService", "Failed to acquire WakeLock", e)
+            wakeLockAcquired = false
         }
     }
 
     private fun releaseWakeLock() {
         wakeLock?.let {
             if (it.isHeld) {
-                it.release()
+                try {
+                    it.release()
+                    Log.d("MeditationService", "WakeLock released")
+                } catch (e: Exception) {
+                    Log.e("MeditationService", "Error releasing WakeLock", e)
+                }
             }
         }
         wakeLock = null
+        wakeLockAcquired = false
     }
 
     private fun startHrDataCollection() {
@@ -351,13 +399,34 @@ class MeditationService : Service() {
             .build()
     }
 
+    private fun requestBatteryOptimizationExemption() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                try {
+                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                        data = Uri.parse("package:$packageName")
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    startActivity(intent)
+                    Log.d("MeditationService", "Requested battery optimization exemption")
+                } catch (e: Exception) {
+                    Log.e("MeditationService", "Failed to request battery optimization exemption", e)
+                }
+            } else {
+                Log.d("MeditationService", "Already exempt from battery optimizations")
+            }
+        }
+    }
+
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,
             "WAGS Meditation Service",
-            NotificationManager.IMPORTANCE_LOW
-        ).apply { 
-            description = "Keeps meditation session alive during playback" 
+            NotificationManager.IMPORTANCE_MIN
+        ).apply {
+            description = "Keeps meditation session alive during playback"
+            setShowBadge(false)
         }
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(channel)
