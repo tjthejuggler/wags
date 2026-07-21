@@ -83,7 +83,13 @@ class AssessmentRunViewModel @Inject constructor(
         /** Number of test epochs completed so far (enables "End Early & Save"). */
         val completedEpochCount: Int = 0,
         /** Posture for the assessment (SITTING or LAYING). */
-        val posture: Posture = Posture.LAYING
+        val posture: Posture = Posture.LAYING,
+        /** All RR intervals collected during the assessment for long-term chart. */
+        val allSessionRrIntervals: List<Double> = emptyList(),
+        /** History of coherence ratio samples for the coherence-over-time chart. */
+        val coherenceHistory: List<Float> = emptyList(),
+        /** History of RMSSD values for the long-term chart. */
+        val rmssdHistory: List<Float> = emptyList()
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -457,7 +463,8 @@ class AssessmentRunViewModel @Inject constructor(
                     liveHr = hrDataSource.liveHr.value,
                     liveRrIntervals = chartRr,
                     liveRmssd = liveRmssd,
-                    liveSdnn = liveSdnn
+                    liveSdnn = liveSdnn,
+                    allSessionRrIntervals = allSessionRrIntervals.toList()
                 )
             }
         }
@@ -500,8 +507,19 @@ class AssessmentRunViewModel @Inject constructor(
                 }
                 if (rrSnapshot != null) {
                     val result = coherenceCalc.calculateCoherenceRatio(rrSnapshot)
-                    _uiState.value = _uiState.value.copy(
-                        liveCoherenceRatio = result.coherenceRatio
+                    val currentState = _uiState.value
+                    val newCoherenceHistory = currentState.coherenceHistory + result.coherenceRatio
+                    
+                    // Also compute and store RMSSD for history
+                    val currentRmssd = computeLiveRmssd(rrSnapshot.toList())
+                    val newRmssdHistory = if (currentRmssd != null)
+                        currentState.rmssdHistory + currentRmssd
+                    else currentState.rmssdHistory
+                    
+                    _uiState.value = currentState.copy(
+                        liveCoherenceRatio = result.coherenceRatio,
+                        coherenceHistory = newCoherenceHistory,
+                        rmssdHistory = newRmssdHistory
                     )
                 }
             }

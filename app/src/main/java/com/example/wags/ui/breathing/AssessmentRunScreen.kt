@@ -1,7 +1,9 @@
 package com.example.wags.ui.breathing
 
+import android.content.res.Configuration
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -15,7 +17,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -31,9 +40,20 @@ import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.common.StripChartColors
 import com.example.wags.ui.common.WagsFeedback
 import com.example.wags.ui.common.LiveSensorActionsCallback
-import com.example.wags.ui.common.LiveSensorActionsCallback
+import com.example.wags.ui.common.BackgroundLineChart
 import com.example.wags.ui.theme.*
 
+// ── Monochrome palette ────────────────────────────────────────────────────────
+private val AsmBone      = Color(0xFFE8E8E8)
+private val AsmSilver    = Color(0xFFB0B0B0)
+private val AsmAsh       = Color(0xFF707070)
+private val AsmGraphite  = Color(0xFF383838)
+private val AsmCharcoal  = Color(0xFF1C1C1C)
+private val AsmInk       = Color(0xFF0A0A0A)
+private val AsmGold      = Color(0xFFD0D0D0)   // light grey (replaces gold)
+private val AsmZoneBlue  = Color(0xFF909090)   // mid grey  = medium coherence
+
+// RMSSD chart — slightly lighter grey to distinguish from RR chart
 private val AsmRmssdColors = StripChartColors(
     lineColor = Color(0xFFB0B0B0),
     dotColor  = Color(0xFFD0D0D0),
@@ -140,141 +160,441 @@ fun AssessmentRunScreen(
             )
         }
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Vibration callback — only fires when toggle is on
-            val vibrationCallback: ((Boolean) -> Unit)? = if (vibrationEnabled) {
-                { inhaling ->
-                    if (inhaling) WagsFeedback.breathInhale(context)
-                    else WagsFeedback.breathExhale(context)
+        // Vibration callback — only fires when toggle is on
+        val vibrationCallback: ((Boolean) -> Unit)? = if (vibrationEnabled) {
+            { inhaling ->
+                if (inhaling) WagsFeedback.breathInhale(context)
+                else WagsFeedback.breathExhale(context)
+            }
+        } else null
+
+        val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+        if (isLandscape) {
+            // ── Landscape: breathing circle centered background, charts on top ──
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Background breathing circle (drawn first, so behind everything)
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(280.dp)
+                        .align(Alignment.Center)
+                ) {
+                    val overlayLabel = when {
+                        uiState.phase == "BASELINE" || uiState.phase == "BREATHE NATURALLY" -> uiState.phase
+                        else -> null
+                    }
+                    BreathingPacerCircle(
+                        progress = uiState.refWave,
+                        isInhaling = uiState.isInhaling,
+                        size = 280.dp,
+                        overlayLabel = if (protocol.isStepped()) overlayLabel else null,
+                        useColors = colorsEnabled,
+                        onPhaseTransition = vibrationCallback
+                    )
                 }
-            } else null
 
-            // Pacer visual — unified circle for all protocols
-            if (protocol.isStepped()) {
-                val overlayLabel = when {
-                    uiState.phase == "BASELINE" || uiState.phase == "BREATHE NATURALLY" -> uiState.phase
-                    else -> null
+                // Foreground content (drawn last, so on top)
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .verticalScroll(rememberScrollState())
+                        .background(Color.Transparent),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Top stats row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        AsmSessionStatsRow(
+                            currentBpm = uiState.currentBpm,
+                            remainingSeconds = uiState.remainingSeconds,
+                            coherenceRatio = uiState.liveCoherenceRatio
+                        )
+
+                        AsmHrvMetricsRow(
+                            hrBpm  = uiState.liveHr,
+                            rmssd  = uiState.liveRmssd?.toDouble(),
+                            sdnn   = uiState.liveSdnn?.toDouble(),
+                            rrCount = uiState.rrCount
+                        )
+                    }
+
+                    // Progress bar
+                    LinearProgressIndicator(
+                        progress = { uiState.progress },
+                        modifier = Modifier.fillMaxWidth(),
+                        color = TextSecondary,
+                        trackColor = SurfaceVariant
+                    )
+
+                    // Phase label
+                    Text(
+                        text = uiState.phase,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextPrimary,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+
+                    // Quality warning card
+                    val warning = uiState.qualityWarning
+                    if (warning != null) {
+                        QualityWarningCard(message = warning)
+                    }
+
+                    // Charts row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Coherence chart
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(120.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(
+                                        Brush.verticalGradient(
+                                            listOf(AsmInk, AsmCharcoal.copy(alpha = 0.3f), AsmInk)
+                                        )
+                                    )
+                            ) {
+                                // Background: long-term coherence
+                                if (uiState.coherenceHistory.size >= 2) {
+                                    BackgroundLineChart(
+                                        data = uiState.coherenceHistory,
+                                        color = AsmZoneBlue.copy(alpha = 0.3f),
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                                
+                                // Foreground: short-term coherence
+                                if (uiState.coherenceHistory.size >= 2) {
+                                    AsmCoherenceChart(
+                                        history = uiState.coherenceHistory,
+                                        showLabel = false,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            "awaiting data…",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = AsmAsh.copy(alpha = 0.5f),
+                                            letterSpacing = 2.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // RR Interval chart
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(120.dp)
+                            ) {
+                                // Background: long-term RR
+                                if (uiState.allSessionRrIntervals.size >= 2) {
+                                    BackgroundLineChart(
+                                        data = uiState.allSessionRrIntervals.map { it.toFloat() },
+                                        color = AsmAsh.copy(alpha = 0.3f),
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                                
+                                // Foreground: short-term RR
+                                RrIntervalChart(
+                                    rrIntervals = uiState.liveRrIntervals,
+                                    windowMs = ASM_CHART_WINDOW_MS,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                        }
+
+                        // RMSSD chart
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(120.dp)
+                            ) {
+                                // Background: long-term RMSSD
+                                if (uiState.rmssdHistory.size >= 2) {
+                                    BackgroundLineChart(
+                                        data = uiState.rmssdHistory,
+                                        color = AsmRmssdColors.lineColor.copy(alpha = 0.3f),
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                                
+                                // Foreground: short-term RMSSD
+                                RmssdChart(
+                                    rrIntervals = uiState.liveRrIntervals,
+                                    windowMs = ASM_CHART_WINDOW_MS,
+                                    colors = AsmRmssdColors,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                        }
+                    }
+
+                    // End Early & Save button
+                    val canFinishEarly = uiState.completedEpochCount >= 1 && !uiState.isComplete
+                    Button(
+                        onClick = { viewModel.finishEarly() },
+                        enabled = canFinishEarly,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF2E7D32),
+                            contentColor   = Color.White,
+                            disabledContainerColor = SurfaceVariant,
+                            disabledContentColor   = TextSecondary
+                        )
+                    ) {
+                        val epochLabel = if (uiState.completedEpochCount > 0)
+                            "End Early & Save (${uiState.completedEpochCount} test${if (uiState.completedEpochCount == 1) "" else "s"} done)"
+                        else
+                            "End Early & Save (complete a test first)"
+                        Text(epochLabel)
+                    }
+
+                    // Cancel button
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.cancel()
+                            onNavigateBack()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
+                    ) {
+                        Text("Cancel Assessment")
+                    }
                 }
-                BreathingPacerCircle(
-                    progress = uiState.refWave,
-                    isInhaling = uiState.isInhaling,
-                    size = 200.dp,
-                    overlayLabel = overlayLabel,
-                    useColors = colorsEnabled,
-                    onPhaseTransition = vibrationCallback
-                )
-            } else {
-                BreathingPacerCircle(
-                    progress = uiState.refWave,
-                    isInhaling = uiState.isInhaling,
-                    size = 200.dp,
-                    useColors = colorsEnabled,
-                    onPhaseTransition = vibrationCallback
-                )
             }
+        } else {
+            // ── Portrait: breathing circle centered background, charts on top ──
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Background breathing circle (drawn first, so behind everything)
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(300.dp)
+                        .align(Alignment.Center)
+                ) {
+                    val overlayLabel = when {
+                        uiState.phase == "BASELINE" || uiState.phase == "BREATHE NATURALLY" -> uiState.phase
+                        else -> null
+                    }
+                    BreathingPacerCircle(
+                        progress = uiState.refWave,
+                        isInhaling = uiState.isInhaling,
+                        size = 300.dp,
+                        overlayLabel = if (protocol.isStepped()) overlayLabel else null,
+                        useColors = colorsEnabled,
+                        onPhaseTransition = vibrationCallback
+                    )
+                }
 
-            // HUD
-            AssessmentHud(
-                phase            = uiState.phase,
-                currentBpm       = uiState.currentBpm,
-                remainingSeconds = uiState.remainingSeconds
-            )
+                // Foreground content (drawn last, so on top)
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .verticalScroll(rememberScrollState())
+                        .background(Color.Transparent),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Top stats row
+                    AsmSessionStatsRow(
+                        currentBpm = uiState.currentBpm,
+                        remainingSeconds = uiState.remainingSeconds,
+                        coherenceRatio = uiState.liveCoherenceRatio
+                    )
 
-            // Live stats row
-            LiveStatsRow(
-                hr = uiState.liveHr,
-                rrCount = uiState.rrCount,
-                coherenceRatio = uiState.liveCoherenceRatio
-            )
+                    // Progress bar
+                    LinearProgressIndicator(
+                        progress = { uiState.progress },
+                        modifier = Modifier.fillMaxWidth(),
+                        color = TextSecondary,
+                        trackColor = SurfaceVariant
+                    )
 
-            // Overall progress
-            LinearProgressIndicator(
-                progress         = { uiState.progress },
-                modifier         = Modifier.fillMaxWidth(),
-                color            = TextSecondary,
-                trackColor       = SurfaceVariant
-            )
+                    // Phase label
+                    Text(
+                        text = uiState.phase,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextPrimary,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
 
-            // Quality warning card
-            val warning = uiState.qualityWarning
-            if (warning != null) {
-                QualityWarningCard(message = warning)
-            }
+                    // Live HRV metrics
+                    AsmHrvMetricsRow(
+                        hrBpm  = uiState.liveHr,
+                        rmssd  = uiState.liveRmssd?.toDouble(),
+                        sdnn   = uiState.liveSdnn?.toDouble(),
+                        rrCount = uiState.rrCount
+                    )
 
-            // ── RR interval scrolling chart ───────────────────────────────
-            AsmChartLabel("RR INTERVAL")
-            RrIntervalChart(
-                rrIntervals = uiState.liveRrIntervals,
-                windowMs = ASM_CHART_WINDOW_MS,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(100.dp)
-            )
+                    // Quality warning card
+                    val warning = uiState.qualityWarning
+                    if (warning != null) {
+                        QualityWarningCard(message = warning)
+                    }
 
-            // ── RMSSD scrolling chart ─────────────────────────────────────
-            AsmChartLabel("RMSSD")
-            RmssdChart(
-                rrIntervals = uiState.liveRrIntervals,
-                windowMs = ASM_CHART_WINDOW_MS,
-                colors = AsmRmssdColors,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(100.dp)
-            )
+                    // Coherence chart
+                    AsmChartLabel("COHERENCE")
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(AsmInk, AsmCharcoal.copy(alpha = 0.3f), AsmInk)
+                                )
+                            )
+                    ) {
+                        // Background: long-term coherence
+                        if (uiState.coherenceHistory.size >= 2) {
+                            BackgroundLineChart(
+                                data = uiState.coherenceHistory,
+                                color = AsmZoneBlue.copy(alpha = 0.3f),
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        
+                        // Foreground: short-term coherence
+                        if (uiState.coherenceHistory.size >= 2) {
+                            AsmCoherenceChart(
+                                history = uiState.coherenceHistory,
+                                showLabel = false,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "awaiting data…",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = AsmAsh.copy(alpha = 0.5f),
+                                    letterSpacing = 2.sp
+                                )
+                            }
+                        }
+                    }
 
-            // End Early & Save button — only enabled once at least 1 epoch is done
-            val canFinishEarly = uiState.completedEpochCount >= 1 && !uiState.isComplete
-            Button(
-                onClick = { viewModel.finishEarly() },
-                enabled = canFinishEarly,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF2E7D32),
-                    contentColor   = Color.White,
-                    disabledContainerColor = SurfaceVariant,
-                    disabledContentColor   = TextSecondary
-                )
-            ) {
-                val epochLabel = if (uiState.completedEpochCount > 0)
-                    "End Early & Save (${uiState.completedEpochCount} test${if (uiState.completedEpochCount == 1) "" else "s"} done)"
-                else
-                    "End Early & Save (complete a test first)"
-                Text(epochLabel)
-            }
+                    // RR Interval chart
+                    AsmChartLabel("RR INTERVAL")
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                    ) {
+                        // Background: long-term RR
+                        if (uiState.allSessionRrIntervals.size >= 2) {
+                            BackgroundLineChart(
+                                data = uiState.allSessionRrIntervals.map { it.toFloat() },
+                                color = AsmAsh.copy(alpha = 0.3f),
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        
+                        // Foreground: short-term RR
+                        RrIntervalChart(
+                            rrIntervals = uiState.liveRrIntervals,
+                            windowMs = ASM_CHART_WINDOW_MS,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
 
-            // Cancel button — discards everything
-            OutlinedButton(
-                onClick = {
-                    viewModel.cancel()
-                    onNavigateBack()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
-            ) {
-                Text("Cancel Assessment")
+                    // RMSSD chart
+                    AsmChartLabel("RMSSD")
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                    ) {
+                        // Background: long-term RMSSD
+                        if (uiState.rmssdHistory.size >= 2) {
+                            BackgroundLineChart(
+                                data = uiState.rmssdHistory,
+                                color = AsmRmssdColors.lineColor.copy(alpha = 0.3f),
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        
+                        // Foreground: short-term RMSSD
+                        RmssdChart(
+                            rrIntervals = uiState.liveRrIntervals,
+                            windowMs = ASM_CHART_WINDOW_MS,
+                            colors = AsmRmssdColors,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+
+                    // End Early & Save button
+                    val canFinishEarly = uiState.completedEpochCount >= 1 && !uiState.isComplete
+                    Button(
+                        onClick = { viewModel.finishEarly() },
+                        enabled = canFinishEarly,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF2E7D32),
+                            contentColor   = Color.White,
+                            disabledContainerColor = SurfaceVariant,
+                            disabledContentColor   = TextSecondary
+                        )
+                    ) {
+                        val epochLabel = if (uiState.completedEpochCount > 0)
+                            "End Early & Save (${uiState.completedEpochCount} test${if (uiState.completedEpochCount == 1) "" else "s"} done)"
+                        else
+                            "End Early & Save (complete a test first)"
+                        Text(epochLabel)
+                    }
+
+                    // Cancel button
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.cancel()
+                            onNavigateBack()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
+                    ) {
+                        Text("Cancel Assessment")
+                    }
+                }
             }
         }
     }
 }
 
 // ---------------------------------------------------------------------------
-// Live Stats Row
+// Session Stats Row
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun LiveStatsRow(
-    hr: Int?,
-    rrCount: Int,
-    coherenceRatio: Float
-) {
+private fun AsmSessionStatsRow(currentBpm: Float, remainingSeconds: Int, coherenceRatio: Float) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -284,14 +604,14 @@ private fun LiveStatsRow(
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        StatCell(value = hr?.toString() ?: "—", label = "HR", unit = "bpm")
-        StatCell(value = rrCount.toString(), label = "BEATS", unit = "")
-        StatCell(value = "%.1f".format(coherenceRatio), label = "COHERENCE", unit = "ratio")
+        AsmStatCell(value = "%.2f".format(currentBpm), label = "BPM",       color = AsmGold)
+        AsmStatCell(value = asmFmtDuration(remainingSeconds),   label = "TIME",      color = AsmBone)
+        AsmStatCell(value = "%.1f".format(coherenceRatio),   label = "COHERENCE", color = EcgCyan)
     }
 }
 
 @Composable
-private fun StatCell(value: String, label: String, unit: String) {
+private fun AsmStatCell(value: String, label: String, color: Color) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.widthIn(min = 60.dp)
@@ -299,7 +619,7 @@ private fun StatCell(value: String, label: String, unit: String) {
         Text(
             text = value,
             style = MaterialTheme.typography.titleMedium,
-            color = TextPrimary,
+            color = color,
             fontWeight = FontWeight.Bold
         )
         Text(
@@ -308,50 +628,167 @@ private fun StatCell(value: String, label: String, unit: String) {
             color = TextSecondary,
             letterSpacing = 1.sp
         )
+    }
+}
+
+private fun asmFmtDuration(seconds: Int): String {
+    val mins = seconds / 60
+    val secs = seconds % 60
+    return "%d:%02d".format(mins, secs)
+}
+
+// ---------------------------------------------------------------------------
+// HRV Metrics Row
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun AsmHrvMetricsRow(hrBpm: Int?, rmssd: Double?, sdnn: Double?, rrCount: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(AsmGraphite)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AsmMetricCell(value = hrBpm?.toString() ?: "—",                                  label = "HR",    unit = "bpm",  highlight = true)
+        AsmThinDivider()
+        AsmMetricCell(value = if (rmssd != null && rmssd > 0) "%.0f".format(rmssd) else "—", label = "RMSSD", unit = "ms")
+        AsmThinDivider()
+        AsmMetricCell(value = if (sdnn  != null && sdnn  > 0) "%.0f".format(sdnn)  else "—", label = "SDNN",  unit = "ms")
+        AsmThinDivider()
+        AsmMetricCell(value = rrCount.toString(),                                         label = "BEATS", unit = "")
+    }
+}
+
+@Composable
+private fun AsmMetricCell(value: String, label: String, unit: String, highlight: Boolean = false) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.widthIn(min = 48.dp)
+    ) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontWeight = if (highlight) FontWeight.Bold else FontWeight.Normal,
+                fontSize = 20.sp
+            ),
+            color = if (highlight) AsmBone else AsmSilver
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
+            color = AsmAsh,
+            letterSpacing = 1.sp,
+            textAlign = TextAlign.Center
+        )
         if (unit.isNotEmpty()) {
             Text(
                 text = unit,
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                color = TextSecondary.copy(alpha = 0.6f)
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                color = AsmAsh.copy(alpha = 0.6f),
+                textAlign = TextAlign.Center
             )
         }
     }
 }
 
+@Composable
+private fun AsmThinDivider() {
+    Box(
+        modifier = Modifier
+            .width(1.dp)
+            .height(28.dp)
+            .background(AsmCharcoal)
+    )
+}
+
 // ---------------------------------------------------------------------------
-// HUD
+// Chart section label
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun AssessmentHud(
-    phase: String,
-    currentBpm: Float,
-    remainingSeconds: Int
+private fun AsmChartLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = AsmAsh,
+        letterSpacing = 2.sp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 4.dp, top = 2.dp)
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Coherence Chart
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun AsmCoherenceChart(
+    history: List<Float>,
+    showLabel: Boolean = true,
+    modifier: Modifier = Modifier
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+    Box(
+        modifier = modifier
     ) {
-        Text(
-            text  = phase,
-            style = MaterialTheme.typography.headlineSmall,
-            color = TextPrimary
-        )
-        if (currentBpm > 0f) {
-            Text(
-                text  = "%.2f BPM".format(currentBpm),
-                style = MaterialTheme.typography.titleMedium,
-                color = TextPrimary
+        Canvas(modifier = Modifier.fillMaxSize().padding(8.dp)) {
+            if (history.size < 2) return@Canvas
+            val w = size.width
+            val h = size.height
+            val maxVal = history.max().coerceAtLeast(1f)
+
+            // Zone threshold lines
+            val highThreshold = 3f
+            val mediumThreshold = 1f
+
+            // Draw threshold lines
+            val highY = h - (highThreshold / maxVal * h).coerceIn(0f, h)
+            val mediumY = h - (mediumThreshold / maxVal * h).coerceIn(0f, h)
+
+            drawLine(
+                color = AsmZoneBlue.copy(alpha = 0.3f),
+                start = Offset(0f, highY),
+                end = Offset(w, highY),
+                strokeWidth = 1.dp.toPx()
             )
-        }
-        if (remainingSeconds > 0) {
-            val mins = remainingSeconds / 60
-            val secs = remainingSeconds % 60
-            Text(
-                text  = "%d:%02d remaining".format(mins, secs),
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary
+            drawLine(
+                color = AsmZoneBlue.copy(alpha = 0.2f),
+                start = Offset(0f, mediumY),
+                end = Offset(w, mediumY),
+                strokeWidth = 1.dp.toPx()
             )
+
+            // Draw coherence line
+            val path = Path()
+            history.forEachIndexed { idx, value ->
+                val x = idx.toFloat() / (history.size - 1) * w
+                val y = h - (value / maxVal * h).coerceIn(0f, h)
+                if (idx == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+
+            drawPath(
+                path,
+                AsmGold,
+                style = Stroke(
+                    width = 2.dp.toPx(),
+                    cap = StrokeCap.Round,
+                    join = StrokeJoin.Round
+                )
+            )
+
+            // Draw dots at each point
+            history.forEachIndexed { idx, value ->
+                val x = idx.toFloat() / (history.size - 1) * w
+                val y = h - (value / maxVal * h).coerceIn(0f, h)
+                drawCircle(
+                    color = AsmSilver,
+                    radius = 3.dp.toPx(),
+                    center = Offset(x, y)
+                )
+            }
         }
     }
 }
@@ -386,21 +823,4 @@ private fun QualityWarningCard(message: String) {
             )
         }
     }
-}
-
-// ---------------------------------------------------------------------------
-// Chart section label
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun AsmChartLabel(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelSmall,
-        color = TextSecondary,
-        letterSpacing = 2.sp,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 4.dp, top = 2.dp)
-    )
 }
