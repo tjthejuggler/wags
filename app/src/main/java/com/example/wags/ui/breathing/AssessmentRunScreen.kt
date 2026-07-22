@@ -190,6 +190,7 @@ fun AssessmentRunScreen(
                         size = 280.dp,
                         overlayLabel = if (protocol.isStepped()) overlayLabel else null,
                         useColors = colorsEnabled,
+                        breathCycleCount = uiState.breathCycleCount,
                         onPhaseTransition = vibrationCallback
                     )
                 }
@@ -407,6 +408,7 @@ fun AssessmentRunScreen(
                         size = 300.dp,
                         overlayLabel = if (protocol.isStepped()) overlayLabel else null,
                         useColors = colorsEnabled,
+                        breathCycleCount = uiState.breathCycleCount,
                         onPhaseTransition = vibrationCallback
                     )
                 }

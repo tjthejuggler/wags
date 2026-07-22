@@ -89,7 +89,9 @@ class AssessmentRunViewModel @Inject constructor(
         /** History of coherence ratio samples for the coherence-over-time chart. */
         val coherenceHistory: List<Float> = emptyList(),
         /** History of RMSSD values for the long-term chart. */
-        val rmssdHistory: List<Float> = emptyList()
+        val rmssdHistory: List<Float> = emptyList(),
+        /** Number of completed breath cycles (for hiding labels after initial cycles). */
+        val breathCycleCount: Int = 0
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -532,6 +534,9 @@ class AssessmentRunViewModel @Inject constructor(
 
     private fun startPacerLoop() {
         pacerJob = viewModelScope.launch {
+            var lastInhalingState = _uiState.value.isInhaling
+            var cycleCount = 0
+            
             while (isActive) {
                 delay(16L) // ~60 FPS
                 if (!pacerActive) continue
@@ -541,10 +546,18 @@ class AssessmentRunViewModel @Inject constructor(
                 val wave = pacerEngine.getPacerRadius(ie)
                 val prevWave = _uiState.value.refWave
                 val isInhaling = pacerEngine.breathPhaseLabel.value == "INHALE"
+                
+                // Count breath cycles (phase transitions)
+                if (isInhaling != lastInhalingState) {
+                    cycleCount++
+                    lastInhalingState = isInhaling
+                }
+                
                 _uiState.value = _uiState.value.copy(
                     lastRefWave = prevWave,
                     refWave = wave,
-                    isInhaling = isInhaling
+                    isInhaling = isInhaling,
+                    breathCycleCount = cycleCount
                 )
             }
         }
