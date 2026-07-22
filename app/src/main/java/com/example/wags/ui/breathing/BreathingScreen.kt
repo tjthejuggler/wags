@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -205,10 +206,10 @@ fun BreathingScreen(
                 onInfinityToggle = { viewModel.setInfinityMode(it) }
             )
 
-            // ── HR device gate ────────────────────────────────────────────────
+            // ── HR device recommendation ─────────────────────────────────────────
             if (!state.isHrDeviceConnected) {
                 HrRequiredBanner(
-                    message = "Connect a Polar H10, Verity Sense, or pulse oximeter to start a session or assessment."
+                    message = "For best results, connect a Polar H10, Verity Sense, or pulse oximeter. Session will be recorded without coherence tracking."
                 )
             }
 
@@ -220,8 +221,7 @@ fun BreathingScreen(
             ) {
                 Button(
                     onClick = { onNavigateToSession(vibrationEnabled, state.sessionDurationMinutes, state.infinityMode, state.breathingRateBpm) },
-                    modifier = Modifier.weight(1f),
-                    enabled = state.isHrDeviceConnected
+                    modifier = Modifier.weight(1f)
                 ) { Text("Start Session") }
 
                 // Vibration toggle
@@ -832,7 +832,7 @@ private fun HrRequiredBanner(message: String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f)
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
         ),
         shape = MaterialTheme.shapes.medium
     ) {
@@ -844,16 +844,16 @@ private fun HrRequiredBanner(message: String) {
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Icon(
-                imageVector = Icons.Default.Warning,
+                imageVector = Icons.Default.Info,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
+                tint = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.size(20.dp)
             )
             Column {
                 Text(
-                    text = "HR Device Required",
+                    text = "HR Device Recommended",
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.error
+                    color = MaterialTheme.colorScheme.tertiary
                 )
                 Text(
                     text = message,

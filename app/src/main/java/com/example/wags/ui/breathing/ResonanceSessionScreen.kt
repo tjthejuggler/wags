@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -98,9 +99,15 @@ fun ResonanceSessionScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val deviceId = "PLACEHOLDER_H10_ID"
     val apneaPrefs = remember {
         context.getSharedPreferences("apnea_prefs", android.content.Context.MODE_PRIVATE)
+    }
+    
+    // Check if HR device is connected - use null if not connected
+    val deviceId = if (state.isHrDeviceConnected) {
+        state.connectedDeviceId ?: "PLACEHOLDER_H10_ID"
+    } else {
+        null
     }
 
     // Color mode toggle — persisted to SharedPreferences
@@ -204,6 +211,44 @@ fun ResonanceSessionScreen(
                 }
 
                 BreathingSessionPhase.BREATHING -> {
+                    // Show notification banner if no HR device is connected
+                    if (!state.isHrDeviceConnected) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
+                            ),
+                            shape = MaterialTheme.shapes.medium
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                                    .fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.tertiary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Column {
+                                    Text(
+                                        text = "No HR Monitor Connected",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.tertiary
+                                    )
+                                    Text(
+                                        text = "Session will be recorded but won't contribute to coherence rankings or recommendations.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    
                     // Vibration callback — only fires when toggle is on
                     val vibrationCallback: ((Boolean) -> Unit)? = if (vibrationEnabled) {
                         { inhaling ->

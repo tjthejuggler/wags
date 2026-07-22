@@ -58,6 +58,7 @@ data class BreathingUiState(
     val breathingRateBpm: Float = 5.5f,
     val ieRatio: Float = 1.0f,
     val isHrDeviceConnected: Boolean = false,
+    val connectedDeviceId: String? = null,
     val pacerRadius: Float = 0f,
     val isInhaling: Boolean = true,
     val breathPhaseLabel: String = "INHALE",
@@ -166,7 +167,12 @@ class BreathingViewModel @Inject constructor(
         hrDataSource.liveSpO2,
         hrDataSource.isAnyHrDeviceConnected
     ) { state, hr, spo2, hrConnected ->
-        state.copy(liveHr = hr, liveSpO2 = spo2, isHrDeviceConnected = hrConnected)
+        state.copy(
+            liveHr = hr,
+            liveSpO2 = spo2,
+            isHrDeviceConnected = hrConnected,
+            connectedDeviceId = deviceManager.connectedDeviceId()
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -266,10 +272,16 @@ class BreathingViewModel @Inject constructor(
         _uiState.update { it.copy(posture = savedPosture) }
     }
 
-    fun startSession(deviceId: String) {
+    fun startSession(deviceId: String?) {
         if (_uiState.value.isSessionActive) return
-        deviceManager.startRrStream(deviceId)
-        rrWritesAtStart = deviceManager.rrBuffer.totalWrites()
+        // Only start RR stream if a device is connected
+        if (deviceId != null) {
+            deviceManager.startRrStream(deviceId)
+            rrWritesAtStart = deviceManager.rrBuffer.totalWrites()
+        } else {
+            // No device connected - set writes to 0 to indicate no HR data
+            rrWritesAtStart = 0L
+        }
         pacerEngine.reset()
         allSessionRrIntervals.clear()
         sessionStartTimeMs = System.currentTimeMillis()

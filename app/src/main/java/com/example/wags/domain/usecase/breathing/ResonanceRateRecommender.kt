@@ -146,7 +146,12 @@ class ResonanceRateRecommender @Inject constructor(
         // ── Collect session data points (use meanCoherenceRatio) ────────────
         var validSessionCount = 0
         sessions.forEach { s ->
-            if (s.breathingRateBpm in 4f..7f && s.durationSeconds >= 60) {
+            // Only include sessions with HR device connected and valid data
+            if (s.breathingRateBpm in 4f..7f &&
+                s.durationSeconds >= 60 &&
+                s.hrDeviceId != null &&
+                s.hrDeviceId != "NULL" &&
+                s.totalBeats > 0) {
                 validSessionCount++
                 val normalized = (s.meanCoherenceRatio / COHERENCE_RATIO_CEILING).coerceIn(0f, 1f)
                 val durationLabel = "%d:%02d".format(s.durationSeconds / 60, s.durationSeconds % 60)
