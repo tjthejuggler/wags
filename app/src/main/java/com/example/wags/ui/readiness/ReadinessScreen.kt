@@ -3,6 +3,7 @@ package com.example.wags.ui.readiness
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -150,7 +151,8 @@ fun ReadinessScreen(
                 )
                 ReadinessSessionState.RECORDING -> RecordingContent(
                     state = state,
-                    onCancel = { viewModel.cancelSession() }
+                    onCancel = { viewModel.cancelSession() },
+                    onMetricSelected = { viewModel.setSelectedCircleMetric(it) }
                 )
                 ReadinessSessionState.PROCESSING -> ProcessingContent()
                 ReadinessSessionState.COMPLETE -> CompleteContent(
@@ -287,7 +289,11 @@ private fun PreparingContent(secondsRemaining: Int, onCancel: () -> Unit) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 @Composable
-private fun RecordingContent(state: ReadinessUiState, onCancel: () -> Unit) {
+private fun RecordingContent(
+    state: ReadinessUiState,
+    onCancel: () -> Unit,
+    onMetricSelected: (CircleMetric) -> Unit
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -304,7 +310,12 @@ private fun RecordingContent(state: ReadinessUiState, onCancel: () -> Unit) {
         // ── Countdown arc — shows elapsed (filled) vs remaining (track) ──
         MinimalistArcCountdown(
             remainingSeconds = state.remainingSeconds.toInt(),
-            totalSeconds = state.sessionDurationSeconds.toInt()
+            totalSeconds = state.sessionDurationSeconds.toInt(),
+            selectedMetric = state.selectedCircleMetric,
+            hrBpm = state.liveHr,
+            rmssd = state.liveRmssd?.toFloat(),
+            sdnn = state.liveSdnn?.toFloat(),
+            beatsCount = state.rrCount
         )
 
         Spacer(Modifier.height(4.dp))
@@ -314,7 +325,9 @@ private fun RecordingContent(state: ReadinessUiState, onCancel: () -> Unit) {
             hrBpm = state.liveHr,
             rmssd = state.liveRmssd?.toDouble(),
             sdnn = state.liveSdnn?.toDouble(),
-            rrCount = state.rrCount
+            rrCount = state.rrCount,
+            selectedMetric = state.selectedCircleMetric,
+            onMetricSelected = onMetricSelected
         )
 
         Spacer(Modifier.height(4.dp))
@@ -550,7 +563,15 @@ private fun ErrorContent(message: String, onReset: () -> Unit) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 @Composable
-private fun MinimalistArcCountdown(remainingSeconds: Int, totalSeconds: Int) {
+private fun MinimalistArcCountdown(
+    remainingSeconds: Int,
+    totalSeconds: Int,
+    selectedMetric: CircleMetric = CircleMetric.TIME,
+    hrBpm: Int? = null,
+    rmssd: Float? = null,
+    sdnn: Float? = null,
+    beatsCount: Int = 0
+) {
     val progress = if (totalSeconds > 0) remainingSeconds.toFloat() / totalSeconds.toFloat() else 0f
 
     val animatedProgress by animateFloatAsState(
@@ -622,22 +643,90 @@ private fun MinimalistArcCountdown(remainingSeconds: Int, totalSeconds: Int) {
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.scale(breatheScale)
         ) {
-            val minutes = remainingSeconds / 60
-            val secs = remainingSeconds % 60
-            Text(
-                text = if (minutes > 0) String.format("%d:%02d", minutes, secs) else "$secs",
-                style = MaterialTheme.typography.displayMedium.copy(
-                    fontWeight = FontWeight.Thin,
-                    fontSize = if (minutes > 0) 36.sp else 42.sp,
-                    letterSpacing = 2.sp
-                ),
-                color = Bone
-            )
-            Text(
-                text = if (minutes > 0) "min" else "sec",
-                style = MaterialTheme.typography.bodySmall,
-                color = Ash
-            )
+            when (selectedMetric) {
+                CircleMetric.TIME -> {
+                    val minutes = remainingSeconds / 60
+                    val secs = remainingSeconds % 60
+                    Text(
+                        text = if (minutes > 0) String.format("%d:%02d", minutes, secs) else "$secs",
+                        style = MaterialTheme.typography.displayMedium.copy(
+                            fontWeight = FontWeight.Thin,
+                            fontSize = if (minutes > 0) 36.sp else 42.sp,
+                            letterSpacing = 2.sp
+                        ),
+                        color = Bone
+                    )
+                    Text(
+                        text = if (minutes > 0) "min" else "sec",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Ash
+                    )
+                }
+                CircleMetric.HR -> {
+                    Text(
+                        text = hrBpm?.toString() ?: "—",
+                        style = MaterialTheme.typography.displayMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 42.sp,
+                            letterSpacing = 2.sp
+                        ),
+                        color = Bone
+                    )
+                    Text(
+                        text = "HR",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Ash
+                    )
+                }
+                CircleMetric.RMSSD -> {
+                    Text(
+                        text = if (rmssd != null && rmssd > 0) String.format("%.0f", rmssd) else "—",
+                        style = MaterialTheme.typography.displayMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 42.sp,
+                            letterSpacing = 2.sp
+                        ),
+                        color = Bone
+                    )
+                    Text(
+                        text = "RMSSD",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Ash
+                    )
+                }
+                CircleMetric.SDNN -> {
+                    Text(
+                        text = if (sdnn != null && sdnn > 0) String.format("%.0f", sdnn) else "—",
+                        style = MaterialTheme.typography.displayMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 42.sp,
+                            letterSpacing = 2.sp
+                        ),
+                        color = Bone
+                    )
+                    Text(
+                        text = "SDNN",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Ash
+                    )
+                }
+                CircleMetric.BEATS -> {
+                    Text(
+                        text = beatsCount.toString(),
+                        style = MaterialTheme.typography.displayMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 42.sp,
+                            letterSpacing = 2.sp
+                        ),
+                        color = Bone
+                    )
+                    Text(
+                        text = "BEATS",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Ash
+                    )
+                }
+            }
         }
     }
 }
@@ -651,7 +740,9 @@ private fun HrvLiveMetricsRow(
     hrBpm: Int?,
     rmssd: Double?,
     sdnn: Double?,
-    rrCount: Int
+    rrCount: Int,
+    selectedMetric: CircleMetric = CircleMetric.TIME,
+    onMetricSelected: (CircleMetric) -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -662,30 +753,82 @@ private fun HrvLiveMetricsRow(
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        MetricCell(
+        ClickableMetricCell(
             value = hrBpm?.toString() ?: "—",
             label = "HR",
             unit = "bpm",
-            highlight = true
+            highlight = true,
+            isSelected = selectedMetric == CircleMetric.HR,
+            onClick = { onMetricSelected(CircleMetric.HR) }
         )
         ThinDivider()
-        MetricCell(
+        ClickableMetricCell(
             value = if (rmssd != null && rmssd > 0) String.format("%.0f", rmssd) else "—",
             label = "RMSSD",
-            unit = "ms"
+            unit = "ms",
+            isSelected = selectedMetric == CircleMetric.RMSSD,
+            onClick = { onMetricSelected(CircleMetric.RMSSD) }
         )
         ThinDivider()
-        MetricCell(
+        ClickableMetricCell(
             value = if (sdnn != null && sdnn > 0) String.format("%.0f", sdnn) else "—",
             label = "SDNN",
-            unit = "ms"
+            unit = "ms",
+            isSelected = selectedMetric == CircleMetric.SDNN,
+            onClick = { onMetricSelected(CircleMetric.SDNN) }
         )
         ThinDivider()
-        MetricCell(
+        ClickableMetricCell(
             value = rrCount.toString(),
             label = "BEATS",
-            unit = ""
+            unit = "",
+            isSelected = selectedMetric == CircleMetric.BEATS,
+            onClick = { onMetricSelected(CircleMetric.BEATS) }
         )
+    }
+}
+
+@Composable
+private fun ClickableMetricCell(
+    value: String,
+    label: String,
+    unit: String,
+    highlight: Boolean = false,
+    isSelected: Boolean = false,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .widthIn(min = 48.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (isSelected) ArcTrack.copy(alpha = 0.3f) else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+    ) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontWeight = if (highlight || isSelected) FontWeight.Bold else FontWeight.Normal,
+                fontSize = 20.sp
+            ),
+            color = if (highlight || isSelected) Bone else Silver
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
+            color = Ash,
+            letterSpacing = 1.sp,
+            textAlign = TextAlign.Center
+        )
+        if (unit.isNotEmpty()) {
+            Text(
+                text = unit,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                color = Ash.copy(alpha = 0.6f),
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 

@@ -1,5 +1,7 @@
 package com.example.wags.ui.morning
 
+import android.content.Context
+import android.content.SharedPreferences
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -21,9 +23,8 @@ import com.example.wags.domain.usecase.readiness.MorningReadinessFsm
 import com.example.wags.domain.usecase.readiness.MorningReadinessOrchestrator
 import com.example.wags.domain.usecase.readiness.MorningReadinessState
 import com.example.wags.domain.usecase.readiness.StandDetector
-import kotlin.math.roundToInt
-import kotlin.math.sqrt
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -37,7 +38,20 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
+import kotlin.math.sqrt
 import javax.inject.Inject
+
+/**
+ * Represents the different metrics that can be displayed in the countdown circle center.
+ */
+enum class CircleMetric {
+    TIME,
+    HR,
+    RMSSD,
+    SDNN,
+    BEATS
+}
 
 data class MorningReadinessUiState(
     val fsmState: MorningReadinessState = MorningReadinessState.IDLE,
@@ -59,7 +73,9 @@ data class MorningReadinessUiState(
     val liveHr: Int? = null,
     val liveSpO2: Int? = null,
     /** Recent RR intervals (ms) for the scrolling chart — last ~30 s worth. */
-    val liveRrIntervals: List<Double> = emptyList()
+    val liveRrIntervals: List<Double> = emptyList(),
+    /** Which metric to display in the center of the countdown circle. */
+    val selectedCircleMetric: CircleMetric = CircleMetric.HR
 )
 
 @HiltViewModel
@@ -71,8 +87,15 @@ class MorningReadinessViewModel @Inject constructor(
     private val hrDataSource: HrDataSource,
     private val habitRepo: HabitIntegrationRepository,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
-    @MathDispatcher private val mathDispatcher: CoroutineDispatcher
+    @MathDispatcher private val mathDispatcher: CoroutineDispatcher,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
+
+    companion object {
+        private const val TAG = "MorningReadinessVM"
+        private const val PREFS_NAME = "morning_readiness_prefs"
+        private const val KEY_SELECTED_METRIC = "selected_circle_metric"
+    }
 
     // Captured at session-start so we record the device that was connected when the
     // assessment began, even if it disconnects before the result is saved.
@@ -80,6 +103,22 @@ class MorningReadinessViewModel @Inject constructor(
     private var sessionDeviceType: DeviceType = DeviceType.GENERIC_BLE
 
     private val _uiState = MutableStateFlow(MorningReadinessUiState())
+
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    init {
+        // Load saved metric preference
+        val savedMetric = prefs.getString(KEY_SELECTED_METRIC, null)
+        if (savedMetric != null) {
+            try {
+                val metric = CircleMetric.valueOf(savedMetric)
+                _uiState.update { it.copy(selectedCircleMetric = metric) }
+            } catch (e: IllegalArgumentException) {
+                // Invalid saved value, use default (HR)
+            }
+        }
+    }
     val uiState: StateFlow<MorningReadinessUiState> = combine(
         _uiState,
         hrDataSource.liveHr,
@@ -383,10 +422,6 @@ class MorningReadinessViewModel @Inject constructor(
         }
     }
 
-    companion object {
-        private const val TAG = "MorningReadinessVM"
-    }
-
     fun updateHooper(sleep: Float, fatigue: Float, soreness: Float, stress: Float) {
         _uiState.update {
             it.copy(
@@ -437,6 +472,11 @@ class MorningReadinessViewModel @Inject constructor(
         standDetector.reset()
         fsm.reset()
         _uiState.value = MorningReadinessUiState()
+    }
+
+    fun setSelectedCircleMetric(metric: CircleMetric) {
+        _uiState.update { it.copy(selectedCircleMetric = metric) }
+        prefs.edit().putString(KEY_SELECTED_METRIC, metric.name).apply()
     }
 
     override fun onCleared() {

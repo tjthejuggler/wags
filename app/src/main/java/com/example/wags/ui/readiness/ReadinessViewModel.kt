@@ -1,5 +1,7 @@
 package com.example.wags.ui.readiness
 
+import android.content.Context
+import android.content.SharedPreferences
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -18,6 +20,7 @@ import com.example.wags.domain.usecase.hrv.FrequencyDomainCalculator
 import com.example.wags.domain.usecase.hrv.TimeDomainHrvCalculator
 import com.example.wags.domain.usecase.readiness.ReadinessScoreCalculator
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -42,6 +45,17 @@ enum class HrvDuration(val seconds: Long, val label: String) {
     LONG(300L, "5 min")
 }
 
+/**
+ * Represents the different metrics that can be displayed in the countdown circle center.
+ */
+enum class CircleMetric {
+    TIME,
+    HR,
+    RMSSD,
+    SDNN,
+    BEATS
+}
+
 data class ReadinessUiState(
     val sessionState: ReadinessSessionState = ReadinessSessionState.IDLE,
     val remainingSeconds: Long = 0L,
@@ -59,7 +73,9 @@ data class ReadinessUiState(
     val liveHr: Int? = null,
     val liveSpO2: Int? = null,
     /** Recent RR intervals (ms) for the scrolling chart — last ~30 s worth. */
-    val liveRrIntervals: List<Double> = emptyList()
+    val liveRrIntervals: List<Double> = emptyList(),
+    /** Which metric to display in the center of the countdown circle. */
+    val selectedCircleMetric: CircleMetric = CircleMetric.HR
 )
 
 @HiltViewModel
@@ -73,10 +89,33 @@ class ReadinessViewModel @Inject constructor(
     private val readinessScoreCalculator: ReadinessScoreCalculator,
     private val habitRepo: HabitIntegrationRepository,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
-    @MathDispatcher private val mathDispatcher: CoroutineDispatcher
+    @MathDispatcher private val mathDispatcher: CoroutineDispatcher,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
+    companion object {
+        private const val TAG = "ReadinessVM"
+        private const val PREFS_NAME = "hrv_readiness_prefs"
+        private const val KEY_SELECTED_METRIC = "selected_circle_metric"
+    }
+
     private val _uiState = MutableStateFlow(ReadinessUiState())
+
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    init {
+        // Load saved metric preference
+        val savedMetric = prefs.getString(KEY_SELECTED_METRIC, null)
+        if (savedMetric != null) {
+            try {
+                val metric = CircleMetric.valueOf(savedMetric)
+                _uiState.update { it.copy(selectedCircleMetric = metric) }
+            } catch (e: IllegalArgumentException) {
+                // Invalid saved value, use default (HR)
+            }
+        }
+    }
     val uiState: StateFlow<ReadinessUiState> = combine(
         _uiState,
         hrDataSource.liveHr,
@@ -257,6 +296,11 @@ class ReadinessViewModel @Inject constructor(
 
     fun dismissHrDialog() {
         _uiState.update { it.copy(hrDialogMessage = null) }
+    }
+
+    fun setSelectedCircleMetric(metric: CircleMetric) {
+        _uiState.update { it.copy(selectedCircleMetric = metric) }
+        prefs.edit().putString(KEY_SELECTED_METRIC, metric.name).apply()
     }
 
     fun reset() {
