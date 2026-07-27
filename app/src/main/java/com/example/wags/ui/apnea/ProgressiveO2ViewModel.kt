@@ -546,13 +546,24 @@ class ProgressiveO2ViewModel @Inject constructor(
                 currentSelected + track
             }
             
-            // Preload only the first song if we have Spotify connected
-            if (newSelected.isNotEmpty() && newSelected.first().spotifyUri.isNotBlank() && spotifyAuthManager.isConnected.value) {
+            // Sync Spotify playback with the new selection (if connected).
+            // The FULL ordered selection is sent directly to Spotify via
+            // PUT /v1/me/player/play with the uris array. This replaces the
+            // active playback context atomically, avoiding playlist creation.
+            // Re-send on EVERY selection change so all songs are queued in order.
+            if (spotifyAuthManager.isConnected.value) {
+                val allUris = newSelected.map { it.spotifyUri }.filter { it.isNotBlank() }
+
                 viewModelScope.launch {
-                    spotifyManager.preloadTrack(newSelected.first().spotifyUri)
+                    if (allUris.isNotEmpty()) {
+                        spotifyManager.preloadTrackList(allUris)
+                    }
                     _uiState.update { it.copy(loadingSelectedSong = false) }
                 }
-                currentState.copy(selectedSongs = newSelected, loadingSelectedSong = true)
+                currentState.copy(
+                    selectedSongs = newSelected,
+                    loadingSelectedSong = allUris.isNotEmpty()
+                )
             } else {
                 currentState.copy(selectedSongs = newSelected, loadingSelectedSong = false)
             }

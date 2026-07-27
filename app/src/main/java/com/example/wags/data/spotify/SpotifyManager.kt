@@ -77,6 +77,11 @@ class SpotifyManager @Inject constructor(
         private const val KEY_SONG_CACHE = "song_picker_cache"
         /** Maximum number of songs to persist in the cache. */
         private const val MAX_CACHED_SONGS = 100
+
+        /** Name of the single reusable playlist that backs our ordered queue. */
+        private const val QUEUE_PLAYLIST_NAME = "Wags Dynamic Queue"
+        /** Prefs key storing the reusable playlist's Spotify ID. */
+        private const val KEY_QUEUE_PLAYLIST_ID = "queue_playlist_id"
     }
 
     /** Internal scope for fire-and-forget work (metadata polling). */
@@ -757,6 +762,101 @@ class SpotifyManager @Inject constructor(
     }
 
     /**
+     * Pre-load an ordered list of tracks into Spotify playback, then pause it
+     * so it's ready to resume instantly when the user starts a session.
+     *
+     * This replaces the active playback context with the provided track URIs.
+     * Track 1 will play immediately when resumed, tracks 2+ become the upcoming
+     * queue in order. This approach bypasses playlist creation entirely and
+     * uses only the `user-modify-playback-state` scope.
+     *
+     * Mirrors [preloadTrack] but starts playback with an ordered array of URIs
+     * instead of a single track URI. Does NOT queue a random follow-up song —
+     * the array itself defines the complete playback sequence.
+     *
+     * @param trackUris Ordered list of Spotify URIs like "spotify:track:XXXX"
+     * @return true if the tracks were successfully loaded and paused.
+     */
+    suspend fun preloadTrackList(trackUris: List<String>): Boolean {
+        if (trackUris.isEmpty()) {
+            Log.w("SpotifyMgr", "preloadTrackList: empty track list")
+            return false
+        }
+
+        val wasActive = spotifyController != null
+        ensureSpotifyActive()
+
+        if (!wasActive) {
+            Log.d("SpotifyMgr", "preloadTrackList: Spotify was just launched, waking player via media key")
+            sendPlayCommand()
+            delay(WAKE_PLAYER_DELAY_MS)
+            sendPauseAndRewindCommand()
+        }
+
+        var success = false
+        for (attempt in 1..PRELOAD_MAX_ATTEMPTS) {
+            success = spotifyApiClient.startPlaybackUris(trackUris)
+            if (success) break
+            Log.d("SpotifyMgr", "preloadTrackList: startPlaybackUris attempt $attempt failed, retrying in ${PRELOAD_RETRY_DELAY_MS}ms...")
+            delay(PRELOAD_RETRY_DELAY_MS.toLong())
+        }
+
+        if (success) {
+            delay(PRELOAD_PAUSE_DELAY_MS)
+            sendPauseAndRewindCommand()
+            Log.d("SpotifyMgr", "preloadTrackList: loaded ${trackUris.size} tracks successfully")
+        } else {
+            Log.w("SpotifyMgr", "preloadTrackList: failed after $PRELOAD_MAX_ATTEMPTS attempts for ${trackUris.size} tracks")
+        }
+
+        return success
+    }
+
+    /**
+     * Pre-load a playlist context (the reusable "Wags Dynamic Queue") into
+     * Spotify playback, then pause it so it's ready to resume instantly when
+     * the user starts a session. Playing via the playlist context forces
+     * Spotify to follow the playlist order strictly.
+     *
+     * Mirrors [preloadTrack] but starts playback with a `context_uri` instead
+     * of a single track URI. Does NOT queue a random follow-up song — the
+     * playlist itself defines what plays next.
+     *
+     * @param contextUri e.g. "spotify:playlist:XXXX"
+     * @return true if the context was successfully loaded and paused.
+     * @deprecated Use [preloadTrackList] instead to avoid playlist creation overhead and 403 errors.
+     */
+    @Deprecated("Use preloadTrackList() instead", ReplaceWith("preloadTrackList(trackUris)"))
+    suspend fun preloadPlaylistContext(contextUri: String): Boolean {
+        val wasActive = spotifyController != null
+        ensureSpotifyActive()
+
+        if (!wasActive) {
+            Log.d("SpotifyMgr", "preloadPlaylistContext: Spotify was just launched, waking player via media key")
+            sendPlayCommand()
+            delay(WAKE_PLAYER_DELAY_MS)
+            sendPauseAndRewindCommand()
+        }
+
+        var success = false
+        for (attempt in 1..PRELOAD_MAX_ATTEMPTS) {
+            success = spotifyApiClient.playContext(contextUri)
+            if (success) break
+            Log.d("SpotifyMgr", "preloadPlaylistContext: playContext attempt $attempt failed, retrying in ${PRELOAD_RETRY_DELAY_MS}ms...")
+            delay(PRELOAD_RETRY_DELAY_MS.toLong())
+        }
+
+        if (success) {
+            delay(PRELOAD_PAUSE_DELAY_MS)
+            sendPauseAndRewindCommand()
+        } else {
+            Log.w("SpotifyMgr", "preloadPlaylistContext: failed after $PRELOAD_MAX_ATTEMPTS attempts for $contextUri")
+        }
+
+        return success
+    }
+
+    /**
      * Queue a follow-up song after [selectedTrackUri] so that playback continues
      * automatically when the selected track ends.
      *
@@ -791,6 +891,81 @@ class SpotifyManager @Inject constructor(
         val fallbackUri = candidates.random().spotifyUri
         val queued = spotifyApiClient.addToQueue(fallbackUri)
         Log.d("SpotifyMgr", "queueFollowUpSong: fallback queued=$queued uri=$fallbackUri")
+    }
+
+    /**
+     * Get (or lazily create) the single reusable "Wags Dynamic Queue" playlist.
+     *
+     * The playlist ID is cached in SharedPreferences. On first use (or if the
+     * cached ID no longer resolves) we look it up by name and create it if
+     * absent. Returns the playlist ID, or null on failure.
+     */
+    private suspend fun getOrCreateQueuePlaylist(): String? {
+        // Fast path: cached ID
+        val cached = cachePrefs.getString(KEY_QUEUE_PLAYLIST_ID, null)
+        if (!cached.isNullOrBlank()) return cached
+
+        val userId = spotifyApiClient.getCurrentUserId()
+        if (userId == null) {
+            Log.w("SpotifyMgr", "getOrCreateQueuePlaylist: could not resolve user id")
+            return null
+        }
+
+        // Look up by name (handles the case where the playlist exists but we
+        // lost the cached ID, e.g. after a reinstall).
+        var id = spotifyApiClient.findPlaylistByName(userId, QUEUE_PLAYLIST_NAME)
+        if (id == null) {
+            Log.d("SpotifyMgr", "getOrCreateQueuePlaylist: creating playlist '$QUEUE_PLAYLIST_NAME'")
+            id = spotifyApiClient.createPlaylist(
+                userId = userId,
+                name = QUEUE_PLAYLIST_NAME,
+                description = "Ordered playback queue managed by Wags apnea training."
+            )
+        }
+        if (id != null) {
+            cachePrefs.edit().putString(KEY_QUEUE_PLAYLIST_ID, id).apply()
+            Log.d("SpotifyMgr", "getOrCreateQueuePlaylist: playlist id=$id")
+        }
+        return id
+    }
+
+    /**
+     * Replace the contents of the reusable queue playlist with [trackUris] so
+     * the songs play in the exact order the user selected them.
+     *
+     * Unlike [preloadTrack], this does NOT launch Spotify or touch playback —
+     * it only edits the playlist via the Web API, so it never steals focus
+     * from our app. Safe to call on every picker tap.
+     *
+     * Because `PUT /v1/playlists/{id}/tracks` is an atomic replace, tapping
+     * songs repeatedly never accumulates duplicates — the playlist always
+     * reflects the current selection exactly.
+     *
+     * @param trackUris Ordered Spotify URIs (the full selection, 1st onwards).
+     */
+    suspend fun queueTracks(trackUris: List<String>) {
+        val uris = trackUris.filter { it.isNotBlank() }
+        if (uris.isEmpty()) {
+            Log.d("SpotifyMgr", "queueTracks: empty list, nothing to queue")
+            return
+        }
+        val playlistId = getOrCreateQueuePlaylist()
+        if (playlistId == null) {
+            Log.w("SpotifyMgr", "queueTracks: no queue playlist available")
+            return
+        }
+        Log.d("SpotifyMgr", "queueTracks: replacing playlist $playlistId with ${uris.size} tracks")
+        val ok = spotifyApiClient.replacePlaylistTracks(playlistId, uris)
+        Log.d("SpotifyMgr", "queueTracks: replace ok=$ok")
+    }
+
+    /**
+     * Get the `spotify:playlist:<id>` context URI for the reusable queue
+     * playlist, creating it on first use. Returns null on failure.
+     */
+    suspend fun getQueuePlaylistContextUri(): String? {
+        val id = getOrCreateQueuePlaylist() ?: return null
+        return "spotify:playlist:$id"
     }
 
     /**

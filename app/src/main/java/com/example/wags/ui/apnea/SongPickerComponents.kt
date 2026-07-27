@@ -414,23 +414,47 @@ private fun SongCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Selection number circle or album art / loading indicator
+            // Album art (or fallback icon / loading indicator) with the selection
+            // number shown as a small badge in the top-start corner.
             Box(
-                modifier = Modifier.size(36.dp),
-                contentAlignment = Alignment.Center
+                modifier = Modifier.size(36.dp)
             ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = TextSecondary,
-                        strokeWidth = 2.dp
-                    )
-                } else if (isSelected && selectionNumber != null) {
-                    // Show numbered circle for selected songs
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = TextSecondary,
+                            strokeWidth = 2.dp
+                        )
+                    } else if (!track.albumArt.isNullOrBlank()) {
+                        AsyncImage(
+                            model = track.albumArt,
+                            contentDescription = "${track.title} album art",
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(4.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Text(
+                            "🎵",
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.grayscale()
+                        )
+                    }
+                }
+
+                // Selection-order badge overlaid on the corner of the album art.
+                if (isSelected && selectionNumber != null) {
                     Surface(
                         shape = RoundedCornerShape(50),
                         color = TextSecondary,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier
+                            .size(16.dp)
+                            .align(Alignment.TopStart)
                     ) {
                         Box(
                             contentAlignment = Alignment.Center,
@@ -438,27 +462,12 @@ private fun SongCard(
                         ) {
                             Text(
                                 text = selectionNumber.toString(),
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MaterialTheme.typography.labelSmall,
                                 color = BackgroundDark,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                     }
-                } else if (!track.albumArt.isNullOrBlank()) {
-                    AsyncImage(
-                        model = track.albumArt,
-                        contentDescription = "${track.title} album art",
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(4.dp)),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Text(
-                        "🎵",
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.grayscale()
-                    )
                 }
             }
 

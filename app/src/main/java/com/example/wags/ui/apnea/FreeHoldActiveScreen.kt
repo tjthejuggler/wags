@@ -811,26 +811,59 @@ class FreeHoldActiveViewModel @Inject constructor(
             val prefsSongs = loadSongHistoryFromPrefs()
             // Merge: deduplicate by URI then title+artist
             val merged = mergeSongs(dbSongs, prefsSongs)
-            val details = merged.map { song ->
+            
+            // Resolve URIs first (search-backfill for any song missing a URI).
+            val isConnected = spotifyAuthManager.isConnected.value
+            val withUris = merged.map { song ->
                 var uri = song.spotifyUri
-                // If no URI saved, try resolving via Spotify Search API
-                if (uri == null && spotifyAuthManager.isConnected.value) {
+                if (uri == null && isConnected) {
                     uri = spotifyApiClient.searchTrack(song.title, song.artist)
                     Log.d("FreeHold", "searchTrack backfill: '$uri' for '${song.title}' by '${song.artist}'")
                 }
+                song to uri
+            }
+
+            // Use the persistent cache first to avoid hitting Spotify's rate limit.
+            val existingCache = spotifyManager.songPickerCache.value ?: emptyList()
+            val cacheByUri = existingCache.associateBy { it.spotifyUri }
+
+            // Split into cache-hits vs URIs needing a fetch.
+            val needFetch = mutableListOf<Pair<SpotifySong, String>>()
+            val preliminary = withUris.map { (song, uri) ->
                 if (uri != null) {
-                    // Try API first for duration/art; fall back to basic info from DB
-                    spotifyApiClient.getTrackDetail(uri) ?: SpotifyTrackDetail(
-                        spotifyUri = uri,
+                    val cached = cacheByUri[uri]
+                    if (cached != null) {
+                        cached
+                    } else {
+                        needFetch.add(song to uri)
+                        null // placeholder — filled by the batch fetch below
+                    }
+                } else {
+                    SpotifyTrackDetail(
+                        spotifyUri = "",
                         title = song.title,
                         artist = song.artist,
                         durationMs = 0L,
                         albumArt = song.albumArt
                     )
+                }
+            }
+
+            // ONE batch API call for all cache-misses (avoids per-track 429s).
+            val fetched = if (needFetch.isNotEmpty() && isConnected) {
+                Log.d("FreeHold", "Batch fetching ${needFetch.size} track details")
+                spotifyApiClient.getTracksDetail(needFetch.map { it.second })
+            } else emptyMap()
+
+            // Merge everything back together in original order.
+            var fetchIdx = 0
+            val details = preliminary.mapIndexed { _, prelim ->
+                if (prelim != null) {
+                    prelim
                 } else {
-                    // No URI and no auth — show with basic info
-                    SpotifyTrackDetail(
-                        spotifyUri = "",
+                    val (song, uri) = needFetch[fetchIdx++]
+                    fetched[uri] ?: SpotifyTrackDetail(
+                        spotifyUri = uri,
                         title = song.title,
                         artist = song.artist,
                         durationMs = 0L,
@@ -954,15 +987,32 @@ class FreeHoldActiveViewModel @Inject constructor(
                 currentSelected + track
             }
             
-            // Preload only the first song if we have Spotify connected
-            if (newSelected.isNotEmpty() && newSelected.first().spotifyUri.isNotBlank() && spotifyAuthManager.isConnected.value) {
+            // Sync Spotify playback with the new selection (if connected).
+            // The FULL ordered selection is sent directly to Spotify via
+            // PUT /v1/me/player/play with the uris array. This replaces the
+            // active playback context atomically, avoiding playlist creation.
+            // Re-send on EVERY selection change so all songs are queued in order.
+            val isConnected = spotifyAuthManager.isConnected.value
+            Log.d("FreeHold", "selectSong: isConnected=$isConnected, newSelected.size=${newSelected.size}")
+
+            if (isConnected) {
+                val allUris = newSelected.map { it.spotifyUri }.filter { it.isNotBlank() }
+
+                Log.d("FreeHold", "selectSong: allUris=${allUris.size}")
+
                 viewModelScope.launch {
-                    val success = spotifyManager.preloadTrack(newSelected.first().spotifyUri)
-                    Log.d("FreeHold", "selectSong pre-load: success=$success for ${newSelected.first().spotifyUri}")
+                    if (allUris.isNotEmpty()) {
+                        val success = spotifyManager.preloadTrackList(allUris)
+                        Log.d("FreeHold", "selectSong pre-load: success=$success for ${allUris.size} tracks")
+                    }
                     _uiState.update { it.copy(loadingSelectedSong = false) }
                 }
-                currentState.copy(selectedSongs = newSelected, loadingSelectedSong = true)
+                currentState.copy(
+                    selectedSongs = newSelected,
+                    loadingSelectedSong = allUris.isNotEmpty()
+                )
             } else {
+                Log.d("FreeHold", "selectSong: Spotify not connected, skipping queue")
                 currentState.copy(selectedSongs = newSelected, loadingSelectedSong = false)
             }
         }

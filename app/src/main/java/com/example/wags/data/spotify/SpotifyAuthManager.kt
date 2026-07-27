@@ -201,7 +201,8 @@ class SpotifyAuthManager @Inject constructor(
         }
 
         _isConnected.value = true
-        Log.d(TAG, "Tokens saved, expires at $expiresAt")
+        val grantedScopes = json.optString("scope", "<none reported>")
+        Log.d(TAG, "Tokens saved, expires at $expiresAt, scopes=[$grantedScopes]")
     }
 
     // ── Public API ───────────────────────────────────────────────────────────
