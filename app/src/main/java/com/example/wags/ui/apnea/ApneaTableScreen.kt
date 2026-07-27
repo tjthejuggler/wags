@@ -87,7 +87,7 @@ fun ApneaTableScreen(
             SongPickerDialog(
                 songs = state.previousSongs,
                 isLoading = state.loadingSongs,
-                selectedSong = state.selectedSong,
+                selectedSongs = state.selectedSongs,
                 loadingSelectedSong = state.loadingSelectedSong,
                 onSongSelected = { track -> viewModel.selectSong(track) },
                 onDismiss = { showSongPicker = false }
@@ -185,8 +185,8 @@ fun ApneaTableScreen(
                     if (state.audio == AudioSetting.MUSIC && state.apneaState == ApneaState.IDLE) {
                         item {
                             if (state.spotifyConnected) {
-                                if (state.selectedSong != null) {
-                                    SelectedSongBanner(track = state.selectedSong!!) {
+                                if (state.selectedSongs.isNotEmpty()) {
+                                    SelectedSongBanner(tracks = state.selectedSongs) {
                                         viewModel.clearSelectedSong()
                                     }
                                 }

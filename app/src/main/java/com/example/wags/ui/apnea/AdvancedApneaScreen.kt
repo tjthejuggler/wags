@@ -84,7 +84,7 @@ fun AdvancedApneaScreen(
             SongPickerDialog(
                 songs = uiState.previousSongs,
                 isLoading = uiState.loadingSongs,
-                selectedSong = uiState.selectedSong,
+                selectedSongs = uiState.selectedSongs,
                 loadingSelectedSong = uiState.loadingSelectedSong,
                 onSongSelected = { track -> viewModel.selectSong(track) },
                 onDismiss = { showSongPicker = false }
@@ -116,8 +116,8 @@ fun AdvancedApneaScreen(
             // Song picker / connect prompt — shown when MUSIC mode + session not yet started
             if (uiState.isMusicMode && state.phase == AdvancedApneaPhase.IDLE) {
                 if (uiState.spotifyConnected) {
-                    if (uiState.selectedSong != null) {
-                        SelectedSongBanner(track = uiState.selectedSong!!) {
+                    if (uiState.selectedSongs.isNotEmpty()) {
+                        SelectedSongBanner(tracks = uiState.selectedSongs) {
                             viewModel.clearSelectedSong()
                         }
                     }

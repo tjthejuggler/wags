@@ -97,7 +97,7 @@ data class MinBreathUiState(
     val guidedCompletionStatuses: Map<Long, GuidedCompletionStatus> = emptyMap(),
     val previousSongs: List<SpotifyTrackDetail> = emptyList(),
     val loadingSongs: Boolean = false,
-    val selectedSong: SpotifyTrackDetail? = null,
+    val selectedSongs: List<SpotifyTrackDetail> = emptyList(),
     val loadingSelectedSong: Boolean = false,
     // ── Guided hyperventilation ──────────────────────────────────────────────
     /** True when the prep type is HYPER — controls whether the guided hyper section is shown. */
@@ -589,20 +589,47 @@ class MinBreathViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Stable identity key for a song card — uses URI when available, otherwise title+artist.
+     */
+    private fun SpotifyTrackDetail.cardKey(): String =
+        if (spotifyUri.isNotBlank()) spotifyUri else "$title|$artist"
+
+    /**
+     * Called when the user taps a song card in the picker.
+     * Toggles the song in the selected songs list with numbered ordering.
+     * If the song is already selected, it's deselected and other songs shift down.
+     * If not selected, it's added to the end of the list.
+     */
     fun selectSong(track: SpotifyTrackDetail) {
-        _uiState.update { it.copy(selectedSong = track, loadingSelectedSong = true) }
-        if (track.spotifyUri.isNotBlank() && spotifyAuthManager.isConnected.value) {
-            viewModelScope.launch {
-                spotifyManager.preloadTrack(track.spotifyUri)
-                _uiState.update { it.copy(loadingSelectedSong = false) }
+        val trackKey = track.cardKey()
+        _uiState.update { currentState ->
+            val currentSelected = currentState.selectedSongs
+            val existingIndex = currentSelected.indexOfFirst { it.cardKey() == trackKey }
+            
+            val newSelected = if (existingIndex >= 0) {
+                // Song is already selected - deselect it
+                currentSelected.toMutableList().apply { removeAt(existingIndex) }
+            } else {
+                // Song is not selected - add it to the end
+                currentSelected + track
             }
-        } else {
-            _uiState.update { it.copy(loadingSelectedSong = false) }
+            
+            // Preload only the first song if we have Spotify connected
+            if (newSelected.isNotEmpty() && newSelected.first().spotifyUri.isNotBlank() && spotifyAuthManager.isConnected.value) {
+                viewModelScope.launch {
+                    spotifyManager.preloadTrack(newSelected.first().spotifyUri)
+                    _uiState.update { it.copy(loadingSelectedSong = false) }
+                }
+                currentState.copy(selectedSongs = newSelected, loadingSelectedSong = true)
+            } else {
+                currentState.copy(selectedSongs = newSelected, loadingSelectedSong = false)
+            }
         }
     }
 
     fun clearSelectedSong() {
-        _uiState.update { it.copy(selectedSong = null) }
+        _uiState.update { it.copy(selectedSongs = emptyList()) }
     }
 
     private fun loadSongHistoryFromPrefs(): List<SpotifySong> {

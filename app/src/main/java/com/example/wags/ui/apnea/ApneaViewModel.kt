@@ -190,8 +190,8 @@ data class ApneaUiState(
     val previousSongs: List<SpotifyTrackDetail> = emptyList(),
     /** True while previous songs are being loaded. */
     val loadingSongs: Boolean = false,
-    /** The song the user selected from the picker for the next session. */
-    val selectedSong: SpotifyTrackDetail? = null,
+    /** The songs the user selected from the picker for the next session (ordered by selection). */
+    val selectedSongs: List<SpotifyTrackDetail> = emptyList(),
     /** True while a selected song is being loaded into Spotify playback. */
     val loadingSelectedSong: Boolean = false,
     /** True when audio setting is GUIDED — controls whether the guided audio picker is shown. */
@@ -1585,24 +1585,46 @@ class ApneaViewModel @Inject constructor(
     }
 
     /**
+     * Stable identity key for a song card — uses URI when available, otherwise title+artist.
+     */
+    private fun SpotifyTrackDetail.cardKey(): String =
+        if (spotifyUri.isNotBlank()) spotifyUri else "$title|$artist"
+
+    /**
      * Called when the user taps a song card in the picker.
-     * Pre-loads the song into Spotify playback immediately (then pauses) so it
-     * is ready to resume instantly when the user taps Start.
+     * Toggles the song in the selected songs list with numbered ordering.
+     * If the song is already selected, it's deselected and other songs shift down.
+     * If not selected, it's added to the end of the list.
      */
     fun selectSong(track: SpotifyTrackDetail) {
-        _uiState.update { it.copy(selectedSong = track, loadingSelectedSong = true) }
-        if (track.spotifyUri.isNotBlank() && spotifyAuthManager.isConnected.value) {
-            viewModelScope.launch {
-                spotifyManager.preloadTrack(track.spotifyUri)
-                _uiState.update { it.copy(loadingSelectedSong = false) }
+        val trackKey = track.cardKey()
+        _uiState.update { currentState ->
+            val currentSelected = currentState.selectedSongs
+            val existingIndex = currentSelected.indexOfFirst { it.cardKey() == trackKey }
+            
+            val newSelected = if (existingIndex >= 0) {
+                // Song is already selected - deselect it
+                currentSelected.toMutableList().apply { removeAt(existingIndex) }
+            } else {
+                // Song is not selected - add it to the end
+                currentSelected + track
             }
-        } else {
-            _uiState.update { it.copy(loadingSelectedSong = false) }
+            
+            // Preload only the first song if we have Spotify connected
+            if (newSelected.isNotEmpty() && newSelected.first().spotifyUri.isNotBlank() && spotifyAuthManager.isConnected.value) {
+                viewModelScope.launch {
+                    spotifyManager.preloadTrack(newSelected.first().spotifyUri)
+                    _uiState.update { it.copy(loadingSelectedSong = false) }
+                }
+                currentState.copy(selectedSongs = newSelected, loadingSelectedSong = true)
+            } else {
+                currentState.copy(selectedSongs = newSelected, loadingSelectedSong = false)
+            }
         }
     }
 
     fun clearSelectedSong() {
-        _uiState.update { it.copy(selectedSong = null) }
+        _uiState.update { it.copy(selectedSongs = emptyList()) }
     }
 
     /**

@@ -115,39 +115,77 @@ fun SpotifyConnectPrompt(onNavigateToSettings: () -> Unit) {
  * from the picker. Shows the song name/artist and a clear button.
  */
 @Composable
-fun SelectedSongBanner(track: SpotifyTrackDetail, onClear: () -> Unit) {
+fun SelectedSongBanner(tracks: List<SpotifyTrackDetail>, onClear: () -> Unit) {
+    if (tracks.isEmpty()) return
+    
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = SurfaceDark,
         tonalElevation = 4.dp
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Text("🎵", style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.grayscale())
-            Column(modifier = Modifier.weight(1f)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("🎵", style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.grayscale())
                 Text(
-                    track.title,
+                    "${tracks.size} song${if (tracks.size > 1) "s" else ""} selected",
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    fontWeight = FontWeight.SemiBold
                 )
-                Text(
-                    track.artist,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Spacer(modifier = Modifier.weight(1f))
+                TextButton(onClick = onClear) {
+                    Text("✕", color = TextSecondary)
+                }
             }
-            TextButton(onClick = onClear) {
-                Text("✕", color = TextSecondary)
+            // Show up to first 9 songs with numbers
+            tracks.take(9).forEachIndexed { index, track ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(start = 28.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = TextSecondary,
+                        modifier = Modifier.size(20.dp)
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Text(
+                                text = (index + 1).toString(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = BackgroundDark,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    Text(
+                        "${track.title} • ${track.artist}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            if (tracks.size > 9) {
+                Text(
+                    "+${tracks.size - 9} more",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextDisabled,
+                    modifier = Modifier.padding(start = 28.dp)
+                )
             }
         }
     }
@@ -171,7 +209,7 @@ private fun SpotifyTrackDetail.cardKey(): String =
 fun SongPickerDialog(
     songs: List<SpotifyTrackDetail>,
     isLoading: Boolean,
-    selectedSong: SpotifyTrackDetail?,
+    selectedSongs: List<SpotifyTrackDetail>,
     loadingSelectedSong: Boolean,
     songCompletionStatus: Map<String, SongCompletionStatus> = emptyMap(),
     onSongSelected: (SpotifyTrackDetail) -> Unit,
@@ -265,11 +303,14 @@ fun SongPickerDialog(
                             items(sortedSongs, key = { it.cardKey() }) { track ->
                                 val key = "${track.title.lowercase().trim()}|${track.artist.lowercase().trim()}"
                                 val completion = songCompletionStatus[key]
+                                val selectedIndex = selectedSongs.indexOfFirst { it.cardKey() == track.cardKey() }
                                 SongCard(
                                     track = track,
-                                    isSelected = selectedSong?.cardKey() == track.cardKey(),
+                                    isSelected = selectedIndex >= 0,
+                                    selectionNumber = if (selectedIndex >= 0) selectedIndex + 1 else null,
                                     isLoading = loadingSelectedSong &&
-                                        selectedSong?.cardKey() == track.cardKey(),
+                                        selectedSongs.isNotEmpty() &&
+                                        selectedSongs.first().cardKey() == track.cardKey(),
                                     completedEver = completion?.completedEver == true,
                                     completedWithCurrentSettings = completion?.completedWithCurrentSettings == true,
                                     onClick = { onSongSelected(track) }
@@ -283,7 +324,7 @@ fun SongPickerDialog(
         confirmButton = {
             TextButton(onClick = onDismiss) {
                 Text(
-                    if (selectedSong != null) "Done" else "Cancel",
+                    if (selectedSongs.isNotEmpty()) "Done" else "Cancel",
                     color = TextSecondary
                 )
             }
@@ -347,6 +388,7 @@ private fun SortChipRow(
 private fun SongCard(
     track: SpotifyTrackDetail,
     isSelected: Boolean,
+    selectionNumber: Int? = null,
     isLoading: Boolean,
     completedEver: Boolean = false,
     completedWithCurrentSettings: Boolean = false,
@@ -372,7 +414,7 @@ private fun SongCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Album art / loading indicator
+            // Selection number circle or album art / loading indicator
             Box(
                 modifier = Modifier.size(36.dp),
                 contentAlignment = Alignment.Center
@@ -383,6 +425,25 @@ private fun SongCard(
                         color = TextSecondary,
                         strokeWidth = 2.dp
                     )
+                } else if (isSelected && selectionNumber != null) {
+                    // Show numbered circle for selected songs
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = TextSecondary,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Text(
+                                text = selectionNumber.toString(),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = BackgroundDark,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 } else if (!track.albumArt.isNullOrBlank()) {
                     AsyncImage(
                         model = track.albumArt,

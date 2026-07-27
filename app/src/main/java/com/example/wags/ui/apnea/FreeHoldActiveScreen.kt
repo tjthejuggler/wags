@@ -163,8 +163,8 @@ data class FreeHoldActiveUiState(
      * Value: [SongCompletionStatus] indicating whether the song was completed ever / with current settings.
      */
     val songCompletionStatus: Map<String, SongCompletionStatus> = emptyMap(),
-    /** The song the user selected from the picker (will be loaded into Spotify on Start). */
-    val selectedSong: SpotifyTrackDetail? = null,
+    /** The songs the user selected from the picker (ordered by selection). */
+    val selectedSongs: List<SpotifyTrackDetail> = emptyList(),
     /** True while a selected song is being loaded into Spotify playback. */
     val loadingSelectedSong: Boolean = false,
     // ── Guided hyperventilation ──────────────────────────────────────────────
@@ -614,11 +614,11 @@ class FreeHoldActiveViewModel @Inject constructor(
         // This avoids the ~500ms API latency that previously caused the song
         // to sometimes not be ready when the hold started.
         if (audio == AudioSetting.MUSIC.name) {
-            val selected = _uiState.value.selectedSong
-            val hasValidUri = selected != null
-                && selected.spotifyUri.isNotBlank()
+            val selectedSongs = _uiState.value.selectedSongs
+            val hasValidUri = selectedSongs.isNotEmpty()
+                && selectedSongs.first().spotifyUri.isNotBlank()
                 && spotifyAuthManager.isConnected.value
-            Log.d("FreeHold", "startFreeHold: hasValidUri=$hasValidUri, uri=${selected?.spotifyUri}, connected=${spotifyAuthManager.isConnected.value}")
+            Log.d("FreeHold", "startFreeHold: hasValidUri=$hasValidUri, uri=${selectedSongs.firstOrNull()?.spotifyUri}, connected=${spotifyAuthManager.isConnected.value}")
             spotifyManager.startTracking()
             // The song was pre-loaded in selectSong() — just resume playback.
             // sendPlayCommand() resumes the paused track instantly.
@@ -929,31 +929,53 @@ class FreeHoldActiveViewModel @Inject constructor(
     }
 
     /**
+     * Stable identity key for a song card — uses URI when available, otherwise title+artist.
+     */
+    private fun SpotifyTrackDetail.cardKey(): String =
+        if (spotifyUri.isNotBlank()) spotifyUri else "$title|$artist"
+
+    /**
      * Called when the user taps a song card in the picker.
-     * Pre-loads the song into Spotify playback immediately (then pauses) so it
-     * is ready to resume instantly when the user taps Start.
+     * Toggles the song in the selected songs list with numbered ordering.
+     * If the song is already selected, it's deselected and other songs shift down.
+     * If not selected, it's added to the end of the list.
      */
     fun selectSong(track: SpotifyTrackDetail) {
-        _uiState.update { it.copy(selectedSong = track, loadingSelectedSong = true) }
-        if (track.spotifyUri.isNotBlank() && spotifyAuthManager.isConnected.value) {
-            viewModelScope.launch {
-                val success = spotifyManager.preloadTrack(track.spotifyUri)
-                Log.d("FreeHold", "selectSong pre-load: success=$success for ${track.spotifyUri}")
-                _uiState.update { it.copy(loadingSelectedSong = false) }
+        val trackKey = track.cardKey()
+        _uiState.update { currentState ->
+            val currentSelected = currentState.selectedSongs
+            val existingIndex = currentSelected.indexOfFirst { it.cardKey() == trackKey }
+            
+            val newSelected = if (existingIndex >= 0) {
+                // Song is already selected - deselect it
+                currentSelected.toMutableList().apply { removeAt(existingIndex) }
+            } else {
+                // Song is not selected - add it to the end
+                currentSelected + track
             }
-        } else {
-            _uiState.update { it.copy(loadingSelectedSong = false) }
+            
+            // Preload only the first song if we have Spotify connected
+            if (newSelected.isNotEmpty() && newSelected.first().spotifyUri.isNotBlank() && spotifyAuthManager.isConnected.value) {
+                viewModelScope.launch {
+                    val success = spotifyManager.preloadTrack(newSelected.first().spotifyUri)
+                    Log.d("FreeHold", "selectSong pre-load: success=$success for ${newSelected.first().spotifyUri}")
+                    _uiState.update { it.copy(loadingSelectedSong = false) }
+                }
+                currentState.copy(selectedSongs = newSelected, loadingSelectedSong = true)
+            } else {
+                currentState.copy(selectedSongs = newSelected, loadingSelectedSong = false)
+            }
         }
     }
 
     fun clearSelectedSong() {
-        _uiState.update { it.copy(selectedSong = null) }
+        _uiState.update { it.copy(selectedSongs = emptyList()) }
     }
 
     fun clearSongHistory() {
         viewModelScope.launch {
             apneaRepository.clearSongHistory()
-            _uiState.update { it.copy(previousSongs = emptyList(), selectedSong = null) }
+            _uiState.update { it.copy(previousSongs = emptyList(), selectedSongs = emptyList()) }
         }
     }
 
@@ -1206,7 +1228,7 @@ private fun FreeHoldActiveScreenContent(
             SongPickerDialog(
                 songs = state.previousSongs,
                 isLoading = state.loadingSongs,
-                selectedSong = state.selectedSong,
+                selectedSongs = state.selectedSongs,
                 loadingSelectedSong = state.loadingSelectedSong,
                 songCompletionStatus = state.songCompletionStatus,
                 onSongSelected = { track ->
@@ -1272,8 +1294,8 @@ private fun FreeHoldActiveScreenContent(
             }
 
             // Selected song banner — shown before hold starts when a song was picked
-            if (!state.freeHoldActive && state.selectedSong != null) {
-                SelectedSongBanner(track = state.selectedSong!!) {
+            if (!state.freeHoldActive && state.selectedSongs.isNotEmpty()) {
+                SelectedSongBanner(tracks = state.selectedSongs) {
                     viewModel.clearSelectedSong()
                 }
             }
