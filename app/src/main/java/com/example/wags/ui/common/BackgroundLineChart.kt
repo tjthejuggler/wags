@@ -60,8 +60,8 @@ fun BackgroundLineChart(
         label = "bg_y_max"
     )
 
-    // Make the line more visible by increasing alpha
-    val visibleColor = color.copy(alpha = 0.5f)
+    // Make the line more visible by increasing alpha and stroke width
+    val visibleColor = color.copy(alpha = 0.6f)
 
     Canvas(
         modifier = modifier
@@ -82,7 +82,7 @@ fun BackgroundLineChart(
             path,
             visibleColor,
             style = androidx.compose.ui.graphics.drawscope.Stroke(
-                width = 1.5.dp.toPx(),
+                width = 2.dp.toPx(),
                 cap = StrokeCap.Round,
                 join = StrokeJoin.Round
             )

@@ -42,6 +42,7 @@ import com.example.wags.ui.common.StripChartColors
 import com.example.wags.ui.common.WagsFeedback
 import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.common.BackgroundLineChart
+import com.example.wags.ui.common.CoherenceStripChart
 import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.theme.*
 
@@ -352,7 +353,7 @@ fun ResonanceSessionScreen(
                                                     )
                                                 )
                                         ) {
-                                            // Background: long-term coherence
+                                            // Background: long-term coherence (full history)
                                             if (state.coherenceHistory.size >= 2) {
                                                 BackgroundLineChart(
                                                     data = state.coherenceHistory,
@@ -361,26 +362,20 @@ fun ResonanceSessionScreen(
                                                 )
                                             }
                                             
-                                            // Foreground: short-term coherence (using existing chart)
-                                            if (state.coherenceHistory.size >= 2) {
-                                                RsCoherenceChart(
-                                                    history = state.coherenceHistory,
-                                                    showLabel = false,
-                                                    modifier = Modifier.fillMaxSize()
-                                                )
-                                            } else {
-                                                Box(
-                                                    modifier = Modifier.fillMaxSize(),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Text(
-                                                        "awaiting data…",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = RsAsh.copy(alpha = 0.5f),
-                                                        letterSpacing = 2.sp
-                                                    )
-                                                }
-                                            }
+                                            // Foreground: short-term coherence (scrolling strip chart)
+                                            CoherenceStripChart(
+                                                coherenceHistory = state.coherenceHistory,
+                                                windowMs = RS_CHART_WINDOW_MS,
+                                                colors = StripChartColors(
+                                                    lineColor = RsGold,
+                                                    dotColor = RsSilver,
+                                                    glowColor = RsZoneBlue,
+                                                    bgDark = Color.Transparent,
+                                                    bgMid = Color.Transparent,
+                                                    waitingTextColor = RsAsh.copy(alpha = 0.5f)
+                                                ),
+                                                modifier = Modifier.fillMaxSize()
+                                            )
                                         }
                                     }
 
@@ -529,7 +524,7 @@ fun ResonanceSessionScreen(
                                             )
                                         )
                                 ) {
-                                    // Background: long-term coherence
+                                    // Background: long-term coherence (full history)
                                     if (state.coherenceHistory.size >= 2) {
                                         BackgroundLineChart(
                                             data = state.coherenceHistory,
@@ -538,26 +533,20 @@ fun ResonanceSessionScreen(
                                         )
                                     }
                                     
-                                    // Foreground: short-term coherence (using existing chart)
-                                    if (state.coherenceHistory.size >= 2) {
-                                        RsCoherenceChart(
-                                            history = state.coherenceHistory,
-                                            showLabel = false,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                    } else {
-                                        Box(
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                "awaiting data…",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = RsAsh.copy(alpha = 0.5f),
-                                                letterSpacing = 2.sp
-                                            )
-                                        }
-                                    }
+                                    // Foreground: short-term coherence (scrolling strip chart)
+                                    CoherenceStripChart(
+                                        coherenceHistory = state.coherenceHistory,
+                                        windowMs = RS_CHART_WINDOW_MS,
+                                        colors = StripChartColors(
+                                            lineColor = RsGold,
+                                            dotColor = RsSilver,
+                                            glowColor = RsZoneBlue,
+                                            bgDark = Color.Transparent,
+                                            bgMid = Color.Transparent,
+                                            waitingTextColor = RsAsh.copy(alpha = 0.5f)
+                                        ),
+                                        modifier = Modifier.fillMaxSize()
+                                    )
                                 }
 
                                 // RR Interval chart

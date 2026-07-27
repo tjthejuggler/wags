@@ -41,6 +41,7 @@ import com.example.wags.ui.common.StripChartColors
 import com.example.wags.ui.common.WagsFeedback
 import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.common.BackgroundLineChart
+import com.example.wags.ui.common.CoherenceStripChart
 import com.example.wags.ui.theme.*
 
 // ── Monochrome palette ────────────────────────────────────────────────────────
@@ -467,14 +468,8 @@ fun AssessmentRunScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(120.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(AsmInk, AsmCharcoal.copy(alpha = 0.3f), AsmInk)
-                                )
-                            )
                     ) {
-                        // Background: long-term coherence
+                        // Background: long-term coherence (full history)
                         if (uiState.coherenceHistory.size >= 2) {
                             BackgroundLineChart(
                                 data = uiState.coherenceHistory,
@@ -483,26 +478,20 @@ fun AssessmentRunScreen(
                             )
                         }
                         
-                        // Foreground: short-term coherence
-                        if (uiState.coherenceHistory.size >= 2) {
-                            AsmCoherenceChart(
-                                history = uiState.coherenceHistory,
-                                showLabel = false,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        } else {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    "awaiting data…",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = AsmAsh.copy(alpha = 0.5f),
-                                    letterSpacing = 2.sp
-                                )
-                            }
-                        }
+                        // Foreground: short-term coherence (scrolling strip chart)
+                        CoherenceStripChart(
+                            coherenceHistory = uiState.coherenceHistory,
+                            windowMs = ASM_CHART_WINDOW_MS,
+                            colors = StripChartColors(
+                                lineColor = AsmGold,
+                                dotColor = AsmSilver,
+                                glowColor = AsmZoneBlue,
+                                bgDark = Color.Transparent,
+                                bgMid = Color.Transparent,
+                                waitingTextColor = AsmAsh.copy(alpha = 0.5f)
+                            ),
+                            modifier = Modifier.fillMaxSize()
+                        )
                     }
 
                     // RR Interval chart

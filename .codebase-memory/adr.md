@@ -1,35 +1,23 @@
-## Wake Lock Timeout Fix for Background Sessions
+# ADR: Coherence strip-chart foreground pattern
 
-### Date
-2025-07-18
+## Context
+The live-session coherence graph on both [`ResonanceSessionScreen`](app/src/main/java/com/example/wags/ui/breathing/ResonanceSessionScreen.kt) and [`AssessmentRunScreen`](app/src/main/java/com/example/wags/ui/breathing/AssessmentRunScreen.kt) originally drew the same static line chart in both the background and the foreground, contradicting the user's two-layer convention used for HR/HRV:
+- **Background** = long-term, dim/grey
+- **Foreground** = recent window, bright/white, scrolling like a strip-chart recorder
 
-### Context
-Meditation sessions were being canceled and data was lost when the phone screen was off for more than 10 minutes. The user reported that after ~10 minutes of a meditation session with the screen off, the audio stopped and the session was canceled with no record of the data.
+The RR/RMSSD charts implement the foreground via [`RrStripChart.kt`](app/src/main/java/com/example/wags/ui/common/RrStripChart.kt), which plots every incoming beat at its wall-clock time. Coherence, however, is sampled only every ~5 s by [`CoherenceScoreCalculator`](app/src/main/java/com/example/wags/domain/usecase/breathing/CoherenceScoreCalculator.kt), so a naive port produced a sparse strip chart with very long line segments and a pile-up of points at the left edge.
 
-### Decision
-Fixed two critical issues that caused session cancellation when the screen is off:
+## Decision
+Introduce [`CoherenceStripChart.kt`](app/src/main/java/com/example/wags/ui/common/CoherenceStripChart.kt) that:
+1. Stamps each new coherence sample at `now - SAMPLE_INTERVAL_MS` (5 s) — the time it should have been produced — instead of the ingestion time. This removes the "long flat lead" between points.
+2. Densifies the line by emitting linearly-interpolated sub-points every `SUB_POINT_MS` (1 s) between consecutive anchors. The foreground therefore behaves like the RR/RMSSD strips: one dot per second, short segments, smooth per-second scrolling.
+3. Uses the same Catmull-Rom spline + left-edge fade overlay + shimmer as `StripChartShell` so the visual style is identical to HR/HRV.
+4. Uses a collision-safe fingerprint `(size shl 32) xor last.toBits()` so two near-equal coherence values cannot accidentally be deduplicated.
 
-1. **Wake Lock Timeout in MeditationService**: Removed the 10-minute timeout from the wake lock acquisition. The wake lock is now held indefinitely until explicitly released in `stopSession()`. This prevents the CPU from sleeping during long meditation sessions.
+Background layer continues to be [`BackgroundLineChart`](app/src/main/java/com/example/wags/ui/common/BackgroundLineChart.kt), with stroke width raised to 2 dp and alpha to 0.6 to satisfy the "slightly more visible" request without competing with the foreground.
 
-2. **ViewModel onCleared() Stopping Session**: Modified `MeditationViewModel.onCleared()` to NOT stop the meditation session. The `MeditationService` runs independently as a foreground service and should continue recording even when the ViewModel is cleared (e.g., when user navigates away or screen is off).
-
-3. **Wake Lock Timeout in BleService**: Also removed the 10-minute timeout from `BleService.acquireWakeLock()` to prevent BLE connections from dropping during long sessions.
-
-### Rationale
-- The foreground service pattern is designed to keep operations running independently of the UI lifecycle
-- Wake locks with timeouts are appropriate for short operations, but meditation sessions can be arbitrarily long
-- The system will still properly release wake locks when the service is destroyed
-- The notification provides user control to stop the session explicitly
-
-### Impact
-- Meditation sessions will now continue indefinitely until:
-  1. User explicitly stops it (via UI or notification)
-  2. The timer completes (if set)
-  3. The system kills the service (unlikely with foreground service + wake lock)
-- BLE connections will remain stable during long sessions
-- No data loss when screen is off for extended periods
-
-### Files Modified
-- `app/src/main/java/com/example/wags/data/meditation/MeditationService.kt` - Removed wake lock timeout
-- `app/src/main/java/com/example/wags/ui/meditation/MeditationViewModel.kt` - Removed session stop in onCleared()
-- `app/src/main/java/com/example/wags/data/ble/BleService.kt` - Removed wake lock timeout
+## Consequences
+- Foreground coherence strip on both breathing screens now matches the RR/RMSSD strips: smooth, ~1 dot/s, short segments, left-edge fade.
+- The background long-term line is now slightly more visible across **all three** charts (coherence, RR, RMSSD) since they share `BackgroundLineChart`.
+- `AsmCoherenceChart` / `RsCoherenceChart` composables remain in the codebase but are no longer invoked for live strips; they can be removed in a follow-up cleanup if desired.
+- No data-layer changes; the ViewModels still expose `coherenceHistory: List<Float>` at 5 s cadence.
