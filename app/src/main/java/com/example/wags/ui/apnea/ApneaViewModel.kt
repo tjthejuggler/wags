@@ -37,7 +37,9 @@ import com.example.wags.domain.model.TableDifficulty
 import com.example.wags.domain.model.TableLength
 import com.example.wags.domain.model.TrainingModality
 import com.example.wags.domain.model.WonkaConfig
+import com.example.wags.domain.model.EucapnicConfig
 import com.example.wags.domain.usecase.apnea.AdvancedApneaPhase
+import com.example.wags.domain.usecase.breathing.EucapnicScalingEngine
 import com.example.wags.domain.usecase.apnea.AdvancedApneaState
 import com.example.wags.domain.usecase.apnea.AdvancedApneaStateMachine
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
@@ -211,6 +213,11 @@ data class ApneaUiState(
     val progO2RecordForecast: RecordForecast? = null,
     /** Forecast for Min Breath with the current settings. Null when insufficient data. */
     val minBreathRecordForecast: RecordForecast? = null,
+    // ── Eucapnic Diaphragmatic Breathing ───────────────────────────────────────
+    /** Current eucapnic configuration (when EUCAPNIC_DIAPHRAGMATIC prep type is selected). */
+    val eucapnicConfig: com.example.wags.domain.model.EucapnicConfig? = null,
+    /** Whether the Past Configurations dialog is visible. */
+    val showPastConfigurationsDialog: Boolean = false,
 )
 
 @HiltViewModel
@@ -1207,7 +1214,14 @@ class ApneaViewModel @Inject constructor(
                     tableType = null,
                     firstContractionMs = firstContractionMs,
                     hrDeviceId = deviceLabel,
-                    guidedAudioName = if (_audio.value == AudioSetting.GUIDED) _uiState.value.guidedSelectedName else null
+                    guidedAudioName = if (_audio.value == AudioSetting.GUIDED) _uiState.value.guidedSelectedName else null,
+                    eucapnicPrepDurationSec = state.eucapnicConfig?.prepDurationSec,
+                    eucapnicBreathsPerMin = state.eucapnicConfig?.breathsPerMin,
+                    eucapnicInhaleSec = state.eucapnicConfig?.inhaleSec,
+                    eucapnicTopPauseSec = state.eucapnicConfig?.topPauseSec,
+                    eucapnicExhaleSec = state.eucapnicConfig?.exhaleSec,
+                    eucapnicBottomPauseSec = state.eucapnicConfig?.bottomPauseSec,
+                    eucapnicBreathDepthPercent = state.eucapnicConfig?.breathDepthPercent
                 )
             )
 
@@ -1319,6 +1333,11 @@ class ApneaViewModel @Inject constructor(
         _prepType.value = type
         _uiState.update { it.copy(prepType = type) }
         prefs.edit().putString("setting_prep_type", type.name).apply()
+        
+        // Initialize eucapnic config when EUCAPNIC_DIAPHRAGMATIC is selected
+        if (type == PrepType.EUCAPNIC_DIAPHRAGMATIC && _uiState.value.eucapnicConfig == null) {
+            _uiState.update { it.copy(eucapnicConfig = EucapnicConfig()) }
+        }
     }
 
     fun setTimeOfDay(tod: TimeOfDay) {
@@ -1725,6 +1744,36 @@ class ApneaViewModel @Inject constructor(
             result.add(song)
         }
         return result
+    }
+
+    // ── Eucapnic Diaphragmatic Breathing ───────────────────────────────────────
+
+    /**
+     * Update the eucapnic configuration.
+     */
+    fun updateEucapnicConfig(config: EucapnicConfig) {
+        _uiState.update { it.copy(eucapnicConfig = config) }
+    }
+
+    /**
+     * Show the Past Configurations dialog.
+     */
+    fun showPastConfigurationsDialog() {
+        _uiState.update { it.copy(showPastConfigurationsDialog = true) }
+    }
+
+    /**
+     * Hide the Past Configurations dialog.
+     */
+    fun hidePastConfigurationsDialog() {
+        _uiState.update { it.copy(showPastConfigurationsDialog = false) }
+    }
+
+    /**
+     * Load a saved eucapnic configuration.
+     */
+    fun loadEucapnicConfiguration(config: EucapnicConfig) {
+        _uiState.update { it.copy(eucapnicConfig = config) }
     }
 
     override fun onCleared() {

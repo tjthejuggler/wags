@@ -63,5 +63,26 @@ data class ApneaRecordEntity(
     val newRecordIndication: Boolean = false,
     /** User notes associated with this record. Null if no notes were added. */
     @ColumnInfo(defaultValue = "NULL")
-    val note: String? = null
+    val note: String? = null,
+    /** Eucapnic prep: total prep duration in seconds. Null when prepType != EUCAPNIC_DIAPHRAGMATIC. */
+    @ColumnInfo(defaultValue = "NULL")
+    val eucapnicPrepDurationSec: Int? = null,
+    /** Eucapnic prep: target breathing rate in breaths per minute. Null when prepType != EUCAPNIC_DIAPHRAGMATIC. */
+    @ColumnInfo(defaultValue = "NULL")
+    val eucapnicBreathsPerMin: Float? = null,
+    /** Eucapnic prep: inhale phase duration in seconds. Null when prepType != EUCAPNIC_DIAPHRAGMATIC. */
+    @ColumnInfo(defaultValue = "NULL")
+    val eucapnicInhaleSec: Float? = null,
+    /** Eucapnic prep: breath-hold pause at the top of the inhale, in seconds. Null when prepType != EUCAPNIC_DIAPHRAGMATIC. */
+    @ColumnInfo(defaultValue = "NULL")
+    val eucapnicTopPauseSec: Float? = null,
+    /** Eucapnic prep: exhale phase duration in seconds. Null when prepType != EUCAPNIC_DIAPHRAGMATIC. */
+    @ColumnInfo(defaultValue = "NULL")
+    val eucapnicExhaleSec: Float? = null,
+    /** Eucapnic prep: breath-hold pause at the bottom of the exhale, in seconds. Null when prepType != EUCAPNIC_DIAPHRAGMATIC. */
+    @ColumnInfo(defaultValue = "NULL")
+    val eucapnicBottomPauseSec: Float? = null,
+    /** Eucapnic prep: breath depth as a percentage of vital capacity (0–100). Null when prepType != EUCAPNIC_DIAPHRAGMATIC. */
+    @ColumnInfo(defaultValue = "NULL")
+    val eucapnicBreathDepthPercent: Int? = null
 )

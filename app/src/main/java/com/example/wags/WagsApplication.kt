@@ -7,6 +7,7 @@ import com.example.wags.data.backup.AutoBackupManager
 import com.example.wags.data.crash.CrashLogWriter
 import com.example.wags.data.garmin.GarminApneaRepository
 import com.example.wags.data.garmin.GarminManager
+import com.example.wags.data.repository.EucapnicConfigRepository
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -27,6 +28,9 @@ class WagsApplication : Application() {
     @Inject
     lateinit var autoBackupManager: AutoBackupManager
 
+    @Inject
+    lateinit var eucapnicConfigRepository: EucapnicConfigRepository
+
     override fun onCreate() {
         super.onCreate()
         installCrashLogger()
@@ -46,6 +50,9 @@ class WagsApplication : Application() {
         // The SDK will find the watch via Garmin Connect Mobile if it's paired.
         Log.i("WagsApp", "Auto-initializing Garmin Connect IQ SDK...")
         garminManager.initialize()
+
+        // Seed default eucapnic configurations on first run
+        eucapnicConfigRepository.seedDefaultConfigurationsIfNeeded()
 
         // Listen for toast messages from GarminManager and show them
         scope.launch {

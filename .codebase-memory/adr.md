@@ -1,37 +1,25 @@
-# ADR: Spotify song-picker metadata — Dev-Mode batch block + daily-quota 429
+## ADR: Eucapnic Pacer Renderer — Active Session UI
 
-## Status
-Accepted (2026-07-27) — final, supersedes earlier notes
+**Date:** 2026-07-28
 
-## Symptom
-Apnea "Choose a Song" picker shows titles but no album art / durations.
+**Context:**
+The EUCAPNIC_DIAPHRAGMATIC prep type needed an active pacing renderer to guide the user through diaphragmatic breathing during apnea preparation. The domain layer (EucapnicPacerEngine, EucapnicConfig, PacerState, EucapnicPhase) was already implemented. The UI layer needed three new components.
 
-## Two distinct blockers found (via PID-filtered logcat)
+**Decision:**
+Created three new files in `ui/apnea/`, following the established patterns from BreathingPacerCircle and BreathingViewModel:
 
-### 1. Batch endpoint blocked in Development Mode → 403
-`GET /v1/tracks?ids={comma-separated}` ("Get Several Tracks") returned **HTTP 403 Forbidden** even with a valid token and after adding `user-library-read`, while `/v1/search` and playback worked under the SAME token. Batch "Get Several Tracks" is not available to apps in Spotify Development Mode.
-**Fix:** `SpotifyApiClient.getTracksDetail` no longer uses the comma-separated batch endpoint. It loops **single-track** `GET /v1/tracks/{id}` ("Get Track", allowed in Dev Mode), one call per ID, ~120 ms apart (≈8 req/s) with a private `fetchSingleTrack` helper.
+1. **EucapnicPacerGauge** — Canvas-based composable rendering an expanding/contracting circle. Supports 4 phases (INHALE/TOP_PAUSE/EXHALE/BOTTOM_PAUSE) with depth scaling (15–50% breathDepthPercent mapped to 0.30–1.00 radius scale). Uses the same greyscale palette (PacerInhale/PacerExhale) as the resonance pacer.
 
-### 2. Daily Dev-Mode quota exhausted → 429 with huge Retry-After
-After switching to single-track, the endpoint returned:
-```
-W SpotifyApi: ⏳ fetchSingleTrack RATE LIMITED (429) for 7AalBKBoLDR4UmRYRJpdbj. Retry-After=49626s
-```
-`Retry-After=49626s ≈ 13.8 hours`. This is NOT a rolling rate-window; it's the Development-Mode DAILY quota being exhausted (burned by the earlier per-track storms + repeated testing). No code change can bypass it — the metadata will load once the quota resets.
-**Fix:** `fetchSingleTrack` only blocks-and-retries a 429 when `Retry-After <= MAX_BLOCKING_RETRY_AFTER_SEC` (30s, a genuine rolling window). For larger values it logs "daily quota appears exhausted, metadata unavailable for ~Xh" and fails fast (returns null for that track) instead of freezing the loader for hours.
+2. **EucapnicPacerViewModel** — @HiltViewModel wrapping EucapnicPacerEngine. Runs a ~60 FPS tick loop via viewModelScope. Exposes StateFlows for phase, radius, remaining time, breath count, BPM. Handles pause/resume for lifecycle events. Fires WagsFeedback haptics on phase transitions and sessionEnd chime on completion.
 
-## Current behaviour
-- Code is correct and will populate art/durations automatically once the daily quota resets.
-- On quota-exhaustion the picker keeps showing cached titles/artists and fails fast rather than hanging.
-- All 5 apnea picker ViewModels unchanged — they still call `getTracksDetail(uris)`; only its internal implementation changed.
-- ⟳ refresh button + `forceRefresh` param retained.
+3. **EucapnicPacerScreen** — Full-screen composable with info bar (remaining time, breaths, BPM), gauge, phase indicator chip, linear progress bar, and time text. Uses LockPortrait, KeepScreenOn, SessionBackHandler from SessionGuards. Observes ON_PAUSE/ON_RESUME lifecycle events to pause/resume the pacer.
 
-## Logging added (kept for future diagnosis)
-- `getTracksDetail: fetching N ids via single-track loop` / `resolved X/N tracks`
-- 429 handler prints `Retry-After=Ns (~Xh Ym)` and quota-exhaustion warning
-- `SpotifyAuthManager.saveTokens` logs `scopes=[...]`
+**Consequences:**
+- Purely additive: no existing files modified.
+- Not yet wired into navigation or apnea session flow — integration is a separate task.
+- The gauge depth scaling provides visual feedback on target breath depth.
+- Haptic patterns reuse existing WagsFeedback methods (breathInhale/breathExhale/sessionEnd).
 
-## Files
-- app/src/main/java/com/example/wags/data/spotify/SpotifyApiClient.kt (getTracksDetail → single-track loop + fetchSingleTrack + 429 cap)
-- app/src/main/java/com/example/wags/data/spotify/SpotifyAuthManager.kt (user-library-read scope, scopes log)
-- SongPickerComponents.kt + 5 ViewModels + 5 Screens (refresh button & batch wiring)
+**Alternatives considered:**
+- Reusing BreathingPacerCircle directly: rejected because it only supports 2 phases (inhale/exhale) and lacks depth scaling.
+- Using a progress arc instead of a circle: rejected to maintain visual consistency with the existing resonance pacer.

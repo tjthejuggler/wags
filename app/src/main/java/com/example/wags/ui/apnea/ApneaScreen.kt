@@ -60,9 +60,11 @@ import com.example.wags.ui.theme.*
 @Composable
 fun ApneaScreen(
     navController: NavController,
-    viewModel: ApneaViewModel = hiltViewModel()
+    viewModel: ApneaViewModel = hiltViewModel(),
+    eucapnicConfigViewModel: EucapnicConfigViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val pastConfigurations by eucapnicConfigViewModel.pastConfigurations.collectAsStateWithLifecycle()
 
     LockPortrait()
 
@@ -87,6 +89,69 @@ fun ApneaScreen(
             category = pbResult.category,
             onDismiss = { viewModel.dismissNewPersonalBest() }
         )
+    }
+
+    // Past Configurations dialog for Eucapnic Diaphragmatic Breathing
+    if (state.showPastConfigurationsDialog) {
+        var showSaveNameDialog by remember { mutableStateOf(false) }
+        var saveName by remember { mutableStateOf("") }
+
+        PastConfigurationsDialog(
+            configurations = pastConfigurations,
+            onConfigurationSelected = { entity ->
+                // Load the configuration in both ViewModels
+                eucapnicConfigViewModel.loadConfiguration(entity)
+                val config = com.example.wags.domain.model.EucapnicConfig(
+                    prepDurationSec = entity.prepDurationSec,
+                    breathsPerMin = entity.breathsPerMin,
+                    inhaleSec = entity.inhaleSec,
+                    topPauseSec = entity.topPauseSec,
+                    exhaleSec = entity.exhaleSec,
+                    bottomPauseSec = entity.bottomPauseSec,
+                    breathDepthPercent = entity.breathDepthPercent
+                )
+                viewModel.loadEucapnicConfiguration(config)
+                viewModel.hidePastConfigurationsDialog()
+            },
+            onSaveCurrentClick = {
+                showSaveNameDialog = true
+            },
+            onDismiss = { viewModel.hidePastConfigurationsDialog() }
+        )
+
+        // Save name dialog
+        if (showSaveNameDialog) {
+            AlertDialog(
+                onDismissRequest = { showSaveNameDialog = false },
+                title = { Text("Save Configuration") },
+                text = {
+                    TextField(
+                        value = saveName,
+                        onValueChange = { saveName = it },
+                        label = { Text("Configuration name") },
+                        singleLine = true
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            state.eucapnicConfig?.let { config ->
+                                eucapnicConfigViewModel.saveConfiguration(saveName)
+                            }
+                            showSaveNameDialog = false
+                            saveName = ""
+                        }
+                    ) {
+                        Text("Save")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showSaveNameDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
     }
 
     Scaffold(
@@ -190,16 +255,28 @@ fun ApneaScreen(
                         recordForecast      = state.recordForecast,
                         onAutoSet           = { viewModel.autoSetBestSettings() },
                         onStartHold = {
-                            navController.navigate(
-                                WagsRoutes.freeHoldActive(
-                                    lungVolume = state.selectedLungVolume,
-                                    prepType   = state.prepType.name,
-                                    timeOfDay  = state.timeOfDay.name,
-                                    posture    = state.posture.name,
-                                    showTimer  = state.showTimer,
-                                    audio      = state.audio.name
+                            // Navigate to EucapnicPacerScreen when EUCAPNIC_DIAPHRAGMATIC is selected
+                            if (state.prepType == PrepType.EUCAPNIC_DIAPHRAGMATIC) {
+                                navController.navigate(
+                                    WagsRoutes.eucapnicPacer(
+                                        lungVolume = state.selectedLungVolume,
+                                        timeOfDay  = state.timeOfDay.name,
+                                        posture    = state.posture.name,
+                                        audio      = state.audio.name
+                                    )
                                 )
-                            )
+                            } else {
+                                navController.navigate(
+                                    WagsRoutes.freeHoldActive(
+                                        lungVolume = state.selectedLungVolume,
+                                        prepType   = state.prepType.name,
+                                        timeOfDay  = state.timeOfDay.name,
+                                        posture    = state.posture.name,
+                                        showTimer  = state.showTimer,
+                                        audio      = state.audio.name
+                                    )
+                                )
+                            }
                         },
                         onBestTimeClick = { recordId ->
                             navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
@@ -209,6 +286,15 @@ fun ApneaScreen(
                         },
                         onTrophyClick = {
                             navController.navigate(WagsRoutes.personalBests())
+                        },
+                        // Eucapnic Diaphragmatic Breathing parameters
+                        prepType = state.prepType,
+                        eucapnicConfig = state.eucapnicConfig,
+                        onEucapnicConfigChange = { config ->
+                            viewModel.updateEucapnicConfig(config)
+                        },
+                        onShowPastConfigurations = {
+                            viewModel.showPastConfigurationsDialog()
                         }
                     )
                 }
@@ -734,7 +820,12 @@ private fun FreeHoldContent(
     onStartHold: () -> Unit,
     onBestTimeClick: (Long) -> Unit = {},
     onLastTimeClick: (Long) -> Unit = {},
-    onTrophyClick: () -> Unit = {}
+    onTrophyClick: () -> Unit = {},
+    // Eucapnic Diaphragmatic Breathing parameters
+    prepType: PrepType = PrepType.NO_PREP,
+    eucapnicConfig: com.example.wags.domain.model.EucapnicConfig? = null,
+    onEucapnicConfigChange: (com.example.wags.domain.model.EucapnicConfig) -> Unit = {},
+    onShowPastConfigurations: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -803,6 +894,43 @@ private fun FreeHoldContent(
 
         // ── Record-breaking forecast ──────────────────────────────────────────
         RecordForecastSummary(forecast = recordForecast, onAutoSet = onAutoSet)
+
+        // ── Eucapnic Diaphragmatic Breathing Configuration ────────────────────
+        if (prepType == PrepType.EUCAPNIC_DIAPHRAGMATIC && eucapnicConfig != null) {
+            EucapnicConfigSection(
+                config = eucapnicConfig,
+                scalingEngine = com.example.wags.domain.usecase.breathing.EucapnicScalingEngine(),
+                onPrepDurationChange = { duration ->
+                    onEucapnicConfigChange(eucapnicConfig.copy(prepDurationSec = duration))
+                },
+                onBpmChange = { bpm ->
+                    onEucapnicConfigChange(eucapnicConfig.copy(breathsPerMin = bpm))
+                },
+                onInhaleChange = { inhale ->
+                    onEucapnicConfigChange(eucapnicConfig.copy(inhaleSec = inhale))
+                },
+                onTopPauseChange = { topPause ->
+                    onEucapnicConfigChange(eucapnicConfig.copy(topPauseSec = topPause))
+                },
+                onExhaleChange = { exhale ->
+                    onEucapnicConfigChange(eucapnicConfig.copy(exhaleSec = exhale))
+                },
+                onBottomPauseChange = { bottomPause ->
+                    onEucapnicConfigChange(eucapnicConfig.copy(bottomPauseSec = bottomPause))
+                },
+                onBreathDepthChange = { depth ->
+                    onEucapnicConfigChange(eucapnicConfig.copy(breathDepthPercent = depth))
+                }
+            )
+            
+            // Past Configurations button
+            OutlinedButton(
+                onClick = onShowPastConfigurations,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Past Configurations")
+            }
+        }
 
         Button(
             onClick = onStartHold,

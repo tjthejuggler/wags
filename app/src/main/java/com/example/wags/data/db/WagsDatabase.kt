@@ -29,9 +29,10 @@ import com.example.wags.data.db.entity.*
         RapidHrSessionEntity::class,
         RapidHrTelemetryEntity::class,
         GuidedAudioEntity::class,
-        ForecastCalibrationEntity::class
+        ForecastCalibrationEntity::class,
+        EucapnicPastConfigurationEntity::class
     ],
-    version = 38,
+    version = 39,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -56,6 +57,7 @@ abstract class WagsDatabase : RoomDatabase() {
     abstract fun rapidHrTelemetryDao(): RapidHrTelemetryDao
     abstract fun guidedAudioDao(): GuidedAudioDao
     abstract fun forecastCalibrationDao(): ForecastCalibrationDao
+    abstract fun eucapnicPastConfigurationDao(): EucapnicPastConfigurationDao
 
     companion object {
         /**
@@ -1017,6 +1019,47 @@ abstract class WagsDatabase : RoomDatabase() {
                                 AND s.timestamp = apnea_records.timestamp
                               LIMIT 1
                           ) IS NOT NULL
+                    """.trimIndent())
+                }
+            }
+
+            /**
+             * v38 → v39: EUCAPNIC_DIAPHRAGMATIC prep type integration.
+             *
+             * Changes:
+             *  1. Add 7 nullable eucapnic-specific columns to apnea_records.
+             *     All default to NULL so existing records are unaffected and
+             *     backward compatibility is preserved.
+             *  2. Create eucapnic_past_configurations table for storing
+             *     user-saved eucapnic breathing preparation configurations.
+             */
+            val MIGRATION_38_39 = object : Migration(38, 39) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // 1. Add 7 eucapnic columns to apnea_records
+                    db.execSQL("ALTER TABLE apnea_records ADD COLUMN eucapnicPrepDurationSec INTEGER DEFAULT NULL")
+                    db.execSQL("ALTER TABLE apnea_records ADD COLUMN eucapnicBreathsPerMin REAL DEFAULT NULL")
+                    db.execSQL("ALTER TABLE apnea_records ADD COLUMN eucapnicInhaleSec REAL DEFAULT NULL")
+                    db.execSQL("ALTER TABLE apnea_records ADD COLUMN eucapnicTopPauseSec REAL DEFAULT NULL")
+                    db.execSQL("ALTER TABLE apnea_records ADD COLUMN eucapnicExhaleSec REAL DEFAULT NULL")
+                    db.execSQL("ALTER TABLE apnea_records ADD COLUMN eucapnicBottomPauseSec REAL DEFAULT NULL")
+                    db.execSQL("ALTER TABLE apnea_records ADD COLUMN eucapnicBreathDepthPercent INTEGER DEFAULT NULL")
+
+                    // 2. Create eucapnic_past_configurations table
+                    db.execSQL("""
+                        CREATE TABLE IF NOT EXISTS `eucapnic_past_configurations` (
+                            `configId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `name` TEXT NOT NULL,
+                            `prepDurationSec` INTEGER NOT NULL,
+                            `breathsPerMin` REAL NOT NULL,
+                            `inhaleSec` REAL NOT NULL,
+                            `topPauseSec` REAL NOT NULL,
+                            `exhaleSec` REAL NOT NULL,
+                            `bottomPauseSec` REAL NOT NULL,
+                            `breathDepthPercent` INTEGER NOT NULL,
+                            `createdAtMs` INTEGER NOT NULL,
+                            `lastUsedAtMs` INTEGER DEFAULT NULL,
+                            `useCount` INTEGER NOT NULL DEFAULT 0
+                        )
                     """.trimIndent())
                 }
             }

@@ -63,7 +63,9 @@ data class ApneaRecordDetailUiState(
      *  Swipe right (lower index) = newer; swipe left (higher index) = older. */
     val allRecordIds: List<Long> = emptyList(),
     /** Index of the currently displayed record in [allRecordIds]. */
-    val currentIndex: Int = 0
+    val currentIndex: Int = 0,
+    /** Eucapnic configuration used for this record (null if not EUCAPNIC_DIAPHRAGMATIC). */
+    val eucapnicConfig: com.example.wags.domain.model.EucapnicConfig? = null
 )
 
 @HiltViewModel
@@ -104,6 +106,14 @@ class ApneaRecordDetailViewModel @Inject constructor(
                 val tableSession = if (record.tableType != null) {
                     sessionRepository.getSessionByTimestampAndType(record.timestamp, record.tableType)
                 } else null
+                
+                // Load eucapnic config if this record used EUCAPNIC_DIAPHRAGMATIC prep
+                val eucapnicConfig = if (record.prepType == PrepType.EUCAPNIC_DIAPHRAGMATIC.name) {
+                    // TODO: Load from database or reconstruct from record data
+                    // For now, create a default config
+                    com.example.wags.domain.model.EucapnicConfig()
+                } else null
+                
                 _uiState.update {
                     it.copy(
                         record       = record,
@@ -114,7 +124,8 @@ class ApneaRecordDetailViewModel @Inject constructor(
                         tableSession = tableSession,
                         isLoading    = false,
                         allRecordIds = allIds,
-                        currentIndex = startIndex
+                        currentIndex = startIndex,
+                        eucapnicConfig = eucapnicConfig
                     )
                 }
             }
