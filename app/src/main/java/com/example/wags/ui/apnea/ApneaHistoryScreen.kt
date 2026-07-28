@@ -748,7 +748,7 @@ private fun StatsSettingsDialog(
                 SettingRow(label = "Prep") {
                     SettingChip(FILTER_ALL, "All", prepType == FILTER_ALL, { onSetPrepType(FILTER_ALL) }, chipColors)
                     PrepType.entries.forEach { pt ->
-                        SettingChip(pt.name, pt.displayName(), prepType == pt.name, { onSetPrepType(pt.name) }, chipColors)
+                        SettingChip(pt.name, pt.shortDisplayName(), prepType == pt.name, { onSetPrepType(pt.name) }, chipColors)
                     }
                 }
                 // Time of Day

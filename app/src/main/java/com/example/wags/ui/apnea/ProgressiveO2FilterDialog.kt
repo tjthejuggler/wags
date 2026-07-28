@@ -96,7 +96,7 @@ fun ProgressiveO2FilterDialog(
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     FilterChip(selected = filterPrepType.isEmpty(), onClick = { onPrepTypeChange("") }, label = { Text("All", style = MaterialTheme.typography.labelSmall) }, modifier = Modifier.height(30.dp), colors = chipColors)
                     PrepType.entries.forEach { pt ->
-                        FilterChip(selected = filterPrepType == pt.name, onClick = { onPrepTypeChange(pt.name) }, label = { Text(pt.displayName(), style = MaterialTheme.typography.labelSmall) }, modifier = Modifier.height(30.dp), colors = chipColors)
+                        FilterChip(selected = filterPrepType == pt.name, onClick = { onPrepTypeChange(pt.name) }, label = { Text(pt.shortDisplayName(), style = MaterialTheme.typography.labelSmall) }, modifier = Modifier.height(30.dp), colors = chipColors)
                     }
                 }
             }

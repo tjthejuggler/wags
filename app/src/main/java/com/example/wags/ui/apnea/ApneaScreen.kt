@@ -704,7 +704,7 @@ private fun ApneaSettingsContent(
                 FilterChip(
                     selected = prepType == type,
                     onClick = { onPrepTypeChange(type) },
-                    label = { Text(type.displayName(), style = MaterialTheme.typography.bodySmall) },
+                    label = { Text(type.shortDisplayName(), style = MaterialTheme.typography.bodySmall) },
                     modifier = Modifier.height(30.dp),
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = SurfaceVariant,

@@ -212,7 +212,7 @@ fun AllApneaRecordsScreen(
                                         FilterChip(
                                             selected = state.filterPrepType == pt.name,
                                             onClick = { viewModel.setPrepTypeFilter(pt.name) },
-                                            label = { Text(pt.displayName(), style = MaterialTheme.typography.labelSmall) }
+                                            label = { Text(pt.shortDisplayName(), style = MaterialTheme.typography.labelSmall) }
                                         )
                                     }
                                 }

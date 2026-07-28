@@ -384,7 +384,7 @@ private fun EditRecordSheet(
                             onClick  = { onPrepTypeChange(pt) },
                             label    = {
                                 Text(
-                                    pt.displayName(),
+                                    pt.shortDisplayName(),
                                     color = if (isSelected) TextPrimary else MaterialTheme.colorScheme.onSurface
                                 )
                             },

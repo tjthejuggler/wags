@@ -79,7 +79,7 @@ fun FreeHoldSettingsDialog(
                         FilterChip(
                             selected = prepType == type.name,
                             onClick = { onPrepTypeChange(type.name) },
-                            label = { Text(type.displayName(), style = MaterialTheme.typography.bodySmall) },
+                            label = { Text(type.shortDisplayName(), style = MaterialTheme.typography.bodySmall) },
                             modifier = Modifier.height(30.dp),
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = SurfaceVariant,

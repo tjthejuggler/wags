@@ -12,4 +12,11 @@ enum class PrepType {
         HYPER                 -> "Hyper"
         EUCAPNIC_DIAPHRAGMATIC -> "Eucapnic Diaphragmatic"
     }
+
+    fun shortDisplayName(): String = when (this) {
+        NO_PREP               -> "No Prep"
+        RESONANCE             -> "Resonance"
+        HYPER                 -> "Hyper"
+        EUCAPNIC_DIAPHRAGMATIC -> "Eucapnic"
+    }
 }
