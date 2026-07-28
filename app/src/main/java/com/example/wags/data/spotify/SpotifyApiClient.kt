@@ -44,6 +44,12 @@ class SpotifyApiClient @Inject constructor(
     companion object {
         private const val TAG = "SpotifyApi"
         private const val BASE_URL = "https://api.spotify.com/v1"
+        /**
+         * Max Retry-After (seconds) we'll actually block on. Above this, the 429 is a
+         * daily-quota exhaustion (Spotify Development Mode), not a rolling window —
+         * waiting would freeze the loader for hours, so we fail fast instead.
+         */
+        private const val MAX_BLOCKING_RETRY_AFTER_SEC = 30L
     }
 
     private val client = OkHttpClient()
@@ -71,6 +77,11 @@ class SpotifyApiClient @Inject constructor(
                 val response = client.newCall(request).execute()
                 val body = response.body?.string() ?: return@withContext null
 
+                if (response.code == 429) {
+                    Log.w(TAG, "⏳ getTrackDetail RATE LIMITED (429). Retry-After = " +
+                        "${response.header("Retry-After")}s for $trackId")
+                    return@withContext null
+                }
                 if (!response.isSuccessful) {
                     Log.w(TAG, "getTrackDetail failed for $trackId (${response.code}): ${body.take(200)}")
                     return@withContext null
@@ -104,12 +115,17 @@ class SpotifyApiClient @Inject constructor(
         }
 
     /**
-     * Fetch details for MULTIPLE tracks in a single API call.
+     * Fetch details for MULTIPLE tracks.
      *
-     * Calls `GET /v1/tracks?ids={comma-separated-ids}` which supports up to 50
-     * track IDs per request. This avoids the per-track `GET /v1/tracks/{id}`
-     * calls that were triggering Spotify's 429 rate-limit when loading the
-     * song picker.
+     * NOTE: The batch endpoint `GET /v1/tracks?ids={comma-separated}` ("Get Several
+     * Tracks") is BLOCKED for apps in Spotify Development Mode (returns 403 even with
+     * a valid token), while the single-track endpoint `GET /v1/tracks/{id}` ("Get
+     * Track") IS allowed. We therefore loop single-track calls — one per ID — with a
+     * small inter-request delay to stay well under the rate limit (the original
+     * per-track storm is what caused the 429s this method was created to avoid).
+     *
+     * On a 429 we honor the `Retry-After` header: wait that many seconds, then retry
+     * the SAME track once before moving on.
      *
      * @param trackUris Spotify URIs like "spotify:track:XXXX"
      * @return Map of trackUri → [SpotifyTrackDetail] for every track found.
@@ -123,48 +139,80 @@ class SpotifyApiClient @Inject constructor(
                 .distinct()
             if (ids.isEmpty()) return@withContext emptyMap()
 
+            Log.d(TAG, "getTracksDetail: fetching ${ids.size} ids via single-track loop")
             val result = mutableMapOf<String, SpotifyTrackDetail>()
-            try {
-                for (chunk in ids.chunked(50)) {
-                    val request = Request.Builder()
-                        .url("$BASE_URL/tracks?ids=${chunk.joinToString(",")}")
-                        .addHeader("Authorization", "Bearer $token")
-                        .build()
-                    val response = client.newCall(request).execute()
-                    val body = response.body?.string() ?: continue
-                    if (!response.isSuccessful) {
-                        Log.w(TAG, "getTracksDetail failed (${response.code}): ${body.take(200)}")
-                        continue
-                    }
-                    val tracks = JSONObject(body).optJSONArray("tracks") ?: continue
-                    for (i in 0 until tracks.length()) {
-                        val json = tracks.optJSONObject(i) ?: continue
-                        val uri = json.optString("uri")
-                        val artists = json.optJSONArray("artists")
-                        val artistName = if (artists != null && artists.length() > 0) {
-                            artists.getJSONObject(0).optString("name")
-                        } else ""
-                        val album = json.optJSONObject("album")
-                        val images = album?.optJSONArray("images")
-                        val artUrl = if (images != null && images.length() > 0) {
-                            val idx = if (images.length() > 1) 1 else 0
-                            images.getJSONObject(idx).optString("url")
-                        } else null
-                        if (uri.isNotBlank()) {
-                            result[uri] = SpotifyTrackDetail(
-                                spotifyUri = uri,
-                                title = json.optString("name"),
-                                artist = artistName,
-                                durationMs = json.optLong("duration_ms"),
-                                albumArt = artUrl
-                            )
-                        }
-                    }
+            for (id in ids) {
+                val detail = fetchSingleTrack(id, token)
+                if (detail != null) {
+                    result[detail.spotifyUri] = detail
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "getTracksDetail error", e)
+                // Throttle: ~8 req/sec keeps us comfortably under Spotify's rate limit.
+                if (id != ids.last()) kotlinx.coroutines.delay(120L)
             }
+            Log.d(TAG, "getTracksDetail: resolved ${result.size}/${ids.size} tracks")
             result
+        }
+
+    /**
+     * Fetch a single track via `GET /v1/tracks/{id}` (allowed in Development Mode).
+     * Retries once after honoring `Retry-After` on a 429. Returns null on failure.
+     */
+    private suspend fun fetchSingleTrack(trackId: String, token: String, isRetry: Boolean = false): SpotifyTrackDetail? =
+        withContext(Dispatchers.IO) {
+            try {
+                val request = Request.Builder()
+                    .url("$BASE_URL/tracks/$trackId")
+                    .addHeader("Authorization", "Bearer $token")
+                    .build()
+                val response = client.newCall(request).execute()
+                val body = response.body?.string() ?: return@withContext null
+
+                if (response.code == 429) {
+                    val retryAfterSec = response.header("Retry-After")?.toLongOrNull() ?: 1L
+                    Log.w(TAG, "⏳ fetchSingleTrack RATE LIMITED (429) for $trackId. " +
+                        "Retry-After=${retryAfterSec}s (~${retryAfterSec / 3600}h ${(retryAfterSec % 3600) / 60}m)")
+                    // Only block-and-retry for short, genuine rolling-window limits.
+                    // A large Retry-After means the daily Dev-Mode quota is exhausted —
+                    // don't tie up the coroutine for hours; surface it and move on.
+                    if (!isRetry && retryAfterSec <= MAX_BLOCKING_RETRY_AFTER_SEC) {
+                        Log.d(TAG, "Retrying $trackId after ${retryAfterSec}s cooldown")
+                        kotlinx.coroutines.delay(retryAfterSec * 1000L)
+                        return@withContext fetchSingleTrack(trackId, token, isRetry = true)
+                    }
+                    if (retryAfterSec > MAX_BLOCKING_RETRY_AFTER_SEC) {
+                        Log.w(TAG, "⚠️ Spotify daily quota appears exhausted. " +
+                            "Metadata unavailable for ~${retryAfterSec / 3600}h. Try again later.")
+                    }
+                    return@withContext null
+                }
+                if (!response.isSuccessful) {
+                    Log.w(TAG, "fetchSingleTrack failed for $trackId (${response.code}): ${body.take(200)}")
+                    return@withContext null
+                }
+
+                val json = JSONObject(body)
+                val uri = json.optString("uri").ifBlank { "spotify:track:$trackId" }
+                val artists = json.optJSONArray("artists")
+                val artistName = if (artists != null && artists.length() > 0) {
+                    artists.getJSONObject(0).optString("name")
+                } else ""
+                val album = json.optJSONObject("album")
+                val images = album?.optJSONArray("images")
+                val artUrl = if (images != null && images.length() > 0) {
+                    val idx = if (images.length() > 1) 1 else 0
+                    images.getJSONObject(idx).optString("url")
+                } else null
+                SpotifyTrackDetail(
+                    spotifyUri = uri,
+                    title = json.optString("name"),
+                    artist = artistName,
+                    durationMs = json.optLong("duration_ms"),
+                    albumArt = artUrl
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "fetchSingleTrack error for $trackId", e)
+                null
+            }
         }
 
     /**
@@ -187,6 +235,11 @@ class SpotifyApiClient @Inject constructor(
             val response = client.newCall(request).execute()
             val body = response.body?.string() ?: return@withContext null
 
+            if (response.code == 429) {
+                Log.w(TAG, "⏳ searchTrack RATE LIMITED (429). Retry-After = " +
+                    "${response.header("Retry-After")}s for query '$query'")
+                return@withContext null
+            }
             if (!response.isSuccessful) {
                 Log.w(TAG, "searchTrack failed (${response.code}): $body")
                 return@withContext null

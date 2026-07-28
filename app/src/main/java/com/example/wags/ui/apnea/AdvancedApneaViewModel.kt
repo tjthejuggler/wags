@@ -276,11 +276,11 @@ class AdvancedApneaViewModel @Inject constructor(
 
     // ── Song picker ──────────────────────────────────────────────────────────
 
-    fun loadPreviousSongs() {
-        // If we have a cached song list, show it instantly
+    fun loadPreviousSongs(forceRefresh: Boolean = false) {
+        // If we have a cached song list, show it instantly (unless forcing a refresh)
         val cached = spotifyManager.songPickerCache.value
         if (cached != null) {
-            _uiState.update { it.copy(previousSongs = cached, loadingSongs = false) }
+            _uiState.update { it.copy(previousSongs = cached, loadingSongs = forceRefresh) }
         } else {
             _uiState.update { it.copy(loadingSongs = true) }
         }
@@ -289,19 +289,57 @@ class AdvancedApneaViewModel @Inject constructor(
             val dbSongs = apneaRepository.getDistinctSongs()
             val prefsSongs = loadSongHistoryFromPrefs()
             val merged = mergeSongs(dbSongs, prefsSongs)
-            val details = merged.map { song ->
+
+            // Resolve URIs first (search-backfill for any song missing a URI).
+            val isConnected = spotifyAuthManager.isConnected.value
+            val withUris = merged.map { song ->
                 var uri = song.spotifyUri
-                if (uri == null && spotifyAuthManager.isConnected.value) {
+                if (uri == null && isConnected) {
                     uri = spotifyApiClient.searchTrack(song.title, song.artist)
                 }
+                song to uri
+            }
+
+            // Use the persistent cache to avoid hitting Spotify's rate limit.
+            // On a forced refresh we bypass the cache and re-fetch everything.
+            val existingCache = spotifyManager.songPickerCache.value ?: emptyList()
+            val cacheByUri = if (forceRefresh) emptyMap() else existingCache.associateBy { it.spotifyUri }
+
+            // Split into cache-hits vs URIs needing a fetch.
+            val needFetch = mutableListOf<Pair<SpotifySong, String>>()
+            val preliminary = withUris.map { (song, uri) ->
                 if (uri != null) {
-                    spotifyApiClient.getTrackDetail(uri) ?: SpotifyTrackDetail(
+                    val hit = cacheByUri[uri]
+                    if (hit != null) {
+                        hit
+                    } else {
+                        needFetch.add(song to uri)
+                        null // placeholder — filled by the batch fetch below
+                    }
+                } else {
+                    SpotifyTrackDetail(
+                        spotifyUri = "", title = song.title, artist = song.artist,
+                        durationMs = 0L, albumArt = song.albumArt
+                    )
+                }
+            }
+
+            // ONE batch API call for all cache-misses (avoids per-track 429s).
+            val fetched = if (needFetch.isNotEmpty() && isConnected) {
+                spotifyApiClient.getTracksDetail(needFetch.map { it.second })
+            } else emptyMap()
+
+            // Merge everything back together in original order.
+            var fetchIdx = 0
+            val details = preliminary.map { prelim ->
+                if (prelim != null) {
+                    prelim
+                } else {
+                    val (song, uri) = needFetch[fetchIdx++]
+                    fetched[uri] ?: SpotifyTrackDetail(
                         spotifyUri = uri, title = song.title, artist = song.artist,
                         durationMs = 0L, albumArt = song.albumArt
                     )
-                } else {
-                    SpotifyTrackDetail(spotifyUri = "", title = song.title, artist = song.artist,
-                        durationMs = 0L, albumArt = song.albumArt)
                 }
             }
             // Final dedup by title+artist after API enrichment

@@ -90,6 +90,7 @@ fun ApneaTableScreen(
                 selectedSongs = state.selectedSongs,
                 loadingSelectedSong = state.loadingSelectedSong,
                 onSongSelected = { track -> viewModel.selectSong(track) },
+                onRefresh = { viewModel.loadPreviousSongs(forceRefresh = true) },
                 onDismiss = { showSongPicker = false }
             )
         }

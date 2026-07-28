@@ -41,7 +41,11 @@ class SpotifyAuthManager @Inject constructor(
         private const val TAG = "SpotifyAuth"
         const val CLIENT_ID = "0222e13813374d96886a1bd19e431bb2"
         const val REDIRECT_URI = "wags://spotify-callback"
-        private const val SCOPES = "user-modify-playback-state user-read-playback-state"
+        // user-library-read is required to read track metadata (GET /v1/tracks,
+        // /v1/search). Without it those endpoints return 403 Forbidden — which is
+        // why the song picker was not loading album art or durations.
+        private const val SCOPES =
+            "user-modify-playback-state user-read-playback-state user-library-read"
 
         // SharedPreferences keys
         private const val KEY_ACCESS_TOKEN = "spotify_access_token"

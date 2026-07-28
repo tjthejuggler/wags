@@ -795,11 +795,11 @@ class FreeHoldActiveViewModel @Inject constructor(
      * Merges DB records (free holds) with SharedPreferences history (all session types).
      * For each song with a spotifyUri, fetches track details (duration, art) from the API.
      */
-    fun loadPreviousSongs() {
-        // If we have a cached song list, show it instantly
+    fun loadPreviousSongs(forceRefresh: Boolean = false) {
+        // If we have a cached song list, show it instantly (unless forcing a refresh)
         val cached = spotifyManager.songPickerCache.value
         if (cached != null) {
-            _uiState.update { it.copy(previousSongs = cached, loadingSongs = false) }
+            _uiState.update { it.copy(previousSongs = cached, loadingSongs = forceRefresh) }
         } else {
             _uiState.update { it.copy(loadingSongs = true) }
         }
@@ -824,8 +824,9 @@ class FreeHoldActiveViewModel @Inject constructor(
             }
 
             // Use the persistent cache first to avoid hitting Spotify's rate limit.
+            // On a forced refresh we bypass the cache and re-fetch everything.
             val existingCache = spotifyManager.songPickerCache.value ?: emptyList()
-            val cacheByUri = existingCache.associateBy { it.spotifyUri }
+            val cacheByUri = if (forceRefresh) emptyMap() else existingCache.associateBy { it.spotifyUri }
 
             // Split into cache-hits vs URIs needing a fetch.
             val needFetch = mutableListOf<Pair<SpotifySong, String>>()
@@ -1284,6 +1285,7 @@ private fun FreeHoldActiveScreenContent(
                 onSongSelected = { track ->
                     viewModel.selectSong(track)
                 },
+                onRefresh = { viewModel.loadPreviousSongs(forceRefresh = true) },
                 onDismiss = { showSongPicker = false }
             )
         }

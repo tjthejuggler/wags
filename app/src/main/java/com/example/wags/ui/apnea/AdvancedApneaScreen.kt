@@ -87,6 +87,7 @@ fun AdvancedApneaScreen(
                 selectedSongs = uiState.selectedSongs,
                 loadingSelectedSong = uiState.loadingSelectedSong,
                 onSongSelected = { track -> viewModel.selectSong(track) },
+                onRefresh = { viewModel.loadPreviousSongs(forceRefresh = true) },
                 onDismiss = { showSongPicker = false }
             )
         }

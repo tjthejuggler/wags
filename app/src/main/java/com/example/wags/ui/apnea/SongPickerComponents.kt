@@ -213,6 +213,7 @@ fun SongPickerDialog(
     loadingSelectedSong: Boolean,
     songCompletionStatus: Map<String, SongCompletionStatus> = emptyMap(),
     onSongSelected: (SpotifyTrackDetail) -> Unit,
+    onRefresh: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     // Sort state
@@ -240,11 +241,37 @@ fun SongPickerDialog(
         onDismissRequest = onDismiss,
         containerColor = BackgroundDark,
         title = {
-            Text(
-                "Choose a Song",
-                style = MaterialTheme.typography.titleLarge,
-                color = TextPrimary
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Choose a Song",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = TextPrimary,
+                    modifier = Modifier.weight(1f)
+                )
+                // Refresh button — bypasses the cached metadata and re-fetches
+                // album art / durations from Spotify in a single batched request.
+                IconButton(
+                    onClick = onRefresh,
+                    enabled = !isLoading
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = TextSecondary,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text(
+                            "⟳",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = TextSecondary
+                        )
+                    }
+                }
+            }
         },
         text = {
             Column {
