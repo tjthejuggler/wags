@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.*
@@ -133,7 +134,15 @@ fun ApneaRecordDetailScreen(
                     }
                 },
                 actions = {
-                    LiveSensorActionsNav(navController)
+                    val hasSensorData = LiveSensorActionsNav(navController)
+                    if (!hasSensorData && !state.isLoading && !state.notFound) {
+                        IconButton(onClick = { navController.navigate(WagsRoutes.SETTINGS) }) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings"
+                            )
+                        }
+                    }
                     if (!state.isLoading && !state.notFound) {
                         // Edit button
                         IconButton(onClick = { viewModel.openEditSheet() }) {

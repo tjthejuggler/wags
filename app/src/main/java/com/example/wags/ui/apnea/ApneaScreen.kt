@@ -50,8 +50,8 @@ import com.example.wags.domain.usecase.apnea.AdvancedApneaState
 import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.InfoHelpBubble
-import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.common.LockPortrait
+import com.example.wags.ui.common.StatsAndSensorActionsNav
 import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
@@ -100,24 +100,22 @@ fun ApneaScreen(
                     }
                 },
                 actions = {
-                    LiveSensorActions(liveHr = state.liveHr, liveSpO2 = state.liveSpO2, onClick = { navController.navigate(WagsRoutes.SETTINGS) })
-                    TextButton(onClick = {
-                        navController.navigate(
-                            WagsRoutes.apneaHistory(
-                                lungVolume = state.selectedLungVolume,
-                                prepType   = state.prepType.name,
-                                timeOfDay  = state.timeOfDay.name,
-                                posture    = state.posture.name,
-                                audio      = state.audio.name
+                    StatsAndSensorActionsNav(
+                        onStatsClick = {
+                            navController.navigate(
+                                WagsRoutes.apneaHistory(
+                                    lungVolume = state.selectedLungVolume,
+                                    prepType   = state.prepType.name,
+                                    timeOfDay  = state.timeOfDay.name,
+                                    posture    = state.posture.name,
+                                    audio      = state.audio.name
+                                )
                             )
-                        )
-                    }) {
-                        Text(
-                            "History",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = TextSecondary
-                        )
-                    }
+                        },
+                        navController = navController,
+                        liveHr = state.liveHr,
+                        liveSpO2 = state.liveSpO2
+                    )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )

@@ -39,12 +39,14 @@ fun DashboardScreen(
             TopAppBar(
                 title = { Text("WAGS", style = MaterialTheme.typography.headlineMedium) },
                 actions = {
-                    LiveSensorActionsNav(navController)
-                    IconButton(onClick = { navController.navigate(WagsRoutes.SETTINGS) }) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Device Settings"
-                        )
+                    val hasSensorData = LiveSensorActionsNav(navController)
+                    if (!hasSensorData) {
+                        IconButton(onClick = { navController.navigate(WagsRoutes.SETTINGS) }) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Device Settings"
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)

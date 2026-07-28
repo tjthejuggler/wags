@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -126,7 +127,15 @@ fun MeditationHistoryScreen(
                     }
                 },
                 actions = {
-                    LiveSensorActionsNav(navController)
+                    val hasSensorData = LiveSensorActionsNav(navController)
+                    if (!hasSensorData) {
+                        IconButton(onClick = { navController.navigate(WagsRoutes.SETTINGS) }) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings"
+                            )
+                        }
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )

@@ -36,8 +36,8 @@ import androidx.navigation.NavController
 import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.KeepScreenOn
-import com.example.wags.ui.common.LiveSensorActions
 import com.example.wags.ui.common.LockPortrait
+import com.example.wags.ui.common.StatsAndSensorActionsNav
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.common.RrIntervalChart
 import com.example.wags.ui.common.grayscale
@@ -120,10 +120,12 @@ fun BreathingScreen(
                     }
                 },
                 actions = {
-                    LiveSensorActions(liveHr = state.liveHr, liveSpO2 = state.liveSpO2, onClick = { navController.navigate(WagsRoutes.SETTINGS) })
-                    TextButton(onClick = onNavigateToHistory) {
-                        Text("History", color = EcgCyan)
-                    }
+                    StatsAndSensorActionsNav(
+                        onStatsClick = onNavigateToHistory,
+                        navController = navController,
+                        liveHr = state.liveHr,
+                        liveSpO2 = state.liveSpO2
+                    )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )

@@ -26,7 +26,7 @@ import com.example.wags.data.db.entity.MeditationAudioEntity
 import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.KeepScreenOn
-import com.example.wags.ui.common.LiveSensorActions
+import com.example.wags.ui.common.StatsAndSensorActionsNav
 import com.example.wags.ui.common.LockPortrait
 import com.example.wags.ui.common.SessionBackHandler
 import com.example.wags.ui.common.grayscale
@@ -68,13 +68,12 @@ fun MeditationScreen(
                     }
                 },
                 actions = {
-                    LiveSensorActions(liveHr = state.liveHr, liveSpO2 = state.liveSpO2, onClick = { navController.navigate(WagsRoutes.SETTINGS) })
-                    IconButton(onClick = {
-                        navController.navigate(WagsRoutes.MEDITATION_HISTORY)
-                    }) {
-                        Text("📊", style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.grayscale())
-                    }
+                    StatsAndSensorActionsNav(
+                        onStatsClick = { navController.navigate(WagsRoutes.MEDITATION_HISTORY) },
+                        navController = navController,
+                        liveHr = state.liveHr,
+                        liveSpO2 = state.liveSpO2
+                    )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )

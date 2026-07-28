@@ -35,8 +35,8 @@ import com.example.wags.domain.usecase.readiness.MorningReadinessState
 import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.KeepScreenOn
-import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.common.LockPortrait
+import com.example.wags.ui.common.StatsAndSensorActions
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.common.RrIntervalChart
 import com.example.wags.ui.common.SessionBackHandler
@@ -133,10 +133,12 @@ fun MorningReadinessScreen(
                     }
                 },
                 actions = {
-                    LiveSensorActionsCallback(onNavigateToSettings)
-                    TextButton(onClick = onNavigateToHistory) {
-                        Text("History", color = TextSecondary)
-                    }
+                    StatsAndSensorActions(
+                        onStatsClick = onNavigateToHistory,
+                        onSettingsClick = onNavigateToSettings,
+                        liveHr = uiState.liveHr,
+                        liveSpO2 = uiState.liveSpO2
+                    )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )

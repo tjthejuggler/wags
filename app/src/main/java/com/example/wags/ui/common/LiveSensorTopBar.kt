@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -112,19 +113,27 @@ fun LiveSensorActions(liveHr: Int?, liveSpO2: Int?, onClick: (() -> Unit)? = nul
  *     actions = { LiveSensorActionsNav(navController) }
  * )
  * ```
+ *
+ * @return Boolean indicating whether sensor data is currently visible
  */
 @Composable
 fun LiveSensorActionsNav(
     navController: NavController,
     viewModel: LiveSensorViewModel = hiltViewModel()
-) {
+): Boolean {
     val liveHr by viewModel.liveHr.collectAsStateWithLifecycle()
     val liveSpO2 by viewModel.liveSpO2.collectAsStateWithLifecycle()
-    LiveSensorActions(
-        liveHr = liveHr,
-        liveSpO2 = liveSpO2,
-        onClick = { navController.navigate(WagsRoutes.SETTINGS) }
-    )
+    val hasSensorData = liveHr != null || liveSpO2 != null
+    
+    if (hasSensorData) {
+        LiveSensorActions(
+            liveHr = liveHr,
+            liveSpO2 = liveSpO2,
+            onClick = { navController.navigate(WagsRoutes.SETTINGS) }
+        )
+    }
+    
+    return hasSensorData
 }
 
 /**
@@ -149,5 +158,85 @@ fun LiveSensorActionsCallback(
         liveHr = liveHr,
         liveSpO2 = liveSpO2,
         onClick = onNavigateToSettings
+    )
+}
+
+/**
+ * Reusable stats icon button (📊) for navigating to history/stats screens.
+ * Matches the style used in MeditationScreen.
+ */
+@Composable
+fun StatsIconButton(onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        Text(
+            "📊",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.grayscale()
+        )
+    }
+}
+
+/**
+ * Combined actions bar that shows:
+ * - Stats icon button (left)
+ * - Sensor readings OR Settings button (right, mutually exclusive)
+ *
+ * @param onStatsClick Click handler for the stats icon
+ * @param onSettingsClick Click handler for settings navigation
+ * @param liveHr Optional live heart rate reading
+ * @param liveSpO2 Optional live SpO₂ reading
+ */
+@Composable
+fun StatsAndSensorActions(
+    onStatsClick: () -> Unit,
+    onSettingsClick: () -> Unit,
+    liveHr: Int?,
+    liveSpO2: Int?
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Stats icon (always shown)
+        StatsIconButton(onClick = onStatsClick)
+        
+        // Sensor readings OR Settings button (mutually exclusive)
+        if (liveHr != null || liveSpO2 != null) {
+            LiveSensorActions(
+                liveHr = liveHr,
+                liveSpO2 = liveSpO2,
+                onClick = onSettingsClick
+            )
+        } else {
+            IconButton(onClick = onSettingsClick) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Settings"
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Nav-based version of StatsAndSensorActions that uses NavController.
+ *
+ * @param onStatsClick Click handler for the stats icon (navigate to history)
+ * @param navController NavController for settings navigation
+ * @param liveHr Optional live heart rate reading
+ * @param liveSpO2 Optional live SpO₂ reading
+ */
+@Composable
+fun StatsAndSensorActionsNav(
+    onStatsClick: () -> Unit,
+    navController: NavController,
+    liveHr: Int?,
+    liveSpO2: Int?
+) {
+    StatsAndSensorActions(
+        onStatsClick = onStatsClick,
+        onSettingsClick = { navController.navigate(WagsRoutes.SETTINGS) },
+        liveHr = liveHr,
+        liveSpO2 = liveSpO2
     )
 }

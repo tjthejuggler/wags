@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,6 +33,7 @@ import androidx.navigation.NavController
 import com.example.wags.data.db.entity.RapidHrSessionEntity
 import com.example.wags.data.db.entity.RapidHrTelemetryEntity
 import com.example.wags.ui.common.LiveSensorActionsNav
+import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 import java.time.Instant
 import java.time.ZoneId
@@ -105,7 +107,15 @@ fun RapidHrDetailScreen(
                     }
                 },
                 actions = {
-                    LiveSensorActionsNav(navController)
+                    val hasSensorData = LiveSensorActionsNav(navController)
+                    if (!hasSensorData) {
+                        IconButton(onClick = { navController.navigate(WagsRoutes.SETTINGS) }) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings"
+                            )
+                        }
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
             )

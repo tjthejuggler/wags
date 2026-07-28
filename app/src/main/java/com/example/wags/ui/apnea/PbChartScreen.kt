@@ -7,6 +7,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -77,7 +79,15 @@ fun PbChartScreen(
                     }
                 },
                 actions = {
-                    LiveSensorActionsNav(navController)
+                    val hasSensorData = LiveSensorActionsNav(navController)
+                    if (!hasSensorData) {
+                        IconButton(onClick = { navController.navigate(WagsRoutes.SETTINGS) }) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings"
+                            )
+                        }
+                    }
                     PbToggleChip(
                         showPbOnly = state.showPbOnly,
                         onToggle = { viewModel.togglePbOnly() }
