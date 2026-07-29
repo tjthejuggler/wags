@@ -109,8 +109,8 @@ object WagsRoutes {
     const val MIN_BREATH_ACTIVE = "min_breath_active"
 
     // ── Eucapnic Diaphragmatic Breathing ───────────────────────────────────────
-    const val EUCAPNIC_SETUP = "eucapnic_setup/{lungVolume}/{timeOfDay}/{posture}/{audio}"
-    const val EUCAPNIC_PACER = "eucapnic_pacer/{lungVolume}/{timeOfDay}/{posture}/{audio}?prepDurationSec={prepDurationSec}&breathsPerMin={breathsPerMin}&inhaleSec={inhaleSec}&topPauseSec={topPauseSec}&exhaleSec={exhaleSec}&bottomPauseSec={bottomPauseSec}&breathDepthPercent={breathDepthPercent}"
+    const val EUCAPNIC_SETUP = "eucapnic_setup/{lungVolume}/{timeOfDay}/{posture}/{audio}/{sessionType}"
+    const val EUCAPNIC_PACER = "eucapnic_pacer/{lungVolume}/{timeOfDay}/{posture}/{audio}/{sessionType}?prepDurationSec={prepDurationSec}&breathsPerMin={breathsPerMin}&inhaleSec={inhaleSec}&topPauseSec={topPauseSec}&exhaleSec={exhaleSec}&bottomPauseSec={bottomPauseSec}&breathDepthPercent={breathDepthPercent}"
 
     // ── Trophy Chart ──────────────────────────────────────────────────────────
     const val TROPHY_CHART = "trophy_chart"
@@ -160,14 +160,16 @@ object WagsRoutes {
         lungVolume: String,
         timeOfDay: String,
         posture: String,
-        audio: String = "SILENCE"
-    ) = "eucapnic_setup/$lungVolume/$timeOfDay/$posture/$audio"
+        audio: String = "SILENCE",
+        sessionType: String = "FREE_HOLD"
+    ) = "eucapnic_setup/$lungVolume/$timeOfDay/$posture/$audio/$sessionType"
 
     fun eucapnicPacer(
         lungVolume: String,
         timeOfDay: String,
         posture: String,
         audio: String = "SILENCE",
+        sessionType: String = "FREE_HOLD",
         prepDurationSec: Int = 300,
         breathsPerMin: Float = 5.5f,
         inhaleSec: Float = 4.0f,
@@ -175,7 +177,7 @@ object WagsRoutes {
         exhaleSec: Float = 6.0f,
         bottomPauseSec: Float = 0.9f,
         breathDepthPercent: Int = 25
-    ) = "eucapnic_pacer/$lungVolume/$timeOfDay/$posture/$audio?prepDurationSec=$prepDurationSec&breathsPerMin=$breathsPerMin&inhaleSec=$inhaleSec&topPauseSec=$topPauseSec&exhaleSec=$exhaleSec&bottomPauseSec=$bottomPauseSec&breathDepthPercent=$breathDepthPercent"
+    ) = "eucapnic_pacer/$lungVolume/$timeOfDay/$posture/$audio/$sessionType?prepDurationSec=$prepDurationSec&breathsPerMin=$breathsPerMin&inhaleSec=$inhaleSec&topPauseSec=$topPauseSec&exhaleSec=$exhaleSec&bottomPauseSec=$bottomPauseSec&breathDepthPercent=$breathDepthPercent"
 
     /**
      * Navigate to All Records pre-filtered to the given settings.
@@ -374,19 +376,22 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
                 navArgument("lungVolume") { type = NavType.StringType },
                 navArgument("timeOfDay")  { type = NavType.StringType },
                 navArgument("posture")    { type = NavType.StringType },
-                navArgument("audio")      { type = NavType.StringType; defaultValue = "SILENCE" }
+                navArgument("audio")      { type = NavType.StringType; defaultValue = "SILENCE" },
+                navArgument("sessionType") { type = NavType.StringType; defaultValue = "FREE_HOLD" }
             )
         ) { backStackEntry ->
             val lungVolume = backStackEntry.arguments?.getString("lungVolume") ?: "FULL"
             val timeOfDay  = backStackEntry.arguments?.getString("timeOfDay")  ?: "DAY"
             val posture    = backStackEntry.arguments?.getString("posture")    ?: "LAYING"
             val audio      = backStackEntry.arguments?.getString("audio")      ?: "SILENCE"
+            val sessionType = backStackEntry.arguments?.getString("sessionType") ?: "FREE_HOLD"
             EucapnicSetupScreen(
                 navController = navController,
                 lungVolume = lungVolume,
                 timeOfDay  = timeOfDay,
                 posture    = posture,
-                audio      = audio
+                audio      = audio,
+                sessionType = sessionType
             )
         }
         composable(
@@ -396,6 +401,7 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
                 navArgument("timeOfDay")  { type = NavType.StringType },
                 navArgument("posture")    { type = NavType.StringType },
                 navArgument("audio")      { type = NavType.StringType; defaultValue = "SILENCE" },
+                navArgument("sessionType") { type = NavType.StringType; defaultValue = "FREE_HOLD" },
                 navArgument("prepDurationSec") { type = NavType.IntType; defaultValue = 300 },
                 navArgument("breathsPerMin")   { type = NavType.FloatType; defaultValue = 5.5f },
                 navArgument("inhaleSec")       { type = NavType.FloatType; defaultValue = 4.0f },
@@ -409,6 +415,7 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             val timeOfDay  = backStackEntry.arguments?.getString("timeOfDay")  ?: "DAY"
             val posture    = backStackEntry.arguments?.getString("posture")    ?: "LAYING"
             val audio      = backStackEntry.arguments?.getString("audio")      ?: "SILENCE"
+            val sessionType = backStackEntry.arguments?.getString("sessionType") ?: "FREE_HOLD"
             val prepDurationSec = backStackEntry.arguments?.getInt("prepDurationSec") ?: 300
             val breathsPerMin   = backStackEntry.arguments?.getFloat("breathsPerMin") ?: 5.5f
             val inhaleSec       = backStackEntry.arguments?.getFloat("inhaleSec") ?: 4.0f
@@ -422,6 +429,7 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
                 timeOfDay  = timeOfDay,
                 posture    = posture,
                 audio      = audio,
+                sessionType = sessionType,
                 initialConfig = EucapnicConfig(
                     prepDurationSec = prepDurationSec,
                     breathsPerMin = breathsPerMin,

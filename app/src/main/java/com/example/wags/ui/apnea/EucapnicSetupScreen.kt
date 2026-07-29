@@ -35,6 +35,7 @@ fun EucapnicSetupScreen(
     timeOfDay: String,
     posture: String,
     audio: String,
+    sessionType: String = "FREE_HOLD",
     viewModel: EucapnicConfigViewModel = hiltViewModel()
 ) {
     val config by viewModel.config.collectAsStateWithLifecycle()
@@ -95,13 +96,14 @@ fun EucapnicSetupScreen(
             // Start button
             Button(
                 onClick = {
-                    // Navigate to the actual pacer screen with config
+                    // Navigate to the actual pacer screen with config and sessionType
                     navController.navigate(
                         WagsRoutes.eucapnicPacer(
                             lungVolume = lungVolume,
                             timeOfDay = timeOfDay,
                             posture = posture,
                             audio = audio,
+                            sessionType = sessionType,
                             prepDurationSec = config.prepDurationSec,
                             breathsPerMin = config.breathsPerMin,
                             inhaleSec = config.inhaleSec,

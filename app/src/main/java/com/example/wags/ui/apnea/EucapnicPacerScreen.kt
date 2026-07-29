@@ -53,6 +53,7 @@ fun EucapnicPacerScreen(
     timeOfDay: String,
     posture: String,
     audio: String,
+    sessionType: String = "FREE_HOLD",
     initialConfig: EucapnicConfig? = null,
     viewModel: EucapnicPacerViewModel = hiltViewModel()
 ) {
@@ -78,19 +79,45 @@ fun EucapnicPacerScreen(
         configToUse?.let { viewModel.startPrep(it) }
     }
 
-    // Handle completion - navigate to FreeHoldActiveScreen
+    // Handle completion - navigate to the appropriate active screen based on sessionType
     LaunchedEffect(isComplete) {
         if (isComplete && config != null) {
-            navController.navigate(
-                WagsRoutes.freeHoldActive(
-                    lungVolume = lungVolume,
-                    prepType = "EUCAPNIC_DIAPHRAGMATIC",
-                    timeOfDay = timeOfDay,
-                    posture = posture,
-                    showTimer = true,
-                    audio = audio
-                )
-            )
+            when (sessionType) {
+                "FREE_HOLD" -> {
+                    navController.navigate(
+                        WagsRoutes.freeHoldActive(
+                            lungVolume = lungVolume,
+                            prepType = "EUCAPNIC_DIAPHRAGMATIC",
+                            timeOfDay = timeOfDay,
+                            posture = posture,
+                            showTimer = true,
+                            audio = audio
+                        )
+                    )
+                }
+                "PROGRESSIVE_O2" -> {
+                    navController.navigate(WagsRoutes.PROGRESSIVE_O2_ACTIVE)
+                }
+                "MIN_BREATH" -> {
+                    navController.navigate(WagsRoutes.MIN_BREATH_ACTIVE)
+                }
+                "APNEA_TABLE" -> {
+                    navController.navigate(WagsRoutes.APNEA_TABLE)
+                }
+                else -> {
+                    // Default to free hold for unknown session types
+                    navController.navigate(
+                        WagsRoutes.freeHoldActive(
+                            lungVolume = lungVolume,
+                            prepType = "EUCAPNIC_DIAPHRAGMATIC",
+                            timeOfDay = timeOfDay,
+                            posture = posture,
+                            showTimer = true,
+                            audio = audio
+                        )
+                    )
+                }
+            }
         }
     }
 

@@ -262,7 +262,8 @@ fun ApneaScreen(
                                         lungVolume = state.selectedLungVolume,
                                         timeOfDay  = state.timeOfDay.name,
                                         posture    = state.posture.name,
-                                        audio      = state.audio.name
+                                        audio      = state.audio.name,
+                                        sessionType = "FREE_HOLD"
                                     )
                                 )
                             } else {
