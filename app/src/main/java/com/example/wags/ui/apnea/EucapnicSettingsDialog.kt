@@ -45,15 +45,9 @@ fun EucapnicSettingsDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp)
+                    .padding(vertical = 4.dp)
             ) {
-                Text(
-                    text = "Slow, controlled diaphragmatic breathing to reduce CO₂ tolerance.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextPrimary
-                )
-                
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 
                 // Use the existing EucapnicConfigSection but without the header
                 EucapnicConfigSection(
@@ -66,7 +60,8 @@ fun EucapnicSettingsDialog(
                     onExhaleChange = onExhaleChange,
                     onBottomPauseChange = onBottomPauseChange,
                     onBreathDepthChange = onBreathDepthChange,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    showHeader = false
                 )
             }
         },

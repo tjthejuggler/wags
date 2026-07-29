@@ -46,28 +46,31 @@ fun EucapnicConfigSection(
     onExhaleChange: (Float) -> Unit,
     onBottomPauseChange: (Float) -> Unit,
     onBreathDepthChange: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showHeader: Boolean = true
 ) {
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+            .padding(horizontal = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         // ── Section header ────────────────────────────────────────────────
-        Text(
-            text = "Eucapnic Diaphragmatic Breathing",
-            style = MaterialTheme.typography.titleMedium,
-            color = TextPrimary,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            text = "Slow, controlled diaphragmatic breathing to reduce CO₂ tolerance.",
-            style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary
-        )
+        if (showHeader) {
+            Text(
+                text = "Eucapnic Diaphragmatic Breathing",
+                style = MaterialTheme.typography.titleMedium,
+                color = TextPrimary,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "Slow, controlled diaphragmatic breathing to reduce CO₂ tolerance.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
 
-        Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+        }
 
         // ── 1. Total Prep Duration ────────────────────────────────────────
         EucapnicSliderRow(
@@ -146,8 +149,6 @@ fun EucapnicConfigSection(
             onValueChange = { onBreathDepthChange(it.roundToInt()) }
         )
 
-        Spacer(modifier = Modifier.height(4.dp))
-
         // ── Read-only Inhale:Exhale ratio ─────────────────────────────────
         InhaleExhaleRatioRow(config = config, scalingEngine = scalingEngine)
     }
@@ -178,12 +179,12 @@ private fun EucapnicSliderRow(
         ) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = TextPrimary
             )
             Text(
                 text = valueText,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = TextPrimary,
                 fontWeight = FontWeight.Medium
             )
@@ -225,18 +226,18 @@ private fun InhaleExhaleRatioRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = "Inhale : Exhale Ratio",
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             color = TextSecondary
         )
         Text(
             text = "$inhalePct% : $exhalePct%",
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             color = TextPrimary,
             fontWeight = FontWeight.Medium
         )
