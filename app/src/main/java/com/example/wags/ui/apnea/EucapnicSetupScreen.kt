@@ -95,13 +95,20 @@ fun EucapnicSetupScreen(
             // Start button
             Button(
                 onClick = {
-                    // Navigate to the actual pacer screen
+                    // Navigate to the actual pacer screen with config
                     navController.navigate(
                         WagsRoutes.eucapnicPacer(
                             lungVolume = lungVolume,
                             timeOfDay = timeOfDay,
                             posture = posture,
-                            audio = audio
+                            audio = audio,
+                            prepDurationSec = config.prepDurationSec,
+                            breathsPerMin = config.breathsPerMin,
+                            inhaleSec = config.inhaleSec,
+                            topPauseSec = config.topPauseSec,
+                            exhaleSec = config.exhaleSec,
+                            bottomPauseSec = config.bottomPauseSec,
+                            breathDepthPercent = config.breathDepthPercent
                         )
                     )
                 },

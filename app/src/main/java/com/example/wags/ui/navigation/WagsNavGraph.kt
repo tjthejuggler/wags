@@ -9,6 +9,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import java.net.URLDecoder
 import java.net.URLEncoder
+import com.example.wags.domain.model.EucapnicConfig
 import com.example.wags.domain.model.TableLength
 import com.example.wags.domain.model.TrainingModality
 import com.example.wags.domain.usecase.breathing.RfProtocol
@@ -109,7 +110,7 @@ object WagsRoutes {
 
     // ── Eucapnic Diaphragmatic Breathing ───────────────────────────────────────
     const val EUCAPNIC_SETUP = "eucapnic_setup/{lungVolume}/{timeOfDay}/{posture}/{audio}"
-    const val EUCAPNIC_PACER = "eucapnic_pacer/{lungVolume}/{timeOfDay}/{posture}/{audio}"
+    const val EUCAPNIC_PACER = "eucapnic_pacer/{lungVolume}/{timeOfDay}/{posture}/{audio}?prepDurationSec={prepDurationSec}&breathsPerMin={breathsPerMin}&inhaleSec={inhaleSec}&topPauseSec={topPauseSec}&exhaleSec={exhaleSec}&bottomPauseSec={bottomPauseSec}&breathDepthPercent={breathDepthPercent}"
 
     // ── Trophy Chart ──────────────────────────────────────────────────────────
     const val TROPHY_CHART = "trophy_chart"
@@ -166,8 +167,15 @@ object WagsRoutes {
         lungVolume: String,
         timeOfDay: String,
         posture: String,
-        audio: String = "SILENCE"
-    ) = "eucapnic_pacer/$lungVolume/$timeOfDay/$posture/$audio"
+        audio: String = "SILENCE",
+        prepDurationSec: Int = 300,
+        breathsPerMin: Float = 5.5f,
+        inhaleSec: Float = 4.0f,
+        topPauseSec: Float = 0.0f,
+        exhaleSec: Float = 6.0f,
+        bottomPauseSec: Float = 0.9f,
+        breathDepthPercent: Int = 25
+    ) = "eucapnic_pacer/$lungVolume/$timeOfDay/$posture/$audio?prepDurationSec=$prepDurationSec&breathsPerMin=$breathsPerMin&inhaleSec=$inhaleSec&topPauseSec=$topPauseSec&exhaleSec=$exhaleSec&bottomPauseSec=$bottomPauseSec&breathDepthPercent=$breathDepthPercent"
 
     /**
      * Navigate to All Records pre-filtered to the given settings.
@@ -387,19 +395,42 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
                 navArgument("lungVolume") { type = NavType.StringType },
                 navArgument("timeOfDay")  { type = NavType.StringType },
                 navArgument("posture")    { type = NavType.StringType },
-                navArgument("audio")      { type = NavType.StringType; defaultValue = "SILENCE" }
+                navArgument("audio")      { type = NavType.StringType; defaultValue = "SILENCE" },
+                navArgument("prepDurationSec") { type = NavType.IntType; defaultValue = 300 },
+                navArgument("breathsPerMin")   { type = NavType.FloatType; defaultValue = 5.5f },
+                navArgument("inhaleSec")       { type = NavType.FloatType; defaultValue = 4.0f },
+                navArgument("topPauseSec")     { type = NavType.FloatType; defaultValue = 0.0f },
+                navArgument("exhaleSec")       { type = NavType.FloatType; defaultValue = 6.0f },
+                navArgument("bottomPauseSec")  { type = NavType.FloatType; defaultValue = 0.9f },
+                navArgument("breathDepthPercent") { type = NavType.IntType; defaultValue = 25 }
             )
         ) { backStackEntry ->
             val lungVolume = backStackEntry.arguments?.getString("lungVolume") ?: "FULL"
             val timeOfDay  = backStackEntry.arguments?.getString("timeOfDay")  ?: "DAY"
             val posture    = backStackEntry.arguments?.getString("posture")    ?: "LAYING"
             val audio      = backStackEntry.arguments?.getString("audio")      ?: "SILENCE"
+            val prepDurationSec = backStackEntry.arguments?.getInt("prepDurationSec") ?: 300
+            val breathsPerMin   = backStackEntry.arguments?.getFloat("breathsPerMin") ?: 5.5f
+            val inhaleSec       = backStackEntry.arguments?.getFloat("inhaleSec") ?: 4.0f
+            val topPauseSec     = backStackEntry.arguments?.getFloat("topPauseSec") ?: 0.0f
+            val exhaleSec       = backStackEntry.arguments?.getFloat("exhaleSec") ?: 6.0f
+            val bottomPauseSec  = backStackEntry.arguments?.getFloat("bottomPauseSec") ?: 0.9f
+            val breathDepthPercent = backStackEntry.arguments?.getInt("breathDepthPercent") ?: 25
             EucapnicPacerScreen(
                 navController = navController,
                 lungVolume = lungVolume,
                 timeOfDay  = timeOfDay,
                 posture    = posture,
-                audio      = audio
+                audio      = audio,
+                initialConfig = EucapnicConfig(
+                    prepDurationSec = prepDurationSec,
+                    breathsPerMin = breathsPerMin,
+                    inhaleSec = inhaleSec,
+                    topPauseSec = topPauseSec,
+                    exhaleSec = exhaleSec,
+                    bottomPauseSec = bottomPauseSec,
+                    breathDepthPercent = breathDepthPercent
+                )
             )
         }
         composable(WagsRoutes.SESSION) { backStackEntry ->

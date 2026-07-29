@@ -53,6 +53,7 @@ fun EucapnicPacerScreen(
     timeOfDay: String,
     posture: String,
     audio: String,
+    initialConfig: EucapnicConfig? = null,
     viewModel: EucapnicPacerViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
@@ -73,7 +74,8 @@ fun EucapnicPacerScreen(
 
     // Start the pacer when config is available
     LaunchedEffect(config) {
-        config?.let { viewModel.startPrep(it) }
+        val configToUse = config ?: initialConfig
+        configToUse?.let { viewModel.startPrep(it) }
     }
 
     // Handle completion - navigate to FreeHoldActiveScreen
