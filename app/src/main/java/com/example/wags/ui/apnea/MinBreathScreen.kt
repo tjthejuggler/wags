@@ -225,6 +225,15 @@ fun MinBreathScreen(
                 )
             }
 
+            // 0f. Eucapnic Diaphragmatic Breathing settings — shown when prep is EUCAPNIC_DIAPHRAGMATIC
+            var showEucapnicSettingsDialog by remember { mutableStateOf(false) }
+            if (state.prepType == PrepType.EUCAPNIC_DIAPHRAGMATIC.name && state.eucapnicConfig != null) {
+                EucapnicSettingsButton(
+                    config = state.eucapnicConfig!!,
+                    onClick = { showEucapnicSettingsDialog = true }
+                )
+            }
+
             // Guided hyperventilation countdown dialog
             if (state.showGuidedCountdown) {
                 GuidedHyperCountdownDialog(
@@ -238,7 +247,36 @@ fun MinBreathScreen(
                 )
             }
 
-            // 0f. Record-breaking forecast
+            // Eucapnic settings dialog
+            if (showEucapnicSettingsDialog && state.eucapnicConfig != null) {
+                EucapnicSettingsDialog(
+                    config = state.eucapnicConfig!!,
+                    onPrepDurationChange = { duration ->
+                        viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(prepDurationSec = duration))
+                    },
+                    onBpmChange = { bpm ->
+                        viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(breathsPerMin = bpm))
+                    },
+                    onInhaleChange = { inhale ->
+                        viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(inhaleSec = inhale))
+                    },
+                    onTopPauseChange = { topPause ->
+                        viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(topPauseSec = topPause))
+                    },
+                    onExhaleChange = { exhale ->
+                        viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(exhaleSec = exhale))
+                    },
+                    onBottomPauseChange = { bottomPause ->
+                        viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(bottomPauseSec = bottomPause))
+                    },
+                    onBreathDepthChange = { depth ->
+                        viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(breathDepthPercent = depth))
+                    },
+                    onDismiss = { showEucapnicSettingsDialog = false }
+                )
+            }
+
+            // 0g. Record-breaking forecast
             RecordForecastSummary(
                 forecast = state.recordForecast,
                 showAutoSet = false

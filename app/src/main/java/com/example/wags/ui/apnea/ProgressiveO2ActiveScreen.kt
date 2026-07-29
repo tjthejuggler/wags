@@ -20,6 +20,7 @@ import androidx.compose.ui.window.Popup
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.usecase.apnea.ProgressiveO2Phase
 import com.example.wags.domain.usecase.apnea.ProgressiveO2RoundResult
 import com.example.wags.ui.apnea.pip.ProgressiveO2PipContent
@@ -87,6 +88,9 @@ private fun ProgressiveO2ActiveScreenContent(
         )
     }
 
+    // ── Eucapnic settings dialog state ────────────────────────────────
+    var showEucapnicSettingsDialog by remember { mutableStateOf(false) }
+
     Scaffold(
         containerColor = BackgroundDark,
         topBar = {
@@ -123,7 +127,8 @@ private fun ProgressiveO2ActiveScreenContent(
                 state = state,
                 viewModel = viewModel,
                 onFirstContraction = { viewModel.logFirstContraction() },
-                onStop = { viewModel.stopSession() }
+                onStop = { viewModel.stopSession() },
+                onShowEucapnicSettings = { showEucapnicSettingsDialog = true }
             )
             ProgressiveO2Phase.COMPLETE -> CompleteContent(
                 modifier = Modifier.padding(padding),
@@ -137,6 +142,35 @@ private fun ProgressiveO2ActiveScreenContent(
                 onDone = { navController.popBackStack() }
             )
         }
+    }
+
+    // ── Eucapnic settings dialog ───────────────────────────────────────
+    if (showEucapnicSettingsDialog && state.eucapnicConfig != null) {
+        EucapnicSettingsDialog(
+            config = state.eucapnicConfig!!,
+            onPrepDurationChange = { duration ->
+                viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(prepDurationSec = duration))
+            },
+            onBpmChange = { bpm ->
+                viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(breathsPerMin = bpm))
+            },
+            onInhaleChange = { inhale ->
+                viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(inhaleSec = inhale))
+            },
+            onTopPauseChange = { topPause ->
+                viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(topPauseSec = topPause))
+            },
+            onExhaleChange = { exhale ->
+                viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(exhaleSec = exhale))
+            },
+            onBottomPauseChange = { bottomPause ->
+                viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(bottomPauseSec = bottomPause))
+            },
+            onBreathDepthChange = { depth ->
+                viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(breathDepthPercent = depth))
+            },
+            onDismiss = { showEucapnicSettingsDialog = false }
+        )
     }
 }
 
@@ -164,7 +198,8 @@ private fun ActiveContent(
     state: ProgressiveO2UiState,
     viewModel: ProgressiveO2ViewModel,
     onFirstContraction: () -> Unit,
-    onStop: () -> Unit
+    onStop: () -> Unit,
+    onShowEucapnicSettings: () -> Unit
 ) {
     val session = state.sessionState
     val phase = session.phase
@@ -309,6 +344,16 @@ private fun ActiveContent(
                     color = if (state.vibrationEnabled) TextPrimary else TextDisabled
                 )
             }
+        }
+
+        // ── Eucapnic Diaphragmatic Breathing settings ───────────────────────
+        // Show settings button when EUCAPNIC_DIAPHRAGMATIC prep type is selected
+        // and session is not active
+        if (!state.isSessionActive && state.prepType == PrepType.EUCAPNIC_DIAPHRAGMATIC.name && state.eucapnicConfig != null) {
+            EucapnicSettingsButton(
+                config = state.eucapnicConfig!!,
+                onClick = onShowEucapnicSettings
+            )
         }
 
         Spacer(Modifier.height(16.dp))

@@ -92,6 +92,8 @@ fun ApneaTableScreen(
         var showSongPicker by remember { mutableStateOf(false) }
         // Guided audio picker dialog state
         var showGuidedPicker by remember { mutableStateOf(false) }
+        // Eucapnic settings dialog state
+        var showEucapnicSettingsDialog by remember { mutableStateOf(false) }
 
         if (showSongPicker) {
             SongPickerDialog(
@@ -115,6 +117,35 @@ fun ApneaTableScreen(
                 onAddNew = { uri, name, url -> viewModel.addGuidedAudio(uri, name, url) },
                 onDelete = { audio -> viewModel.deleteGuidedAudio(audio) },
                 onDismiss = { showGuidedPicker = false }
+            )
+        }
+
+        // Eucapnic settings dialog
+        if (showEucapnicSettingsDialog && state.eucapnicConfig != null) {
+            EucapnicSettingsDialog(
+                config = state.eucapnicConfig!!,
+                onPrepDurationChange = { duration ->
+                    viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(prepDurationSec = duration))
+                },
+                onBpmChange = { bpm ->
+                    viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(breathsPerMin = bpm))
+                },
+                onInhaleChange = { inhale ->
+                    viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(inhaleSec = inhale))
+                },
+                onTopPauseChange = { topPause ->
+                    viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(topPauseSec = topPause))
+                },
+                onExhaleChange = { exhale ->
+                    viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(exhaleSec = exhale))
+                },
+                onBottomPauseChange = { bottomPause ->
+                    viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(bottomPauseSec = bottomPause))
+                },
+                onBreathDepthChange = { depth ->
+                    viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(breathDepthPercent = depth))
+                },
+                onDismiss = { showEucapnicSettingsDialog = false }
             )
         }
 
@@ -231,6 +262,17 @@ fun ApneaTableScreen(
                                 vibrationEnabled = state.vibrationEnabled,
                                 onVoiceToggle = { viewModel.setVoiceEnabled(it) },
                                 onVibrationToggle = { viewModel.setVibrationEnabled(it) }
+                            )
+                        }
+                    }
+                    // Eucapnic Diaphragmatic Breathing settings — shown when prep is EUCAPNIC_DIAPHRAGMATIC and session is not active
+                    if ((state.apneaState == ApneaState.IDLE || state.apneaState == ApneaState.COMPLETE) &&
+                        state.prepType == PrepType.EUCAPNIC_DIAPHRAGMATIC &&
+                        state.eucapnicConfig != null) {
+                        item {
+                            EucapnicSettingsButton(
+                                config = state.eucapnicConfig!!,
+                                onClick = { showEucapnicSettingsDialog = true }
                             )
                         }
                     }

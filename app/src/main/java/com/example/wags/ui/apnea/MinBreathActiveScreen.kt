@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.usecase.apnea.MinBreathHoldResult
 import com.example.wags.domain.usecase.apnea.MinBreathPhase
 import com.example.wags.ui.apnea.pip.MinBreathPipContent
@@ -73,6 +74,9 @@ private fun MinBreathActiveScreenContent(
             onDismiss = { viewModel.dismissNewPersonalBest() }
         )
     }
+
+    // ── Eucapnic settings dialog state ────────────────────────────────
+    var showEucapnicSettingsDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = BackgroundDark,

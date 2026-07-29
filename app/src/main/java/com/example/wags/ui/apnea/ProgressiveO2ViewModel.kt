@@ -14,11 +14,13 @@ import com.example.wags.data.ipc.HabitIntegrationRepository
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.data.repository.ApneaSessionRepository
+import com.example.wags.data.repository.EucapnicConfigRepository
 import com.example.wags.data.spotify.SpotifyApiClient
 import com.example.wags.data.spotify.SpotifyAuthManager
 import com.example.wags.data.spotify.SpotifyManager
 import com.example.wags.data.spotify.SpotifyTrackDetail
 import com.example.wags.domain.model.AudioSetting
+import com.example.wags.domain.model.EucapnicConfig
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.DrillContext
 import com.example.wags.domain.model.PersonalBestResult
@@ -63,6 +65,9 @@ data class ProgressiveO2UiState(
     val liveSpO2: Int? = null,
     /** Set after session is saved — used for navigation to record detail screen. */
     val completedRecordId: Long? = null,
+    // ── Eucapnic Diaphragmatic Breathing ───────────────────────────────────────
+    /** Current eucapnic configuration (when EUCAPNIC_DIAPHRAGMATIC prep type is selected). */
+    val eucapnicConfig: com.example.wags.domain.model.EucapnicConfig? = null,
     // ── Apnea settings (read from SharedPreferences) ─────────────────────────
     val lungVolume: String = "FULL",
     val prepType: String = "NO_PREP",
@@ -145,6 +150,7 @@ class ProgressiveO2ViewModel @Inject constructor(
     private val spotifyApiClient: SpotifyApiClient,
     private val spotifyAuthManager: SpotifyAuthManager,
     private val guidedAudioManager: GuidedAudioManager,
+    private val eucapnicConfigRepository: EucapnicConfigRepository,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
@@ -482,6 +488,22 @@ class ProgressiveO2ViewModel @Inject constructor(
         if (_uiState.value.isGuidedMode && _uiState.value.startMp3WithHyper) {
             guidedAudioManager.stopPlayback()
         }
+    }
+
+    // ── Eucapnic Diaphragmatic Breathing ───────────────────────────────────────
+
+    /**
+     * Update the eucapnic configuration.
+     */
+    fun updateEucapnicConfig(config: EucapnicConfig) {
+        _uiState.update { it.copy(eucapnicConfig = config) }
+    }
+
+    /**
+     * Load a saved eucapnic configuration.
+     */
+    fun loadEucapnicConfiguration(config: EucapnicConfig) {
+        _uiState.update { it.copy(eucapnicConfig = config) }
     }
 
     // ── Song picker ─────────────────────────────────────────────────────────

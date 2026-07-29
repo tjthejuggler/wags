@@ -19,6 +19,7 @@ import com.example.wags.ui.apnea.ApneaRecordDetailScreen
 import com.example.wags.ui.apnea.ApneaScreen
 import com.example.wags.ui.apnea.ApneaTableScreen
 import com.example.wags.ui.apnea.EucapnicPacerScreen
+import com.example.wags.ui.apnea.EucapnicSetupScreen
 import com.example.wags.ui.apnea.FreeHoldActiveScreen
 import com.example.wags.ui.apnea.PbChartScreen
 import com.example.wags.ui.apnea.TimeChartScreen
@@ -107,6 +108,7 @@ object WagsRoutes {
     const val MIN_BREATH_ACTIVE = "min_breath_active"
 
     // ── Eucapnic Diaphragmatic Breathing ───────────────────────────────────────
+    const val EUCAPNIC_SETUP = "eucapnic_setup/{lungVolume}/{timeOfDay}/{posture}/{audio}"
     const val EUCAPNIC_PACER = "eucapnic_pacer/{lungVolume}/{timeOfDay}/{posture}/{audio}"
 
     // ── Trophy Chart ──────────────────────────────────────────────────────────
@@ -152,6 +154,13 @@ object WagsRoutes {
         "resonance_session?vibration=$vibration&duration=$duration&infinity=$infinity&rate=$rate"
     fun resonanceSessionDetail(sessionId: Long) = "resonance_session_detail/$sessionId"
     fun progressiveO2Detail(sessionId: Long) = "progressive_o2_detail/$sessionId"
+
+    fun eucapnicSetup(
+        lungVolume: String,
+        timeOfDay: String,
+        posture: String,
+        audio: String = "SILENCE"
+    ) = "eucapnic_setup/$lungVolume/$timeOfDay/$posture/$audio"
 
     fun eucapnicPacer(
         lungVolume: String,
@@ -350,6 +359,27 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
         }
         composable(WagsRoutes.MIN_BREATH_ACTIVE) {
             MinBreathActiveScreen(navController = navController)
+        }
+        composable(
+            route = WagsRoutes.EUCAPNIC_SETUP,
+            arguments = listOf(
+                navArgument("lungVolume") { type = NavType.StringType },
+                navArgument("timeOfDay")  { type = NavType.StringType },
+                navArgument("posture")    { type = NavType.StringType },
+                navArgument("audio")      { type = NavType.StringType; defaultValue = "SILENCE" }
+            )
+        ) { backStackEntry ->
+            val lungVolume = backStackEntry.arguments?.getString("lungVolume") ?: "FULL"
+            val timeOfDay  = backStackEntry.arguments?.getString("timeOfDay")  ?: "DAY"
+            val posture    = backStackEntry.arguments?.getString("posture")    ?: "LAYING"
+            val audio      = backStackEntry.arguments?.getString("audio")      ?: "SILENCE"
+            EucapnicSetupScreen(
+                navController = navController,
+                lungVolume = lungVolume,
+                timeOfDay  = timeOfDay,
+                posture    = posture,
+                audio      = audio
+            )
         }
         composable(
             route = WagsRoutes.EUCAPNIC_PACER,

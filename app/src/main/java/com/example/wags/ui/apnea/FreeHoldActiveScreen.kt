@@ -43,7 +43,9 @@ import com.example.wags.data.spotify.SpotifyAuthManager
 import com.example.wags.data.spotify.SpotifyManager
 import com.example.wags.data.spotify.SpotifyTrackDetail
 import com.example.wags.data.spotify.TrackInfo
+import com.example.wags.data.repository.EucapnicConfigRepository
 import com.example.wags.domain.model.AudioSetting
+import com.example.wags.domain.model.EucapnicConfig
 import com.example.wags.domain.model.OximeterReading
 import com.example.wags.domain.model.PersonalBestCategory
 import com.example.wags.domain.model.NextPbTarget
@@ -200,7 +202,10 @@ data class FreeHoldActiveUiState(
     /** The broadest PB category broken so far during the current hold (for UI display). */
     val currentPbCategory: PersonalBestCategory? = null,
     /** Countdown to the next PB milestone that would earn more trophies. Null when PB indication is off or no target remains. */
-    val nextPbTarget: NextPbTarget? = null
+    val nextPbTarget: NextPbTarget? = null,
+    // ── Eucapnic Diaphragmatic Breathing ───────────────────────────────────────
+    /** Current eucapnic configuration (when EUCAPNIC_DIAPHRAGMATIC prep type is selected). */
+    val eucapnicConfig: com.example.wags.domain.model.EucapnicConfig? = null
 )
 
 @HiltViewModel
@@ -215,6 +220,7 @@ class FreeHoldActiveViewModel @Inject constructor(
     private val spotifyApiClient: SpotifyApiClient,
     private val spotifyAuthManager: SpotifyAuthManager,
     private val guidedAudioManager: GuidedAudioManager,
+    private val eucapnicConfigRepository: EucapnicConfigRepository,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
@@ -580,6 +586,22 @@ class FreeHoldActiveViewModel @Inject constructor(
     fun setPbIndicationVibration(enabled: Boolean) {
         audioHapticEngine.pbIndicationVibration = enabled
         _uiState.update { it.copy(pbIndicationVibration = enabled) }
+    }
+
+    // ── Eucapnic Diaphragmatic Breathing ───────────────────────────────────────
+    
+    /**
+     * Update the eucapnic configuration.
+     */
+    fun updateEucapnicConfig(config: EucapnicConfig) {
+        _uiState.update { it.copy(eucapnicConfig = config) }
+    }
+
+    /**
+     * Load a saved eucapnic configuration.
+     */
+    fun loadEucapnicConfiguration(config: EucapnicConfig) {
+        _uiState.update { it.copy(eucapnicConfig = config) }
     }
 
     fun startFreeHold() {
@@ -1274,6 +1296,8 @@ private fun FreeHoldActiveScreenContent(
         var showSongPicker by remember { mutableStateOf(false) }
         // Settings edit dialog state
         var showSettingsDialog by remember { mutableStateOf(false) }
+        // Eucapnic settings dialog state
+        var showEucapnicSettingsDialog by remember { mutableStateOf(false) }
 
         if (showSongPicker) {
             SongPickerDialog(
@@ -1304,6 +1328,35 @@ private fun FreeHoldActiveScreenContent(
                 onPostureChange = { viewModel.updatePosture(it) },
                 onAudioChange = { viewModel.updateAudio(it) },
                 onDismiss = { showSettingsDialog = false }
+            )
+        }
+
+        // Eucapnic settings dialog
+        if (showEucapnicSettingsDialog && state.eucapnicConfig != null) {
+            EucapnicSettingsDialog(
+                config = state.eucapnicConfig!!,
+                onPrepDurationChange = { duration ->
+                    viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(prepDurationSec = duration))
+                },
+                onBpmChange = { bpm ->
+                    viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(breathsPerMin = bpm))
+                },
+                onInhaleChange = { inhale ->
+                    viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(inhaleSec = inhale))
+                },
+                onTopPauseChange = { topPause ->
+                    viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(topPauseSec = topPause))
+                },
+                onExhaleChange = { exhale ->
+                    viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(exhaleSec = exhale))
+                },
+                onBottomPauseChange = { bottomPause ->
+                    viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(bottomPauseSec = bottomPause))
+                },
+                onBreathDepthChange = { depth ->
+                    viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(breathDepthPercent = depth))
+                },
+                onDismiss = { showEucapnicSettingsDialog = false }
             )
         }
 
@@ -1428,6 +1481,15 @@ private fun FreeHoldActiveScreenContent(
                     onEnabledChange = { viewModel.setPbIndicationEnabled(it) },
                     onSoundChange = { viewModel.setPbIndicationSound(it) },
                     onVibrationChange = { viewModel.setPbIndicationVibration(it) }
+                )
+            }
+
+            // ── Eucapnic Diaphragmatic Breathing settings ───────────────────────
+            // Show settings button when EUCAPNIC_DIAPHRAGMATIC prep type is selected
+            if (!state.freeHoldActive && state.currentPrepType == PrepType.EUCAPNIC_DIAPHRAGMATIC.name && state.eucapnicConfig != null) {
+                EucapnicSettingsButton(
+                    config = state.eucapnicConfig!!,
+                    onClick = { showEucapnicSettingsDialog = true }
                 )
             }
 
