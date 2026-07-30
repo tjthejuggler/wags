@@ -1257,7 +1257,8 @@ private fun FreeHoldActiveScreenContent(
     //   • no PB dialog is showing (newPersonalBestMs is null — either no PB or dismissed).
     LaunchedEffect(stopRequested, state.freeHoldActive, state.newPersonalBest, state.pbCheckPending) {
         if (stopRequested && !state.freeHoldActive && !state.pbCheckPending && state.newPersonalBest == null) {
-            navController.popBackStack()
+            // Pop back to the main apnea screen, not just the previous screen
+            navController.popBackStack(WagsRoutes.APNEA_FREE, inclusive = false)
         }
     }
 
@@ -1280,7 +1281,8 @@ private fun FreeHoldActiveScreenContent(
                 navigationIcon = {
                     IconButton(onClick = {
                         if (state.freeHoldActive) viewModel.cancelFreeHold()
-                        navController.popBackStack()
+                        // Pop back to the main apnea screen, not just the previous screen
+                        navController.popBackStack(WagsRoutes.APNEA_FREE, inclusive = false)
                     }) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }

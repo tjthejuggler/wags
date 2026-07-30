@@ -49,7 +49,8 @@ fun ApneaTableScreen(
 
     SessionBackHandler(enabled = isActive) {
         viewModel.cancelTableSession()
-        navController.popBackStack()
+        // Pop back to the advanced apnea screen (main screen for tables)
+        navController.popBackStack("advanced_apnea", inclusive = false)
     }
     KeepScreenOn(enabled = keepScreenOn)
 
@@ -68,7 +69,8 @@ fun ApneaTableScreen(
                 navigationIcon = {
                     IconButton(onClick = {
                         if (isActive) viewModel.cancelTableSession()
-                        navController.popBackStack()
+                        // Pop back to the advanced apnea screen (main screen for tables)
+                        navController.popBackStack("advanced_apnea", inclusive = false)
                     }) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }

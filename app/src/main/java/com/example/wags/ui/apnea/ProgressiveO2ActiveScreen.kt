@@ -64,7 +64,7 @@ private fun ProgressiveO2ActiveScreenContent(
     // ── Guards ───────────────────────────────────────────────────────────
     SessionBackHandler(enabled = isActive) {
         viewModel.cancelSession()
-        navController.popBackStack()
+        navController.popBackStack(WagsRoutes.PROGRESSIVE_O2, inclusive = false)
     }
     KeepScreenOn(enabled = isActive || phase == ProgressiveO2Phase.COMPLETE)
 
@@ -99,7 +99,7 @@ private fun ProgressiveO2ActiveScreenContent(
                 navigationIcon = {
                     IconButton(onClick = {
                         if (isActive) viewModel.cancelSession()
-                        navController.popBackStack()
+                        navController.popBackStack(WagsRoutes.PROGRESSIVE_O2, inclusive = false)
                     }) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
@@ -139,7 +139,7 @@ private fun ProgressiveO2ActiveScreenContent(
                         popUpTo(WagsRoutes.PROGRESSIVE_O2_ACTIVE) { inclusive = true }
                     }
                 },
-                onDone = { navController.popBackStack() }
+                onDone = { navController.popBackStack(WagsRoutes.PROGRESSIVE_O2, inclusive = false) }
             )
         }
     }

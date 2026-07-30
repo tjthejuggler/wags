@@ -57,7 +57,7 @@ private fun MinBreathActiveScreenContent(
 
     SessionBackHandler(enabled = isActive) {
         viewModel.cancelSession()
-        navController.popBackStack()
+        navController.popBackStack(WagsRoutes.MIN_BREATH, inclusive = false)
     }
     KeepScreenOn(enabled = isActive || phase == MinBreathPhase.COMPLETE)
 
@@ -86,7 +86,7 @@ private fun MinBreathActiveScreenContent(
                 navigationIcon = {
                     IconButton(onClick = {
                         if (isActive) viewModel.cancelSession()
-                        navController.popBackStack()
+                        navController.popBackStack(WagsRoutes.MIN_BREATH, inclusive = false)
                     }) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
@@ -131,7 +131,7 @@ private fun MinBreathActiveScreenContent(
                     }
                     viewModel.onSessionNavigated()
                 },
-                onDone = { navController.popBackStack() }
+                onDone = { navController.popBackStack(WagsRoutes.MIN_BREATH, inclusive = false) }
             )
         }
     }
