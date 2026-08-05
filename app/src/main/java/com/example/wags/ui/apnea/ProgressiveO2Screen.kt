@@ -38,9 +38,19 @@ import com.example.wags.ui.theme.*
 @Composable
 fun ProgressiveO2Screen(
     navController: NavController,
-    viewModel: ProgressiveO2ViewModel = hiltViewModel()
+    viewModel: ProgressiveO2ViewModel = hiltViewModel(),
+    eucapnicConfigViewModel: EucapnicConfigViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val pastConfigurations by eucapnicConfigViewModel.pastConfigurations.collectAsStateWithLifecycle()
+    val eucapnicConfig by eucapnicConfigViewModel.config.collectAsStateWithLifecycle()
+
+    // Update ProgressiveO2ViewModel with eucapnic config when EUCAPNIC_DIAPHRAGMATIC is selected
+    LaunchedEffect(state.prepType, eucapnicConfig) {
+        if (state.prepType == PrepType.EUCAPNIC_DIAPHRAGMATIC.name) {
+            viewModel.updateEucapnicConfig(eucapnicConfig)
+        }
+    }
 
     // Reset filters to current settings every time this screen is entered
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -85,6 +95,11 @@ fun ProgressiveO2Screen(
         var showSongPicker by remember { mutableStateOf(false) }
         // Filter dialog state
         var showFilterDialog by remember { mutableStateOf(false) }
+        // Eucapnic settings dialog state
+        var showEucapnicSettingsDialog by remember { mutableStateOf(false) }
+        var showPastConfigurationsDialog by remember { mutableStateOf(false) }
+        var showSaveConfigurationDialog by remember { mutableStateOf(false) }
+        var saveConfigurationName by remember { mutableStateOf("") }
 
         if (showFilterDialog) {
             ProgressiveO2FilterDialog(
@@ -128,6 +143,98 @@ fun ProgressiveO2Screen(
                 onSongSelected = { track -> viewModel.selectSong(track) },
                 onRefresh = { viewModel.loadPreviousSongs(forceRefresh = true) },
                 onDismiss = { showSongPicker = false }
+            )
+        }
+
+        // Eucapnic settings dialog
+        if (showEucapnicSettingsDialog && state.eucapnicConfig != null) {
+            EucapnicSettingsDialog(
+                config = state.eucapnicConfig!!,
+                onPrepDurationChange = { duration ->
+                    viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(prepDurationSec = duration))
+                },
+                onBpmChange = { bpm ->
+                    viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(breathsPerMin = bpm))
+                },
+                onInhaleChange = { inhale ->
+                    viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(inhaleSec = inhale))
+                },
+                onTopPauseChange = { topPause ->
+                    viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(topPauseSec = topPause))
+                },
+                onExhaleChange = { exhale ->
+                    viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(exhaleSec = exhale))
+                },
+                onBottomPauseChange = { bottomPause ->
+                    viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(bottomPauseSec = bottomPause))
+                },
+                onBreathDepthChange = { depth ->
+                    viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(breathDepthPercent = depth))
+                },
+                onDismiss = { showEucapnicSettingsDialog = false },
+                pastConfigurations = pastConfigurations,
+                onPastConfigurationsClick = { showPastConfigurationsDialog = true }
+            )
+        }
+
+        // Past configurations dialog
+        if (showPastConfigurationsDialog) {
+            PastConfigurationsDialog(
+                configurations = pastConfigurations,
+                onConfigurationSelected = { entity ->
+                    // Load the configuration in both ViewModels
+                    eucapnicConfigViewModel.loadConfiguration(entity)
+                    val config = com.example.wags.domain.model.EucapnicConfig(
+                        prepDurationSec = entity.prepDurationSec,
+                        breathsPerMin = entity.breathsPerMin,
+                        inhaleSec = entity.inhaleSec,
+                        topPauseSec = entity.topPauseSec,
+                        exhaleSec = entity.exhaleSec,
+                        bottomPauseSec = entity.bottomPauseSec,
+                        breathDepthPercent = entity.breathDepthPercent
+                    )
+                    viewModel.loadEucapnicConfiguration(config)
+                    showPastConfigurationsDialog = false
+                },
+                onSaveCurrentClick = {
+                    showPastConfigurationsDialog = false
+                    showSaveConfigurationDialog = true
+                },
+                onDismiss = { showPastConfigurationsDialog = false }
+            )
+        }
+
+        // Save configuration dialog
+        if (showSaveConfigurationDialog) {
+            AlertDialog(
+                onDismissRequest = { showSaveConfigurationDialog = false },
+                title = { Text("Save Configuration") },
+                text = {
+                    TextField(
+                        value = saveConfigurationName,
+                        onValueChange = { saveConfigurationName = it },
+                        label = { Text("Configuration name") },
+                        singleLine = true
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            state.eucapnicConfig?.let { config ->
+                                eucapnicConfigViewModel.saveConfiguration(saveConfigurationName)
+                            }
+                            showSaveConfigurationDialog = false
+                            saveConfigurationName = ""
+                        }
+                    ) {
+                        Text("Save")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showSaveConfigurationDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
             )
         }
 
@@ -232,6 +339,14 @@ fun ProgressiveO2Screen(
                 )
             }
 
+            // 0f. Eucapnic Diaphragmatic Breathing settings — shown when prep is EUCAPNIC_DIAPHRAGMATIC
+            if (state.prepType == PrepType.EUCAPNIC_DIAPHRAGMATIC.name && state.eucapnicConfig != null) {
+                EucapnicSettingsButton(
+                    config = state.eucapnicConfig!!,
+                    onClick = { showEucapnicSettingsDialog = true }
+                )
+            }
+
             // 0e. Record-breaking forecast
             RecordForecastSummary(
                 forecast = state.recordForecast,
@@ -262,7 +377,26 @@ fun ProgressiveO2Screen(
 
             Button(
                 onClick = {
-                    if (useGuidedStart) {
+                    if (state.prepType == PrepType.EUCAPNIC_DIAPHRAGMATIC.name && state.eucapnicConfig != null) {
+                        // Navigate to eucapnic pacer screen with the current config
+                        val config = state.eucapnicConfig!!
+                        navController.navigate(
+                            WagsRoutes.eucapnicPacer(
+                                lungVolume = state.lungVolume,
+                                timeOfDay = state.timeOfDay,
+                                posture = state.posture,
+                                audio = state.audio,
+                                sessionType = "PROGRESSIVE_O2",
+                                prepDurationSec = config.prepDurationSec,
+                                breathsPerMin = config.breathsPerMin,
+                                inhaleSec = config.inhaleSec,
+                                topPauseSec = config.topPauseSec,
+                                exhaleSec = config.exhaleSec,
+                                bottomPauseSec = config.bottomPauseSec,
+                                breathDepthPercent = config.breathDepthPercent
+                            )
+                        )
+                    } else if (useGuidedStart) {
                         viewModel.showGuidedCountdown()
                     } else {
                         navController.navigate(WagsRoutes.PROGRESSIVE_O2_ACTIVE)

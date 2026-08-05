@@ -39,9 +39,19 @@ import com.example.wags.ui.theme.*
 @Composable
 fun MinBreathScreen(
     navController: NavController,
-    viewModel: MinBreathViewModel = hiltViewModel()
+    viewModel: MinBreathViewModel = hiltViewModel(),
+    eucapnicConfigViewModel: EucapnicConfigViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val pastConfigurations by eucapnicConfigViewModel.pastConfigurations.collectAsStateWithLifecycle()
+    val eucapnicConfig by eucapnicConfigViewModel.config.collectAsStateWithLifecycle()
+
+    // Update MinBreathViewModel with eucapnic config when EUCAPNIC_DIAPHRAGMATIC is selected
+    LaunchedEffect(state.prepType, eucapnicConfig) {
+        if (state.prepType == PrepType.EUCAPNIC_DIAPHRAGMATIC.name) {
+            viewModel.updateEucapnicConfig(eucapnicConfig)
+        }
+    }
 
     // Reset filters to current settings every time this screen is entered
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -82,6 +92,11 @@ fun MinBreathScreen(
         var showSongPicker by remember { mutableStateOf(false) }
         // Filter dialog state
         var showFilterDialog by remember { mutableStateOf(false) }
+        // Eucapnic settings dialog state
+        var showEucapnicSettingsDialog by remember { mutableStateOf(false) }
+        var showPastConfigurationsDialog by remember { mutableStateOf(false) }
+        var showSaveConfigurationDialog by remember { mutableStateOf(false) }
+        var saveConfigurationName by remember { mutableStateOf("") }
 
         if (showSettingsDialog) {
             FreeHoldSettingsDialog(
@@ -226,7 +241,6 @@ fun MinBreathScreen(
             }
 
             // 0f. Eucapnic Diaphragmatic Breathing settings — shown when prep is EUCAPNIC_DIAPHRAGMATIC
-            var showEucapnicSettingsDialog by remember { mutableStateOf(false) }
             if (state.prepType == PrepType.EUCAPNIC_DIAPHRAGMATIC.name && state.eucapnicConfig != null) {
                 EucapnicSettingsButton(
                     config = state.eucapnicConfig!!,
@@ -272,7 +286,70 @@ fun MinBreathScreen(
                     onBreathDepthChange = { depth ->
                         viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(breathDepthPercent = depth))
                     },
-                    onDismiss = { showEucapnicSettingsDialog = false }
+                    onDismiss = { showEucapnicSettingsDialog = false },
+                    pastConfigurations = pastConfigurations,
+                    onPastConfigurationsClick = { showPastConfigurationsDialog = true }
+                )
+            }
+
+            // Past configurations dialog
+            if (showPastConfigurationsDialog) {
+                PastConfigurationsDialog(
+                    configurations = pastConfigurations,
+                    onConfigurationSelected = { entity ->
+                        // Load the configuration in both ViewModels
+                        eucapnicConfigViewModel.loadConfiguration(entity)
+                        val config = com.example.wags.domain.model.EucapnicConfig(
+                            prepDurationSec = entity.prepDurationSec,
+                            breathsPerMin = entity.breathsPerMin,
+                            inhaleSec = entity.inhaleSec,
+                            topPauseSec = entity.topPauseSec,
+                            exhaleSec = entity.exhaleSec,
+                            bottomPauseSec = entity.bottomPauseSec,
+                            breathDepthPercent = entity.breathDepthPercent
+                        )
+                        viewModel.loadEucapnicConfiguration(config)
+                        showPastConfigurationsDialog = false
+                    },
+                    onSaveCurrentClick = {
+                        showPastConfigurationsDialog = false
+                        showSaveConfigurationDialog = true
+                    },
+                    onDismiss = { showPastConfigurationsDialog = false }
+                )
+            }
+
+            // Save configuration dialog
+            if (showSaveConfigurationDialog) {
+                AlertDialog(
+                    onDismissRequest = { showSaveConfigurationDialog = false },
+                    title = { Text("Save Configuration") },
+                    text = {
+                        TextField(
+                            value = saveConfigurationName,
+                            onValueChange = { saveConfigurationName = it },
+                            label = { Text("Configuration name") },
+                            singleLine = true
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                state.eucapnicConfig?.let { config ->
+                                    eucapnicConfigViewModel.saveConfiguration(saveConfigurationName)
+                                }
+                                showSaveConfigurationDialog = false
+                                saveConfigurationName = ""
+                            }
+                        ) {
+                            Text("Save")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showSaveConfigurationDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
                 )
             }
 
@@ -306,7 +383,26 @@ fun MinBreathScreen(
 
             Button(
                 onClick = {
-                    if (useGuidedStart) {
+                    if (state.prepType == PrepType.EUCAPNIC_DIAPHRAGMATIC.name && state.eucapnicConfig != null) {
+                        // Navigate to eucapnic pacer screen with the current config
+                        val config = state.eucapnicConfig!!
+                        navController.navigate(
+                            WagsRoutes.eucapnicPacer(
+                                lungVolume = state.lungVolume,
+                                timeOfDay = state.timeOfDay,
+                                posture = state.posture,
+                                audio = state.audio,
+                                sessionType = "MIN_BREATH",
+                                prepDurationSec = config.prepDurationSec,
+                                breathsPerMin = config.breathsPerMin,
+                                inhaleSec = config.inhaleSec,
+                                topPauseSec = config.topPauseSec,
+                                exhaleSec = config.exhaleSec,
+                                bottomPauseSec = config.bottomPauseSec,
+                                breathDepthPercent = config.breathDepthPercent
+                            )
+                        )
+                    } else if (useGuidedStart) {
                         viewModel.showGuidedCountdown()
                     } else {
                         navController.navigate("min_breath_active")

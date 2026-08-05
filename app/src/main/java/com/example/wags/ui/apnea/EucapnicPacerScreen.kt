@@ -84,6 +84,11 @@ fun EucapnicPacerScreen(
         if (isComplete && config != null) {
             when (sessionType) {
                 "FREE_HOLD" -> {
+                    // Mark eucapnic prep as completed before navigating
+                    navController.previousBackStackEntry
+                        ?.savedStateHandle
+                        ?.set("eucapnic_prep_completed", true)
+                    
                     navController.navigate(
                         WagsRoutes.freeHoldActive(
                             lungVolume = lungVolume,

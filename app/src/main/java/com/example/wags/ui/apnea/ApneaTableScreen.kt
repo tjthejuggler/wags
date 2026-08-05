@@ -37,10 +37,19 @@ import com.example.wags.ui.theme.*
 fun ApneaTableScreen(
     navController: NavController,
     tableType: String,
-    viewModel: ApneaViewModel = hiltViewModel()
+    viewModel: ApneaViewModel = hiltViewModel(),
+    eucapnicConfigViewModel: EucapnicConfigViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val parsedType = runCatching { ApneaTableType.valueOf(tableType) }.getOrDefault(ApneaTableType.O2)
+    val eucapnicConfig by eucapnicConfigViewModel.config.collectAsStateWithLifecycle()
+
+    // Update ApneaViewModel with eucapnic config when EUCAPNIC_DIAPHRAGMATIC is selected
+    LaunchedEffect(state.prepType, eucapnicConfig) {
+        if (state.prepType == PrepType.EUCAPNIC_DIAPHRAGMATIC) {
+            viewModel.updateEucapnicConfig(eucapnicConfig)
+        }
+    }
 
     val isActive = state.apneaState != ApneaState.IDLE && state.apneaState != ApneaState.COMPLETE
 
@@ -282,8 +291,29 @@ fun ApneaTableScreen(
                         SessionControlRow(
                             apneaState = state.apneaState,
                             onStart = {
-                                viewModel.loadTable(parsedType)
-                                viewModel.startTableSession()
+                                if (state.prepType == PrepType.EUCAPNIC_DIAPHRAGMATIC && state.eucapnicConfig != null) {
+                                    // Navigate to eucapnic pacer screen with the current config
+                                    val config = state.eucapnicConfig!!
+                                    navController.navigate(
+                                        WagsRoutes.eucapnicPacer(
+                                            lungVolume = state.selectedLungVolume,
+                                            timeOfDay = state.timeOfDay.name,
+                                            posture = state.posture.name,
+                                            audio = state.audio.name,
+                                            sessionType = "TABLE_${parsedType.name}",
+                                            prepDurationSec = config.prepDurationSec,
+                                            breathsPerMin = config.breathsPerMin,
+                                            inhaleSec = config.inhaleSec,
+                                            topPauseSec = config.topPauseSec,
+                                            exhaleSec = config.exhaleSec,
+                                            bottomPauseSec = config.bottomPauseSec,
+                                            breathDepthPercent = config.breathDepthPercent
+                                        )
+                                    )
+                                } else {
+                                    viewModel.loadTable(parsedType)
+                                    viewModel.startTableSession()
+                                }
                             },
                             onStop = { viewModel.stopTableSession() }
                         )

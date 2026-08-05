@@ -205,12 +205,14 @@ data class FreeHoldActiveUiState(
     val nextPbTarget: NextPbTarget? = null,
     // ── Eucapnic Diaphragmatic Breathing ───────────────────────────────────────
     /** Current eucapnic configuration (when EUCAPNIC_DIAPHRAGMATIC prep type is selected). */
-    val eucapnicConfig: com.example.wags.domain.model.EucapnicConfig? = null
+    val eucapnicConfig: com.example.wags.domain.model.EucapnicConfig? = null,
+    /** True when eucapnic prep has been completed and the user is ready to start the actual hold. */
+    val eucapnicPrepCompleted: Boolean = false
 )
 
 @HiltViewModel
 class FreeHoldActiveViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
+    private val savedStateHandle: SavedStateHandle,
     private val deviceManager: UnifiedDeviceManager,
     private val hrDataSource: HrDataSource,
     private val apneaRepository: ApneaRepository,
@@ -247,6 +249,8 @@ class FreeHoldActiveViewModel @Inject constructor(
             val perMp3 = if (isGuidedMode && isHyperPrep && selId > 0 && guidedAudioManager.hasPerMp3HyperSettings(selId)) {
                 guidedAudioManager.getPerMp3HyperSettings(selId)
             } else null
+            // Check if we're returning from eucapnic pacer
+            val prepCompleted = savedStateHandle.get<Boolean>("eucapnic_prep_completed") ?: false
             FreeHoldActiveUiState(
                 showTimer = savedStateHandle.get<Boolean>("showTimer") ?: true,
                 isMusicMode = isMusicMode,
@@ -265,7 +269,8 @@ class FreeHoldActiveViewModel @Inject constructor(
                 currentAudio = audio,
                 pbIndicationEnabled = audioHapticEngine.pbIndicationEnabled,
                 pbIndicationSound = audioHapticEngine.pbIndicationSound,
-                pbIndicationVibration = audioHapticEngine.pbIndicationVibration
+                pbIndicationVibration = audioHapticEngine.pbIndicationVibration,
+                eucapnicPrepCompleted = prepCompleted
             )
         }
     )
@@ -315,6 +320,8 @@ class FreeHoldActiveViewModel @Inject constructor(
                 guidedSelectedName = name
             ) }
         }
+
+        // Note: Eucapnic config is loaded in the composable via LaunchedEffect
 
         // Check for a pending repeat song (set by "Repeat This Hold" on the detail screen).
         // If present, auto-select it so the song is pre-loaded and ready when the user taps Start.
@@ -602,6 +609,14 @@ class FreeHoldActiveViewModel @Inject constructor(
      */
     fun loadEucapnicConfiguration(config: EucapnicConfig) {
         _uiState.update { it.copy(eucapnicConfig = config) }
+    }
+
+    /**
+     * Mark eucapnic prep as completed (called after returning from eucapnic pacer screen).
+     */
+    fun setEucapnicPrepCompleted(completed: Boolean) {
+        savedStateHandle["eucapnic_prep_completed"] = completed
+        _uiState.update { it.copy(eucapnicPrepCompleted = completed) }
     }
 
     fun startFreeHold() {
@@ -1222,14 +1237,24 @@ fun FreeHoldActiveScreen(
     timeOfDay: String,
     posture: String,
     showTimer: Boolean,
-    viewModel: FreeHoldActiveViewModel = hiltViewModel()
+    viewModel: FreeHoldActiveViewModel = hiltViewModel(),
+    eucapnicConfigViewModel: EucapnicConfigViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val pastConfigurations by eucapnicConfigViewModel.pastConfigurations.collectAsStateWithLifecycle()
+    val eucapnicConfig by eucapnicConfigViewModel.config.collectAsStateWithLifecycle()
+
+    // Update FreeHoldActiveViewModel with eucapnic config when EUCAPNIC_DIAPHRAGMATIC is selected
+    LaunchedEffect(prepType, eucapnicConfig) {
+        if (prepType == PrepType.EUCAPNIC_DIAPHRAGMATIC.name) {
+            viewModel.updateEucapnicConfig(eucapnicConfig)
+        }
+    }
 
     PipSessionHost(
         pipEnabled = true, // always eligible: covers pre-start, active, and result phases
         pipContent = { FreeHoldPipContent(viewModel = viewModel) },
-        fullContent = { FreeHoldActiveScreenContent(navController, showTimer, state, viewModel) }
+        fullContent = { FreeHoldActiveScreenContent(navController, showTimer, state, viewModel, pastConfigurations, eucapnicConfigViewModel) }
     )
 }
 
@@ -1239,7 +1264,9 @@ private fun FreeHoldActiveScreenContent(
     navController: NavController,
     showTimer: Boolean,
     state: FreeHoldActiveUiState,
-    viewModel: FreeHoldActiveViewModel
+    viewModel: FreeHoldActiveViewModel,
+    pastConfigurations: List<com.example.wags.data.db.entity.EucapnicPastConfigurationEntity>,
+    eucapnicConfigViewModel: EucapnicConfigViewModel
 ) {
     SessionBackHandler(enabled = state.freeHoldActive) {
         viewModel.cancelFreeHold()
@@ -1300,6 +1327,10 @@ private fun FreeHoldActiveScreenContent(
         var showSettingsDialog by remember { mutableStateOf(false) }
         // Eucapnic settings dialog state
         var showEucapnicSettingsDialog by remember { mutableStateOf(false) }
+        // Past configurations dialog state
+        var showPastConfigurationsDialog by remember { mutableStateOf(false) }
+        var showSaveConfigurationDialog by remember { mutableStateOf(false) }
+        var saveConfigurationName by remember { mutableStateOf("") }
 
         if (showSongPicker) {
             SongPickerDialog(
@@ -1358,7 +1389,70 @@ private fun FreeHoldActiveScreenContent(
                 onBreathDepthChange = { depth ->
                     viewModel.updateEucapnicConfig(state.eucapnicConfig!!.copy(breathDepthPercent = depth))
                 },
-                onDismiss = { showEucapnicSettingsDialog = false }
+                onDismiss = { showEucapnicSettingsDialog = false },
+                pastConfigurations = pastConfigurations,
+                onPastConfigurationsClick = { showPastConfigurationsDialog = true }
+            )
+        }
+
+        // Past configurations dialog
+        if (showPastConfigurationsDialog) {
+            PastConfigurationsDialog(
+                configurations = pastConfigurations,
+                onConfigurationSelected = { entity ->
+                    // Load the configuration in both ViewModels
+                    eucapnicConfigViewModel.loadConfiguration(entity)
+                    val config = com.example.wags.domain.model.EucapnicConfig(
+                        prepDurationSec = entity.prepDurationSec,
+                        breathsPerMin = entity.breathsPerMin,
+                        inhaleSec = entity.inhaleSec,
+                        topPauseSec = entity.topPauseSec,
+                        exhaleSec = entity.exhaleSec,
+                        bottomPauseSec = entity.bottomPauseSec,
+                        breathDepthPercent = entity.breathDepthPercent
+                    )
+                    viewModel.loadEucapnicConfiguration(config)
+                    showPastConfigurationsDialog = false
+                },
+                onSaveCurrentClick = {
+                    showPastConfigurationsDialog = false
+                    showSaveConfigurationDialog = true
+                },
+                onDismiss = { showPastConfigurationsDialog = false }
+            )
+        }
+
+        // Save configuration dialog
+        if (showSaveConfigurationDialog) {
+            AlertDialog(
+                onDismissRequest = { showSaveConfigurationDialog = false },
+                title = { Text("Save Configuration") },
+                text = {
+                    TextField(
+                        value = saveConfigurationName,
+                        onValueChange = { saveConfigurationName = it },
+                        label = { Text("Configuration name") },
+                        singleLine = true
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            state.eucapnicConfig?.let { config ->
+                                eucapnicConfigViewModel.saveConfiguration(saveConfigurationName)
+                            }
+                            showSaveConfigurationDialog = false
+                            saveConfigurationName = ""
+                        }
+                    ) {
+                        Text("Save")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showSaveConfigurationDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
             )
         }
 
@@ -1508,10 +1602,36 @@ private fun FreeHoldActiveScreenContent(
                 nextPbTarget = state.nextPbTarget,
                 guidedHyperActive = state.isHyperPrep && state.guidedHyperEnabled,
                 guidedCountdownComplete = state.guidedCountdownComplete,
+                currentPrepType = state.currentPrepType,
+                eucapnicPrepCompleted = state.eucapnicPrepCompleted,
                 modifier = Modifier.fillMaxSize(),
                 onShowTimerChange = { viewModel.setShowTimer(it) },
                 onStart = {
-                    if (useGuidedStart) {
+                    if (state.currentPrepType == PrepType.EUCAPNIC_DIAPHRAGMATIC.name && state.eucapnicConfig != null) {
+                        if (state.eucapnicPrepCompleted) {
+                            // Eucapnic prep already done, start the actual hold
+                            viewModel.startFreeHold()
+                        } else {
+                            // Navigate to eucapnic pacer screen with the current config
+                            val config = state.eucapnicConfig!!
+                            navController.navigate(
+                                WagsRoutes.eucapnicPacer(
+                                    lungVolume = state.currentLungVolume,
+                                    timeOfDay = state.currentTimeOfDay,
+                                    posture = state.currentPosture,
+                                    audio = state.currentAudio,
+                                    sessionType = "FREE_HOLD",
+                                    prepDurationSec = config.prepDurationSec,
+                                    breathsPerMin = config.breathsPerMin,
+                                    inhaleSec = config.inhaleSec,
+                                    topPauseSec = config.topPauseSec,
+                                    exhaleSec = config.exhaleSec,
+                                    bottomPauseSec = config.bottomPauseSec,
+                                    breathDepthPercent = config.breathDepthPercent
+                                )
+                            )
+                        }
+                    } else if (useGuidedStart) {
                         viewModel.showGuidedCountdown()
                     } else {
                         viewModel.startFreeHold()
@@ -1540,6 +1660,8 @@ private fun FreeHoldActiveContent(
     nextPbTarget: NextPbTarget? = null,
     guidedHyperActive: Boolean = false,
     guidedCountdownComplete: Boolean = false,
+    currentPrepType: String = "NO_PREP",
+    eucapnicPrepCompleted: Boolean = false,
     modifier: Modifier = Modifier,
     onShowTimerChange: (Boolean) -> Unit = {},
     onStart: () -> Unit,
@@ -1668,6 +1790,14 @@ private fun FreeHoldActiveContent(
                                 if (showHyperStart) {
                                     Text(
                                         text = "HYPER",
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = TextAlign.Center,
+                                        color = TextSecondary
+                                    )
+                                } else if (currentPrepType == PrepType.EUCAPNIC_DIAPHRAGMATIC.name) {
+                                    Text(
+                                        text = if (eucapnicPrepCompleted) "HOLD" else "EUCAPNIC",
                                         style = MaterialTheme.typography.headlineSmall,
                                         fontWeight = FontWeight.Bold,
                                         textAlign = TextAlign.Center,

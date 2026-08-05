@@ -255,29 +255,18 @@ fun ApneaScreen(
                         recordForecast         = state.recordForecast,
                         onAutoSet              = { viewModel.autoSetBestSettings() },
                         onStartHold = {
-                            // Navigate to EucapnicSetupScreen when EUCAPNIC_DIAPHRAGMATIC is selected
-                            if (state.prepType == PrepType.EUCAPNIC_DIAPHRAGMATIC) {
-                                navController.navigate(
-                                    WagsRoutes.eucapnicSetup(
-                                        lungVolume = state.selectedLungVolume,
-                                        timeOfDay  = state.timeOfDay.name,
-                                        posture    = state.posture.name,
-                                        audio      = state.audio.name,
-                                        sessionType = "FREE_HOLD"
-                                    )
+                            // Always navigate to FreeHoldActiveScreen
+                            // Eucapnic config button will be shown there when EUCAPNIC_DIAPHRAGMATIC is selected
+                            navController.navigate(
+                                WagsRoutes.freeHoldActive(
+                                    lungVolume = state.selectedLungVolume,
+                                    prepType   = state.prepType.name,
+                                    timeOfDay  = state.timeOfDay.name,
+                                    posture    = state.posture.name,
+                                    showTimer  = state.showTimer,
+                                    audio      = state.audio.name
                                 )
-                            } else {
-                                navController.navigate(
-                                    WagsRoutes.freeHoldActive(
-                                        lungVolume = state.selectedLungVolume,
-                                        prepType   = state.prepType.name,
-                                        timeOfDay  = state.timeOfDay.name,
-                                        posture    = state.posture.name,
-                                        showTimer  = state.showTimer,
-                                        audio      = state.audio.name
-                                    )
-                                )
-                            }
+                            )
                         },
                         onBestTimeClick = { recordId ->
                             navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
