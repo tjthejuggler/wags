@@ -1,25 +1,20 @@
-## ADR: Eucapnic Pacer Renderer — Active Session UI
+## Coherence strip chart scroll anchoring fix (2026-08-05)
 
-**Date:** 2026-07-28
+**Context:** The short-term coherence foreground chart in resonance sessions
+(ResonanceSessionScreen) and assessments (AssessmentRunScreen) exhibited a
+jarring "halfway → 3/4 → halfway" scroll cycle. The RR/RMSSD strip charts on
+the same screens scrolled correctly.
 
-**Context:**
-The EUCAPNIC_DIAPHRAGMATIC prep type needed an active pacing renderer to guide the user through diaphragmatic breathing during apnea preparation. The domain layer (EucapnicPacerEngine, EucapnicConfig, PacerState, EucapnicPhase) was already implemented. The UI layer needed three new components.
+**Root cause:** `CoherenceStripChartState.ingest()` anchored the newest raw
+sample at `wallTimeMs - SAMPLE_INTERVAL_MS` (5 s behind the cursor). With a
+20 s window, that placed the right edge at 75 %, drifting to 50 % before the
+next sample snapped it back. The RR/RMSSD charts anchor the newest beat at the
+cursor (`wallTimeMs`), keeping the right edge at ~100 %–95 %.
 
-**Decision:**
-Created three new files in `ui/apnea/`, following the established patterns from BreathingPacerCircle and BreathingViewModel:
+**Decision:** Rewrote the coherence ingest anchoring to spread new samples
+evenly between the last ingested sample time and `wallTimeMs`, with the newest
+landing exactly at the cursor — identical to `RrStripChartState.ingest()`.
+The densification (1 sub-point per SUB_POINT_MS) is unchanged.
 
-1. **EucapnicPacerGauge** — Canvas-based composable rendering an expanding/contracting circle. Supports 4 phases (INHALE/TOP_PAUSE/EXHALE/BOTTOM_PAUSE) with depth scaling (15–50% breathDepthPercent mapped to 0.30–1.00 radius scale). Uses the same greyscale palette (PacerInhale/PacerExhale) as the resonance pacer.
-
-2. **EucapnicPacerViewModel** — @HiltViewModel wrapping EucapnicPacerEngine. Runs a ~60 FPS tick loop via viewModelScope. Exposes StateFlows for phase, radius, remaining time, breath count, BPM. Handles pause/resume for lifecycle events. Fires WagsFeedback haptics on phase transitions and sessionEnd chime on completion.
-
-3. **EucapnicPacerScreen** — Full-screen composable with info bar (remaining time, breaths, BPM), gauge, phase indicator chip, linear progress bar, and time text. Uses LockPortrait, KeepScreenOn, SessionBackHandler from SessionGuards. Observes ON_PAUSE/ON_RESUME lifecycle events to pause/resume the pacer.
-
-**Consequences:**
-- Purely additive: no existing files modified.
-- Not yet wired into navigation or apnea session flow — integration is a separate task.
-- The gauge depth scaling provides visual feedback on target breath depth.
-- Haptic patterns reuse existing WagsFeedback methods (breathInhale/breathExhale/sessionEnd).
-
-**Alternatives considered:**
-- Reusing BreathingPacerCircle directly: rejected because it only supports 2 phases (inhale/exhale) and lacks depth scaling.
-- Using a progress arc instead of a circle: rejected to maintain visual consistency with the existing resonance pacer.
+**Impact:** Single file (`CoherenceStripChart.kt`), internal method only.
+Public composable API unchanged; both call sites unaffected.

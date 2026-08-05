@@ -495,8 +495,10 @@ class BreathingViewModel @Inject constructor(
     private fun startCoherenceLoop() {
         coherenceJob = viewModelScope.launch {
             while (isActive) {
-                delay(5_000L)
+                delay(2_000L)
                 val now = System.currentTimeMillis()
+                val elapsedSec = if (lastCoherenceUpdateMs > 0L)
+                    ((now - lastCoherenceUpdateMs) / 1000).toInt().coerceIn(1, 10) else 2
                 lastCoherenceUpdateMs = now
 
                 val rrSnapshot = synchronized(allSessionRrIntervals) {
@@ -522,18 +524,18 @@ class BreathingViewModel @Inject constructor(
                     }
                     if (fftScore > 0f) lastCoherenceScore = fftScore
 
-                    // Track coherence zone time (5 seconds per update)
+                    // Track coherence zone time (dynamic — matches actual update interval)
                     when {
                         ratio >= 3f -> {
-                            highCoherenceSeconds += 5
-                            sessionPoints += 5f  // 1 pt/sec in high
+                            highCoherenceSeconds += elapsedSec
+                            sessionPoints += elapsedSec.toFloat()  // 1 pt/sec in high
                         }
                         ratio >= 1f -> {
-                            mediumCoherenceSeconds += 5
-                            sessionPoints += 2.5f  // 0.5 pt/sec in medium
+                            mediumCoherenceSeconds += elapsedSec
+                            sessionPoints += elapsedSec * 0.5f  // 0.5 pt/sec in medium
                         }
                         else -> {
-                            lowCoherenceSeconds += 5
+                            lowCoherenceSeconds += elapsedSec
                             // No points in low coherence
                         }
                     }

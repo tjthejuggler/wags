@@ -147,14 +147,6 @@ fun BreathingScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-            // Only the IDLE phase lives on this hub screen now.
-            // PREPARING / BREATHING / COMPLETE all happen on ResonanceSessionScreen.
-            BreathingPacerCircle(
-                progress = state.pacerRadius,
-                isInhaling = state.isInhaling,
-                size = 200.dp
-            )
-
             BreathingControls(
                 rateBpm = state.breathingRateBpm,
                 ieRatio = state.ieRatio,

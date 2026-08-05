@@ -486,13 +486,13 @@ class AssessmentRunViewModel @Inject constructor(
     }
 
     // -------------------------------------------------------------------------
-    // Live coherence loop — updates every 5 seconds
+    // Live coherence loop — updates every 2 seconds
     // -------------------------------------------------------------------------
 
     private fun startLiveCoherenceLoop() {
         coherenceJob = viewModelScope.launch {
             while (isActive) {
-                delay(5_000L)
+                delay(2_000L)
                 // Suppress coherence during BASELINE — the user breathes freely and
                 // the metric is meaningless there. Also, using baseline RR data would
                 // contaminate the coherence display at the start of the first test block.
