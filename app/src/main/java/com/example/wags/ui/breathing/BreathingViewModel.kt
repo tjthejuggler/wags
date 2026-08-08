@@ -361,7 +361,8 @@ class BreathingViewModel @Inject constructor(
             }
 
             // Signal the Habit app that a Resonance Breathing session was completed
-            habitRepo.sendHabitIncrement(Slot.RESONANCE_BREATHING)
+            val minutes = HabitIntegrationRepository.secondsToMinutes(summary.durationSeconds)
+            habitRepo.sendHabitIncrementWithMinutes(Slot.RESONANCE_BREATHING, minutes)
         } else {
             _uiState.update {
                 it.copy(

@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -345,7 +346,12 @@ fun SettingsScreen(
                     musicHabit              = state.musicHabit,
                     onSelectHabit           = { slot, entry -> viewModel.selectHabit(slot, entry) },
                     onClearHabit            = { slot -> viewModel.clearHabit(slot) },
-                    onRefresh               = { viewModel.loadHabits() }
+                    onRefresh               = { viewModel.loadHabits() },
+                    isBackfilling           = state.isBackfilling,
+                    backfillMessage         = state.backfillMessage,
+                    backfillError           = state.backfillError,
+                    onBackfill              = { viewModel.backfillHabitMinutes() },
+                    onDismissBackfillMsg    = { viewModel.clearBackfillMessage() }
                 )
             }
 
@@ -701,7 +707,12 @@ private fun TailAppIntegrationCard(
     musicHabit: HabitSlotSelection,
     onSelectHabit: (Slot, HabitEntry) -> Unit,
     onClearHabit: (Slot) -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    isBackfilling: Boolean = false,
+    backfillMessage: String? = null,
+    backfillError: String? = null,
+    onBackfill: () -> Unit = {},
+    onDismissBackfillMsg: () -> Unit = {}
 ) {
     var expandedSlot by remember { mutableStateOf<Slot?>(null) }
 
@@ -785,6 +796,61 @@ private fun TailAppIntegrationCard(
                 if (index < slots.lastIndex) {
                     HorizontalDivider(color = SurfaceVariant)
                 }
+            }
+
+            // ── Retroactive backfill ───────────────────────────────────────────
+            HorizontalDivider(color = SurfaceVariant)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Backfill Past Sessions",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        "Send total minutes from all past resonance breathing, " +
+                                "assessments, and meditation sessions to Tail.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                }
+                if (isBackfilling) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = EcgCyan,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    TextButton(onClick = onBackfill) {
+                        Text("Send", style = MaterialTheme.typography.bodySmall, color = EcgCyan)
+                    }
+                }
+            }
+
+            // Show result or error message
+            backfillMessage?.let { msg ->
+                Text(
+                    msg,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ReadinessGreen,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onDismissBackfillMsg() }
+                )
+            }
+            backfillError?.let { err ->
+                Text(
+                    err,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ReadinessOrange,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onDismissBackfillMsg() }
+                )
             }
         }
     }

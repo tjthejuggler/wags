@@ -45,6 +45,9 @@ class RfAssessmentRepository @Inject constructor(
 
     /** Get all assessments since a given timestamp. */
     suspend fun getSince(sinceMs: Long): List<RfAssessmentEntity> = dao.getSince(sinceMs)
+
+    /** Get all assessments, newest first. */
+    suspend fun getAll(): List<RfAssessmentEntity> = dao.getAll()
     
     /** Update posture for an assessment by timestamp. */
     suspend fun updatePosture(timestamp: Long, posture: String) = dao.updatePosture(timestamp, posture)

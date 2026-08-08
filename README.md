@@ -5,6 +5,25 @@
 ## Changelog
 
 
+### 2026-08-08 — Tail integration Protocol v2: minute-based habit reporting + retroactive backfill
+
+**Enhanced: Tail habit integration now sends session minutes instead of "did a session"** ([`HabitIntegrationRepository.kt`](app/src/main/java/com/example/wags/data/ipc/HabitIntegrationRepository.kt:40))
+- Resonance breathing, RF assessments, and meditation sessions now report the actual number of minutes to Tail via a new `EXTRA_MINUTES` Int extra on the existing `ACTION_INCREMENT_HABIT` broadcast.
+- Fully backward compatible: if Tail hasn't been updated yet, it ignores the extra and increments by 1 as before.
+- Minutes are rounded to the nearest whole minute with a minimum of 1 via [`secondsToMinutes()`](app/src/main/java/com/example/wags/data/ipc/HabitIntegrationRepository.kt:354) / [`millisToMinutes()`](app/src/main/java/com/example/wags/data/ipc/HabitIntegrationRepository.kt:360).
+
+**Added: Retroactive backfill of past session minutes** ([`HabitBackfillManager.kt`](app/src/main/java/com/example/wags/data/ipc/HabitBackfillManager.kt:35))
+- New "Backfill Past Sessions" button in Settings → Tail App Integration.
+- Queries all past resonance sessions, RF assessments, and meditation sessions from the Room DB, groups by date, sums minutes, and sends them to Tail via a new `ACTION_SET_HABIT_VALUES` broadcast with a JSON payload of `{date: minutes}` pairs.
+- Idempotent: Tail SETS (replaces) the value for each date, so running it multiple times is safe.
+- Tail app implementation guide: [`plans/tail_integration_protocol_v2.md`](plans/tail_integration_protocol_v2.md).
+
+**Updated call sites:**
+- [`MeditationViewModel.stopSession()`](app/src/main/java/com/example/wags/ui/meditation/MeditationViewModel.kt:468) — sends `millisToMinutes(durationMs)`.
+- [`BreathingViewModel.stopSession()`](app/src/main/java/com/example/wags/ui/breathing/BreathingViewModel.kt:337) — sends `secondsToMinutes(summary.durationSeconds)`.
+- [`AssessmentRunViewModel`](app/src/main/java/com/example/wags/ui/breathing/AssessmentRunViewModel.kt:180) — all 3 completion paths (Complete, SlidingDone, finishEarly) now send minutes.
+
+
 ### 2026-07-08 — Data-loss hardening: automatic daily backups + no time-based deletion
 
 **Fixed: Export "database is locked" error** ([`DataExportImportRepository.kt`](app/src/main/java/com/example/wags/data/repository/DataExportImportRepository.kt:78))

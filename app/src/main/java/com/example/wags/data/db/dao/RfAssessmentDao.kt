@@ -27,6 +27,9 @@ interface RfAssessmentDao {
     @Query("SELECT * FROM rf_assessments ORDER BY timestamp DESC")
     fun observeAll(): Flow<List<RfAssessmentEntity>>
 
+    @Query("SELECT * FROM rf_assessments ORDER BY timestamp DESC")
+    suspend fun getAll(): List<RfAssessmentEntity>
+
     @Query("DELETE FROM rf_assessments WHERE timestamp = :timestamp")
     suspend fun deleteByTimestamp(timestamp: Long)
 

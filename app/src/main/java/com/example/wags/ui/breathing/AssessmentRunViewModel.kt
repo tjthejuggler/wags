@@ -245,7 +245,9 @@ class AssessmentRunViewModel @Inject constructor(
                         pacerActive = false
                         saveSteppedSession(orchState.epochs)
                         // Signal the Habit app that a Resonance Breathing assessment completed
-                        habitRepo.sendHabitIncrement(Slot.RESONANCE_BREATHING)
+                        val durationSec = ((System.currentTimeMillis() - sessionStartTimeMs) / 1000).toInt()
+                        val minutes = HabitIntegrationRepository.secondsToMinutes(durationSec)
+                        habitRepo.sendHabitIncrementWithMinutes(Slot.RESONANCE_BREATHING, minutes)
                     }
 
                     is RfOrchestratorState.SlidingDone -> {
@@ -253,7 +255,8 @@ class AssessmentRunViewModel @Inject constructor(
                         val enrichedEntity = buildEnrichedSlidingEntity(result)
                         val id = saveEntity(enrichedEntity)
                         // Signal the Habit app that a Resonance Breathing assessment completed
-                        habitRepo.sendHabitIncrement(Slot.RESONANCE_BREATHING)
+                        val minutes = HabitIntegrationRepository.secondsToMinutes(enrichedEntity.durationSeconds)
+                        habitRepo.sendHabitIncrementWithMinutes(Slot.RESONANCE_BREATHING, minutes)
                         _uiState.value = _uiState.value.copy(
                             phase      = "COMPLETE",
                             isComplete = true,
@@ -583,7 +586,9 @@ class AssessmentRunViewModel @Inject constructor(
         orchestrator.stop()
         viewModelScope.launch {
             saveSteppedSession(epochs)
-            habitRepo.sendHabitIncrement(Slot.RESONANCE_BREATHING)
+            val durationSec = ((System.currentTimeMillis() - sessionStartTimeMs) / 1000).toInt()
+            val minutes = HabitIntegrationRepository.secondsToMinutes(durationSec)
+            habitRepo.sendHabitIncrementWithMinutes(Slot.RESONANCE_BREATHING, minutes)
         }
     }
 

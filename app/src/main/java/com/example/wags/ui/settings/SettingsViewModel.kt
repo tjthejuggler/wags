@@ -10,6 +10,7 @@ import com.example.wags.data.ble.UnifiedDeviceManager
 import com.example.wags.data.debug.DebugPreferences
 import com.example.wags.data.garmin.GarminConnectionState
 import com.example.wags.data.garmin.GarminManager
+import com.example.wags.data.ipc.HabitBackfillManager
 import com.example.wags.data.ipc.HabitIntegrationRepository
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.data.repository.DataExportImportRepository
@@ -65,6 +66,10 @@ data class SettingsUiState(
     val progressiveO2Habit: HabitSlotSelection = HabitSlotSelection(),
     val minBreathHabit: HabitSlotSelection = HabitSlotSelection(),
     val musicHabit: HabitSlotSelection = HabitSlotSelection(),
+    // ── Habit backfill (retroactive minute export to Tail) ─────────────────────
+    val isBackfilling: Boolean = false,
+    val backfillMessage: String? = null,
+    val backfillError: String? = null,
     // ── Spotify account ───────────────────────────────────────────────────────
     val spotifyConnected: Boolean = false,
     // ── Data Export / Import ────────────────────────────────────────────────────
@@ -86,6 +91,7 @@ class SettingsViewModel @Inject constructor(
     private val deviceManager: UnifiedDeviceManager,
     private val autoConnectManager: AutoConnectManager,
     private val habitRepo: HabitIntegrationRepository,
+    private val habitBackfillManager: HabitBackfillManager,
     private val meditationRepository: com.example.wags.data.repository.MeditationRepository,
     private val garminManager: GarminManager,
     private val dataExportImportRepo: DataExportImportRepository,
@@ -95,6 +101,7 @@ class SettingsViewModel @Inject constructor(
 
     private val _habitState = MutableStateFlow(buildInitialHabitState())
     private val _exportImportState = MutableStateFlow(ExportImportPartialState())
+    private val _backfillState = MutableStateFlow(BackfillPartialState())
 
     val uiState: StateFlow<SettingsUiState> = combine(
         deviceManager.connectionState,
@@ -148,6 +155,12 @@ class SettingsViewModel @Inject constructor(
         state.copy(
             debugModeEnabled = debugSnap.debugModeEnabled,
             debugFileDirUri  = debugSnap.debugFileDirUri
+        )
+    }.combine(_backfillState) { state, backfill ->
+        state.copy(
+            isBackfilling   = backfill.isBackfilling,
+            backfillMessage = backfill.backfillMessage,
+            backfillError   = backfill.backfillError
         )
     }.stateIn(
         scope = viewModelScope,
@@ -240,6 +253,45 @@ class SettingsViewModel @Inject constructor(
     fun clearHabit(slot: Slot) {
         habitRepo.clearHabit(slot)
         _habitState.update { it.copySlot(slot, HabitSlotSelection()) }
+    }
+
+    // ── Retroactive backfill ───────────────────────────────────────────────────
+
+    /**
+     * Aggregates minutes from all past resonance-breathing, RF-assessment, and
+     * meditation sessions, then sends per-date totals to Tail. Idempotent —
+     * Tail SETS (replaces) the value for each date.
+     */
+    fun backfillHabitMinutes() {
+        viewModelScope.launch {
+            _backfillState.update {
+                it.copy(isBackfilling = true, backfillMessage = null, backfillError = null)
+            }
+            try {
+                val result = habitBackfillManager.backfill()
+                val msg = buildString {
+                    append("Sent ${result.totalDates} dates ")
+                    append("(${result.totalMinutes} min) to Tail.")
+                    if (result.resonanceSkipped) {
+                        append(" Resonance habit not selected — skipped.")
+                    }
+                    if (result.meditationSkipped) {
+                        append(" Meditation habit not selected — skipped.")
+                    }
+                }
+                _backfillState.update {
+                    it.copy(isBackfilling = false, backfillMessage = msg)
+                }
+            } catch (e: Exception) {
+                _backfillState.update {
+                    it.copy(isBackfilling = false, backfillError = "Backfill failed: ${e.message}")
+                }
+            }
+        }
+    }
+
+    fun clearBackfillMessage() {
+        _backfillState.update { it.copy(backfillMessage = null, backfillError = null) }
     }
 
     // ── Data Export / Import ───────────────────────────────────────────────────
@@ -365,4 +417,10 @@ private data class ExportImportPartialState(
     val isImporting: Boolean = false,
     val exportImportMessage: String? = null,
     val exportImportError: String? = null
+)
+
+private data class BackfillPartialState(
+    val isBackfilling: Boolean = false,
+    val backfillMessage: String? = null,
+    val backfillError: String? = null
 )

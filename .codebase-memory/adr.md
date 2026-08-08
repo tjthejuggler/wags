@@ -1,20 +1,41 @@
-## Coherence strip chart scroll anchoring fix (2026-08-05)
+# ADR: Tail Integration Protocol v2 — Minute-Based Habit Reporting
 
-**Context:** The short-term coherence foreground chart in resonance sessions
-(ResonanceSessionScreen) and assessments (AssessmentRunScreen) exhibited a
-jarring "halfway → 3/4 → halfway" scroll cycle. The RR/RMSSD strip charts on
-the same screens scrolled correctly.
+**Date:** 2026-08-08
+**Status:** Accepted
 
-**Root cause:** `CoherenceStripChartState.ingest()` anchored the newest raw
-sample at `wallTimeMs - SAMPLE_INTERVAL_MS` (5 s behind the cursor). With a
-20 s window, that placed the right edge at 75 %, drifting to 50 % before the
-next sample snapped it back. The RR/RMSSD charts anchor the newest beat at the
-cursor (`wallTimeMs`), keeping the right edge at ~100 %–95 %.
+## Context
 
-**Decision:** Rewrote the coherence ingest anchoring to spread new samples
-evenly between the last ingested sample time and `wallTimeMs`, with the newest
-landing exactly at the cursor — identical to `RrStripChartState.ingest()`.
-The densification (1 sub-point per SUB_POINT_MS) is unchanged.
+The WAGS app integrates with the Tail habit-tracking app via explicit,
+permission-guarded broadcasts. Previously, when a resonance-breathing session,
+RF assessment, or meditation session completed, WAGS sent a simple
+"increment by 1" signal — Tail just recorded that a session happened, with no
+duration information.
 
-**Impact:** Single file (`CoherenceStripChart.kt`), internal method only.
-Public composable API unchanged; both call sites unaffected.
+The user wants Tail to receive the **actual number of minutes** each session
+lasted, and also wants to retroactively backfill all past sessions.
+
+## Decision
+
+Implement **Protocol v2** with two enhancements, both backward compatible:
+
+### 1. Real-time minute increments (EXTRA_MINUTES)
+- Add an optional `EXTRA_MINUTES` (Int) extra to the existing
+  `ACTION_INCREMENT_HABIT` broadcast.
+- Tail reads it and uses it as the increment amount; falls back to 1 if absent.
+- Only `RESONANCE_BREATHING` and `MEDITATION` slots send this extra.
+- Minutes are rounded to nearest whole minute, minimum 1.
+
+### 2. Retroactive backfill (ACTION_SET_HABIT_VALUES)
+- New broadcast action with a JSON payload `{date: minutes}` for multiple dates.
+- Tail SETS (replaces) the value for each date — idempotent.
+- Triggered manually via a "Backfill Past Sessions" button in Settings.
+- New `HabitBackfillManager` aggregates all past sessions from Room DB.
+
+## Consequences
+
+- **WAGS side:** Fully implemented. All call sites updated, backfill UI added.
+- **Tail side:** Needs two changes documented in `plans/tail_integration_protocol_v2.md`.
+- **Backward compatibility:** Old Tail app continues to work (ignores new extras).
+- **Data model:** No Room schema changes needed — duration fields already exist
+  in all three entity types (ResonanceSessionEntity, RfAssessmentEntity,
+  MeditationSessionEntity).
