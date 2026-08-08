@@ -175,6 +175,13 @@ class DebugNoteRepository @Inject constructor(
         debugPrefs.saveQueuedNotes(_queue.value)
     }
 
+    fun updateQueuedNote(noteId: String, noteType: NoteType, noteText: String) {
+        _queue.value = _queue.value.map {
+            if (it.id == noteId) it.copy(noteType = noteType, noteText = noteText) else it
+        }
+        debugPrefs.saveQueuedNotes(_queue.value)
+    }
+
     /**
      * Submit all queued notes to the JSON file and clear the queue.
      * After submission, notes are completely gone from the app —

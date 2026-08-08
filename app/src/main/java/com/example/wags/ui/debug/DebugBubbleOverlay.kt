@@ -214,6 +214,9 @@ fun DebugBubbleOverlay(
             onRemoveFromQueue = { noteId ->
                 debugNoteRepo.removeFromQueue(noteId)
             },
+            onUpdateQueuedNote = { noteId, noteType, text ->
+                debugNoteRepo.updateQueuedNote(noteId, noteType, text)
+            },
             onUpdateSavedNote = { noteId, noteType, text ->
                 debugNoteRepo.updateSavedNote(noteId, noteType, text)
             },

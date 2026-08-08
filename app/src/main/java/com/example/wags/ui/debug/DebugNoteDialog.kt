@@ -44,6 +44,7 @@ fun DebugNoteDialog(
     onQueueNote: (NoteType, String) -> Unit,
     onSubmitQueue: () -> Unit,
     onRemoveFromQueue: (String) -> Unit,
+    onUpdateQueuedNote: (String, NoteType, String) -> Unit,
     onUpdateSavedNote: (String, NoteType, String) -> Unit,
     onDeleteSavedNote: (String) -> Unit,
     onQueueSavedNote: (String) -> Unit
@@ -52,6 +53,7 @@ fun DebugNoteDialog(
     var selectedType by remember { mutableStateOf(NoteType.BUG) }
     var activeTab by remember { mutableStateOf(DebugTab.NOTE) }
     var editingNote by remember { mutableStateOf<SavedNote?>(null) }
+    var editingQueuedNote by remember { mutableStateOf<QueuedNote?>(null) }
 
     val totalSaved = savedNotes.size
 
@@ -72,6 +74,22 @@ fun DebugNoteDialog(
                 editingNote = null
             },
             onDismiss = { editingNote = null }
+        )
+    }
+
+    // If a queued note is being edited, show its edit dialog
+    if (editingQueuedNote != null) {
+        QueuedNoteEditDialog(
+            note = editingQueuedNote!!,
+            onUpdate = { noteId, noteType, text ->
+                onUpdateQueuedNote(noteId, noteType, text)
+                editingQueuedNote = null
+            },
+            onRemove = { noteId ->
+                onRemoveFromQueue(noteId)
+                editingQueuedNote = null
+            },
+            onDismiss = { editingQueuedNote = null }
         )
     }
 
@@ -141,7 +159,8 @@ fun DebugNoteDialog(
 
                 DebugTab.QUEUE -> QueueContent(
                     queuedNotes = queuedNotes,
-                    onRemoveFromQueue = onRemoveFromQueue
+                    onRemoveFromQueue = onRemoveFromQueue,
+                    onClickNote = { editingQueuedNote = it }
                 )
 
                 DebugTab.SAVED -> SavedContent(
@@ -299,7 +318,8 @@ private fun NoteComposeContent(
 @Composable
 private fun QueueContent(
     queuedNotes: List<QueuedNote>,
-    onRemoveFromQueue: (String) -> Unit
+    onRemoveFromQueue: (String) -> Unit,
+    onClickNote: (QueuedNote) -> Unit
 ) {
     if (queuedNotes.isEmpty()) {
         Box(
@@ -329,7 +349,8 @@ private fun QueueContent(
                         ) {
                             Text("✕", color = TextSecondary, fontSize = 12.sp)
                         }
-                    }
+                    },
+                    modifier = Modifier.clickable { onClickNote(note) }
                 )
             }
         }
@@ -480,6 +501,118 @@ private fun SavedNoteEditDialog(
                     enabled = editText.isNotBlank(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = ReadinessGreen,
+                        contentColor = BackgroundDark,
+                        disabledContainerColor = SurfaceVariant,
+                        disabledContentColor = TextSecondary
+                    )
+                ) {
+                    Text("Update")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = TextSecondary)
+            }
+        }
+    )
+}
+
+/**
+ * Edit dialog for a queued note.
+ * Allows viewing the full text, editing, or removing from the queue.
+ */
+@Composable
+private fun QueuedNoteEditDialog(
+    note: QueuedNote,
+    onUpdate: (String, NoteType, String) -> Unit,
+    onRemove: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var editType by remember(note.id) { mutableStateOf(note.noteType) }
+    var editText by remember(note.id) { mutableStateOf(note.noteText) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceDark,
+        shape = RoundedCornerShape(16.dp),
+        title = {
+            Column {
+                Text(
+                    "📋 Queued Note",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = TextPrimary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "📍 ${note.screenLabel}  •  ${note.timestamp}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondary
+                )
+                Text(
+                    note.sourceFile,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = EcgCyan.copy(alpha = 0.7f)
+                )
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // Type selector
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    NoteType.entries.forEach { type ->
+                        FilterChip(
+                            selected = editType == type,
+                            onClick = { editType = type },
+                            label = { Text(type.label) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = when (type) {
+                                    NoteType.BUG -> ReadinessRed.copy(alpha = 0.3f)
+                                    NoteType.FEATURE -> ReadinessGreen.copy(alpha = 0.3f)
+                                    NoteType.NOTE -> EcgCyan.copy(alpha = 0.3f)
+                                },
+                                selectedLabelColor = TextPrimary
+                            )
+                        )
+                    }
+                }
+                // Editable text
+                OutlinedTextField(
+                    value = editText,
+                    onValueChange = { editText = it },
+                    label = { Text("Note text") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 120.dp, max = 200.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = EcgCyan,
+                        unfocusedBorderColor = SurfaceVariant,
+                        cursorColor = EcgCyan,
+                        focusedLabelColor = EcgCyan,
+                        unfocusedLabelColor = TextSecondary
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                )
+            }
+        },
+        confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Remove from queue button
+                OutlinedButton(
+                    onClick = { onRemove(note.id) },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = ReadinessRed)
+                ) {
+                    Text("Remove")
+                }
+                // Update button
+                Button(
+                    onClick = { onUpdate(note.id, editType, editText) },
+                    enabled = editText.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ReadinessOrange,
                         contentColor = BackgroundDark,
                         disabledContainerColor = SurfaceVariant,
                         disabledContentColor = TextSecondary
