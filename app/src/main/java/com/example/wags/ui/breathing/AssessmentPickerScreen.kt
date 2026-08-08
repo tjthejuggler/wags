@@ -155,36 +155,7 @@ fun AssessmentPickerScreen(
                 style = MaterialTheme.typography.titleMedium
             )
 
-            PROTOCOL_LIST.forEach { info ->
-                val isHistoryRequired = info.protocol == RfProtocol.TARGETED || info.protocol == RfProtocol.BEST_RATES
-                val isDisabled = isHistoryRequired && !state.targetedEnabled
-                val isSelected = state.selectedProtocol == info.protocol
-
-                ProtocolCard(
-                    info       = info,
-                    isSelected = isSelected,
-                    isDisabled = isDisabled,
-                    onClick    = { if (!isDisabled) viewModel.selectProtocol(info.protocol) }
-                )
-            }
-
-            // ── Custom duration slider ──────────────────────────────────────
-            if (state.selectedProtocol == RfProtocol.CUSTOM) {
-                CustomDurationSection(
-                    durationMinutes = state.customDurationMinutes,
-                    onDurationChange = { viewModel.setCustomDuration(it) }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Description card for selected protocol
-            val selectedInfo = PROTOCOL_LIST.first { it.protocol == state.selectedProtocol }
-            DescriptionCard(info = selectedInfo)
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // ── Posture selector ─────────────────────────────────────────────
+            // ── Posture selector (top so it's immediately visible) ──────────
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -210,13 +181,12 @@ fun AssessmentPickerScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
             // ── HR device gate ────────────────────────────────────────────────
             if (!state.isHrDeviceConnected) {
                 HrRequiredBanner()
             }
 
+            // ── Start button + toggles (top so it's immediately visible) ─────
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -267,6 +237,36 @@ fun AssessmentPickerScreen(
                     )
                 }
             }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
+
+            // ── Protocol list ────────────────────────────────────────────────
+            PROTOCOL_LIST.forEach { info ->
+                val isHistoryRequired = info.protocol == RfProtocol.TARGETED || info.protocol == RfProtocol.BEST_RATES
+                val isDisabled = isHistoryRequired && !state.targetedEnabled
+                val isSelected = state.selectedProtocol == info.protocol
+
+                ProtocolCard(
+                    info       = info,
+                    isSelected = isSelected,
+                    isDisabled = isDisabled,
+                    onClick    = { if (!isDisabled) viewModel.selectProtocol(info.protocol) }
+                )
+            }
+
+            // ── Custom duration slider ──────────────────────────────────────
+            if (state.selectedProtocol == RfProtocol.CUSTOM) {
+                CustomDurationSection(
+                    durationMinutes = state.customDurationMinutes,
+                    onDurationChange = { viewModel.setCustomDuration(it) }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Description card for selected protocol
+            val selectedInfo = PROTOCOL_LIST.first { it.protocol == state.selectedProtocol }
+            DescriptionCard(info = selectedInfo)
         }
     }
 }

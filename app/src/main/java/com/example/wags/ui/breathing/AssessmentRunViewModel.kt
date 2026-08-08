@@ -229,6 +229,15 @@ class AssessmentRunViewModel @Inject constructor(
 
                     is RfOrchestratorState.SlidingTick -> {
                         pacerActive = false   // sliding window drives its own refWave
+                        // The sliding window protocol has no separate baseline
+                        // phase — enable live coherence from the very first tick so
+                        // the score appears during the session instead of staying
+                        // pinned at 0 (isBaselinePhase defaults to true and is only
+                        // cleared for stepped protocols on TEST_BLOCK entry).
+                        if (isBaselinePhase) {
+                            isBaselinePhase = false
+                            currentPhaseRrStartIndex = 0
+                        }
                         val prevWave = _uiState.value.refWave
                         val newWave = orchState.pacerState.refWave
                         _uiState.value = _uiState.value.copy(
