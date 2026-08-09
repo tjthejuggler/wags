@@ -9,6 +9,7 @@ import com.example.wags.data.db.entity.RfAssessmentEntity
 import com.example.wags.data.ipc.HabitIntegrationRepository
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.data.repository.RfAssessmentRepository
+import com.example.wags.di.MathDispatcher
 import com.example.wags.domain.usecase.breathing.CoherenceScoreCalculator
 import com.example.wags.domain.usecase.breathing.ContinuousPacerEngine
 import com.example.wags.domain.usecase.breathing.ResonanceRateRecommender
@@ -22,13 +23,16 @@ import com.example.wags.domain.usecase.breathing.SlidingWindowResult
 import com.example.wags.domain.usecase.hrv.ArtifactCorrectionUseCase
 import com.example.wags.domain.usecase.hrv.TimeDomainHrvCalculator
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @HiltViewModel
@@ -43,6 +47,7 @@ class AssessmentRunViewModel @Inject constructor(
     private val artifactCorrection: ArtifactCorrectionUseCase,
     private val timeDomainCalc: TimeDomainHrvCalculator,
     private val rateRecommender: ResonanceRateRecommender,
+    @MathDispatcher private val mathDispatcher: CoroutineDispatcher,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -238,16 +243,22 @@ class AssessmentRunViewModel @Inject constructor(
                             isBaselinePhase = false
                             currentPhaseRrStartIndex = 0
                         }
-                        val prevWave = _uiState.value.refWave
-                        val newWave = orchState.pacerState.refWave
-                        _uiState.value = _uiState.value.copy(
-                            phase            = "TESTING %.2f BPM".format(orchState.pacerState.instantBpm),
-                            currentBpm       = orchState.pacerState.instantBpm,
-                            progress         = orchState.progress,
-                            lastRefWave      = prevWave,
-                            refWave          = newWave,
-                            isInhaling       = newWave > prevWave || newWave > 0.95f
-                        )
+                        // Use _uiState.update for atomic read-modify-write — the
+                        // SlidingTick fires at 20 Hz and the non-atomic pattern
+                        // (_uiState.value = _uiState.value.copy(...)) can stomp
+                        // coherence updates written by the live coherence loop.
+                        _uiState.update { prev ->
+                            val newWave = orchState.pacerState.refWave
+                            prev.copy(
+                                phase            = "TESTING %.2f BPM".format(orchState.pacerState.instantBpm),
+                                currentBpm       = orchState.pacerState.instantBpm,
+                                remainingSeconds = orchestrator.remainingSeconds.value.toInt(),
+                                progress         = orchState.progress,
+                                lastRefWave      = prev.refWave,
+                                refWave          = newWave,
+                                isInhaling       = newWave > prev.refWave || newWave > 0.95f
+                            )
+                        }
                     }
 
                     is RfOrchestratorState.Complete -> {
@@ -472,14 +483,16 @@ class AssessmentRunViewModel @Inject constructor(
                 val liveRmssd = computeLiveRmssd(snapshot)
                 val liveSdnn = computeLiveSdnn(snapshot)
 
-                _uiState.value = _uiState.value.copy(
-                    rrCount = allSessionRrIntervals.size,
-                    liveHr = hrDataSource.liveHr.value,
-                    liveRrIntervals = chartRr,
-                    liveRmssd = liveRmssd,
-                    liveSdnn = liveSdnn,
-                    allSessionRrIntervals = allSessionRrIntervals.toList()
-                )
+                _uiState.update { prev ->
+                    prev.copy(
+                        rrCount = allSessionRrIntervals.size,
+                        liveHr = hrDataSource.liveHr.value,
+                        liveRrIntervals = chartRr,
+                        liveRmssd = liveRmssd,
+                        liveSdnn = liveSdnn,
+                        allSessionRrIntervals = allSessionRrIntervals.toList()
+                    )
+                }
             }
         }
     }
@@ -509,7 +522,7 @@ class AssessmentRunViewModel @Inject constructor(
                 // the metric is meaningless there. Also, using baseline RR data would
                 // contaminate the coherence display at the start of the first test block.
                 if (isBaselinePhase) {
-                    _uiState.value = _uiState.value.copy(liveCoherenceRatio = 0f)
+                    _uiState.update { it.copy(liveCoherenceRatio = 0f) }
                     continue
                 }
                 val rrSnapshot = synchronized(allSessionRrIntervals) {
@@ -520,21 +533,27 @@ class AssessmentRunViewModel @Inject constructor(
                     if (phaseRr.size >= 32) phaseRr.takeLast(256).toDoubleArray() else null
                 }
                 if (rrSnapshot != null) {
-                    val result = coherenceCalc.calculateCoherenceRatio(rrSnapshot)
-                    val currentState = _uiState.value
-                    val newCoherenceHistory = currentState.coherenceHistory + result.coherenceRatio
-                    
-                    // Also compute and store RMSSD for history
+                    // Offload FFT to a background thread — running it on the main
+                    // thread blocks the 20 Hz SlidingTick handler and can cause
+                    // the coherence write to be lost when SlidingTick resumes.
+                    val result = withContext(mathDispatcher) {
+                        coherenceCalc.calculateCoherenceRatio(rrSnapshot)
+                    }
                     val currentRmssd = computeLiveRmssd(rrSnapshot.toList())
-                    val newRmssdHistory = if (currentRmssd != null)
-                        currentState.rmssdHistory + currentRmssd
-                    else currentState.rmssdHistory
-                    
-                    _uiState.value = currentState.copy(
-                        liveCoherenceRatio = result.coherenceRatio,
-                        coherenceHistory = newCoherenceHistory,
-                        rmssdHistory = newRmssdHistory
-                    )
+
+                    // Use _uiState.update for atomic read-modify-write.
+                    // The non-atomic pattern (val s = _uiState.value; _uiState.value
+                    // = s.copy(...)) can stomp coherence data when the 20 Hz
+                    // SlidingTick handler interleaves between read and write.
+                    _uiState.update { prev ->
+                        prev.copy(
+                            liveCoherenceRatio = result.coherenceRatio,
+                            coherenceHistory   = prev.coherenceHistory + result.coherenceRatio,
+                            rmssdHistory       = if (currentRmssd != null)
+                                prev.rmssdHistory + currentRmssd
+                            else prev.rmssdHistory
+                        )
+                    }
                 }
             }
         }
@@ -565,12 +584,14 @@ class AssessmentRunViewModel @Inject constructor(
                     lastInhalingState = isInhaling
                 }
                 
-                _uiState.value = _uiState.value.copy(
-                    lastRefWave = prevWave,
-                    refWave = wave,
-                    isInhaling = isInhaling,
-                    breathCycleCount = cycleCount
-                )
+                _uiState.update { prev ->
+                    prev.copy(
+                        lastRefWave = prev.refWave,
+                        refWave = wave,
+                        isInhaling = isInhaling,
+                        breathCycleCount = cycleCount
+                    )
+                }
             }
         }
     }
