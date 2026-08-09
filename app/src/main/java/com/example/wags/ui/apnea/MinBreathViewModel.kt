@@ -1042,7 +1042,10 @@ class MinBreathViewModel @Inject constructor(
         }
 
         // Fire Tail habit for every completed Min Breath session
-        try { habitRepo.sendHabitIncrement(Slot.MIN_BREATH) } catch (_: Exception) {}
+        try {
+            val holdMinutes = HabitIntegrationRepository.millisToMinutes(totalHoldTimeMs)
+            habitRepo.sendHabitIncrementWithMinutes(Slot.MIN_BREATH, holdMinutes)
+        } catch (_: Exception) {}
 
         // Fire music habit if applicable (once per TimeOfDay per day)
         try { habitRepo.sendMusicHabitIncrementIfNeeded(effectiveAudio, currentState.timeOfDay) } catch (_: Exception) {}

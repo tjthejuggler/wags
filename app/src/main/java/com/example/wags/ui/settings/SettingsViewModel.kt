@@ -278,6 +278,18 @@ class SettingsViewModel @Inject constructor(
                     if (result.meditationSkipped) {
                         append(" Meditation habit not selected — skipped.")
                     }
+                    if (result.freeHoldSkipped) {
+                        append(" Free Hold habit not selected — skipped.")
+                    }
+                    if (result.tableTrainingSkipped) {
+                        append(" Table Training habit not selected — skipped.")
+                    }
+                    if (result.progressiveO2Skipped) {
+                        append(" Progressive O₂ habit not selected — skipped.")
+                    }
+                    if (result.minBreathSkipped) {
+                        append(" Min Breath habit not selected — skipped.")
+                    }
                 }
                 _backfillState.update {
                     it.copy(isBackfilling = false, backfillMessage = msg)

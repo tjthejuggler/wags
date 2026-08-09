@@ -218,7 +218,7 @@ class HabitIntegrationRepository @Inject constructor(
      * Does nothing if no habit has been selected for [slot].
      *
      * **Deprecated in favour of [sendHabitIncrementWithMinutes]** — kept for
-     * slots that are inherently count-based (apnea holds, table training, etc.).
+     * slots that are inherently count-based (new records, readiness, etc.).
      */
     fun sendHabitIncrement(slot: Slot) {
         sendHabitIncrementInternal(slot, minutes = null)

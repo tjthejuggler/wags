@@ -996,7 +996,10 @@ class ProgressiveO2ViewModel @Inject constructor(
         }
 
         // Fire Tail habit for every completed Progressive O2 session
-        try { habitRepo.sendHabitIncrement(Slot.PROGRESSIVE_O2) } catch (_: Exception) {}
+        try {
+            val holdMinutes = HabitIntegrationRepository.millisToMinutes(totalHoldTimeMs)
+            habitRepo.sendHabitIncrementWithMinutes(Slot.PROGRESSIVE_O2, holdMinutes)
+        } catch (_: Exception) {}
 
         // Fire music habit if applicable (once per TimeOfDay per day)
         try { habitRepo.sendMusicHabitIncrementIfNeeded(effectiveAudio, timeOfDay) } catch (_: Exception) {}

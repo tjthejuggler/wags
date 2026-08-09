@@ -776,7 +776,8 @@ class FreeHoldActiveViewModel @Inject constructor(
             )
         }
         audioHapticEngine.vibrateHoldEnd()
-        habitRepo.sendHabitIncrement(Slot.FREE_HOLD)
+        val freeHoldMinutes = HabitIntegrationRepository.millisToMinutes(duration)
+        habitRepo.sendHabitIncrementWithMinutes(Slot.FREE_HOLD, freeHoldMinutes)
         habitRepo.sendMusicHabitIncrementIfNeeded(audio, timeOfDay)
         viewModelScope.launch {
             // Check broader PB categories BEFORE saving so queries compare against prior records only.

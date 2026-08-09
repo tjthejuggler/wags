@@ -1,19 +1,17 @@
-## Sliding Window Live Coherence Fix & Assessment Picker Layout Reorder
+## ADR: Apnea hold-time minutes sent to Tail app
 
-**Date:** 2026-08-08
+**Date:** 2026-08-09
 
 ### Context
-Two issues reported:
-1. The Sliding Window RF assessment never displayed a live coherence score (stuck at 0.0) even after several minutes of running.
-2. On the RF Assessment picker screen, the posture selector and Start button were buried at the bottom of a long scrollable list, requiring scrolling to reach them.
+Protocol v2 (2026-08-08) introduced minute-based habit reporting for resonance breathing and meditation. Apnea activities (free holds, O2/CO2 tables, Progressive O2, Min Breath) were still sending count-based increments of 1.
 
 ### Decision
-1. **Coherence fix** — Root cause: `AssessmentRunViewModel.isBaselinePhase` defaults to `true` and is only cleared to `false` when a stepped protocol enters `RfPhase.TEST_BLOCK`. The Sliding Window protocol emits `RfOrchestratorState.SlidingTick` states exclusively and never touches `isBaselinePhase`, so [`startLiveCoherenceLoop()`](app/src/main/java/com/example/wags/ui/breathing/AssessmentRunViewModel.kt:495) permanently early-returned at the baseline guard, keeping `liveCoherenceRatio` at 0 for the entire ~16-minute session. Fix: clear `isBaselinePhase = false` and set `currentPhaseRrStartIndex = 0` on the first `SlidingTick` (the sliding protocol has no baseline phase, so coherence should use all session RR data from the start).
+Extended Protocol v2 to all four apnea activity slots. Each now sends `EXTRA_MINUTES` containing the total breath-hold time (in minutes) via `sendHabitIncrementWithMinutes()`. The `APNEA_NEW_RECORD` slot remains count-based (event-based, not duration-based).
 
-2. **Layout reorder** — Moved the posture selector card, HR-device gate banner, and Start button row to the top of the scrollable Column in [`AssessmentPickerScreen`](app/src/main/java/com/example/wags/ui/breathing/AssessmentPickerScreen.kt:101), directly under the "Select Protocol" title. The protocol list, custom-duration slider, and description card now follow below a divider. This makes posture selection and the start action immediately visible without scrolling.
+The retroactive backfill (`HabitBackfillManager`) was extended to query all `ApneaRecordEntity` rows, group by `tableType` (null→FREE_HOLD, O2/CO2→TABLE_TRAINING, PROGRESSIVE_O2, MIN_BREATH), aggregate `durationMs` by date, and send per-slot `ACTION_SET_HABIT_VALUES` broadcasts.
 
-### Consequences
-- Live coherence now updates every 2 seconds during Sliding Window sessions (same cadence as stepped protocols).
-- Post-session coherence (computed in `buildEnrichedSlidingEntity`) was already correct and unchanged.
-- The picker screen layout change is purely presentational; no ViewModel or navigation logic changed.
-- Blast radius: 2 files, both in `ui/breathing/`. No data layer, domain, or service impact.
+### Key design choices
+- Minutes = total breath-hold time, NOT session wall-clock time. This is the meaningful training metric.
+- Same `durationMs` field used for both real-time and backfill, guaranteeing consistency.
+- No new protocol constants needed — reuses existing `EXTRA_MINUTES` and `ACTION_SET_HABIT_VALUES`.
+- Fully backward compatible: Tail ignores unknown extras and falls back to increment-by-1.

@@ -5,6 +5,25 @@
 ## Changelog
 
 
+### 2026-08-09 — Tail integration: apnea hold-time minutes + backfill
+
+**Enhanced: Apnea activities now send total hold-time minutes to Tail** ([`HabitIntegrationRepository.kt`](app/src/main/java/com/example/wags/data/ipc/HabitIntegrationRepository.kt:40))
+- Free holds, O₂/CO₂ table training, Progressive O₂ drills, and Min Breath drills now report the **total breath-hold time** (in minutes) to Tail via the existing `EXTRA_MINUTES` extra on `ACTION_INCREMENT_HABIT`.
+- Previously these slots sent only a count-based increment of 1. Now they send the actual hold minutes, matching the behaviour already in place for resonance breathing and meditation.
+- Minutes are computed from the same `durationMs` field used for all other analytics, ensuring consistency between real-time increments and backfill.
+- The `APNEA_NEW_RECORD` slot remains count-based (fires once when a personal best is achieved) — this is an event, not a duration.
+
+**Updated call sites:**
+- [`ApneaViewModel`](app/src/main/java/com/example/wags/ui/apnea/ApneaViewModel.kt:645) — TABLE_TRAINING sends `millisToMinutes(sum of all hold durations)`; FREE_HOLD sends `millisToMinutes(hold duration)`.
+- [`FreeHoldActiveScreen`](app/src/main/java/com/example/wags/ui/apnea/FreeHoldActiveScreen.kt:779) — FREE_HOLD sends `millisToMinutes(hold duration)`.
+- [`ProgressiveO2ViewModel`](app/src/main/java/com/example/wags/ui/apnea/ProgressiveO2ViewModel.kt:999) — PROGRESSIVE_O2 sends `millisToMinutes(totalHoldTimeMs)`.
+- [`MinBreathViewModel`](app/src/main/java/com/example/wags/ui/apnea/MinBreathViewModel.kt:1045) — MIN_BREATH sends `millisToMinutes(totalHoldTimeMs)`.
+
+**Extended: Retroactive backfill now includes apnea sessions** ([`HabitBackfillManager.kt`](app/src/main/java/com/example/wags/data/ipc/HabitBackfillManager.kt:35))
+- The "Backfill Past Sessions" button in Settings → Tail App Integration now also queries all past apnea records, groups them by activity type (`tableType`), sums hold minutes per date, and sends them to the corresponding Tail habit slots (FREE_HOLD, TABLE_TRAINING, PROGRESSIVE_O2, MIN_BREATH).
+- Updated Tail app implementation guide: [`plans/tail_integration_protocol_v2.md`](plans/tail_integration_protocol_v2.md).
+
+
 ### 2026-08-08 — Tail integration Protocol v2: minute-based habit reporting + retroactive backfill
 
 **Enhanced: Tail habit integration now sends session minutes instead of "did a session"** ([`HabitIntegrationRepository.kt`](app/src/main/java/com/example/wags/data/ipc/HabitIntegrationRepository.kt:40))

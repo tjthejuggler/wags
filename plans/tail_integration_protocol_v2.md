@@ -8,10 +8,11 @@
 ## Overview
 
 Previously, WAGS told Tail only **"did a session"** (increment by 1) when a
-resonance-breathing, RF-assessment, or meditation session completed.
+resonance-breathing, RF-assessment, meditation, or apnea session completed.
 
 **Protocol v2** changes this so WAGS sends the **actual number of minutes** the
-session lasted. This requires two changes on the Tail side:
+session lasted (or, for apnea, the total breath-hold time). This requires two
+changes on the Tail side:
 
 1. **Real-time increments** — read a new `EXTRA_MINUTES` extra from the existing
    `ACTION_INCREMENT_HABIT` broadcast and use it as the increment amount.
@@ -58,15 +59,26 @@ method already accepts an `amount` parameter — the receiver just hardcodes `1`
 
 ### Affected slots
 
-Only these WAGS slots send `EXTRA_MINUTES`:
+These WAGS slots send `EXTRA_MINUTES`:
 
 | Slot | Source of minutes |
 |------|-------------------|
 | `RESONANCE_BREATHING` | Resonance breathing sessions + RF assessments |
 | `MEDITATION` | Meditation / NSDR sessions |
+| `FREE_HOLD` | Apnea free breath-hold (single hold duration) |
+| `TABLE_TRAINING` | O₂ / CO₂ table session (sum of all hold durations) |
+| `PROGRESSIVE_O2` | Progressive O₂ drill (sum of all hold durations) |
+| `MIN_BREATH` | Min Breath drill (sum of all hold durations) |
 
-All other slots (apnea, tables, readiness, etc.) continue to send the old
-increment-by-1 behaviour with no `EXTRA_MINUTES`.
+Slots that remain count-based (increment by 1, no `EXTRA_MINUTES`):
+
+| Slot | Why |
+|------|-----|
+| `APNEA_NEW_RECORD` | Event-based: fires once when a new personal best is achieved |
+| `MORNING_READINESS` | Completion-based assessment |
+| `HRV_READINESS` | Completion-based assessment |
+| `RAPID_HR_CHANGE` | Completion-based assessment |
+| `MUSIC` | Once-per-TimeOfDay deduplicated event |
 
 ### Minute rounding
 
@@ -233,17 +245,70 @@ suspend fun setHabitValueForDate(
 The user taps **"Backfill Past Sessions" → "Send"** in WAGS Settings →
 Tail App Integration. WAGS then:
 
-1. Queries all past resonance-breathing sessions, RF assessments, and meditation
-   sessions from its local Room database.
+1. Queries all past resonance-breathing sessions, RF assessments, meditation
+   sessions, and apnea records from its local Room database.
 2. Groups them by calendar date (device timezone).
 3. Sums the minutes per date.
 4. Sends one `ACTION_SET_HABIT_VALUES` broadcast per habit slot:
    - `RESONANCE_BREATHING` slot: combined minutes from resonance sessions +
      RF assessments.
    - `MEDITATION` slot: minutes from meditation sessions.
+   - `FREE_HOLD` slot: total hold minutes from free-hold records.
+   - `TABLE_TRAINING` slot: total hold minutes from O₂/CO₂ table sessions.
+   - `PROGRESSIVE_O2` slot: total hold minutes from Progressive O₂ drills.
+   - `MIN_BREATH` slot: total hold minutes from Min Breath drills.
 5. Shows a summary (number of dates, total minutes) in the UI.
 
 Slots with no habit selected are silently skipped.
+
+---
+
+## Apnea hold-time minutes
+
+### What "minutes" means for apnea
+
+For resonance breathing and meditation, the minutes sent to Tail are the
+**session duration** (how long the user breathed / meditated).
+
+For apnea activities, the minutes sent are the **total breath-hold time** —
+the cumulative time the user spent holding their breath, **not** the total
+session wall-clock time. This is the metric that matters for apnea training.
+
+| Slot | What is summed |
+|------|----------------|
+| `FREE_HOLD` | Duration of the single breath hold (e.g. a 3-minute hold → 3 min) |
+| `TABLE_TRAINING` | Sum of all hold durations across all rounds in the O₂/CO₂ table |
+| `PROGRESSIVE_O2` | Sum of all hold durations across all rounds in the Progressive O₂ drill |
+| `MIN_BREATH` | Sum of all hold durations across all rounds in the Min Breath drill |
+
+### Example: Table Training session
+
+An O₂ table with 8 rounds where each round has a progressively longer hold
+(30 s, 45 s, 60 s, …, 2 min). The `EXTRA_MINUTES` value sent to Tail is the
+**sum** of all 8 hold durations, not the longest single hold and not the
+total session time (which includes breathing/ventilation periods).
+
+### Real-time vs backfill consistency
+
+The same `durationMs` field on the `ApneaRecordEntity` is used for both:
+- **Real-time:** converted to minutes via `millisToMinutes(durationMs)` and
+  sent as `EXTRA_MINUTES` immediately after the session completes.
+- **Backfill:** the same `durationMs` values are queried from the database,
+  grouped by date, summed, and sent via `ACTION_SET_HABIT_VALUES`.
+
+This guarantees that running the backfill after a session produces the same
+result as the real-time increment for that date.
+
+### What Tail needs to do
+
+**Nothing new.** The Tail receiver already handles `EXTRA_MINUTES` for
+resonance/meditation (Change 1 above) and `ACTION_SET_HABIT_VALUES` for
+backfill (Change 2 above). The apnea slots use the exact same protocol —
+they just now include `EXTRA_MINUTES` where they previously did not.
+
+The only requirement is that the user has mapped the apnea slots to Tail
+habits in WAGS Settings → Tail App Integration. Each apnea activity has its
+own independent habit slot, so minutes flow to the correct habit.
 
 ---
 
