@@ -180,7 +180,10 @@ fun MeditationHistoryScreen(
                         onPostureFilterSelected = { viewModel.setPostureFilter(it) },
                         onTimePeriodChange = viewModel::setTimePeriod,
                         onStepBack = viewModel::stepBack,
-                        onStepForward = viewModel::stepForward
+                        onStepForward = viewModel::stepForward,
+                        onNavigateToSession = { id ->
+                            navController.navigate(WagsRoutes.meditationSessionDetail(id))
+                        }
                     )
                     MeditationHistoryTabSelection.CALENDAR -> CalendarContent(
                         uiState = uiState,
@@ -215,7 +218,8 @@ private fun GraphsContent(
     onPostureFilterSelected: (PostureFilter) -> Unit,
     onTimePeriodChange: (MeditationChartTimePeriod) -> Unit,
     onStepBack: () -> Unit,
-    onStepForward: () -> Unit
+    onStepForward: () -> Unit,
+    onNavigateToSession: (Long) -> Unit
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
@@ -264,7 +268,8 @@ private fun GraphsContent(
                 points = uiState.chartData.durationMin,
                 lineColor = TextPrimary,
                 label = "Duration (min)",
-                isLandscape = isLandscape
+                isLandscape = isLandscape,
+                onNavigateToSession = onNavigateToSession
             )
         }
 
@@ -275,7 +280,8 @@ private fun GraphsContent(
                     points = uiState.chartData.avgHr,
                     lineColor = TextSecondary,
                     label = "Avg HR (bpm)",
-                    isLandscape = isLandscape
+                    isLandscape = isLandscape,
+                    onNavigateToSession = onNavigateToSession
                 )
             }
         }
@@ -293,7 +299,8 @@ private fun GraphsContent(
                     colorB = TextSecondary,
                     labelA = "Start RMSSD",
                     labelB = "End RMSSD",
-                    isLandscape = isLandscape
+                    isLandscape = isLandscape,
+                    onNavigateToSession = onNavigateToSession
                 )
             }
         }
@@ -309,7 +316,8 @@ private fun GraphsContent(
                     lineColor = TextSecondary,
                     label = "ln(RMSSD) slope",
                     showZeroLine = true,
-                    isLandscape = isLandscape
+                    isLandscape = isLandscape,
+                    onNavigateToSession = onNavigateToSession
                 )
             }
         }
@@ -779,7 +787,8 @@ private fun MeditationLineChart(
     lineColor: Color,
     label: String,
     showZeroLine: Boolean = false,
-    isLandscape: Boolean = false
+    isLandscape: Boolean = false,
+    onNavigateToSession: (Long) -> Unit = {}
 ) {
     if (points.isEmpty()) { NoDataLabel(); return }
 
@@ -820,7 +829,13 @@ private fun MeditationLineChart(
         )
 
         tooltipPoint?.let { tp ->
-            MeditationTooltipCard(label = label, value = String.format("%.2f", tp.value), date = tp.label, color = lineColor)
+            MeditationTooltipCard(
+                label = label,
+                value = String.format("%.2f", tp.value),
+                date = tp.label,
+                color = lineColor,
+                onDateClick = { onNavigateToSession(tp.sessionId) }
+            )
         }
 
         Row(
@@ -851,7 +866,8 @@ private fun DualLineChart(
     colorB: Color,
     labelA: String,
     labelB: String,
-    isLandscape: Boolean = false
+    isLandscape: Boolean = false,
+    onNavigateToSession: (Long) -> Unit = {}
 ) {
     if (pointsA.isEmpty()) { NoDataLabel(); return }
 
@@ -904,10 +920,22 @@ private fun DualLineChart(
         }
 
         tooltipPointA?.let { tp ->
-            MeditationTooltipCard(label = labelA, value = String.format("%.2f", tp.value), date = tp.label, color = colorA)
+            MeditationTooltipCard(
+                label = labelA,
+                value = String.format("%.2f", tp.value),
+                date = tp.label,
+                color = colorA,
+                onDateClick = { onNavigateToSession(tp.sessionId) }
+            )
         }
         tooltipPointB?.let { tp ->
-            MeditationTooltipCard(label = labelB, value = String.format("%.2f", tp.value), date = tp.label, color = colorB)
+            MeditationTooltipCard(
+                label = labelB,
+                value = String.format("%.2f", tp.value),
+                date = tp.label,
+                color = colorB,
+                onDateClick = { onNavigateToSession(tp.sessionId) }
+            )
         }
     }
 }
@@ -915,7 +943,13 @@ private fun DualLineChart(
 // ── Tooltip card ───────────────────────────────────────────────────────────────
 
 @Composable
-private fun MeditationTooltipCard(label: String, value: String, date: String, color: Color) {
+private fun MeditationTooltipCard(
+    label: String,
+    value: String,
+    date: String,
+    color: Color,
+    onDateClick: (() -> Unit)? = null
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -927,7 +961,29 @@ private fun MeditationTooltipCard(label: String, value: String, date: String, co
     ) {
         Column {
             Text(label, style = MaterialTheme.typography.labelSmall, color = TextDisabled)
-            Text(date, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+            if (onDateClick != null) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable(onClick = onDateClick)
+                        .padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        date,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextSecondary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        " ›",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = color
+                    )
+                }
+            } else {
+                Text(date, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+            }
         }
         Text(value, style = MaterialTheme.typography.titleMedium, color = color, fontWeight = FontWeight.Bold)
     }

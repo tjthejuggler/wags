@@ -22,6 +22,8 @@ data class MeditationSessionDetailUiState(
     val isLoading: Boolean = true,
     /** True while the delete-confirmation dialog is visible. */
     val showDeleteConfirm: Boolean = false,
+    /** True while the edit-duration dialog is visible. */
+    val showEditDuration: Boolean = false,
     /** Set to true after the last session was deleted — screen should pop. */
     val deleted: Boolean = false,
     /** All session IDs ordered oldest-first, for swipe navigation.
@@ -123,6 +125,32 @@ class MeditationSessionDetailViewModel @Inject constructor(
                 showDeleteConfirm = false,
                 allSessionIds = newIds,
                 currentIndex  = newIndex
+            ) }
+        }
+    }
+
+    // ── Edit duration ────────────────────────────────────────────────────────
+
+    fun requestEditDuration() {
+        _uiState.update { it.copy(showEditDuration = true) }
+    }
+
+    fun cancelEditDuration() {
+        _uiState.update { it.copy(showEditDuration = false) }
+    }
+
+    /**
+     * Persists a new [durationMs] for the current session and refreshes the
+     * displayed state so the UI updates immediately.
+     */
+    fun confirmUpdateDuration(durationMs: Long) {
+        val sessionId = _uiState.value.session?.sessionId ?: return
+        viewModelScope.launch {
+            repository.updateSessionDuration(sessionId, durationMs)
+            val updated = repository.getSessionById(sessionId) ?: return@launch
+            _uiState.update { it.copy(
+                session = updated,
+                showEditDuration = false
             ) }
         }
     }

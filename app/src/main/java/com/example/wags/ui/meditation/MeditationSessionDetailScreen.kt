@@ -15,6 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,7 +33,9 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -116,6 +119,15 @@ fun MeditationSessionDetailScreen(
         )
     }
 
+    // Edit-duration dialog
+    if (state.showEditDuration && state.session != null) {
+        EditDurationDialog(
+            currentDurationMs = state.session!!.durationMs,
+            onDismiss = { viewModel.cancelEditDuration() },
+            onConfirm = { newMs -> viewModel.confirmUpdateDuration(newMs) }
+        )
+    }
+
     Scaffold(
         containerColor = BackgroundDark,
         topBar = {
@@ -152,6 +164,13 @@ fun MeditationSessionDetailScreen(
                         }
                     }
                     if (state.session != null) {
+                        IconButton(onClick = { viewModel.requestEditDuration() }) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "Edit duration",
+                                tint = TextSecondary
+                            )
+                        }
                         IconButton(onClick = { viewModel.requestDelete() }) {
                             Icon(
                                 Icons.Default.Delete,
@@ -260,7 +279,19 @@ fun MeditationSessionDetailScreen(
                     // ── Overview card ──────────────────────────────────────────
                     DetailSection(title = "Overview") {
                         DetailRow("Audio", audioName)
-                        DetailRow("Duration", "${durationMin}m ${durationSec}s")
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            DetailRow("Duration", "${durationMin}m ${durationSec}s")
+                            TextButton(
+                                onClick = { viewModel.requestEditDuration() },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                            ) {
+                                Text("Edit", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                            }
+                        }
                         DetailRow("Posture", session.posture.lowercase()
                             .replaceFirstChar { it.uppercase() })
                         DetailRow("Monitor", session.monitorId ?: "None")
@@ -952,4 +983,130 @@ private fun SessionLineChart(
             }
         }
     }
+}
+
+// ── Edit-duration dialog ──────────────────────────────────────────────────────
+
+@Composable
+private fun EditDurationDialog(
+    currentDurationMs: Long,
+    onDismiss: () -> Unit,
+    onConfirm: (Long) -> Unit
+) {
+    var editMinutes by remember(currentDurationMs) {
+        mutableStateOf((currentDurationMs / 60_000L).toInt())
+    }
+    var editSeconds by remember(currentDurationMs) {
+        mutableStateOf(((currentDurationMs % 60_000L) / 1_000L).toInt())
+    }
+
+    val totalSeconds = editMinutes * 60L + editSeconds
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceVariant,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("😴", style = MaterialTheme.typography.titleLarge)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Adjust Duration",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextPrimary
+                )
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Fell asleep? Correct the session duration here.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+
+                // mm:ss editable fields
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = if (editMinutes == 0) "" else editMinutes.toString(),
+                        onValueChange = { v ->
+                            editMinutes = v.filter { it.isDigit() }.toIntOrNull()?.coerceIn(0, 999) ?: 0
+                        },
+                        label = { Text("min") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedBorderColor = TextSecondary,
+                            unfocusedBorderColor = SurfaceDark,
+                            focusedLabelColor = TextSecondary,
+                            unfocusedLabelColor = TextDisabled,
+                            cursorColor = TextSecondary
+                        )
+                    )
+                    Text(":", style = MaterialTheme.typography.headlineSmall, color = TextSecondary)
+                    OutlinedTextField(
+                        value = if (editSeconds == 0) "" else editSeconds.toString(),
+                        onValueChange = { v ->
+                            editSeconds = v.filter { it.isDigit() }.toIntOrNull()?.coerceIn(0, 59) ?: 0
+                        },
+                        label = { Text("sec") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedBorderColor = TextSecondary,
+                            unfocusedBorderColor = SurfaceDark,
+                            focusedLabelColor = TextSecondary,
+                            unfocusedLabelColor = TextDisabled,
+                            cursorColor = TextSecondary
+                        )
+                    )
+                }
+
+                // Quick-adjust chips
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    listOf(-10 to "−10m", -5 to "−5m", -1 to "−1m", 1 to "+1m", 5 to "+5m", 10 to "+10m")
+                        .forEach { (deltaMin, label) ->
+                            OutlinedButton(
+                                onClick = {
+                                    val totalSec = (editMinutes + deltaMin) * 60 + editSeconds
+                                    val clamped = totalSec.coerceAtLeast(0)
+                                    editMinutes = clamped / 60
+                                    editSeconds = clamped % 60
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary),
+                                contentPadding = PaddingValues(vertical = 4.dp, horizontal = 2.dp)
+                            ) {
+                                Text(label, style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(totalSeconds * 1_000L) },
+                enabled = totalSeconds > 0
+            ) {
+                Text("Save", color = TextPrimary, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = TextSecondary)
+            }
+        }
+    )
 }
