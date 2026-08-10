@@ -262,19 +262,24 @@ class HabitIntegrationRepository @Inject constructor(
     /**
      * Internal helper that fires the increment broadcast with an optional
      * [EXTRA_MINUTES] extra.
+     *
+     * When [isSecondary] is true, the habit ID is prefixed with
+     * [SECONDARY_VALUE_PREFIX] so Tail writes to the secondary value slot.
      */
-    private fun sendHabitIncrementInternal(slot: Slot, minutes: Int?) {
-        val habitId = getHabitId(slot)
-        if (habitId.isBlank()) {
+    private fun sendHabitIncrementInternal(slot: Slot, minutes: Int?, isSecondary: Boolean = false) {
+        val habitName = getHabitId(slot)
+        if (habitName.isBlank()) {
             Log.d(TAG, "sendHabitIncrement(${slot.name}): no habit selected, skipping")
             return
         }
+
+        val effectiveHabitId = if (isSecondary) SECONDARY_VALUE_PREFIX + habitName else habitName
 
         try {
             val intent = Intent(ACTION_INCREMENT).apply {
                 // Explicit broadcast — required for reliable delivery on API 26+
                 `package` = HABIT_APP_PACKAGE
-                putExtra(EXTRA_HABIT_ID, habitId)
+                putExtra(EXTRA_HABIT_ID, effectiveHabitId)
                 putExtra(EXTRA_SLOT, slot.name)
                 if (minutes != null) {
                     putExtra(EXTRA_MINUTES, minutes)
@@ -284,7 +289,7 @@ class HabitIntegrationRepository @Inject constructor(
             // receiverPermission ensures only the Habit app (which declared the
             // signature permission) can receive this broadcast.
             context.sendBroadcast(intent, PERMISSION_TAIL)
-            Log.d(TAG, "sendHabitIncrement(${slot.name}): fired for habitId=$habitId" +
+            Log.d(TAG, "sendHabitIncrement(${slot.name}): fired for habitId=$effectiveHabitId" +
                     if (minutes != null) ", minutes=$minutes" else "")
         } catch (e: SecurityException) {
             // On Android 14+ (API 34), sendBroadcast with a receiverPermission that
@@ -296,6 +301,46 @@ class HabitIntegrationRepository @Inject constructor(
             // Catch-all: habit integration must never crash the host app.
             Log.w(TAG, "sendHabitIncrement(${slot.name}): unexpected error — ${e.message}")
         }
+    }
+
+    // ── Secondary Value (Value 2) ─────────────────────────────────────────────
+
+    /**
+     * Sends an increment broadcast for the **secondary value** of the habit
+     * mapped to [slot].
+     *
+     * Tail stores secondary values under the key `secondary_value:<habitName>`.
+     * This method uses the same IPC mechanism as [sendHabitIncrementWithMinutes]
+     * but sends the broadcast with `EXTRA_HABIT_ID` set to
+     * `secondary_value:<habitName>` so Tail writes to the secondary slot.
+     *
+     * For meditation: [value] = 1 (one session completed).
+     *
+     * Does nothing if no habit has been selected for [slot] or if [value] < 1.
+     */
+    fun sendSecondaryValueIncrement(slot: Slot, value: Int) {
+        if (value < 1) {
+            Log.d(TAG, "sendSecondaryValueIncrement(${slot.name}): value=$value < 1, skipping")
+            return
+        }
+        sendHabitIncrementInternal(slot, value, isSecondary = true)
+    }
+
+    /**
+     * Sends a SET broadcast for the **secondary value** of the habit mapped to
+     * [slot], with per-date values.
+     *
+     * Tail stores secondary values under the key `secondary_value:<habitName>`.
+     * This method uses the same IPC mechanism as [sendHabitValuesForDates] but
+     * sends the broadcast with `EXTRA_HABIT_ID` set to
+     * `secondary_value:<habitName>` so Tail writes to the secondary slot.
+     *
+     * For meditation backfill: each date's value = number of sessions that day.
+     *
+     * Does nothing if no habit has been selected for [slot] or if the map is empty.
+     */
+    fun sendSecondaryValuesForDates(slot: Slot, dateValues: Map<String, Int>) {
+        sendValuesForDatesBroadcast(slot, dateValues, isSecondary = true)
     }
 
     // ── Retroactive backfill ──────────────────────────────────────────────────
@@ -314,20 +359,37 @@ class HabitIntegrationRepository @Inject constructor(
      * Does nothing if no habit has been selected for [slot] or if the map is empty.
      */
     fun sendHabitValuesForDates(slot: Slot, dateMinutes: Map<String, Int>) {
-        val habitId = getHabitId(slot)
-        if (habitId.isBlank()) {
+        sendValuesForDatesBroadcast(slot, dateMinutes, isSecondary = false)
+    }
+
+    /**
+     * Internal helper that serialises a date→value map as JSON and fires the
+     * [ACTION_SET_HABIT_VALUES] broadcast.
+     *
+     * When [isSecondary] is true, the habit ID is prefixed with
+     * [SECONDARY_VALUE_PREFIX] so Tail writes to the secondary value slot.
+     */
+    private fun sendValuesForDatesBroadcast(
+        slot: Slot,
+        dateValues: Map<String, Int>,
+        isSecondary: Boolean
+    ) {
+        val habitName = getHabitId(slot)
+        if (habitName.isBlank()) {
             Log.d(TAG, "sendHabitValuesForDates(${slot.name}): no habit selected, skipping")
             return
         }
-        if (dateMinutes.isEmpty()) {
+        if (dateValues.isEmpty()) {
             Log.d(TAG, "sendHabitValuesForDates(${slot.name}): empty map, skipping")
             return
         }
 
+        val effectiveHabitId = if (isSecondary) SECONDARY_VALUE_PREFIX + habitName else habitName
+
         // Serialise the date→minutes map as a compact JSON object.
         val json = buildString {
             append("{")
-            dateMinutes.entries.forEachIndexed { i, (date, mins) ->
+            dateValues.entries.forEachIndexed { i, (date, mins) ->
                 if (i > 0) append(",")
                 append("\"").append(date).append("\":").append(mins)
             }
@@ -337,13 +399,14 @@ class HabitIntegrationRepository @Inject constructor(
         try {
             val intent = Intent(ACTION_SET_HABIT_VALUES).apply {
                 `package` = HABIT_APP_PACKAGE
-                putExtra(EXTRA_HABIT_ID, habitId)
+                putExtra(EXTRA_HABIT_ID, effectiveHabitId)
                 putExtra(EXTRA_SLOT, slot.name)
                 putExtra(EXTRA_VALUES_JSON, json)
             }
             context.sendBroadcast(intent, PERMISSION_TAIL)
-            Log.d(TAG, "sendHabitValuesForDates(${slot.name}): fired for habitId=$habitId, " +
-                    "${dateMinutes.size} dates")
+            val sample = dateValues.entries.firstOrNull()
+            Log.d(TAG, "sendHabitValuesForDates(${slot.name}): fired for habitId=$effectiveHabitId, " +
+                    "${dateValues.size} dates, sample: ${sample?.key}=${sample?.value}")
         } catch (e: SecurityException) {
             Log.w(TAG, "sendHabitValuesForDates(${slot.name}): SecurityException — " +
                     "Tail app likely not installed. ${e.message}")
@@ -359,6 +422,13 @@ class HabitIntegrationRepository @Inject constructor(
 
         /** Package name of the Tail habit-tracking app. */
         const val HABIT_APP_PACKAGE = "com.example.tail"
+
+        /**
+         * Prefix used by Tail for secondary value keys in habitsdb.txt.
+         * A secondary value for "Meditations" is stored under
+         * `"secondary_value:Meditations"`.
+         */
+        const val SECONDARY_VALUE_PREFIX = "secondary_value:"
 
         /**
          * Converts a duration in seconds to whole minutes, rounded to the nearest

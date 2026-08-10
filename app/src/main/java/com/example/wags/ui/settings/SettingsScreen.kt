@@ -812,8 +812,9 @@ private fun TailAppIntegrationCard(
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
-                        "Send total minutes from all past resonance breathing, " +
-                                "assessments, meditation, and apnea sessions to Tail.",
+                        "Send minutes (and meditation session counts) from all " +
+                                "past resonance breathing, assessments, meditation, " +
+                                "and apnea sessions to Tail.",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondary
                     )

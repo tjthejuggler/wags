@@ -474,10 +474,12 @@ class MeditationViewModel @Inject constructor(
         // ── Stop MeditationService ─────────────────────────────────────────────
         stopMeditationService()
         
-        // Signal Tail habit integration with session duration in minutes
+        // Signal Tail habit integration with session duration in minutes (Value 1)
+        // and session count = 1 (Value 2 / secondary_value)
         try {
             val minutes = HabitIntegrationRepository.millisToMinutes(durationMs)
             habitRepo.sendHabitIncrementWithMinutes(Slot.MEDITATION, minutes)
+            habitRepo.sendSecondaryValueIncrement(Slot.MEDITATION, 1)
         } catch (_: Exception) { /* never crash */ }
         processSession(durationMs)
     }

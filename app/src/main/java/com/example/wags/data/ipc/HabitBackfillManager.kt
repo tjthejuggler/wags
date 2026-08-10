@@ -50,6 +50,7 @@ class HabitBackfillManager @Inject constructor(
         val resonanceMinutes: Int,
         val meditationDates: Int,
         val meditationMinutes: Int,
+        val meditationSessions: Int,
         val freeHoldDates: Int,
         val freeHoldMinutes: Int,
         val tableTrainingDates: Int,
@@ -108,20 +109,32 @@ class HabitBackfillManager @Inject constructor(
         }
 
         // ── Meditation ────────────────────────────────────────────────────────
+        // Minutes → primary slot (Value 1), session count → secondary_value slot (Value 2)
         val meditationMinutesByDate = mutableMapOf<String, Int>()
+        val meditationSessionsByDate = mutableMapOf<String, Int>()
 
         val meditationSessions = meditationRepo.getAllSessions()
         for (session in meditationSessions) {
             val dateStr = epochMsToDateStr(session.timestamp, zone)
             val minutes = HabitIntegrationRepository.millisToMinutes(session.durationMs)
             meditationMinutesByDate[dateStr] = (meditationMinutesByDate[dateStr] ?: 0) + minutes
+            meditationSessionsByDate[dateStr] = (meditationSessionsByDate[dateStr] ?: 0) + 1
         }
         Log.i(TAG, "Meditation sessions: ${meditationSessions.size}, " +
-                "${meditationMinutesByDate.size} unique dates")
+                "${meditationMinutesByDate.size} unique dates, " +
+                "${meditationSessionsByDate.values.sum()} total sessions")
 
         val meditationSkipped = habitRepo.getHabitId(Slot.MEDITATION).isBlank()
         if (!meditationSkipped && meditationMinutesByDate.isNotEmpty()) {
+            Log.i(TAG, "Sending meditation minutes (primary): ${meditationMinutesByDate.size} dates, " +
+                    "${meditationMinutesByDate.values.sum()} total minutes")
             habitRepo.sendHabitValuesForDates(Slot.MEDITATION, meditationMinutesByDate)
+            // Small delay to let Tail's mutex-serialised receiver finish the primary write
+            // before we send the secondary broadcast.
+            kotlinx.coroutines.delay(500)
+            Log.i(TAG, "Sending meditation sessions (secondary): ${meditationSessionsByDate.size} dates, " +
+                    "${meditationSessionsByDate.values.sum()} total sessions")
+            habitRepo.sendSecondaryValuesForDates(Slot.MEDITATION, meditationSessionsByDate)
         }
 
         // ── Apnea (free holds, tables, progressive O₂, min breath) ────────────
@@ -184,6 +197,7 @@ class HabitBackfillManager @Inject constructor(
             resonanceMinutes     = resonanceMinutesByDate.values.sum(),
             meditationDates      = meditationMinutesByDate.size,
             meditationMinutes    = meditationMinutesByDate.values.sum(),
+            meditationSessions   = meditationSessionsByDate.values.sum(),
             freeHoldDates        = freeHoldMinutesByDate.size,
             freeHoldMinutes      = freeHoldMinutesByDate.values.sum(),
             tableTrainingDates   = tableTrainingMinutesByDate.size,

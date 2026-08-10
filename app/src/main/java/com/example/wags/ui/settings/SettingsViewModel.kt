@@ -271,7 +271,11 @@ class SettingsViewModel @Inject constructor(
                 val result = habitBackfillManager.backfill()
                 val msg = buildString {
                     append("Sent ${result.totalDates} dates ")
-                    append("(${result.totalMinutes} min) to Tail.")
+                    append("(${result.totalMinutes} min")
+                    if (result.meditationSessions > 0) {
+                        append(", ${result.meditationSessions} meditation sessions")
+                    }
+                    append(") to Tail.")
                     if (result.resonanceSkipped) {
                         append(" Resonance habit not selected — skipped.")
                     }
