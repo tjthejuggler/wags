@@ -30,4 +30,7 @@ interface MeditationSessionDao {
 
     @Query("DELETE FROM meditation_sessions WHERE sessionId = :id")
     suspend fun deleteById(id: Long)
+
+    @Query("UPDATE meditation_sessions SET durationMs = :durationMs WHERE sessionId = :id")
+    suspend fun updateDurationMs(id: Long, durationMs: Long)
 }

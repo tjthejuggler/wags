@@ -154,6 +154,9 @@ class MeditationRepository @Inject constructor(
 
     suspend fun deleteSessionById(id: Long) = sessionDao.deleteById(id)
 
+    suspend fun updateSessionDuration(id: Long, durationMs: Long) =
+        sessionDao.updateDurationMs(id, durationMs)
+
     // ── Telemetry ──────────────────────────────────────────────────────────────
 
     suspend fun insertTelemetry(rows: List<MeditationTelemetryEntity>) =

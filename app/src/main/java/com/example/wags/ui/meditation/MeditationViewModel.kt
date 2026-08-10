@@ -517,6 +517,39 @@ class MeditationViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Adjusts the just-completed session's duration after the user edits it on
+     * the summary screen (e.g. they fell asleep and the recorded time is too long).
+     *
+     * Updates the persisted session, the UI state, and sends a signed habit delta
+     * so the companion Habit app stays in sync.
+     */
+    fun adjustSessionDuration(newDurationMs: Long) {
+        val sessionId = _uiState.value.savedSessionId ?: return
+        val oldDurationMs = _uiState.value.durationMs
+        if (newDurationMs == oldDurationMs) return
+        val clamped = newDurationMs.coerceAtLeast(1_000L) // minimum 1 second
+
+        val oldMinutes = HabitIntegrationRepository.millisToMinutes(oldDurationMs)
+        val newMinutes = HabitIntegrationRepository.millisToMinutes(clamped)
+        val deltaMinutes = newMinutes - oldMinutes
+
+        viewModelScope.launch {
+            withContext(ioDispatcher) {
+                repository.updateSessionDuration(sessionId, clamped)
+            }
+
+            // Send signed habit adjustment (positive or negative)
+            try {
+                if (deltaMinutes != 0) {
+                    habitRepo.sendHabitDelta(Slot.MEDITATION, deltaMinutes)
+                }
+            } catch (_: Exception) { /* never crash */ }
+
+            _uiState.update { it.copy(durationMs = clamped) }
+        }
+    }
+
     fun reset() {
         _uiState.update {
             it.copy(

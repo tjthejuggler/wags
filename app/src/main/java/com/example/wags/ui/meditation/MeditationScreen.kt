@@ -115,6 +115,7 @@ fun MeditationScreen(
                     onViewHistory = {
                         navController.navigate(WagsRoutes.MEDITATION_HISTORY)
                     },
+                    onAdjustDuration = { viewModel.adjustSessionDuration(it) },
                     onDone = { viewModel.reset() },
                     modifier = Modifier
                 )
@@ -620,6 +621,7 @@ private fun ProcessingContent(modifier: Modifier = Modifier) {
 private fun CompleteContent(
     state: MeditationUiState,
     onViewHistory: () -> Unit,
+    onAdjustDuration: (Long) -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -694,6 +696,12 @@ private fun CompleteContent(
             }
         }
 
+        // ── Duration adjuster (fell asleep? fix the time here) ──────────────
+        DurationAdjuster(
+            currentDurationMs = state.durationMs,
+            onAdjustDuration = onAdjustDuration
+        )
+
         OutlinedButton(
             onClick = onViewHistory,
             modifier = Modifier.fillMaxWidth(),
@@ -704,6 +712,109 @@ private fun CompleteContent(
 
         Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) {
             Text("New Session")
+        }
+    }
+}
+
+// ── Duration adjuster ──────────────────────────────────────────────────────────
+
+@Composable
+private fun DurationAdjuster(
+    currentDurationMs: Long,
+    onAdjustDuration: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var editMinutes by remember(currentDurationMs) {
+        mutableStateOf((currentDurationMs / 60_000L).toInt())
+    }
+    var editSeconds by remember(currentDurationMs) {
+        mutableStateOf(((currentDurationMs % 60_000L) / 1_000L).toInt())
+    }
+    var saved by remember { mutableStateOf(false) }
+
+    Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = SurfaceVariant)) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("😴", style = MaterialTheme.typography.titleLarge)
+                Spacer(Modifier.width(8.dp))
+                Column {
+                    Text("Adjust Duration", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                    Text(
+                        "Fell asleep? Correct the time here.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                }
+            }
+
+            // mm:ss editable fields
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TimerField(
+                    value = editMinutes,
+                    label = "min",
+                    max = 999,
+                    onChange = {
+                        editMinutes = it
+                        saved = false
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                Text(":", style = MaterialTheme.typography.headlineSmall, color = TextSecondary)
+                TimerField(
+                    value = editSeconds,
+                    label = "sec",
+                    max = 59,
+                    onChange = {
+                        editSeconds = it
+                        saved = false
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            // Quick-adjust chips
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                listOf(-10 to "−10m", -5 to "−5m", -1 to "−1m", 1 to "+1m", 5 to "+5m", 10 to "+10m")
+                    .forEach { (deltaMin, label) ->
+                        OutlinedButton(
+                            onClick = {
+                                val totalSec = (editMinutes + deltaMin) * 60 + editSeconds
+                                val clamped = totalSec.coerceAtLeast(0)
+                                editMinutes = clamped / 60
+                                editSeconds = clamped % 60
+                                saved = false
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary),
+                            contentPadding = PaddingValues(vertical = 4.dp, horizontal = 2.dp)
+                        ) {
+                            Text(label, style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+            }
+
+            // Save button
+            val totalSeconds = editMinutes * 60L + editSeconds
+            Button(
+                onClick = {
+                    onAdjustDuration(totalSeconds * 1_000L)
+                    saved = true
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !saved && totalSeconds > 0
+            ) {
+                Text(if (saved) "Saved ✓" else "Save Corrected Duration")
+            }
         }
     }
 }

@@ -243,6 +243,23 @@ class HabitIntegrationRepository @Inject constructor(
     }
 
     /**
+     * Sends a **signed** habit increment/decrement for [slot].
+     *
+     * Unlike [sendHabitIncrementWithMinutes], this accepts negative values so the
+     * Habit app can subtract minutes when a session duration is corrected downward
+     * (e.g. user fell asleep and shortens the recorded time).
+     *
+     * Does nothing if no habit has been selected for [slot] or if [deltaMinutes] is 0.
+     */
+    fun sendHabitDelta(slot: Slot, deltaMinutes: Int) {
+        if (deltaMinutes == 0) {
+            Log.d(TAG, "sendHabitDelta(${slot.name}): deltaMinutes=0, skipping")
+            return
+        }
+        sendHabitIncrementInternal(slot, minutes = deltaMinutes)
+    }
+
+    /**
      * Internal helper that fires the increment broadcast with an optional
      * [EXTRA_MINUTES] extra.
      */
