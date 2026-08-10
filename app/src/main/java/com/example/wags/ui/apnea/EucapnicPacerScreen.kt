@@ -84,21 +84,15 @@ fun EucapnicPacerScreen(
         if (isComplete && config != null) {
             when (sessionType) {
                 "FREE_HOLD" -> {
-                    // Mark eucapnic prep as completed before navigating
+                    // Pop back to the existing FreeHoldActiveScreen and mark
+                    // eucapnic prep as completed so the user can start the hold.
+                    // Using popBackStack avoids stacking duplicate FreeHoldActive
+                    // screens and keeps the back navigation clean.
                     navController.previousBackStackEntry
                         ?.savedStateHandle
                         ?.set("eucapnic_prep_completed", true)
-                    
-                    navController.navigate(
-                        WagsRoutes.freeHoldActive(
-                            lungVolume = lungVolume,
-                            prepType = "EUCAPNIC_DIAPHRAGMATIC",
-                            timeOfDay = timeOfDay,
-                            posture = posture,
-                            showTimer = true,
-                            audio = audio
-                        )
-                    )
+
+                    navController.popBackStack()
                 }
                 "PROGRESSIVE_O2" -> {
                     navController.navigate(WagsRoutes.PROGRESSIVE_O2_ACTIVE)
@@ -110,17 +104,12 @@ fun EucapnicPacerScreen(
                     navController.navigate(WagsRoutes.APNEA_TABLE)
                 }
                 else -> {
-                    // Default to free hold for unknown session types
-                    navController.navigate(
-                        WagsRoutes.freeHoldActive(
-                            lungVolume = lungVolume,
-                            prepType = "EUCAPNIC_DIAPHRAGMATIC",
-                            timeOfDay = timeOfDay,
-                            posture = posture,
-                            showTimer = true,
-                            audio = audio
-                        )
-                    )
+                    // Default to free hold for unknown session types — pop back
+                    navController.previousBackStackEntry
+                        ?.savedStateHandle
+                        ?.set("eucapnic_prep_completed", true)
+
+                    navController.popBackStack()
                 }
             }
         }

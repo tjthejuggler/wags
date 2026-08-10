@@ -306,6 +306,17 @@ class FreeHoldActiveViewModel @Inject constructor(
     )
 
     init {
+        // Reactively observe eucapnic_prep_completed from savedStateHandle.
+        // When the EucapnicPacerScreen pops back to this screen after completing
+        // the prep, the ViewModel is already initialised so we must react to the
+        // savedStateHandle change rather than relying on the init-time read above.
+        viewModelScope.launch {
+            savedStateHandle.getStateFlow<Boolean>("eucapnic_prep_completed", false)
+                .collect { completed ->
+                    _uiState.update { it.copy(eucapnicPrepCompleted = completed) }
+                }
+        }
+
         // Collect guided audio library from DB
         viewModelScope.launch {
             guidedAudioManager.allAudios.collect { audios ->
@@ -617,6 +628,24 @@ class FreeHoldActiveViewModel @Inject constructor(
     fun setEucapnicPrepCompleted(completed: Boolean) {
         savedStateHandle["eucapnic_prep_completed"] = completed
         _uiState.update { it.copy(eucapnicPrepCompleted = completed) }
+    }
+
+    /**
+     * Reset the screen state so the user can start another hold without navigating
+     * away.  This clears eucapnic-prep completion (so the Start button routes to
+     * the eucapnic pacer again) and guided-countdown completion (so the guided
+     * hyper countdown re-arms).  The user stays on this screen and can press Back
+     * to return to the main apnea screen.
+     */
+    fun resetForNewHold() {
+        savedStateHandle["eucapnic_prep_completed"] = false
+        _uiState.update {
+            it.copy(
+                eucapnicPrepCompleted = false,
+                guidedCountdownComplete = false,
+                freeHoldFirstContractionMs = null
+            )
+        }
     }
 
     fun startFreeHold() {
@@ -1279,14 +1308,18 @@ private fun FreeHoldActiveScreenContent(
     // True once the user taps Stop — we wait for the async PB check before navigating.
     var stopRequested by remember { mutableStateOf(false) }
 
-    // Navigate back when:
+    // Reset for a new hold when:
     //   • the user tapped Stop (stopRequested), AND
     //   • the async PB check has finished (pbCheckPending is false), AND
-    //   • no PB dialog is showing (newPersonalBestMs is null — either no PB or dismissed).
+    //   • no PB dialog is showing (newPersonalBest is null — either no PB or dismissed).
+    //
+    // Instead of navigating away, we stay on this screen and reset the prep
+    // state so the user can immediately start another eucapnic breathing +
+    // hold cycle.  The Back button still pops to the main apnea screen.
     LaunchedEffect(stopRequested, state.freeHoldActive, state.newPersonalBest, state.pbCheckPending) {
         if (stopRequested && !state.freeHoldActive && !state.pbCheckPending && state.newPersonalBest == null) {
-            // Pop back to the main apnea screen, not just the previous screen
-            navController.popBackStack(WagsRoutes.APNEA_FREE, inclusive = false)
+            stopRequested = false
+            viewModel.resetForNewHold()
         }
     }
 
