@@ -42,6 +42,7 @@ import com.example.wags.ui.common.WagsFeedback
 import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.common.BackgroundLineChart
 import com.example.wags.ui.common.CoherenceStripChart
+import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.theme.*
 
 // ── Monochrome palette ────────────────────────────────────────────────────────
@@ -98,7 +99,11 @@ fun AssessmentRunScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    
+
+    // Mid-session toggles — initialised from pre-session settings, toggleable during the run
+    var vibrationOn by remember { mutableStateOf(vibrationEnabled) }
+    var colorsOn   by remember { mutableStateOf(colorsEnabled) }
+
     // Set initial posture from navigation parameter
     LaunchedEffect(Unit) {
         try {
@@ -133,7 +138,7 @@ fun AssessmentRunScreen(
 
     // Fire longer vibration when "breathe naturally" phase starts
     LaunchedEffect(uiState.phase) {
-        if (vibrationEnabled && (uiState.phase == "BASELINE" || uiState.phase == "BREATHE NATURALLY")) {
+        if (vibrationOn && (uiState.phase == "BASELINE" || uiState.phase == "BREATHE NATURALLY")) {
             WagsFeedback.breathNaturallyStart(context)
         }
     }
@@ -155,6 +160,24 @@ fun AssessmentRunScreen(
                     }
                 },
                 actions = {
+                    // Vibration toggle — toggleable mid-session
+                    IconButton(onClick = { vibrationOn = !vibrationOn }) {
+                        Text(
+                            text = "📳",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = if (!vibrationOn) Modifier.grayscale() else Modifier,
+                            color = if (vibrationOn) EcgCyan else TextDisabled
+                        )
+                    }
+                    // Color mode toggle — toggleable mid-session
+                    IconButton(onClick = { colorsOn = !colorsOn }) {
+                        Text(
+                            text = "🎨",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = if (!colorsOn) Modifier.grayscale() else Modifier,
+                            color = if (colorsOn) PacerInhaleColor else TextDisabled
+                        )
+                    }
                     LiveSensorActionsCallback(onNavigateToSettings)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
@@ -162,7 +185,7 @@ fun AssessmentRunScreen(
         }
     ) { padding ->
         // Vibration callback — only fires when toggle is on
-        val vibrationCallback: ((Boolean) -> Unit)? = if (vibrationEnabled) {
+        val vibrationCallback: ((Boolean) -> Unit)? = if (vibrationOn) {
             { inhaling ->
                 if (inhaling) WagsFeedback.breathInhale(context)
                 else WagsFeedback.breathExhale(context)
@@ -190,7 +213,7 @@ fun AssessmentRunScreen(
                         isInhaling = uiState.isInhaling,
                         size = 280.dp,
                         overlayLabel = if (protocol.isStepped()) overlayLabel else null,
-                        useColors = colorsEnabled,
+                        useColors = colorsOn,
                         breathCycleCount = uiState.breathCycleCount,
                         onPhaseTransition = vibrationCallback
                     )
@@ -408,7 +431,7 @@ fun AssessmentRunScreen(
                         isInhaling = uiState.isInhaling,
                         size = 300.dp,
                         overlayLabel = if (protocol.isStepped()) overlayLabel else null,
-                        useColors = colorsEnabled,
+                        useColors = colorsOn,
                         breathCycleCount = uiState.breathCycleCount,
                         onPhaseTransition = vibrationCallback
                     )

@@ -114,6 +114,9 @@ fun ResonanceSessionScreen(
     // Color mode toggle — persisted to SharedPreferences
     var useColors by remember { mutableStateOf(apneaPrefs.getBoolean("breathing_colors", false)) }
 
+    // Vibration toggle — initialised from the pre-session setting, toggleable mid-session
+    var vibrationOn by remember { mutableStateOf(vibrationEnabled) }
+
     val isActive = state.sessionPhase == BreathingSessionPhase.PREPARING ||
             state.sessionPhase == BreathingSessionPhase.BREATHING
 
@@ -176,6 +179,15 @@ fun ResonanceSessionScreen(
                     }
                 },
                 actions = {
+                    // Vibration toggle — toggleable mid-session
+                    IconButton(onClick = { vibrationOn = !vibrationOn }) {
+                        Text(
+                            text = "📳",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = if (!vibrationOn) Modifier.grayscale() else Modifier,
+                            color = if (vibrationOn) EcgCyan else TextDisabled
+                        )
+                    }
                     // Color mode toggle for inhale/exhale peripheral vision
                     IconButton(onClick = {
                         useColors = !useColors
@@ -251,7 +263,7 @@ fun ResonanceSessionScreen(
                     }
                     
                     // Vibration callback — only fires when toggle is on
-                    val vibrationCallback: ((Boolean) -> Unit)? = if (vibrationEnabled) {
+                    val vibrationCallback: ((Boolean) -> Unit)? = if (vibrationOn) {
                         { inhaling ->
                             if (inhaling) WagsFeedback.breathInhale(context)
                             else WagsFeedback.breathExhale(context)
