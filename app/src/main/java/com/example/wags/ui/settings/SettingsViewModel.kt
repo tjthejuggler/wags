@@ -272,8 +272,8 @@ class SettingsViewModel @Inject constructor(
                 val msg = buildString {
                     append("Sent ${result.totalDates} dates ")
                     append("(${result.totalMinutes} min")
-                    if (result.meditationSessions > 0) {
-                        append(", ${result.meditationSessions} meditation sessions")
+                    if (result.totalSessions > 0) {
+                        append(", ${result.totalSessions} sessions")
                     }
                     append(") to Tail.")
                     if (result.resonanceSkipped) {

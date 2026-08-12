@@ -999,6 +999,7 @@ class ProgressiveO2ViewModel @Inject constructor(
         try {
             val holdMinutes = HabitIntegrationRepository.millisToMinutes(totalHoldTimeMs)
             habitRepo.sendHabitIncrementWithMinutes(Slot.PROGRESSIVE_O2, holdMinutes)
+            habitRepo.sendSecondaryValueIncrement(Slot.PROGRESSIVE_O2, 1)
         } catch (_: Exception) {}
 
         // Fire music habit if applicable (once per TimeOfDay per day)

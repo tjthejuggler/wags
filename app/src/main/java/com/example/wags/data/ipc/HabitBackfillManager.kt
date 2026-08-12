@@ -53,12 +53,16 @@ class HabitBackfillManager @Inject constructor(
         val meditationSessions: Int,
         val freeHoldDates: Int,
         val freeHoldMinutes: Int,
+        val freeHoldSessions: Int,
         val tableTrainingDates: Int,
         val tableTrainingMinutes: Int,
+        val tableTrainingSessions: Int,
         val progressiveO2Dates: Int,
         val progressiveO2Minutes: Int,
+        val progressiveO2Sessions: Int,
         val minBreathDates: Int,
         val minBreathMinutes: Int,
+        val minBreathSessions: Int,
         val resonanceSkipped: Boolean,
         val meditationSkipped: Boolean,
         val freeHoldSkipped: Boolean,
@@ -70,6 +74,8 @@ class HabitBackfillManager @Inject constructor(
             freeHoldDates + tableTrainingDates + progressiveO2Dates + minBreathDates
         val totalMinutes: Int get() = resonanceMinutes + meditationMinutes +
             freeHoldMinutes + tableTrainingMinutes + progressiveO2Minutes + minBreathMinutes
+        val totalSessions: Int get() = meditationSessions +
+            freeHoldSessions + tableTrainingSessions + progressiveO2Sessions + minBreathSessions
     }
 
     /**
@@ -150,20 +156,26 @@ class HabitBackfillManager @Inject constructor(
         val tableTrainingMinutesByDate = mutableMapOf<String, Int>()
         val progressiveO2MinutesByDate = mutableMapOf<String, Int>()
         val minBreathMinutesByDate = mutableMapOf<String, Int>()
+        // Session counts → secondary_value slot (Value 2)
+        val freeHoldSessionsByDate = mutableMapOf<String, Int>()
+        val tableTrainingSessionsByDate = mutableMapOf<String, Int>()
+        val progressiveO2SessionsByDate = mutableMapOf<String, Int>()
+        val minBreathSessionsByDate = mutableMapOf<String, Int>()
 
         val apneaRecords = apneaRepo.getAllRecordsOnce()
         for (record in apneaRecords) {
             val dateStr = epochMsToDateStr(record.timestamp, zone)
             val minutes = HabitIntegrationRepository.millisToMinutes(record.durationMs)
-            val targetMap = when (record.tableType) {
-                null                    -> freeHoldMinutesByDate
-                "O2", "CO2"             -> tableTrainingMinutesByDate
-                "PROGRESSIVE_O2"        -> progressiveO2MinutesByDate
-                "MIN_BREATH"            -> minBreathMinutesByDate
-                else                    -> null // unknown type — skip
+            val (minuteMap, sessionMap) = when (record.tableType) {
+                null                    -> freeHoldMinutesByDate to freeHoldSessionsByDate
+                "O2", "CO2"             -> tableTrainingMinutesByDate to tableTrainingSessionsByDate
+                "PROGRESSIVE_O2"        -> progressiveO2MinutesByDate to progressiveO2SessionsByDate
+                "MIN_BREATH"            -> minBreathMinutesByDate to minBreathSessionsByDate
+                else                    -> null to null // unknown type — skip
             }
-            if (targetMap != null) {
-                targetMap[dateStr] = (targetMap[dateStr] ?: 0) + minutes
+            if (minuteMap != null && sessionMap != null) {
+                minuteMap[dateStr] = (minuteMap[dateStr] ?: 0) + minutes
+                sessionMap[dateStr] = (sessionMap[dateStr] ?: 0) + 1
             }
         }
         Log.i(TAG, "Apnea records: ${apneaRecords.size} | " +
@@ -175,43 +187,55 @@ class HabitBackfillManager @Inject constructor(
         val freeHoldSkipped = habitRepo.getHabitId(Slot.FREE_HOLD).isBlank()
         if (!freeHoldSkipped && freeHoldMinutesByDate.isNotEmpty()) {
             habitRepo.sendHabitValuesForDates(Slot.FREE_HOLD, freeHoldMinutesByDate)
+            kotlinx.coroutines.delay(500)
+            habitRepo.sendSecondaryValuesForDates(Slot.FREE_HOLD, freeHoldSessionsByDate)
         }
 
         val tableTrainingSkipped = habitRepo.getHabitId(Slot.TABLE_TRAINING).isBlank()
         if (!tableTrainingSkipped && tableTrainingMinutesByDate.isNotEmpty()) {
             habitRepo.sendHabitValuesForDates(Slot.TABLE_TRAINING, tableTrainingMinutesByDate)
+            kotlinx.coroutines.delay(500)
+            habitRepo.sendSecondaryValuesForDates(Slot.TABLE_TRAINING, tableTrainingSessionsByDate)
         }
 
         val progressiveO2Skipped = habitRepo.getHabitId(Slot.PROGRESSIVE_O2).isBlank()
         if (!progressiveO2Skipped && progressiveO2MinutesByDate.isNotEmpty()) {
             habitRepo.sendHabitValuesForDates(Slot.PROGRESSIVE_O2, progressiveO2MinutesByDate)
+            kotlinx.coroutines.delay(500)
+            habitRepo.sendSecondaryValuesForDates(Slot.PROGRESSIVE_O2, progressiveO2SessionsByDate)
         }
 
         val minBreathSkipped = habitRepo.getHabitId(Slot.MIN_BREATH).isBlank()
         if (!minBreathSkipped && minBreathMinutesByDate.isNotEmpty()) {
             habitRepo.sendHabitValuesForDates(Slot.MIN_BREATH, minBreathMinutesByDate)
+            kotlinx.coroutines.delay(500)
+            habitRepo.sendSecondaryValuesForDates(Slot.MIN_BREATH, minBreathSessionsByDate)
         }
 
         return BackfillResult(
-            resonanceDates       = resonanceMinutesByDate.size,
-            resonanceMinutes     = resonanceMinutesByDate.values.sum(),
-            meditationDates      = meditationMinutesByDate.size,
-            meditationMinutes    = meditationMinutesByDate.values.sum(),
-            meditationSessions   = meditationSessionsByDate.values.sum(),
-            freeHoldDates        = freeHoldMinutesByDate.size,
-            freeHoldMinutes      = freeHoldMinutesByDate.values.sum(),
-            tableTrainingDates   = tableTrainingMinutesByDate.size,
-            tableTrainingMinutes = tableTrainingMinutesByDate.values.sum(),
-            progressiveO2Dates   = progressiveO2MinutesByDate.size,
-            progressiveO2Minutes = progressiveO2MinutesByDate.values.sum(),
-            minBreathDates       = minBreathMinutesByDate.size,
-            minBreathMinutes     = minBreathMinutesByDate.values.sum(),
-            resonanceSkipped     = resonanceSkipped,
-            meditationSkipped    = meditationSkipped,
-            freeHoldSkipped      = freeHoldSkipped,
-            tableTrainingSkipped = tableTrainingSkipped,
-            progressiveO2Skipped = progressiveO2Skipped,
-            minBreathSkipped     = minBreathSkipped
+            resonanceDates         = resonanceMinutesByDate.size,
+            resonanceMinutes       = resonanceMinutesByDate.values.sum(),
+            meditationDates        = meditationMinutesByDate.size,
+            meditationMinutes      = meditationMinutesByDate.values.sum(),
+            meditationSessions     = meditationSessionsByDate.values.sum(),
+            freeHoldDates          = freeHoldMinutesByDate.size,
+            freeHoldMinutes        = freeHoldMinutesByDate.values.sum(),
+            freeHoldSessions       = freeHoldSessionsByDate.values.sum(),
+            tableTrainingDates     = tableTrainingMinutesByDate.size,
+            tableTrainingMinutes   = tableTrainingMinutesByDate.values.sum(),
+            tableTrainingSessions  = tableTrainingSessionsByDate.values.sum(),
+            progressiveO2Dates     = progressiveO2MinutesByDate.size,
+            progressiveO2Minutes   = progressiveO2MinutesByDate.values.sum(),
+            progressiveO2Sessions  = progressiveO2SessionsByDate.values.sum(),
+            minBreathDates         = minBreathMinutesByDate.size,
+            minBreathMinutes       = minBreathMinutesByDate.values.sum(),
+            minBreathSessions      = minBreathSessionsByDate.values.sum(),
+            resonanceSkipped       = resonanceSkipped,
+            meditationSkipped      = meditationSkipped,
+            freeHoldSkipped        = freeHoldSkipped,
+            tableTrainingSkipped   = tableTrainingSkipped,
+            progressiveO2Skipped   = progressiveO2Skipped,
+            minBreathSkipped       = minBreathSkipped
         )
     }
 

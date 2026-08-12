@@ -1,17 +1,20 @@
-## ADR: Apnea hold-time minutes sent to Tail app
+## ADR: Apnea Secondary Value (Session Count) for Tail Integration
 
-**Date:** 2026-08-09
+**Date:** 2026-08-12
 
 ### Context
-Protocol v2 (2026-08-08) introduced minute-based habit reporting for resonance breathing and meditation. Apnea activities (free holds, O2/CO2 tables, Progressive O2, Min Breath) were still sending count-based increments of 1.
+Tail added secondary-value support for apnea habits. Each apnea habit can now track two values per day: minutes held (primary/Value 1) and session count (secondary/Value 2). Tail also added a "fallback to secondary" feature where days with 0 minutes but >0 sessions still count as "done" for streak purposes.
 
 ### Decision
-Extended Protocol v2 to all four apnea activity slots. Each now sends `EXTRA_MINUTES` containing the total breath-hold time (in minutes) via `sendHabitIncrementWithMinutes()`. The `APNEA_NEW_RECORD` slot remains count-based (event-based, not duration-based).
+Extended the existing secondary-value mechanism (already used for meditation) to all four apnea activity slots. After every `sendHabitIncrementWithMinutes(slot, minutes)` call for an apnea slot, a `sendSecondaryValueIncrement(slot, 1)` call is now fired. The backfill path (`HabitBackfillManager`) also builds per-date session-count maps and sends them via `sendSecondaryValuesForDates()` with a 500ms delay between primary and secondary broadcasts (Tail processes broadcasts serially through a mutex).
 
-The retroactive backfill (`HabitBackfillManager`) was extended to query all `ApneaRecordEntity` rows, group by `tableType` (null→FREE_HOLD, O2/CO2→TABLE_TRAINING, PROGRESSIVE_O2, MIN_BREATH), aggregate `durationMs` by date, and send per-slot `ACTION_SET_HABIT_VALUES` broadcasts.
+### Affected Slots
+- `FREE_HOLD` — FreeHoldActiveScreen.kt + ApneaViewModel.kt
+- `TABLE_TRAINING` — ApneaViewModel.kt
+- `PROGRESSIVE_O2` — ProgressiveO2ViewModel.kt
+- `MIN_BREATH` — MinBreathViewModel.kt
 
-### Key design choices
-- Minutes = total breath-hold time, NOT session wall-clock time. This is the meaningful training metric.
-- Same `durationMs` field used for both real-time and backfill, guaranteeing consistency.
-- No new protocol constants needed — reuses existing `EXTRA_MINUTES` and `ACTION_SET_HABIT_VALUES`.
-- Fully backward compatible: Tail ignores unknown extras and falls back to increment-by-1.
+### Consequences
+- `BackfillResult` gained `freeHoldSessions`, `tableTrainingSessions`, `progressiveO2Sessions`, `minBreathSessions` fields and a `totalSessions` computed property.
+- The backfill summary message now shows total sessions across all activities instead of meditation-only.
+- No changes needed to `HabitIntegrationRepository.kt` — `sendSecondaryValueIncrement()` and `sendSecondaryValuesForDates()` already existed and work for any slot.

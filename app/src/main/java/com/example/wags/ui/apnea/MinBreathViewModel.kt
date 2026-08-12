@@ -1045,6 +1045,7 @@ class MinBreathViewModel @Inject constructor(
         try {
             val holdMinutes = HabitIntegrationRepository.millisToMinutes(totalHoldTimeMs)
             habitRepo.sendHabitIncrementWithMinutes(Slot.MIN_BREATH, holdMinutes)
+            habitRepo.sendSecondaryValueIncrement(Slot.MIN_BREATH, 1)
         } catch (_: Exception) {}
 
         // Fire music habit if applicable (once per TimeOfDay per day)
