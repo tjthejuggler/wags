@@ -157,6 +157,64 @@ class MeditationRepository @Inject constructor(
     suspend fun updateSessionDuration(id: Long, durationMs: Long) =
         sessionDao.updateDurationMs(id, durationMs)
 
+    /** Updates an existing session row (does NOT trigger CASCADE deletes on telemetry). */
+    suspend fun updateSession(session: MeditationSessionEntity) =
+        sessionDao.update(session)
+
+    // ── Incremental persistence & crash recovery ──────────────────────────────
+
+    /** Returns the most recent in-progress session, or null if none exists. */
+    suspend fun getMostRecentIncompleteSession(): MeditationSessionEntity? =
+        sessionDao.getMostRecentIncompleteSession()
+
+    /** Marks a session as finalized with the given duration. */
+    suspend fun finalizeSession(id: Long, durationMs: Long) =
+        sessionDao.finalizeSession(id, durationMs)
+
+    /** Deletes all telemetry rows for a session (used when replacing with a cleaner set). */
+    suspend fun deleteTelemetryForSession(sessionId: Long) =
+        telemetryDao.deleteBySessionId(sessionId)
+
+    /**
+     * Recovers sessions that were interrupted by process death.
+     *
+     * - Sessions shorter than 5 seconds with no meaningful data are deleted.
+     * - Longer sessions are finalized with their last-known duration.
+     *
+     * Should be called on app / screen startup before starting a new session.
+     */
+    suspend fun recoverOrphanedSessions() {
+        val now = System.currentTimeMillis()
+        // Delete tiny accidental sessions (< 5 s)
+        sessionDao.deleteIncompleteShorterThan(5_000L)
+
+        val orphaned = sessionDao.getIncompleteSessions()
+        var recoveredCount = 0
+        for (session in orphaned) {
+            // Only recover sessions that are truly stale — i.e. the Service is no
+            // longer updating them.  The Service flushes every 15 s, so if the gap
+            // between the expected end time and now exceeds 60 s, the process was
+            // almost certainly killed.
+            val expectedDuration = now - session.timestamp
+            val gap = expectedDuration - session.durationMs
+            if (gap > 60_000L) {
+                val finalDuration = if (session.durationMs > 0) {
+                    session.durationMs
+                } else {
+                    expectedDuration
+                }
+                sessionDao.finalizeSession(session.sessionId, finalDuration)
+                recoveredCount++
+            }
+        }
+        if (recoveredCount > 0) {
+            android.util.Log.i(
+                "MeditationRepository",
+                "Recovered $recoveredCount orphaned meditation session(s)"
+            )
+        }
+    }
+
     // ── Telemetry ──────────────────────────────────────────────────────────────
 
     suspend fun insertTelemetry(rows: List<MeditationTelemetryEntity>) =

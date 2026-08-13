@@ -27,11 +27,22 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 
 /**
  * Foreground service that manages meditation sessions independently of the UI.
- * Ensures sessions are recorded even when the app is closed or screen is off.
+ *
+ * ## Crash-Safety Design
+ *
+ * The service creates a database row for the session **immediately** when it
+ * starts (via [MeditationSessionRecorder.startSession]) and flushes telemetry
+ * to the database every 15 seconds (via the periodic flush job).  This means
+ * that even if Android kills the process while the screen is off, all data
+ * collected up to that point survives in the database.
+ *
+ * Sessions left with `completed = false` are detected and recovered on the
+ * next service restart or app launch.
  */
 @AndroidEntryPoint
 class MeditationService : Service() {
@@ -46,8 +57,11 @@ class MeditationService : Service() {
         const val EXTRA_DURATION_SECONDS = "duration_seconds"
         const val EXTRA_MONITOR_ID = "monitor_id"
         const val EXTRA_SHOULD_SAVE = "should_save"
-        
+        const val EXTRA_POSTURE = "posture"
+        const val EXTRA_TIMER_MS = "timer_ms"
+
         private const val WAKE_LOCK_TIMEOUT_MS = 10 * 60 * 1000L // 10 minutes
+        private const val TELEMETRY_FLUSH_INTERVAL_MS = 15_000L // 15 seconds
     }
 
     @Inject
@@ -62,6 +76,7 @@ class MeditationService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.Default + Job())
     private var sessionJob: Job? = null
     private var hrDataCollectionJob: Job? = null
+    private var telemetryFlushJob: Job? = null
     private var sessionStartMs: Long = 0
     private var timerDurationSeconds: Long? = null
     private var activeMonitorId: String? = null
@@ -90,11 +105,27 @@ class MeditationService : Service() {
                 val audioDirUri = intent.getStringExtra(EXTRA_AUDIO_DIR_URI)
                 val durationSeconds = intent.getLongExtra(EXTRA_DURATION_SECONDS, 0L)
                 val monitorId = intent.getStringExtra(EXTRA_MONITOR_ID)
-                startSession(audioFileName, audioDirUri, monitorId, if (durationSeconds > 0) durationSeconds else null)
+                val posture = intent.getStringExtra(EXTRA_POSTURE) ?: "LAYING"
+                val timerMs = intent.getLongExtra(EXTRA_TIMER_MS, 0L)
+                    .takeIf { it > 0 }
+                startSession(
+                    audioFileName, audioDirUri, monitorId,
+                    if (durationSeconds > 0) durationSeconds else null,
+                    posture, timerMs
+                )
             }
             ACTION_STOP -> {
                 val shouldSave = intent.getBooleanExtra(EXTRA_SHOULD_SAVE, true)
                 stopSession(shouldSave)
+            }
+            null -> {
+                // Service restarted by the system (START_STICKY) after being killed.
+                // Recover any orphaned sessions from the previous lifecycle.
+                Log.d("MeditationService", "Service restarted by system — recovering orphaned sessions")
+                serviceScope.launch {
+                    sessionRecorder.recoverOrphanedSessions()
+                    stopSelf()
+                }
             }
         }
         return START_STICKY
@@ -102,8 +133,22 @@ class MeditationService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        Log.d("MeditationService", "MeditationService onDestroy — isSessionActive=$isSessionActive")
+
+        if (isSessionActive) {
+            // Emergency save: flush remaining telemetry and mark session as completed.
+            // This is the last-resort safety net.  We use runBlocking because onDestroy
+            // gives us no coroutine context — the suspend emergencySave() must complete
+            // before we release our resources.
+            Log.d("MeditationService", "Emergency save: saving session before destruction")
+            runBlocking {
+                sessionRecorder.emergencySave()
+            }
+        }
+
         sessionJob?.cancel()
         hrDataCollectionJob?.cancel()
+        telemetryFlushJob?.cancel()
         stopAudioPlayback()
         releaseWakeLock()
         activeMonitorId?.let { deviceManager.stopAllStreams(it) }
@@ -115,11 +160,18 @@ class MeditationService : Service() {
         audioFileName: String?,
         audioDirUri: String?,
         monitorId: String?,
-        timerDurationSeconds: Long?
+        timerDurationSeconds: Long?,
+        posture: String = "LAYING",
+        timerDurationMs: Long? = null
     ) {
         if (isSessionActive) {
             Log.w("MeditationService", "Session already active, ignoring start request")
             return
+        }
+
+        // Recover any orphaned sessions from a previous crash before starting a new one
+        serviceScope.launch {
+            sessionRecorder.recoverOrphanedSessions()
         }
 
         isSessionActive = true
@@ -152,8 +204,17 @@ class MeditationService : Service() {
         // Start foreground service with notification
         startForeground(NOTIFICATION_ID, buildNotification("Meditation in progress..."))
 
-        // Start session recording
-        sessionRecorder.startSession(sessionStartMs, audioFileName)
+        // Start session recording — creates DB row immediately with completed=false
+        sessionRecorder.startSession(
+            startMs = sessionStartMs,
+            audioFileName = audioFileName,
+            posture = posture,
+            monitorId = monitorId,
+            timerDurationMs = timerDurationMs
+        )
+
+        // Start periodic telemetry flush — writes to DB every 15 seconds
+        startTelemetryFlushJob()
 
         // Start HR data collection if monitor is connected
         if (monitorId != null) {
@@ -177,6 +238,7 @@ class MeditationService : Service() {
         isSessionActive = false
         sessionJob?.cancel()
         hrDataCollectionJob?.cancel()
+        telemetryFlushJob?.cancel()
 
         val durationMs = System.currentTimeMillis() - sessionStartMs
         stopAudioPlayback()
@@ -192,28 +254,15 @@ class MeditationService : Service() {
             }
         }
 
-        // Stop RR stream if monitor is connected
-        activeMonitorId?.let {
-            try {
-                deviceManager.stopAllStreams(it)
-                Log.d("MeditationService", "Stopped RR stream for monitor: $it")
-            } catch (e: Exception) {
-                Log.e("MeditationService", "Failed to stop RR stream for monitor: $it", e)
-            }
-        }
-
-        // Stop and process session only if shouldSave is true
-        // (false means the ViewModel is handling the save)
         if (shouldSave) {
+            // Service handles the full save (timer auto-stop, notification stop, etc.)
             serviceScope.launch {
                 sessionRecorder.stopSession(durationMs) { savedId ->
                     Log.d("MeditationService", "Session saved with ID: $savedId")
-                    // Update notification to show completion
                     val notification = buildNotification("Meditation session saved")
                     val manager = getSystemService(NotificationManager::class.java)
                     manager.notify(NOTIFICATION_ID, notification)
-                    
-                    // Stop foreground service after a short delay
+
                     serviceScope.launch {
                         delay(2000)
                         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -222,10 +271,15 @@ class MeditationService : Service() {
                 }
             }
         } else {
-            Log.d("MeditationService", "Session stopped without saving (ViewModel handles save)")
-            // Stop foreground service immediately
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
+            // ViewModel will handle the save — just flush remaining telemetry
+            // so the DB row has the latest data.  The ViewModel will update the
+            // existing row with full analytics and mark it completed.
+            serviceScope.launch {
+                sessionRecorder.flushTelemetry()
+                Log.d("MeditationService", "Telemetry flushed; ViewModel handles final save")
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+            }
         }
 
         Log.d("MeditationService", "Meditation session stopped, duration: ${durationMs}ms")
@@ -237,16 +291,33 @@ class MeditationService : Service() {
             while (isActive && remainingSeconds > 0) {
                 delay(1000)
                 remainingSeconds--
-                
+
                 // Update notification with remaining time
                 val notification = buildNotification("Meditation in progress... ${remainingSeconds}s remaining")
                 val manager = getSystemService(NotificationManager::class.java)
                 manager.notify(NOTIFICATION_ID, notification)
             }
-            
+
             // Timer completed - auto-stop session
             if (isActive && remainingSeconds == 0L) {
-                stopSession()
+                stopSession(shouldSave = true)
+            }
+        }
+    }
+
+    /**
+     * Periodically flushes telemetry to the database so that data survives
+     * even if the process is killed mid-session.
+     */
+    private fun startTelemetryFlushJob() {
+        telemetryFlushJob = serviceScope.launch {
+            while (isActive && isSessionActive) {
+                delay(TELEMETRY_FLUSH_INTERVAL_MS)
+                try {
+                    sessionRecorder.flushTelemetry()
+                } catch (e: Exception) {
+                    Log.e("MeditationService", "Telemetry flush failed", e)
+                }
             }
         }
     }
@@ -257,7 +328,6 @@ class MeditationService : Service() {
                 delay(5 * 60 * 1000L) // Every 5 minutes
                 if (wakeLockAcquired && isSessionActive) {
                     try {
-                        // Release and re-acquire wake lock to prevent timeout
                         wakeLock?.let {
                             if (it.isHeld) {
                                 it.release()
@@ -267,7 +337,6 @@ class MeditationService : Service() {
                         Log.d("MeditationService", "WakeLock renewed")
                     } catch (e: Exception) {
                         Log.e("MeditationService", "Failed to renew WakeLock", e)
-                        // Try to acquire a new wake lock if renewal failed
                         releaseWakeLock()
                         acquireWakeLock()
                     }
@@ -283,7 +352,7 @@ class MeditationService : Service() {
             val treeDocId = DocumentsContract.getTreeDocumentId(dirUri)
             val childDocId = "$treeDocId/$fileName"
             val fileUri = DocumentsContract.buildDocumentUriUsingTree(dirUri, childDocId)
-            
+
             val mp = MediaPlayer().apply {
                 setDataSource(applicationContext, fileUri)
                 isLooping = true
@@ -316,7 +385,7 @@ class MeditationService : Service() {
                 "wags:MeditationWakeLock"
             ).apply {
                 setReferenceCounted(false)
-                acquire(WAKE_LOCK_TIMEOUT_MS) // Timeout to prevent battery drain if service hangs
+                acquire(WAKE_LOCK_TIMEOUT_MS)
             }
             wakeLockAcquired = true
             Log.d("MeditationService", "WakeLock acquired with ${WAKE_LOCK_TIMEOUT_MS / 1000}s timeout")
@@ -345,14 +414,13 @@ class MeditationService : Service() {
         hrDataCollectionJob = serviceScope.launch {
             while (isActive && isSessionActive) {
                 delay(1_000L)
-                
+
                 try {
                     val rrSnapshot = deviceManager.rrBuffer.readLast(64)
                     val polarHr = if (rrSnapshot.isNotEmpty()) {
                         (60_000.0 / rrSnapshot.last()).toFloat()
                     } else null
-                    
-                    // Calculate live RMSSD (simplified version)
+
                     val liveRmssd = if (rrSnapshot.size >= 2) {
                         val diffs = rrSnapshot.zipWithNext { a, b -> (b - a).toDouble() }
                         val squaredDiffs = diffs.map { it * it }
@@ -360,15 +428,12 @@ class MeditationService : Service() {
                             Math.sqrt(squaredDiffs.average())
                         } else 0.0
                     } else 0.0
-                    
-                    // Add telemetry sample to session recorder
+
                     sessionRecorder.addTelemetrySample(
                         timestampMs = System.currentTimeMillis(),
                         hrBpm = polarHr?.let { Math.round(it) },
                         rollingRmssdMs = liveRmssd
                     )
-                    
-                    Log.d("MeditationService", "HR: ${polarHr?.let { Math.round(it) } ?: "N/A"} bpm, RMSSD: ${liveRmssd.toInt()} ms")
                 } catch (e: Exception) {
                     Log.e("MeditationService", "Error collecting HR data", e)
                 }
@@ -382,7 +447,7 @@ class MeditationService : Service() {
             packageManager.getLaunchIntentForPackage(packageName),
             PendingIntent.FLAG_IMMUTABLE
         )
-        
+
         val stopIntent = PendingIntent.getService(
             this, 0,
             Intent(this, MeditationService::class.java).apply { action = ACTION_STOP },

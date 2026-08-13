@@ -32,7 +32,7 @@ import com.example.wags.data.db.entity.*
         ForecastCalibrationEntity::class,
         EucapnicPastConfigurationEntity::class
     ],
-    version = 39,
+    version = 40,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -1061,6 +1061,18 @@ abstract class WagsDatabase : RoomDatabase() {
                             `useCount` INTEGER NOT NULL DEFAULT 0
                         )
                     """.trimIndent())
+                }
+            }
+
+            /**
+             * v39 → v40: Add `completed` column to meditation_sessions for
+             * incremental persistence and crash-recovery support.
+             */
+            val MIGRATION_39_40 = object : Migration(39, 40) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "ALTER TABLE meditation_sessions ADD COLUMN completed INTEGER NOT NULL DEFAULT 1"
+                    )
                 }
             }
         }

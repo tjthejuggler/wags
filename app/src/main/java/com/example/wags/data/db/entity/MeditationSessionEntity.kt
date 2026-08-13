@@ -49,5 +49,13 @@ data class MeditationSessionEntity(
     val lnRmssdSlope: Float? = null,
     /** One of MeditationPosture enum names: LAYING, SITTING, WALKING */
     @ColumnInfo(defaultValue = "LAYING")
-    val posture: String = "LAYING"
+    val posture: String = "LAYING",
+
+    /**
+     * false while the session is in-progress (being recorded by the foreground service);
+     * true once the session has been finalized and saved.
+     * Used to detect and recover sessions interrupted by process death.
+     */
+    @ColumnInfo(defaultValue = "1")
+    val completed: Boolean = true
 )
