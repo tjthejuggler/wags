@@ -1,12 +1,18 @@
 package com.example.wags.ui.apnea
 
+import android.content.Context
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -21,8 +27,10 @@ import androidx.navigation.NavController
 import com.example.wags.domain.model.EucapnicConfig
 import com.example.wags.domain.model.EucapnicPhase
 import com.example.wags.ui.common.KeepScreenOn
+import com.example.wags.ui.common.LiveSensorActionsCallback
 import com.example.wags.ui.common.LockPortrait
 import com.example.wags.ui.common.SessionBackHandler
+import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 
@@ -46,6 +54,7 @@ import com.example.wags.ui.theme.*
  * @param audio Audio setting for the hold
  * @param viewModel Injected [EucapnicPacerViewModel].
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EucapnicPacerScreen(
     navController: NavController,
@@ -58,6 +67,9 @@ fun EucapnicPacerScreen(
     viewModel: EucapnicPacerViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
+    val prefs = remember {
+        context.getSharedPreferences("apnea_prefs", Context.MODE_PRIVATE)
+    }
 
     // Collect state
     val pacerState by viewModel.pacerState.collectAsStateWithLifecycle()
@@ -69,19 +81,27 @@ fun EucapnicPacerScreen(
     val remainingTimeMs by viewModel.remainingTimeMs.collectAsStateWithLifecycle()
     val breathsCompleted by viewModel.breathsCompleted.collectAsStateWithLifecycle()
     val currentBpm by viewModel.currentBpm.collectAsStateWithLifecycle()
+    val vibrationOn by viewModel.vibrationEnabled.collectAsStateWithLifecycle()
 
     // Get config from ViewModel (it should be set by ApneaViewModel before navigation)
     val config by viewModel.config.collectAsStateWithLifecycle()
 
-    // Start the pacer when config is available
-    LaunchedEffect(config) {
-        val configToUse = config ?: initialConfig
-        configToUse?.let { viewModel.startPrep(it) }
+    // Color mode toggle — persisted to SharedPreferences (same key as resonance breathing)
+    var useColors by remember {
+        mutableStateOf(prefs.getBoolean("breathing_colors", false))
+    }
+
+    // Start the pacer once on first composition.
+    // Using LaunchedEffect(Unit) avoids the double-start bug where keying on
+    // `config` causes startPrep to fire again when the ViewModel sets _config
+    // (null → initialConfig), which would restart the engine from scratch.
+    LaunchedEffect(Unit) {
+        initialConfig?.let { viewModel.startPrep(it) }
     }
 
     // Handle completion - navigate to the appropriate active screen based on sessionType
     LaunchedEffect(isComplete) {
-        if (isComplete && config != null) {
+        if (isComplete) {
             when (sessionType) {
                 "FREE_HOLD" -> {
                     // Pop back to the existing FreeHoldActiveScreen and mark
@@ -142,91 +162,166 @@ fun EucapnicPacerScreen(
         }
     )
 
+    // ── Initialise vibration from persisted pref ───────────────────────────
+    LaunchedEffect(Unit) {
+        viewModel.setVibrationEnabled(prefs.getBoolean("breathing_vibration", false))
+    }
+
+    // ── Colour-mode background (peripheral-vision cue) ──────────────────────
+    val phaseBgColor = if (useColors) {
+        when (phase) {
+            EucapnicPhase.INHALE       -> PacerInhale.copy(alpha = 0.18f)
+            EucapnicPhase.TOP_PAUSE    -> PacerInhale.copy(alpha = 0.12f)
+            EucapnicPhase.EXHALE       -> PacerExhale.copy(alpha = 0.18f)
+            EucapnicPhase.BOTTOM_PAUSE -> PacerExhale.copy(alpha = 0.10f)
+        }
+    } else {
+        BackgroundDark
+    }
+    val animatedBg by animateColorAsState(
+        targetValue = phaseBgColor,
+        animationSpec = tween(durationMillis = 300),
+        label = "eucapnic_bg"
+    )
+
     // ── UI ──────────────────────────────────────────────────────────────────
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BackgroundDark),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+    Scaffold(
+        containerColor = animatedBg,
+        topBar = {
+            TopAppBar(
+                title = { Text("Eucapnic Prep", style = MaterialTheme.typography.titleMedium) },
+                navigationIcon = {
+                    IconButton(onClick = {
+                        viewModel.stopPrep()
+                        navController.popBackStack()
+                    }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Cancel & back",
+                            tint = TextSecondary
+                        )
+                    }
+                },
+                actions = {
+                    // Vibration toggle — toggleable mid-session
+                    IconButton(onClick = {
+                        viewModel.setVibrationEnabled(!vibrationOn)
+                        prefs.edit().putBoolean("breathing_vibration", !vibrationOn).apply()
+                    }) {
+                        Text(
+                            text = "📳",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = if (!vibrationOn) Modifier.grayscale() else Modifier,
+                            color = if (vibrationOn) TextPrimary else TextDisabled
+                        )
+                    }
+                    // Colour mode toggle for inhale/exhale peripheral vision
+                    IconButton(onClick = {
+                        useColors = !useColors
+                        prefs.edit().putBoolean("breathing_colors", useColors).apply()
+                    }) {
+                        Text(
+                            text = "🎨",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = if (!useColors) Modifier.grayscale() else Modifier,
+                            color = if (useColors) PacerInhale else TextDisabled
+                        )
+                    }
+                    // Live HR / SpO₂ feed
+                    LiveSensorActionsCallback(
+                        onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) }
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
+            )
+        }
+    ) { padding ->
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp)
+                .padding(padding)
+                .background(animatedBg),
+            contentAlignment = Alignment.Center
         ) {
-            // ── Top info bar ────────────────────────────────────────────────
-            PacerInfoBar(
-                remainingTimeMs = remainingTimeMs,
-                breathsCompleted = breathsCompleted,
-                currentBpm = currentBpm
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // ── Breathing gauge ─────────────────────────────────────────────
-            EucapnicPacerGauge(
-                phase = phase,
-                radius = pacerRadius,
-                breathDepthPercent = config?.breathDepthPercent ?: 25,
-                size = 280.dp,
-                showLabel = true
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // ── Phase indicator ─────────────────────────────────────────────
-            PhaseIndicator(phase = phase)
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // ── Progress bar ────────────────────────────────────────────────
-            val totalProg = pacerState?.totalProgress ?: 0f
-            LinearProgressIndicator(
-                progress = { totalProg },
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(4.dp),
-                color = TextPrimary,
-                trackColor = SurfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // ── Time remaining text ─────────────────────────────────────────
-            Text(
-                text = formatTime(remainingTimeMs),
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary,
-                textAlign = TextAlign.Center
-            )
-
-            // ── Paused overlay hint ─────────────────────────────────────────
-            if (isPaused && !isComplete) {
-                Spacer(modifier = Modifier.height(24.dp))
-                Text(
-                    text = "PAUSED",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 4.sp
-                    ),
-                    color = TextSecondary
+                    .fillMaxSize()
+                    .padding(24.dp)
+            ) {
+                // ── Top info bar ────────────────────────────────────────────
+                PacerInfoBar(
+                    remainingTimeMs = remainingTimeMs,
+                    breathsCompleted = breathsCompleted,
+                    currentBpm = currentBpm
                 )
-            }
 
-            // ── Completion state ────────────────────────────────────────────
-            if (isComplete) {
-                Spacer(modifier = Modifier.height(24.dp))
-                Text(
-                    text = "PREPARATION COMPLETE",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.sp
-                    ),
-                    color = TextPrimary
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // ── Breathing gauge ─────────────────────────────────────────
+                EucapnicPacerGauge(
+                    phase = phase,
+                    radius = pacerRadius,
+                    breathDepthPercent = config?.breathDepthPercent ?: 25,
+                    size = 280.dp,
+                    showLabel = true
                 )
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // ── Phase indicator ─────────────────────────────────────────
+                PhaseIndicator(phase = phase)
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // ── Progress bar ────────────────────────────────────────────
+                val totalProg = pacerState?.totalProgress ?: 0f
+                LinearProgressIndicator(
+                    progress = { totalProg },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp),
+                    color = TextPrimary,
+                    trackColor = SurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // ── Time remaining text ─────────────────────────────────────
+                Text(
+                    text = formatTime(remainingTimeMs),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary,
+                    textAlign = TextAlign.Center
+                )
+
+                // ── Paused overlay hint ─────────────────────────────────────
+                if (isPaused && !isComplete) {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = "PAUSED",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 4.sp
+                        ),
+                        color = TextSecondary
+                    )
+                }
+
+                // ── Completion state ────────────────────────────────────────
+                if (isComplete) {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = "PREPARATION COMPLETE",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 2.sp
+                        ),
+                        color = TextPrimary
+                    )
+                }
             }
         }
     }

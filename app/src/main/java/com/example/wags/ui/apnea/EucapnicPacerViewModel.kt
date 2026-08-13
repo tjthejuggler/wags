@@ -66,6 +66,10 @@ class EucapnicPacerViewModel @Inject constructor(
     private val _isComplete = MutableStateFlow(false)
     val isComplete: StateFlow<Boolean> = _isComplete.asStateFlow()
 
+    /** Whether haptic feedback (vibration) is enabled for phase transitions. */
+    private val _vibrationEnabled = MutableStateFlow(true)
+    val vibrationEnabled: StateFlow<Boolean> = _vibrationEnabled.asStateFlow()
+
     /** Remaining time in the total prep duration (milliseconds). */
     private val _remainingTimeMs = MutableStateFlow(0L)
     val remainingTimeMs: StateFlow<Long> = _remainingTimeMs.asStateFlow()
@@ -141,6 +145,13 @@ class EucapnicPacerViewModel @Inject constructor(
         startTickLoop()
     }
 
+    /**
+     * Enable or disable haptic feedback (vibration) for phase transitions.
+     */
+    fun setVibrationEnabled(enabled: Boolean) {
+        _vibrationEnabled.value = enabled
+    }
+
     // ── Tick loop ───────────────────────────────────────────────────────────
 
     private fun startTickLoop() {
@@ -179,6 +190,7 @@ class EucapnicPacerViewModel @Inject constructor(
     // ── Haptic feedback ─────────────────────────────────────────────────────
 
     private fun firePhaseTransitionHaptic(newPhase: EucapnicPhase) {
+        if (!_vibrationEnabled.value) return
         when (newPhase) {
             EucapnicPhase.INHALE       -> WagsFeedback.breathInhale(appContext)
             EucapnicPhase.EXHALE       -> WagsFeedback.breathExhale(appContext)
