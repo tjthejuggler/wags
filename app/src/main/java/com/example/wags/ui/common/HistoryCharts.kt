@@ -95,9 +95,9 @@ private fun aggregateByMonth(
 ): List<HistoryChartPoint> {
     if (points.size <= 31) return points // Not enough data to justify aggregation
 
-    // Group by year-month from the dateLabel (format: "yyyy-MM-dd")
+    // Group by year-month from the dateLabel (formats: "yyyy-MM-dd" or "yyyy-MM")
     return points
-        .groupBy { it.dateLabel.substringBeforeLast("-") }
+        .groupBy { it.dateLabel.take(7) }
         .entries
         .mapIndexed { idx, (_, chunk) ->
             val avgValue = chunk.map { it.value }.average().toFloat()
@@ -228,16 +228,38 @@ fun HistoryNoDataLabel() {
 }
 
 // ---------------------------------------------------------------------------
-// Format "MMM d" from ISO date string "yyyy-MM-dd"
+// Date label formatting
 // ---------------------------------------------------------------------------
 
+/** Abbreviated month name (e.g. "Aug") from a 1-based month number string. */
+private fun monthName(monthStr: String): String =
+    java.time.Month.of(monthStr.toInt()).name.take(3).lowercase()
+        .replaceFirstChar { it.uppercase() }
+
+/**
+ * Short x-axis label from an ISO-ish date string.
+ * - "yyyy-MM-dd" → "Aug 14"
+ * - "yyyy-MM"    → "Aug '26" (monthly aggregate)
+ * Anything unparseable is returned as-is.
+ */
 private fun shortDate(isoDate: String): String = try {
     val parts = isoDate.split("-")
-    val month = java.time.Month.of(parts[1].toInt()).name.take(3).lowercase()
-        .replaceFirstChar { it.uppercase() }
-    val day = parts[2].trimStart('0')
-    "$month $day"
+    when (parts.size) {
+        3 -> "${monthName(parts[1])} ${parts[2].trimStart('0')}"
+        2 -> "${monthName(parts[1])} '${parts[0].takeLast(2)}"
+        else -> isoDate
+    }
 } catch (_: Exception) { isoDate }
+
+/**
+ * Tooltip-friendly date label.
+ * - "yyyy-MM-dd" → returned unchanged (full date is clearest in a tooltip)
+ * - "yyyy-MM"    → "Aug 2026" (monthly aggregate)
+ */
+fun formatHistoryDateLabel(label: String): String = try {
+    val parts = label.split("-")
+    if (parts.size == 2) "${monthName(parts[1])} ${parts[0]}" else label
+} catch (_: Exception) { label }
 
 // ---------------------------------------------------------------------------
 // Smoothly scrollable line chart canvas
@@ -493,7 +515,7 @@ fun HistoryMetricChart(
             HistoryTooltipCard(
                 label = label,
                 value = String.format(valueFormat, tp.value),
-                date = tp.dateLabel,
+                date = formatHistoryDateLabel(tp.dateLabel),
                 color = lineColor
             )
         }
@@ -571,7 +593,7 @@ fun HistoryScoreChart(
             HistoryTooltipCard(
                 label = tooltipLabel,
                 value = tp.value.toInt().toString(),
-                date = tp.dateLabel,
+                date = formatHistoryDateLabel(tp.dateLabel),
                 color = scoreColorFn(tp.value)
             )
         }
