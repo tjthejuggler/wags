@@ -37,6 +37,10 @@ interface EucapnicPastConfigurationDao {
     @Query("SELECT * FROM eucapnic_past_configurations ORDER BY createdAtMs DESC LIMIT :limit")
     suspend fun getRecentlyCreated(limit: Int): List<EucapnicPastConfigurationEntity>
 
+    /** Return every saved configuration (table is small; used for in-memory matching). */
+    @Query("SELECT * FROM eucapnic_past_configurations")
+    suspend fun getAll(): List<EucapnicPastConfigurationEntity>
+
     @Query("SELECT COUNT(*) FROM eucapnic_past_configurations")
     suspend fun count(): Int
 

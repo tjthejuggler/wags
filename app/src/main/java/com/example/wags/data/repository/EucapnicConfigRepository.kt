@@ -3,6 +3,7 @@ package com.example.wags.data.repository
 import android.content.SharedPreferences
 import com.example.wags.data.db.dao.EucapnicPastConfigurationDao
 import com.example.wags.data.db.entity.EucapnicPastConfigurationEntity
+import com.example.wags.domain.model.EucapnicConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -68,7 +69,65 @@ class EucapnicConfigRepository @Inject constructor(
         }
     }
 
+    /**
+     * Record that a session was run with the given [config].
+     *
+     * Called automatically every time a eucapnic prep session starts, so any
+     * configuration actually used ends up in the Past Configurations list
+     * without requiring an explicit "Save Current" tap.
+     *
+     * - If an existing saved configuration matches all parameters, its
+     *   [EucapnicPastConfigurationEntity.useCount] and last-used timestamp are
+     *   bumped instead of creating a duplicate.
+     * - Otherwise a new entry is inserted with an auto-generated name.
+     */
+    suspend fun recordSessionUse(config: EucapnicConfig) {
+        val now = System.currentTimeMillis()
+
+        val existing = pastConfigDao.getAll().firstOrNull { it.matches(config) }
+        if (existing != null) {
+            pastConfigDao.incrementUseCount(existing.configId, now)
+            return
+        }
+
+        pastConfigDao.insert(
+            EucapnicPastConfigurationEntity(
+                name = autoName(config),
+                prepDurationSec = config.prepDurationSec,
+                breathsPerMin = config.breathsPerMin,
+                inhaleSec = config.inhaleSec,
+                topPauseSec = config.topPauseSec,
+                exhaleSec = config.exhaleSec,
+                bottomPauseSec = config.bottomPauseSec,
+                breathDepthPercent = config.breathDepthPercent,
+                createdAtMs = now,
+                lastUsedAtMs = now,
+                useCount = 1
+            )
+        )
+    }
+
+    /** Human-readable auto-generated label for a session-used configuration. */
+    private fun autoName(config: EucapnicConfig): String =
+        "Auto · ${config.breathsPerMin} BPM · ${config.prepDurationSec / 60}m${config.prepDurationSec % 60}s"
+
+    private fun EucapnicPastConfigurationEntity.matches(config: EucapnicConfig): Boolean =
+        prepDurationSec == config.prepDurationSec &&
+            breathDepthPercent == config.breathDepthPercent &&
+            floatsEqual(breathsPerMin, config.breathsPerMin) &&
+            floatsEqual(inhaleSec, config.inhaleSec) &&
+            floatsEqual(topPauseSec, config.topPauseSec) &&
+            floatsEqual(exhaleSec, config.exhaleSec) &&
+            floatsEqual(bottomPauseSec, config.bottomPauseSec)
+
+    /**
+     * Tolerant float comparison: config values round-trip through nav-route
+     * string interpolation, so tiny decimal drift must not defeat matching.
+     */
+    private fun floatsEqual(a: Float, b: Float): Boolean = kotlin.math.abs(a - b) < FLOAT_EPSILON
+
     companion object {
         private const val KEY_SEEDED = "eucapnic_configs_seeded"
+        private const val FLOAT_EPSILON = 0.01f
     }
 }

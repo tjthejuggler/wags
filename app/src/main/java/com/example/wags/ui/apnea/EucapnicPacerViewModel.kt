@@ -3,6 +3,7 @@ package com.example.wags.ui.apnea
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.wags.data.repository.EucapnicConfigRepository
 import com.example.wags.domain.model.EucapnicConfig
 import com.example.wags.domain.model.EucapnicPhase
 import com.example.wags.domain.model.PacerState
@@ -35,6 +36,7 @@ import javax.inject.Inject
 @HiltViewModel
 class EucapnicPacerViewModel @Inject constructor(
     private val pacerEngine: EucapnicPacerEngine,
+    private val eucapnicConfigRepository: EucapnicConfigRepository,
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
@@ -96,10 +98,17 @@ class EucapnicPacerViewModel @Inject constructor(
 
     /**
      * Start the preparation pacing session with the given configuration.
+     *
+     * The configuration is automatically recorded in Past Configurations
+     * (deduplicated against existing entries) so every setting actually used
+     * in a session is preserved without an explicit save.
      */
     fun startPrep(config: EucapnicConfig) {
         config.validate()
         _config.value = config
+        viewModelScope.launch {
+            eucapnicConfigRepository.recordSessionUse(config)
+        }
         _isComplete.value = false
         _isPaused.value = false
         completionFeedbackFired = false
