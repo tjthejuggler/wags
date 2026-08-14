@@ -265,9 +265,11 @@ class AssessmentRunViewModel @Inject constructor(
                         pacerActive = false
                         saveSteppedSession(orchState.epochs)
                         // Signal the Habit app that a Resonance Breathing assessment completed
+                        // Minutes → primary slot (Value 1), session count = 1 → secondary_value slot (Value 2)
                         val durationSec = ((System.currentTimeMillis() - sessionStartTimeMs) / 1000).toInt()
                         val minutes = HabitIntegrationRepository.secondsToMinutes(durationSec)
                         habitRepo.sendHabitIncrementWithMinutes(Slot.RESONANCE_BREATHING, minutes)
+                        habitRepo.sendSecondaryValueIncrement(Slot.RESONANCE_BREATHING, 1)
                     }
 
                     is RfOrchestratorState.SlidingDone -> {
@@ -275,8 +277,10 @@ class AssessmentRunViewModel @Inject constructor(
                         val enrichedEntity = buildEnrichedSlidingEntity(result)
                         val id = saveEntity(enrichedEntity)
                         // Signal the Habit app that a Resonance Breathing assessment completed
+                        // Minutes → primary slot (Value 1), session count = 1 → secondary_value slot (Value 2)
                         val minutes = HabitIntegrationRepository.secondsToMinutes(enrichedEntity.durationSeconds)
                         habitRepo.sendHabitIncrementWithMinutes(Slot.RESONANCE_BREATHING, minutes)
+                        habitRepo.sendSecondaryValueIncrement(Slot.RESONANCE_BREATHING, 1)
                         _uiState.value = _uiState.value.copy(
                             phase      = "COMPLETE",
                             isComplete = true,
@@ -619,6 +623,7 @@ class AssessmentRunViewModel @Inject constructor(
             val durationSec = ((System.currentTimeMillis() - sessionStartTimeMs) / 1000).toInt()
             val minutes = HabitIntegrationRepository.secondsToMinutes(durationSec)
             habitRepo.sendHabitIncrementWithMinutes(Slot.RESONANCE_BREATHING, minutes)
+            habitRepo.sendSecondaryValueIncrement(Slot.RESONANCE_BREATHING, 1)
         }
     }
 

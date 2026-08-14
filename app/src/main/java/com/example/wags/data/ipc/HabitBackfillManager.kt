@@ -48,6 +48,7 @@ class HabitBackfillManager @Inject constructor(
     data class BackfillResult(
         val resonanceDates: Int,
         val resonanceMinutes: Int,
+        val resonanceSessions: Int,
         val meditationDates: Int,
         val meditationMinutes: Int,
         val meditationSessions: Int,
@@ -74,7 +75,7 @@ class HabitBackfillManager @Inject constructor(
             freeHoldDates + tableTrainingDates + progressiveO2Dates + minBreathDates
         val totalMinutes: Int get() = resonanceMinutes + meditationMinutes +
             freeHoldMinutes + tableTrainingMinutes + progressiveO2Minutes + minBreathMinutes
-        val totalSessions: Int get() = meditationSessions +
+        val totalSessions: Int get() = resonanceSessions + meditationSessions +
             freeHoldSessions + tableTrainingSessions + progressiveO2Sessions + minBreathSessions
     }
 
@@ -88,7 +89,9 @@ class HabitBackfillManager @Inject constructor(
         val zone = ZoneId.systemDefault()
 
         // ── Resonance Breathing + RF Assessments ──────────────────────────────
+        // Minutes → primary slot (Value 1), session count → secondary_value slot (Value 2)
         val resonanceMinutesByDate = mutableMapOf<String, Int>()
+        val resonanceSessionsByDate = mutableMapOf<String, Int>()
 
         // Normal resonance sessions
         val resonanceSessions = resonanceRepo.getAll()
@@ -96,9 +99,11 @@ class HabitBackfillManager @Inject constructor(
             val dateStr = epochMsToDateStr(session.timestamp, zone)
             val minutes = HabitIntegrationRepository.secondsToMinutes(session.durationSeconds)
             resonanceMinutesByDate[dateStr] = (resonanceMinutesByDate[dateStr] ?: 0) + minutes
+            resonanceSessionsByDate[dateStr] = (resonanceSessionsByDate[dateStr] ?: 0) + 1
         }
         Log.i(TAG, "Resonance sessions: ${resonanceSessions.size}, " +
-                "${resonanceMinutesByDate.size} unique dates")
+                "${resonanceMinutesByDate.size} unique dates, " +
+                "${resonanceSessionsByDate.values.sum()} total sessions")
 
         // RF assessments (same habit slot)
         val assessments = rfAssessmentRepo.getAll()
@@ -106,12 +111,21 @@ class HabitBackfillManager @Inject constructor(
             val dateStr = epochMsToDateStr(assessment.timestamp, zone)
             val minutes = HabitIntegrationRepository.secondsToMinutes(assessment.durationSeconds)
             resonanceMinutesByDate[dateStr] = (resonanceMinutesByDate[dateStr] ?: 0) + minutes
+            resonanceSessionsByDate[dateStr] = (resonanceSessionsByDate[dateStr] ?: 0) + 1
         }
         Log.i(TAG, "RF assessments: ${assessments.size} (merged into resonance dates)")
 
         val resonanceSkipped = habitRepo.getHabitId(Slot.RESONANCE_BREATHING).isBlank()
         if (!resonanceSkipped && resonanceMinutesByDate.isNotEmpty()) {
+            Log.i(TAG, "Sending resonance minutes (primary): ${resonanceMinutesByDate.size} dates, " +
+                    "${resonanceMinutesByDate.values.sum()} total minutes")
             habitRepo.sendHabitValuesForDates(Slot.RESONANCE_BREATHING, resonanceMinutesByDate)
+            // Small delay to let Tail's mutex-serialised receiver finish the primary write
+            // before we send the secondary broadcast.
+            kotlinx.coroutines.delay(500)
+            Log.i(TAG, "Sending resonance sessions (secondary): ${resonanceSessionsByDate.size} dates, " +
+                    "${resonanceSessionsByDate.values.sum()} total sessions")
+            habitRepo.sendSecondaryValuesForDates(Slot.RESONANCE_BREATHING, resonanceSessionsByDate)
         }
 
         // ── Meditation ────────────────────────────────────────────────────────
@@ -215,6 +229,7 @@ class HabitBackfillManager @Inject constructor(
         return BackfillResult(
             resonanceDates         = resonanceMinutesByDate.size,
             resonanceMinutes       = resonanceMinutesByDate.values.sum(),
+            resonanceSessions      = resonanceSessionsByDate.values.sum(),
             meditationDates        = meditationMinutesByDate.size,
             meditationMinutes      = meditationMinutesByDate.values.sum(),
             meditationSessions     = meditationSessionsByDate.values.sum(),
