@@ -43,6 +43,17 @@ class MeditationSessionRecorder @Inject constructor(
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     @MathDispatcher private val mathDispatcher: CoroutineDispatcher
 ) {
+
+    private companion object {
+        /**
+         * Incomplete sessions younger than this are never touched by recovery —
+         * they may belong to a session that is starting right now (or is running
+         * without an HR monitor, so its durationMs is only refreshed by the
+         * periodic duration update).
+         */
+        private const val STALE_SESSION_CUTOFF_MS = 10 * 60 * 1000L // 10 minutes
+    }
+
     private var sessionStartMs: Long = 0
     private var audioFileName: String? = null
     private val telemetrySamples = mutableListOf<MeditationTelemetryEntity>()
@@ -124,18 +135,28 @@ class MeditationSessionRecorder @Inject constructor(
      */
     suspend fun flushTelemetry() {
         val sid = currentSessionId ?: return
-        if (telemetrySamples.isEmpty()) return
 
-        val toFlush = ArrayList(telemetrySamples)
-        telemetrySamples.clear()
+        val toFlush = if (telemetrySamples.isNotEmpty()) {
+            ArrayList(telemetrySamples).also { telemetrySamples.clear() }
+        } else {
+            emptyList()
+        }
 
         withContext(ioDispatcher) {
-            telemetryDao.insertAll(toFlush)
-            // Update the session duration so it's always current in the DB
+            if (toFlush.isNotEmpty()) {
+                telemetryDao.insertAll(toFlush)
+            }
+            // ALWAYS update the session duration — even when there are no telemetry
+            // samples (e.g. no HR monitor connected).  This keeps the row "fresh"
+            // so that recoverOrphanedSessions() can never mistake the ACTIVE
+            // session for an orphan (durationMs = 0 forever) and delete/finalise
+            // it mid-session.
             val durationMs = System.currentTimeMillis() - sessionStartMs
             sessionDao.updateDurationMs(sid, durationMs)
         }
-        Log.d("MeditationSessionRecorder", "Flushed ${toFlush.size} telemetry samples for session $sid")
+        if (toFlush.isNotEmpty()) {
+            Log.d("MeditationSessionRecorder", "Flushed ${toFlush.size} telemetry samples for session $sid")
+        }
     }
 
     /**
@@ -250,29 +271,43 @@ class MeditationSessionRecorder @Inject constructor(
      * Deletes tiny accidental sessions (< 5 s) and finalises longer ones
      * with their last-known duration.
      */
-    suspend fun recoverOrphanedSessions() = withContext(ioDispatcher) {
-        val now = System.currentTimeMillis()
-        sessionDao.deleteIncompleteShorterThan(5_000L)
-        val orphaned = sessionDao.getIncompleteSessions()
-        var recoveredCount = 0
-        for (session in orphaned) {
-            // Only recover sessions that are truly stale (gap > 60 s since last
-            // duration update).  This prevents finalising sessions that are still
-            // being actively recorded by a running foreground service.
-            val expectedDuration = now - session.timestamp
-            val gap = expectedDuration - session.durationMs
-            if (gap > 60_000L) {
-                val finalDuration = if (session.durationMs > 0) {
-                    session.durationMs
-                } else {
-                    expectedDuration
+    suspend fun recoverOrphanedSessions() {
+        try {
+            withContext(ioDispatcher) {
+                val now = System.currentTimeMillis()
+                // Only delete short sessions that are also STALE (created more than
+                // 10 minutes ago).  A just-created session row has durationMs = 0,
+                // so without this cutoff a recovery pass racing with session start
+                // would delete the ACTIVE session row and orphan every telemetry
+                // insert for the rest of the session (FK violation → data loss).
+                sessionDao.deleteIncompleteShorterThan(5_000L, now - STALE_SESSION_CUTOFF_MS)
+                val orphaned = sessionDao.getIncompleteSessions()
+                var recoveredCount = 0
+                for (session in orphaned) {
+                    // Only recover sessions that are truly stale (gap > 60 s since last
+                    // duration update).  This prevents finalising sessions that are still
+                    // being actively recorded by a running foreground service.
+                    val expectedDuration = now - session.timestamp
+                    val gap = expectedDuration - session.durationMs
+                    if (gap > 60_000L) {
+                        val finalDuration = if (session.durationMs > 0) {
+                            session.durationMs
+                        } else {
+                            expectedDuration
+                        }
+                        sessionDao.finalizeSession(session.sessionId, finalDuration)
+                        recoveredCount++
+                    }
                 }
-                sessionDao.finalizeSession(session.sessionId, finalDuration)
-                recoveredCount++
+                if (recoveredCount > 0) {
+                    Log.i("MeditationSessionRecorder", "Recovered $recoveredCount orphaned session(s)")
+                }
             }
-        }
-        if (recoveredCount > 0) {
-            Log.i("MeditationSessionRecorder", "Recovered $recoveredCount orphaned session(s)")
+        } catch (e: Exception) {
+            // Recovery must NEVER throw: callers run it inside service coroutines
+            // where an unhandled exception would tear down the whole scope
+            // (including the wake-lock renewal job) or crash the app.
+            Log.e("MeditationSessionRecorder", "Orphan recovery failed", e)
         }
     }
 

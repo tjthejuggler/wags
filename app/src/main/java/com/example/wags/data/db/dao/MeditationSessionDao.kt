@@ -52,7 +52,23 @@ interface MeditationSessionDao {
     @Query("UPDATE meditation_sessions SET completed = 1, durationMs = :durationMs WHERE sessionId = :id")
     suspend fun finalizeSession(id: Long, durationMs: Long)
 
-    /** Deletes sessions shorter than the given duration (cleans up accidental/empty sessions). */
-    @Query("DELETE FROM meditation_sessions WHERE completed = 0 AND durationMs < :minDurationMs")
-    suspend fun deleteIncompleteShorterThan(minDurationMs: Long)
+    /**
+     * Deletes stale incomplete sessions shorter than the given duration
+     * (cleans up accidental/empty sessions).
+     *
+     * The `createdBeforeMs` cutoff is critical: a *just-created* session row has
+     * `durationMs = 0` and `completed = 0`, so without the recency guard this
+     * query would delete the ACTIVE session row while the session is running
+     * (race with [com.example.wags.data.meditation.MeditationService.startSession]),
+     * which orphans all subsequent telemetry inserts (FK violation) and loses
+     * the whole session. Only sessions started before the cutoff are eligible.
+     */
+    @Query(
+        "DELETE FROM meditation_sessions WHERE completed = 0 AND durationMs < :minDurationMs " +
+            "AND timestamp < :createdBeforeMs"
+    )
+    suspend fun deleteIncompleteShorterThan(
+        minDurationMs: Long,
+        createdBeforeMs: Long
+    )
 }

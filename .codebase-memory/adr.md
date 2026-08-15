@@ -1,15 +1,24 @@
-# ADR: Eucapnic pacer gauge mirrors resonance breathing full-expansion behavior
+# ADR: Meditation session lifecycle — foreground-service ownership, crash isolation, and orphan-recovery safety
+
+**Date:** 2026-08-15
+**Status:** Accepted
 
 ## Context
-The Eucapnic Diaphragmatic prep pacer (`EucapnicPacerGauge`) previously scaled its maximum circle radius by `EucapnicConfig.breathDepthPercent` (15–50% → 0.30–1.00 of outer radius) to visualize breath depth. This diverged from the resonance breathing pacer (`BreathingPacerCircle`), which always expands fully 0→1.0. The color toggle also only changed the screen background, not the gauge colors.
+Two long-standing bugs in the meditation/NSDR flow (evidence: on-device crash log `crash_2026-08-15_15-14-54.txt`, Samsung SM-S918U1, Android 16 / SDK 36, targetSdk 36):
+
+1. **Screen-off kill at ~10 min.** `MeditationService` used a plain `Job()` scope: any child-coroutine failure (e.g. an unguarded `recoverOrphanedSessions()` launch) cancelled the whole scope, silently killing the wake-lock renewal job; the 10-minute `WAKE_LOCK_TIMEOUT_MS` then expired exactly when users reported the session dying. Compounding factors: no `MediaSession` while running a `mediaPlayback` FGS (Android 14+ ties this FGS type's legitimacy to an active media session; Samsung One UI enforces aggressively), `MediaPlayer` without `setWakeMode`, and the 2-arg `startForeground()` which on API 34+ activates ALL manifest types (`mediaPlayback|connectedDevice`), requiring `connectedDevice` runtime prerequisites even for monitor-less sessions.
+
+2. **"Done" button crash + total data loss.** `deleteIncompleteShorterThan(5s)` ran concurrently with the creation of the new session row (which starts at `durationMs = 0, completed = 0`) and deleted the ACTIVE row. Every 15-s telemetry flush then failed with `SQLiteConstraintException: FOREIGN KEY constraint failed` (caught, silent), and the final unguarded flush at session stop crashed the process — killing the ViewModel's in-flight save. 26 minutes of data lost.
 
 ## Decision
-- The eucapnic gauge circle now always expands to the full outer radius regardless of configured breath depth, exactly matching resonance breathing's `BreathingPacerCircle`.
-- The target lung fullness is communicated via a "to X%" label inside the circle (below the phase label) instead of by scaling the animation. `breathDepthPercent` is retained as a parameter but is used only for this label.
-- The depth guide ring was removed (no longer meaningful).
-- `EucapnicPacerGauge` gained a `useColors: Boolean` parameter; when enabled the circle uses `PacerInhaleColor`/`PacerExhaleColor` (same colored palette as resonance), otherwise the monochrome greys. `EucapnicPacerScreen` passes its persisted `breathing_colors` pref through, so the 🎨 toggle now drives both background tint and circle colors.
-- Vibration (〰) and color (🎨) toggles live in the TopAppBar using the same pattern/SharedPreferences keys (`breathing_vibration`, `breathing_colors`) as resonance breathing and apnea drills.
+- **Service owns session audio** exclusively (ViewModel's duplicate MediaPlayer removed); service holds an **active framework `MediaSession`** (STATE_PLAYING) for the whole session and calls `MediaPlayer.setWakeMode(PARTIAL_WAKE_LOCK)`.
+- **`startForeground(id, notification, FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)`** explicitly on API 29+ (subset of manifest types); sticky restarts (`onStartCommand(null)`) also re-enter foreground before recovery+stop to avoid `ForegroundServiceDidNotStartInTime`.
+- **`serviceScope = SupervisorJob() + CoroutineExceptionHandler`** — no child failure can crash the process or cancel siblings (wake-lock renewal survives).
+- **Orphan recovery is safe by construction:** `deleteIncompleteShorterThan` now requires a 10-minute staleness cutoff on `timestamp`; recovery runs sequentially BEFORE the new session row is created; `flushTelemetry()` always refreshes `durationMs` (even with no telemetry) so active rows are never mistaken for orphans; recovery never throws.
+- **Session finalization is atomic:** `MeditationRepository.finalizeSessionWithTelemetry / insertSessionWithTelemetry` wrap UPDATE+DELETE+INSERT in a Room `withTransaction`; the ViewModel save is fully try/caught so a DB failure can never crash the app mid-save (row stays incomplete → recovered on next launch).
+- `Service.onTimeout(fgsType)` (API 35+) emergency-saves the session instead of silently dying.
 
 ## Consequences
-- Single caller (`EucapnicPacerScreen`) was updated in the same change; no other impact.
-- The engine (`EucapnicPacerEngine.getPacerRadius`) is unchanged — it already emits 0→1.0; scaling was purely a UI concern.
+- Any future FGS that plays audio must hold an active MediaSession and pass an explicit foreground-service type at runtime.
+- Any coroutine scope hosting wake-lock renewal or other lifecycle-critical jobs must use SupervisorJob + exception handler.
+- DB recovery/cleanup queries must never match rows that a live component could have just created; guard with recency cutoffs and keep "liveness" columns (durationMs) freshly updated.

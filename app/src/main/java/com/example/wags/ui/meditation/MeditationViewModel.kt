@@ -4,12 +4,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.media.MediaPlayer
-import android.net.Uri
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.provider.DocumentsContract
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -182,7 +180,9 @@ class MeditationViewModel @Inject constructor(
     private val telemetrySamples = mutableListOf<MeditationTelemetryEntity>()
 
     // ── Audio playback ─────────────────────────────────────────────────────────
-    private var mediaPlayer: MediaPlayer? = null
+    // NOTE: session audio is owned exclusively by MeditationService (it survives
+    // screen-off and process lifecycle with the foreground service).  The
+    // ViewModel only plays the ending chime.
     private var chimePlayer: MediaPlayer? = null
 
     init {
@@ -380,11 +380,10 @@ class MeditationViewModel @Inject constructor(
         telemetrySamples.clear()
         sessionStartMs = System.currentTimeMillis()
 
-        // ── Start audio playback ───────────────────────────────────────────────
+        // Session audio playback is started by MeditationService (see
+        // startMeditationService below) — the service owns the audio so it keeps
+        // playing with the screen off.
         val audio = _uiState.value.selectedAudio
-        if (audio != null && !audio.isNone) {
-            startAudioPlayback(audio)
-        }
 
         val timerTotal = if (_uiState.value.timerEnabled) _uiState.value.timerTotalSeconds else 0L
 
@@ -474,7 +473,6 @@ class MeditationViewModel @Inject constructor(
     fun stopSession() {
         sessionJob?.cancel()
         sonificationEngine.stop()
-        stopAudioPlayback()
         val durationMs = System.currentTimeMillis() - sessionStartMs
         
         // ── Stop MeditationService ─────────────────────────────────────────────
@@ -595,47 +593,11 @@ class MeditationViewModel @Inject constructor(
         // 1. User explicitly stops it (via the UI or notification)
         // 2. The timer completes (if set)
         // 3. The system kills the service (which should be prevented by foreground service + wake lock)
-        stopAudioPlayback()
         stopChime()
         sonificationEngine.stop()
     }
 
     // ── Private helpers ────────────────────────────────────────────────────────
-
-    /**
-     * Builds a SAF document URI for [audio] inside the stored audio directory,
-     * then starts MediaPlayer on it. Silently ignores any failure so a missing
-     * file never crashes the session.
-     */
-    private fun startAudioPlayback(audio: MeditationAudioEntity) {
-        stopAudioPlayback()
-        val dirUriString = repository.getAudioDirUri()
-        if (dirUriString.isBlank()) return
-        try {
-            val dirUri = Uri.parse(dirUriString)
-            val treeDocId = DocumentsContract.getTreeDocumentId(dirUri)
-            val childDocId = "$treeDocId/${audio.fileName}"
-            val fileUri = DocumentsContract.buildDocumentUriUsingTree(dirUri, childDocId)
-            val mp = MediaPlayer().apply {
-                setDataSource(appContext, fileUri)
-                isLooping = true
-                prepare()
-                start()
-            }
-            mediaPlayer = mp
-        } catch (_: Exception) {
-            // File may not exist or SAF permission revoked — session continues silently
-            mediaPlayer = null
-        }
-    }
-
-    private fun stopAudioPlayback() {
-        mediaPlayer?.runCatching {
-            if (isPlaying) stop()
-            release()
-        }
-        mediaPlayer = null
-    }
 
     /** Plays the ending chime sound once. Uses chime_end.mp3 from raw resources. */
     private fun playChime() {
@@ -731,62 +693,61 @@ class MeditationViewModel @Inject constructor(
                 if (totalSec > 0L) totalSec * 1_000L else null
             } else null
 
-            val savedId = withContext(ioDispatcher) {
-                // The MeditationService already created a session row (completed=false)
-                // when the session started.  Find it and update with full analytics.
-                val existing = repository.getMostRecentIncompleteSession()
-                if (existing != null) {
-                    // Update the existing row with full analytics from the ViewModel.
-                    // Uses @Update (not INSERT OR REPLACE) to avoid CASCADE-deleting
-                    // the telemetry rows that the Service already flushed.
-                    repository.updateSession(
-                        existing.copy(
-                            durationMs       = durationMs,
-                            timerDurationMs  = timerMs,
-                            avgHrBpm         = avgHr,
-                            hrSlopeBpmPerMin = hrSlope,
-                            startRmssdMs     = startRmssd,
-                            endRmssdMs       = endRmssd,
-                            lnRmssdSlope     = lnSlope,
-                            posture          = _uiState.value.selectedPosture.name,
-                            completed        = true
+            // Snapshot the telemetry so a late write from the (now cancelled)
+            // session loop can't mutate the list mid-save.
+            val telemetrySnapshot = telemetrySamples.toList()
+
+            // The MeditationService already created a session row (completed=false)
+            // when the session started.  Finalise it with the full analytics set.
+            // The whole save runs in a single DB transaction and is fully guarded:
+            // a failure here must NEVER crash the app (an unhandled viewModelScope
+            // exception kills the process mid-save and loses the session) — the
+            // row simply stays incomplete and orphan recovery finalises it with
+            // the flushed telemetry on next launch.
+            val savedId = try {
+                withContext(ioDispatcher) {
+                    val existing = repository.getMostRecentIncompleteSession()
+                    if (existing != null) {
+                        repository.finalizeSessionWithTelemetry(
+                            updated = existing.copy(
+                                durationMs       = durationMs,
+                                timerDurationMs  = timerMs,
+                                avgHrBpm         = avgHr,
+                                hrSlopeBpmPerMin = hrSlope,
+                                startRmssdMs     = startRmssd,
+                                endRmssdMs       = endRmssd,
+                                lnRmssdSlope     = lnSlope,
+                                posture          = _uiState.value.selectedPosture.name,
+                                completed        = true
+                            ),
+                            telemetry = telemetrySnapshot
                         )
-                    )
-                    // Replace telemetry: delete the Service's partial set and insert
-                    // the ViewModel's complete, more accurate set.
-                    repository.deleteTelemetryForSession(existing.sessionId)
-                    if (telemetrySamples.isNotEmpty()) {
-                        repository.insertTelemetry(
-                            telemetrySamples.map { it.copy(sessionId = existing.sessionId) }
-                        )
-                    }
-                    existing.sessionId
-                } else {
-                    // Fallback: Service didn't create a row (edge case).
-                    // Insert a fresh completed session.
-                    Log.w("MeditationViewModel", "No incomplete session found — inserting fresh")
-                    val entity = MeditationSessionEntity(
-                        audioId          = audioId,
-                        timestamp        = sessionStartMs,
-                        durationMs       = durationMs,
-                        timerDurationMs  = timerMs,
-                        monitorId        = monitorId,
-                        avgHrBpm         = avgHr,
-                        hrSlopeBpmPerMin = hrSlope,
-                        startRmssdMs     = startRmssd,
-                        endRmssdMs       = endRmssd,
-                        lnRmssdSlope     = lnSlope,
-                        posture          = _uiState.value.selectedPosture.name,
-                        completed        = true
-                    )
-                    val id = repository.insertSession(entity)
-                    if (telemetrySamples.isNotEmpty()) {
-                        repository.insertTelemetry(
-                            telemetrySamples.map { it.copy(sessionId = id) }
+                    } else {
+                        // Fallback: Service didn't create a row (edge case).
+                        // Insert a fresh completed session.
+                        Log.w("MeditationViewModel", "No incomplete session found — inserting fresh")
+                        repository.insertSessionWithTelemetry(
+                            session = MeditationSessionEntity(
+                                audioId          = audioId,
+                                timestamp        = sessionStartMs,
+                                durationMs       = durationMs,
+                                timerDurationMs  = timerMs,
+                                monitorId        = monitorId,
+                                avgHrBpm         = avgHr,
+                                hrSlopeBpmPerMin = hrSlope,
+                                startRmssdMs     = startRmssd,
+                                endRmssdMs       = endRmssd,
+                                lnRmssdSlope     = lnSlope,
+                                posture          = _uiState.value.selectedPosture.name,
+                                completed        = true
+                            ),
+                            telemetry = telemetrySnapshot
                         )
                     }
-                    id
                 }
+            } catch (e: Exception) {
+                Log.e("MeditationViewModel", "Failed to save meditation session", e)
+                -1L
             }
 
             _uiState.update {
@@ -797,7 +758,7 @@ class MeditationViewModel @Inject constructor(
                     startRmssdMs     = startRmssd,
                     endRmssdMs       = endRmssd,
                     lnRmssdSlope     = lnSlope,
-                    savedSessionId   = savedId
+                    savedSessionId   = savedId.takeIf { id -> id > 0L }
                 )
             }
         }

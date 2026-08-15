@@ -3,7 +3,9 @@ package com.example.wags.data.repository
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
+import androidx.room.withTransaction
 import com.example.wags.data.ble.DevicePreferencesRepository
+import com.example.wags.data.db.WagsDatabase
 import com.example.wags.data.db.dao.MeditationAudioDao
 import com.example.wags.data.db.dao.MeditationSessionDao
 import com.example.wags.data.db.dao.MeditationTelemetryDao
@@ -18,12 +20,21 @@ import javax.inject.Singleton
 @Singleton
 class MeditationRepository @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val db: WagsDatabase,
     private val audioDao: MeditationAudioDao,
     private val sessionDao: MeditationSessionDao,
     private val telemetryDao: MeditationTelemetryDao,
     private val devicePrefs: DevicePreferencesRepository,
     private val youtubeFetcher: YouTubeMetadataFetcher
 ) {
+
+    private companion object {
+        /**
+         * Incomplete sessions younger than this are never touched by recovery —
+         * see [recoverOrphanedSessions].
+         */
+        private const val STALE_SESSION_CUTOFF_MS = 10 * 60 * 1000L // 10 minutes
+    }
 
     // ── Audio directory preference ─────────────────────────────────────────────
 
@@ -184,35 +195,81 @@ class MeditationRepository @Inject constructor(
      * Should be called on app / screen startup before starting a new session.
      */
     suspend fun recoverOrphanedSessions() {
-        val now = System.currentTimeMillis()
-        // Delete tiny accidental sessions (< 5 s)
-        sessionDao.deleteIncompleteShorterThan(5_000L)
+        try {
+            val now = System.currentTimeMillis()
+            // Delete tiny accidental sessions (< 5 s) that are also STALE.  The
+            // recency cutoff is critical: a session row created moments ago also
+            // has durationMs = 0 / completed = 0, and deleting it mid-session
+            // orphans all telemetry inserts (FK violation) and loses the session.
+            sessionDao.deleteIncompleteShorterThan(5_000L, now - STALE_SESSION_CUTOFF_MS)
 
-        val orphaned = sessionDao.getIncompleteSessions()
-        var recoveredCount = 0
-        for (session in orphaned) {
-            // Only recover sessions that are truly stale — i.e. the Service is no
-            // longer updating them.  The Service flushes every 15 s, so if the gap
-            // between the expected end time and now exceeds 60 s, the process was
-            // almost certainly killed.
-            val expectedDuration = now - session.timestamp
-            val gap = expectedDuration - session.durationMs
-            if (gap > 60_000L) {
-                val finalDuration = if (session.durationMs > 0) {
-                    session.durationMs
-                } else {
-                    expectedDuration
+            val orphaned = sessionDao.getIncompleteSessions()
+            var recoveredCount = 0
+            for (session in orphaned) {
+                // Only recover sessions that are truly stale — i.e. the Service is no
+                // longer updating them.  The Service flushes every 15 s, so if the gap
+                // between the expected end time and now exceeds 60 s, the process was
+                // almost certainly killed.
+                val expectedDuration = now - session.timestamp
+                val gap = expectedDuration - session.durationMs
+                if (gap > 60_000L) {
+                    val finalDuration = if (session.durationMs > 0) {
+                        session.durationMs
+                    } else {
+                        expectedDuration
+                    }
+                    sessionDao.finalizeSession(session.sessionId, finalDuration)
+                    recoveredCount++
                 }
-                sessionDao.finalizeSession(session.sessionId, finalDuration)
-                recoveredCount++
             }
+            if (recoveredCount > 0) {
+                android.util.Log.i(
+                    "MeditationRepository",
+                    "Recovered $recoveredCount orphaned meditation session(s)"
+                )
+            }
+        } catch (e: Exception) {
+            // Recovery must never crash the caller (it runs in ViewModel init).
+            android.util.Log.e("MeditationRepository", "Orphan recovery failed", e)
         }
-        if (recoveredCount > 0) {
-            android.util.Log.i(
-                "MeditationRepository",
-                "Recovered $recoveredCount orphaned meditation session(s)"
-            )
+    }
+
+    /**
+     * Atomically finalises an existing session row and replaces its telemetry.
+     *
+     * Runs the UPDATE + DELETE + INSERT inside a single Room transaction so the
+     * process can never die between "delete old telemetry" and "insert new
+     * telemetry" (which would lose the session's data).
+     *
+     * @param updated the session row copy with final analytics and completed = true.
+     * @param telemetry the authoritative full telemetry set for the session.
+     * @return the session row ID.
+     */
+    suspend fun finalizeSessionWithTelemetry(
+        updated: MeditationSessionEntity,
+        telemetry: List<MeditationTelemetryEntity>
+    ): Long = db.withTransaction {
+        sessionDao.update(updated)
+        telemetryDao.deleteBySessionId(updated.sessionId)
+        if (telemetry.isNotEmpty()) {
+            telemetryDao.insertAll(telemetry.map { it.copy(sessionId = updated.sessionId) })
         }
+        updated.sessionId
+    }
+
+    /**
+     * Atomically inserts a fresh completed session together with its telemetry
+     * (fallback path when no pre-existing incomplete row is found).
+     */
+    suspend fun insertSessionWithTelemetry(
+        session: MeditationSessionEntity,
+        telemetry: List<MeditationTelemetryEntity>
+    ): Long = db.withTransaction {
+        val id = sessionDao.insert(session)
+        if (telemetry.isNotEmpty()) {
+            telemetryDao.insertAll(telemetry.map { it.copy(sessionId = id) })
+        }
+        id
     }
 
     // ── Telemetry ──────────────────────────────────────────────────────────────
