@@ -38,7 +38,8 @@ import com.example.wags.ui.theme.*
  * Active pacing screen for Eucapnic Diaphragmatic breathing preparation.
  *
  * Displays a full-screen guided breathing pacer with:
- * - Animated breathing gauge (expand/contract)
+ * - Animated breathing gauge (expand/contract) that always fills fully,
+ *   showing the target lung fullness percent ("to X%") inside the circle
  * - Current phase indicator
  * - Time remaining in total prep
  * - Breath count
@@ -265,7 +266,8 @@ fun EucapnicPacerScreen(
                     radius = pacerRadius,
                     breathDepthPercent = config?.breathDepthPercent ?: 25,
                     size = 280.dp,
-                    showLabel = true
+                    showLabel = true,
+                    useColors = useColors
                 )
 
                 Spacer(modifier = Modifier.height(32.dp))
