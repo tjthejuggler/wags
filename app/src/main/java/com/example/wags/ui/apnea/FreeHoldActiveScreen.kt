@@ -1964,8 +1964,9 @@ private fun formatCountdownMs(ms: Long): String {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Checkbox + sub-options for real-time PB indication during free holds.
- * When the master toggle is on, sound and vibration sub-options become available.
+ * Master toggle + sub-options for real-time PB indication during free holds.
+ * When the master toggle is on, sound (🔊) and vibration (〰) icon toggles become
+ * available — the icon itself is the toggle (lit = enabled, greyed = disabled).
  */
 @Composable
 private fun PbIndicationSection(
@@ -2005,52 +2006,30 @@ private fun PbIndicationSection(
             )
         }
 
+        // Sound / vibration sub-toggles — icon-only, the icon is the toggle
+        // (lit = enabled, greyed = disabled)
         if (enabled) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .padding(start = 32.dp)
-                    .clickable { onSoundChange(!soundEnabled) }
+                modifier = Modifier.padding(start = 32.dp)
             ) {
-                Checkbox(
-                    checked = soundEnabled,
-                    onCheckedChange = onSoundChange,
-                    modifier = Modifier.size(28.dp),
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = TextPrimary,
-                        uncheckedColor = TextSecondary,
-                        checkmarkColor = BackgroundDark
+                // Sound toggle
+                IconButton(onClick = { onSoundChange(!soundEnabled) }) {
+                    Text(
+                        text = "🔊",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = if (!soundEnabled) Modifier.grayscale() else Modifier,
+                        color = if (soundEnabled) TextPrimary else TextDisabled
                     )
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "Sound",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
-                )
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .padding(start = 32.dp)
-                    .clickable { onVibrationChange(!vibrationEnabled) }
-            ) {
-                Checkbox(
-                    checked = vibrationEnabled,
-                    onCheckedChange = onVibrationChange,
-                    modifier = Modifier.size(28.dp),
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = TextPrimary,
-                        uncheckedColor = TextSecondary,
-                        checkmarkColor = BackgroundDark
+                }
+                // Vibration toggle
+                IconButton(onClick = { onVibrationChange(!vibrationEnabled) }) {
+                    Text(
+                        text = "〰",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = if (vibrationEnabled) TextPrimary else TextDisabled
                     )
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "Vibration",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
-                )
+                }
             }
         }
     }

@@ -352,49 +352,29 @@ private fun TimerOptionRow(
                     )
                 }
                 
-                // Sound and vibration toggles
+                // Sound and vibration toggles — icon-only, the icon is the toggle
+                // (lit = enabled, greyed = disabled)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(24.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Sound toggle
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = soundEnabled,
-                            onCheckedChange = onSoundEnabledChange,
-                            modifier = Modifier.size(24.dp),
-                            colors = CheckboxDefaults.colors(
-                                checkedColor = ButtonPrimary,
-                                uncheckedColor = TextSecondary,
-                                checkmarkColor = TextPrimary
-                            )
-                        )
-                        Spacer(Modifier.width(4.dp))
+                    IconButton(onClick = { onSoundEnabledChange(!soundEnabled) }) {
                         Text(
-                            "🔊 Sound",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (soundEnabled) TextPrimary else TextSecondary
+                            "🔊",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = if (!soundEnabled) Modifier.grayscale() else Modifier,
+                            color = if (soundEnabled) TextPrimary else TextDisabled
                         )
                     }
                     
                     // Vibration toggle
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = vibrationEnabled,
-                            onCheckedChange = onVibrationEnabledChange,
-                            modifier = Modifier.size(24.dp),
-                            colors = CheckboxDefaults.colors(
-                                checkedColor = ButtonPrimary,
-                                uncheckedColor = TextSecondary,
-                                checkmarkColor = TextPrimary
-                            )
-                        )
-                        Spacer(Modifier.width(4.dp))
+                    IconButton(onClick = { onVibrationEnabledChange(!vibrationEnabled) }) {
                         Text(
-                            "📳 Vibration",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (vibrationEnabled) TextPrimary else TextSecondary
+                            "〰",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = if (vibrationEnabled) TextPrimary else TextDisabled
                         )
                     }
                 }

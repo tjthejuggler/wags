@@ -210,9 +210,8 @@ fun EucapnicPacerScreen(
                         prefs.edit().putBoolean("breathing_vibration", !vibrationOn).apply()
                     }) {
                         Text(
-                            text = "📳",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = if (!vibrationOn) Modifier.grayscale() else Modifier,
+                            text = "〰",
+                            style = MaterialTheme.typography.titleLarge,
                             color = if (vibrationOn) TextPrimary else TextDisabled
                         )
                     }

@@ -182,9 +182,8 @@ fun ResonanceSessionScreen(
                     // Vibration toggle — toggleable mid-session
                     IconButton(onClick = { vibrationOn = !vibrationOn }) {
                         Text(
-                            text = "📳",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = if (!vibrationOn) Modifier.grayscale() else Modifier,
+                            text = "〰",
+                            style = MaterialTheme.typography.titleLarge,
                             color = if (vibrationOn) EcgCyan else TextDisabled
                         )
                     }
