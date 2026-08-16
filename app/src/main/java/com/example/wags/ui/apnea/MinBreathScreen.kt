@@ -25,6 +25,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.example.wags.domain.model.LungVolume
 import com.example.wags.domain.model.PrepType
 import com.example.wags.ui.apnea.forecast.RecordForecastSummary
 import com.example.wags.ui.common.LiveSensorActions
@@ -97,6 +98,20 @@ fun MinBreathScreen(
         var showPastConfigurationsDialog by remember { mutableStateOf(false) }
         var showSaveConfigurationDialog by remember { mutableStateOf(false) }
         var saveConfigurationName by remember { mutableStateOf("") }
+
+        // Empty-lung safety warning — shown once per screen entry, before any drill starts
+        var showEmptyLungWarning by remember { mutableStateOf(false) }
+        var emptyLungWarningShown by remember { mutableStateOf(false) }
+        LaunchedEffect(state.lungVolume) {
+            if (state.lungVolume == LungVolume.EMPTY.name && !emptyLungWarningShown) {
+                emptyLungWarningShown = true
+                showEmptyLungWarning = true
+            }
+        }
+
+        if (showEmptyLungWarning) {
+            EmptyLungWarningDialog(onDismiss = { showEmptyLungWarning = false })
+        }
 
         if (showSettingsDialog) {
             FreeHoldSettingsDialog(

@@ -50,6 +50,7 @@ import com.example.wags.domain.model.OximeterReading
 import com.example.wags.domain.model.PersonalBestCategory
 import com.example.wags.domain.model.NextPbTarget
 import com.example.wags.domain.model.PersonalBestResult
+import com.example.wags.domain.model.LungVolume
 import com.example.wags.domain.model.PbThresholds
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.trophyCount
@@ -1322,6 +1323,16 @@ private fun FreeHoldActiveScreenContent(
     // True once the user taps Stop — we wait for the async PB check before navigating.
     var stopRequested by remember { mutableStateOf(false) }
 
+    // Empty-lung safety warning — shown once per screen entry, before any hold starts
+    var showEmptyLungWarning by remember { mutableStateOf(false) }
+    var emptyLungWarningShown by remember { mutableStateOf(false) }
+    LaunchedEffect(state.currentLungVolume) {
+        if (state.currentLungVolume == LungVolume.EMPTY.name && !emptyLungWarningShown) {
+            emptyLungWarningShown = true
+            showEmptyLungWarning = true
+        }
+    }
+
     // Reset for a new hold when:
     //   • the user tapped Stop (stopRequested), AND
     //   • the async PB check has finished (pbCheckPending is false), AND
@@ -1346,6 +1357,11 @@ private fun FreeHoldActiveScreenContent(
             category = pbResult.category,
             onDismiss = { viewModel.dismissNewPersonalBest() }
         )
+    }
+
+    // Empty-lung safety popup (pre-start only)
+    if (showEmptyLungWarning) {
+        EmptyLungWarningDialog(onDismiss = { showEmptyLungWarning = false })
     }
 
     Scaffold(
