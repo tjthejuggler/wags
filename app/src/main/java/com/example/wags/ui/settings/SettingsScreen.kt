@@ -255,6 +255,52 @@ fun SettingsScreen(
                 }
             }
 
+            // ── Apnea ─────────────────────────────────────────────────────────
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Apnea",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = TextPrimary
+                            )
+                            Text(
+                                text = "Days required between Hyper uses",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                        }
+                        IconButton(
+                            onClick = { viewModel.setHyperLockDays(state.hyperLockDays - 1) },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Text("−", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                        }
+                        Text(
+                            text = "${state.hyperLockDays}d",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextPrimary
+                        )
+                        IconButton(
+                            onClick = { viewModel.setHyperLockDays(state.hyperLockDays + 1) },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Text("+", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                        }
+                    }
+                }
+            }
+
             // ── Single unified scan button ─────────────────────────────────
             item {
                 Row(

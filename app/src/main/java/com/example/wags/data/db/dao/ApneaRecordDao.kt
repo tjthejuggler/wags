@@ -14,6 +14,19 @@ data class BestRecordTuple(
     val timestamp: Long
 )
 
+/**
+ * Row of [ApneaRecordDao.observeLastUsedPerSetting]: the most recent timestamp
+ * at which one value of one setting column was used by any record at all
+ * (free hold, tables, drills — everything).
+ */
+data class SettingLastUsedTuple(
+    /** Column name: lungVolume | prepType | timeOfDay | posture | audio */
+    val settingKey: String,
+    /** Stored value name for that column (e.g. "HYPER", "FULL", "MORNING"). */
+    val settingValue: String,
+    val lastUsedMs: Long
+)
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Dynamic PB query builder
 //
@@ -780,4 +793,31 @@ interface ApneaRecordDao {
         posture: String,
         audio: String
     ): Int
+
+    // ── Hyper time-lock + per-setting last-used queries ──────────────────────
+
+    /** Most recent timestamp of any record that used the HYPER prep type. Null when never used. */
+    @Query("SELECT MAX(timestamp) FROM apnea_records WHERE prepType = 'HYPER'")
+    fun observeLastHyperUse(): Flow<Long?>
+
+    /** One-shot variant of [observeLastHyperUse]. */
+    @Query("SELECT MAX(timestamp) FROM apnea_records WHERE prepType = 'HYPER'")
+    suspend fun getLastHyperUseOnce(): Long?
+
+    /**
+     * Last-use timestamp per setting column/value across ALL records (any session
+     * type). One row per distinct value of each of the 5 setting columns.
+     */
+    @Query("""
+        SELECT 'lungVolume' AS settingKey, lungVolume AS settingValue, MAX(timestamp) AS lastUsedMs FROM apnea_records GROUP BY lungVolume
+        UNION ALL
+        SELECT 'prepType', prepType, MAX(timestamp) FROM apnea_records GROUP BY prepType
+        UNION ALL
+        SELECT 'timeOfDay', timeOfDay, MAX(timestamp) FROM apnea_records GROUP BY timeOfDay
+        UNION ALL
+        SELECT 'posture', posture, MAX(timestamp) FROM apnea_records GROUP BY posture
+        UNION ALL
+        SELECT 'audio', audio, MAX(timestamp) FROM apnea_records GROUP BY audio
+    """)
+    fun observeLastUsedPerSetting(): Flow<List<SettingLastUsedTuple>>
 }

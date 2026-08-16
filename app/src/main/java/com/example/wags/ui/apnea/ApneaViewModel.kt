@@ -47,6 +47,7 @@ import com.example.wags.domain.usecase.apnea.ApneaState
 import com.example.wags.domain.usecase.apnea.ApneaStateMachine
 import com.example.wags.domain.usecase.apnea.ApneaTableGenerator
 import com.example.wags.domain.usecase.apnea.GuidedAudioManager
+import com.example.wags.domain.usecase.apnea.HyperLockManager
 import com.example.wags.domain.usecase.apnea.forecast.ForecastSettings
 import com.example.wags.domain.usecase.apnea.forecast.RecordForecast
 import com.example.wags.domain.usecase.apnea.forecast.RecordForecastCalculator
@@ -218,6 +219,15 @@ data class ApneaUiState(
     val eucapnicConfig: com.example.wags.domain.model.EucapnicConfig? = null,
     /** Whether the Past Configurations dialog is visible. */
     val showPastConfigurationsDialog: Boolean = false,
+    // ── Hyper time-lock + per-setting last-used badges ─────────────────────────
+    /** Whole days left until HYPER unlocks (0 = unlocked or never used). */
+    val hyperRemainingLockDays: Int = 0,
+    /**
+     * Last-use timestamp (epoch ms) per setting column → setting value name.
+     * Keys: "lungVolume", "prepType", "timeOfDay", "posture", "audio".
+     * Drives the days-since-used badge on each settings chip.
+     */
+    val lastUsedPerSetting: Map<String, Map<String, Long>> = emptyMap(),
 )
 
 @HiltViewModel
@@ -236,6 +246,7 @@ class ApneaViewModel @Inject constructor(
     private val spotifyAuthManager: SpotifyAuthManager,
     private val guidedAudioManager: GuidedAudioManager,
     private val forecastCalibrationDao: ForecastCalibrationDao,
+    private val hyperLockManager: HyperLockManager,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
@@ -488,6 +499,32 @@ class ApneaViewModel @Inject constructor(
         viewModelScope.launch {
             apneaRepository.getStatsAll().collect { stats ->
                 _uiState.update { it.copy(allStats = stats) }
+            }
+        }
+        // ── Hyper time-lock + per-setting last-used badges ─────────────────────
+        // (The lock length is configured in app Settings → Apnea; it is re-read
+        // from prefs on resume via refreshDrillParams() and on every DB change.)
+        viewModelScope.launch {
+            apneaRepository.observeLastUsedPerSetting().collect { tuples ->
+                val grouped = tuples
+                    .groupBy({ it.settingKey }, { it.settingValue to it.lastUsedMs })
+                    .mapValues { (_, pairs) -> pairs.toMap() }
+                _uiState.update {
+                    it.copy(
+                        lastUsedPerSetting = grouped,
+                        hyperRemainingLockDays = HyperLockManager.remainingLockDays(
+                            grouped["prepType"]?.get(PrepType.HYPER.name),
+                            hyperLockManager.lockDays,
+                            System.currentTimeMillis()
+                        )
+                    )
+                }
+                // Auto-deselect HYPER when the lock is engaged (e.g. right after
+                // finishing a HYPER session, or when restoring a stale persisted
+                // selection on launch).
+                if (_prepType.value == PrepType.HYPER && _uiState.value.hyperRemainingLockDays > 0) {
+                    setPrepType(PrepType.NO_PREP)
+                }
             }
         }
         // ── Progressive O₂ best + trophy (for current breath period + current settings) ──
@@ -1336,6 +1373,9 @@ class ApneaViewModel @Inject constructor(
     }
 
     fun setPrepType(type: PrepType) {
+        // HYPER is time-locked: ignore attempts to select it while locked.
+        if (type == PrepType.HYPER && _uiState.value.hyperRemainingLockDays > 0) return
+
         _prepType.value = type
         _uiState.update { it.copy(prepType = type) }
         prefs.edit().putString("setting_prep_type", type.name).apply()
@@ -1485,6 +1525,22 @@ class ApneaViewModel @Inject constructor(
         val sd = prefs.getInt("min_breath_session_duration_sec", 300)
         _progO2BreathPeriodSec.value = bp
         _minBreathSessionDurationSec.value = sd
+
+        // Refresh the hyper lock so the remaining-days badge rolls over at midnight
+        // and re-reads the configured lock length in case it changed elsewhere.
+        val lastHyperUse = _uiState.value.lastUsedPerSetting["prepType"]?.get(PrepType.HYPER.name)
+        _uiState.update {
+            it.copy(
+                hyperRemainingLockDays = HyperLockManager.remainingLockDays(
+                    lastHyperUse,
+                    hyperLockManager.lockDays,
+                    System.currentTimeMillis()
+                )
+            )
+        }
+        if (_prepType.value == PrepType.HYPER && _uiState.value.hyperRemainingLockDays > 0) {
+            setPrepType(PrepType.NO_PREP)
+        }
     }
 
     /**

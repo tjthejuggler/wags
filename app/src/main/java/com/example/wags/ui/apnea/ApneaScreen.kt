@@ -7,6 +7,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -26,6 +28,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -45,6 +48,7 @@ import com.example.wags.domain.model.TableDifficulty
 import com.example.wags.domain.model.TableLength
 import com.example.wags.domain.model.TrainingModality
 import com.example.wags.domain.model.WonkaConfig
+import com.example.wags.domain.usecase.apnea.HyperLockManager
 import com.example.wags.domain.usecase.apnea.AdvancedApneaPhase
 import com.example.wags.domain.usecase.apnea.AdvancedApneaState
 import com.example.wags.ui.common.AdviceBanner
@@ -216,6 +220,8 @@ fun ApneaScreen(
                             timeOfDay = state.timeOfDay,
                             posture = state.posture,
                             audio = state.audio,
+                            lastUsedPerSetting = state.lastUsedPerSetting,
+                            hyperRemainingLockDays = state.hyperRemainingLockDays,
                             onLungVolumeChange = { viewModel.setLungVolume(it) },
                             onPrepTypeChange = { viewModel.setPrepType(it) },
                             onTimeOfDayChange = { viewModel.setTimeOfDay(it) },
@@ -653,12 +659,20 @@ private fun ApneaSettingsContent(
     timeOfDay: TimeOfDay,
     posture: Posture,
     audio: AudioSetting,
+    lastUsedPerSetting: Map<String, Map<String, Long>>,
+    hyperRemainingLockDays: Int,
     onLungVolumeChange: (String) -> Unit,
     onPrepTypeChange: (PrepType) -> Unit,
     onTimeOfDayChange: (TimeOfDay) -> Unit,
     onPostureChange: (Posture) -> Unit,
     onAudioChange: (AudioSetting) -> Unit
 ) {
+    // Day-granularity "now" — recomputed per composition is fine for whole-day badges
+    val nowMs = remember { System.currentTimeMillis() }
+
+    fun daysSince(settingKey: String, settingValue: String): Int? =
+        HyperLockManager.daysSinceUsed(lastUsedPerSetting[settingKey]?.get(settingValue), nowMs)
+
     Column(
         modifier = Modifier.padding(top = 4.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -666,15 +680,11 @@ private fun ApneaSettingsContent(
         Text("Lung Volume", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf("FULL", "PARTIAL", "EMPTY").forEach { volume ->
-                FilterChip(
+                SettingChip(
                     selected = selectedLungVolume == volume,
                     onClick = { onLungVolumeChange(volume) },
-                    label = { Text(volume.displayLungVolume(), style = MaterialTheme.typography.bodySmall) },
-                    modifier = Modifier.height(30.dp),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = SurfaceVariant,
-                        selectedLabelColor = TextPrimary
-                    )
+                    label = volume.displayLungVolume(),
+                    daysSinceUsed = daysSince("lungVolume", volume)
                 )
             }
         }
@@ -682,15 +692,13 @@ private fun ApneaSettingsContent(
         Text("Prep Type", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             PrepType.entries.forEach { type ->
-                FilterChip(
+                SettingChip(
                     selected = prepType == type,
                     onClick = { onPrepTypeChange(type) },
-                    label = { Text(type.shortDisplayName(), style = MaterialTheme.typography.bodySmall) },
-                    modifier = Modifier.height(30.dp),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = SurfaceVariant,
-                        selectedLabelColor = TextPrimary
-                    )
+                    label = type.shortDisplayName(),
+                    daysSinceUsed = daysSince("prepType", type.name),
+                    // Lock badge only on the HYPER chip (lower-right corner)
+                    hyperRemainingLockDays = if (type == PrepType.HYPER) hyperRemainingLockDays else null
                 )
             }
         }
@@ -698,15 +706,11 @@ private fun ApneaSettingsContent(
         Text("Time of Day", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             TimeOfDay.entries.forEach { tod ->
-                FilterChip(
+                SettingChip(
                     selected = timeOfDay == tod,
                     onClick = { onTimeOfDayChange(tod) },
-                    label = { Text(tod.displayName(), style = MaterialTheme.typography.bodySmall) },
-                    modifier = Modifier.height(30.dp),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = SurfaceVariant,
-                        selectedLabelColor = TextPrimary
-                    )
+                    label = tod.displayName(),
+                    daysSinceUsed = daysSince("timeOfDay", tod.name)
                 )
             }
         }
@@ -714,15 +718,11 @@ private fun ApneaSettingsContent(
         Text("Posture", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Posture.entries.forEach { pos ->
-                FilterChip(
+                SettingChip(
                     selected = posture == pos,
                     onClick = { onPostureChange(pos) },
-                    label = { Text(pos.displayName(), style = MaterialTheme.typography.bodySmall) },
-                    modifier = Modifier.height(30.dp),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = SurfaceVariant,
-                        selectedLabelColor = TextPrimary
-                    )
+                    label = pos.displayName(),
+                    daysSinceUsed = daysSince("posture", pos.name)
                 )
             }
         }
@@ -730,19 +730,72 @@ private fun ApneaSettingsContent(
         Text("Audio", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             AudioSetting.entries.forEach { aud ->
-                FilterChip(
+                SettingChip(
                     selected = audio == aud,
                     onClick = { onAudioChange(aud) },
-                    label = { Text(aud.displayName(), style = MaterialTheme.typography.bodySmall) },
-                    modifier = Modifier.height(30.dp),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = SurfaceVariant,
-                        selectedLabelColor = TextPrimary
-                    )
+                    label = aud.displayName(),
+                    daysSinceUsed = daysSince("audio", aud.name)
                 )
             }
         }
 
+    }
+}
+
+/**
+ * A settings FilterChip with a days-since-used badge (upper-right corner).
+ * When [hyperRemainingLockDays] is non-null and > 0 (HYPER chip only), a lock
+ * badge (🔒 + remaining days) is shown in the lower-right corner. Nothing is
+ * shown when HYPER is unlocked.
+ */
+@Composable
+private fun SettingChip(
+    selected: Boolean,
+    onClick: () -> Unit,
+    label: String,
+    daysSinceUsed: Int?,
+    hyperRemainingLockDays: Int? = null
+) {
+    Box {
+        FilterChip(
+            selected = selected,
+            onClick = onClick,
+            label = { Text(label, style = MaterialTheme.typography.bodySmall) },
+            modifier = Modifier.height(30.dp),
+            colors = FilterChipDefaults.filterChipColors(
+                selectedContainerColor = SurfaceVariant,
+                selectedLabelColor = TextPrimary
+            )
+        )
+        // Days-since-used badge — upper-right corner (hidden when never used)
+        if (daysSinceUsed != null) {
+            Text(
+                text = "$daysSinceUsed",
+                fontSize = 9.sp,
+                lineHeight = 10.sp,
+                color = TextPrimary,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .border(1.dp, TextSecondary, RoundedCornerShape(4.dp))
+                    .padding(horizontal = 3.dp, vertical = 1.dp)
+            )
+        }
+        // Hyper lock badge — lower-right corner, shown ONLY while actually
+        // locked. When unlocked nothing is shown: a tiny 🔓 emoji is
+        // illegible at this size and reads as a closed padlock.
+        if (hyperRemainingLockDays != null && hyperRemainingLockDays > 0) {
+            Text(
+                text = "🔒$hyperRemainingLockDays",
+                fontSize = 9.sp,
+                lineHeight = 11.sp,
+                color = TextPrimary,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .border(1.dp, TextSecondary, RoundedCornerShape(4.dp))
+                    .padding(horizontal = 2.dp, vertical = 1.dp)
+                    .grayscale()
+            )
+        }
     }
 }
 

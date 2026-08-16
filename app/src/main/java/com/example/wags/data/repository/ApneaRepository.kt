@@ -4,6 +4,7 @@ import com.example.wags.data.db.dao.ApneaRecordDao
 import com.example.wags.data.db.dao.ApneaSessionDao
 import com.example.wags.data.db.dao.ApneaSongLogDao
 import com.example.wags.data.db.dao.FreeHoldTelemetryDao
+import com.example.wags.data.db.dao.SettingLastUsedTuple
 import com.example.wags.data.db.dao.buildAllDrillRecordsQuery
 import com.example.wags.data.db.dao.buildBestDrillQuery
 import com.example.wags.data.db.dao.buildBestDrillRecordQuery
@@ -79,6 +80,19 @@ class ApneaRepository @Inject constructor(
     suspend fun getAllMinBreathOnce(): List<ApneaRecordEntity> = withContext(ioDispatcher) {
         dao.getAllOnce().filter { it.tableType == "MIN_BREATH" }
     }
+
+    // ── Hyper time-lock + per-setting last-used ──────────────────────────────
+
+    /** Most recent timestamp of any record that used the HYPER prep type. Null when never used. */
+    fun observeLastHyperUse(): Flow<Long?> = dao.observeLastHyperUse()
+
+    /** One-shot variant of [observeLastHyperUse]. */
+    suspend fun getLastHyperUseOnce(): Long? =
+        withContext(ioDispatcher) { dao.getLastHyperUseOnce() }
+
+    /** Last-use timestamp per setting column/value across ALL records (any session type). */
+    fun observeLastUsedPerSetting(): Flow<List<SettingLastUsedTuple>> =
+        dao.observeLastUsedPerSetting()
 
     /** The [limit] most recent records for a given 5-setting combination, across ALL event types. */
     fun getRecentBySettings(

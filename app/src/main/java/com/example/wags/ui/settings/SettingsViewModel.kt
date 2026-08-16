@@ -18,6 +18,7 @@ import com.example.wags.data.spotify.SpotifyAuthManager
 import com.example.wags.domain.model.BleConnectionState
 import com.example.wags.domain.model.HabitEntry
 import com.example.wags.domain.model.ScannedDevice
+import com.example.wags.domain.usecase.apnea.HyperLockManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -80,7 +81,10 @@ data class SettingsUiState(
     val exportFileName: String = "",
     // ── Debug Mode ────────────────────────────────────────────────────────────
     val debugModeEnabled: Boolean = false,
-    val debugFileDirUri: String = ""
+    val debugFileDirUri: String = "",
+    // ── Apnea ─────────────────────────────────────────────────────────────────
+    /** Days required between HYPER prep sessions (0 disables the lock). */
+    val hyperLockDays: Int = HyperLockManager.DEFAULT_LOCK_DAYS
 )
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
@@ -96,12 +100,14 @@ class SettingsViewModel @Inject constructor(
     private val garminManager: GarminManager,
     private val dataExportImportRepo: DataExportImportRepository,
     private val spotifyAuthManager: SpotifyAuthManager,
-    private val debugPrefs: DebugPreferences
+    private val debugPrefs: DebugPreferences,
+    private val hyperLockManager: HyperLockManager
 ) : ViewModel() {
 
     private val _habitState = MutableStateFlow(buildInitialHabitState())
     private val _exportImportState = MutableStateFlow(ExportImportPartialState())
     private val _backfillState = MutableStateFlow(BackfillPartialState())
+    private val _hyperLockDays = MutableStateFlow(hyperLockManager.lockDays)
 
     val uiState: StateFlow<SettingsUiState> = combine(
         deviceManager.connectionState,
@@ -162,6 +168,8 @@ class SettingsViewModel @Inject constructor(
             backfillMessage = backfill.backfillMessage,
             backfillError   = backfill.backfillError
         )
+    }.combine(_hyperLockDays) { state, days ->
+        state.copy(hyperLockDays = days)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -181,6 +189,14 @@ class SettingsViewModel @Inject constructor(
             debugFileDirUri         = debugPrefs.debugFileDirUri
         )
     )
+
+    // ── Apnea ─────────────────────────────────────────────────────────────────
+
+    /** Set how many days must pass between HYPER sessions (0 disables the lock). */
+    fun setHyperLockDays(days: Int) {
+        hyperLockManager.setLockDays(days)
+        _hyperLockDays.value = hyperLockManager.lockDays
+    }
 
     // ── Unified scan ─────────────────────────────────────────────────────────
 

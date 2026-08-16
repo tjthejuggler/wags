@@ -58,6 +58,7 @@ import com.example.wags.domain.model.SpotifySong
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
 import com.example.wags.domain.usecase.apnea.GuidedAudioManager
+import com.example.wags.domain.usecase.apnea.HyperLockManager
 import com.example.wags.ui.apnea.pip.FreeHoldPipContent
 import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
@@ -223,6 +224,7 @@ class FreeHoldActiveViewModel @Inject constructor(
     private val spotifyAuthManager: SpotifyAuthManager,
     private val guidedAudioManager: GuidedAudioManager,
     private val eucapnicConfigRepository: EucapnicConfigRepository,
+    private val hyperLockManager: HyperLockManager,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
@@ -452,6 +454,17 @@ class FreeHoldActiveViewModel @Inject constructor(
     }
 
     fun updatePrepType(type: String) {
+        // HYPER is time-locked: check the lock (DB query) before applying.
+        if (type == PrepType.HYPER.name) {
+            viewModelScope.launch {
+                if (!hyperLockManager.isLocked()) applyPrepType(type)
+            }
+        } else {
+            applyPrepType(type)
+        }
+    }
+
+    private fun applyPrepType(type: String) {
         prepType = type
         isHyperPrep = type == PrepType.HYPER.name
         prefs.edit().putString("setting_prep_type", type).apply()
