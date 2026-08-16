@@ -13,6 +13,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
@@ -28,8 +29,11 @@ import com.example.wags.data.spotify.SpotifyAuthManager
 import com.example.wags.ui.common.pip.PIP_ACTION_BROADCAST
 import com.example.wags.ui.common.pip.PipActionReceiver
 import com.example.wags.ui.common.pip.PipController
+import com.example.wags.data.meditation.AudioImportService
 import com.example.wags.ui.debug.DebugBubbleOverlay
+import com.example.wags.ui.meditation.AudioImportBus
 import com.example.wags.ui.navigation.WagsNavGraph
+import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.WagsTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -88,6 +92,11 @@ class MainActivity : ComponentActivity() {
         // If denied, user can still connect manually from Settings
     }
 
+    /** Optional: notification permission so import-progress notifications show (API 33+). */
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* optional — imports run in the foreground service regardless */ }
+
     /**
      * Observes the *process-level* lifecycle (foreground / background).
      * When the app has been in the background for 10 minutes continuously,
@@ -99,6 +108,12 @@ class MainActivity : ComponentActivity() {
             Log.d(TAG, "App moved to background — starting 10-min shutdown timer")
             backgroundShutdownJob = activityScope.launch {
                 delay(BACKGROUND_TIMEOUT_MS)
+                if (AudioImportService.isRunning) {
+                    // A background audio import is still downloading — don't
+                    // kill the process out from under it.
+                    Log.i(TAG, "Audio import running — deferring background shutdown")
+                    return@launch
+                }
                 Log.i(TAG, "App in background for 10 min — shutting down")
                 finishAndRemoveTask()
                 android.os.Process.killProcess(android.os.Process.myPid())
@@ -125,6 +140,15 @@ class MainActivity : ComponentActivity() {
         setContent {
             WagsTheme {
                 val navController = rememberNavController()
+
+                // Navigate to the YouTube audio import screen whenever a link
+                // is shared to Wags from another app (e.g. the YouTube share sheet)
+                LaunchedEffect(navController) {
+                    AudioImportBus.requests.collect {
+                        navController.navigate(WagsRoutes.AUDIO_IMPORT)
+                    }
+                }
+
                 val isInPip by PipController.isInPipMode.collectAsState()
                 Box {
                     WagsNavGraph(navController = navController)
@@ -143,12 +167,27 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // Optionally request notification permission (API 33+) so background
+        // audio-import progress notifications are visible. Purely optional —
+        // imports run in the foreground service regardless.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+
         // Start the persistent auto-connect loop.
         // If permissions are already granted this is instant; otherwise we request them.
         triggerAutoConnect()
 
         // Handle Spotify OAuth redirect if the activity was launched with one
         handleSpotifyRedirect(intent)
+
+        // Handle a YouTube link shared from another app (cold start via share sheet)
+        if (savedInstanceState == null) {
+            handleSharedYouTubeLink(intent)
+        }
     }
 
     override fun onResume() {
@@ -204,6 +243,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleSpotifyRedirect(intent)
+        handleSharedYouTubeLink(intent)
     }
 
     private fun handleSpotifyRedirect(intent: Intent?) {
@@ -214,6 +254,25 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    /**
+     * Handles ACTION_SEND shares from other apps (e.g. sharing a YouTube video
+     * from the YouTube app). If the shared text contains a YouTube URL it is
+     * forwarded to [AudioImportBus], which triggers the on-device audio import.
+     */
+    private fun handleSharedYouTubeLink(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_SEND) return
+        val type = intent.type ?: return
+        if (!type.startsWith("text/")) return
+        val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return
+        val url = extractYouTubeUrl(text) ?: return
+        AudioImportBus.request(url)
+    }
+
+    /** Finds the first YouTube URL inside arbitrary share text, if any. */
+    private fun extractYouTubeUrl(text: String): String? =
+        YOUTUBE_URL_REGEX.find(text)?.value
+            ?.trimEnd('.', ',', ';', ':', ')', ']', '}', '>', '"', '\'')
 
     private fun triggerAutoConnect() {
         val allGranted = blePermissions.all {
@@ -252,5 +311,14 @@ class MainActivity : ComponentActivity() {
         private const val TAG = "BackgroundTimeout"
         /** 10 minutes in milliseconds. */
         private const val BACKGROUND_TIMEOUT_MS = 10L * 60 * 1_000
+
+        /**
+         * Matches youtube.com / youtu.be / music.youtube.com links inside
+         * arbitrary shared text (watch, shorts, embed and live URLs).
+         */
+        private val YOUTUBE_URL_REGEX = Regex(
+            """https?://(?:[a-z0-9-]+\.)*(?:youtube\.com/(?:watch\?\S+|shorts/\S+|embed/\S+|live/\S+)|youtu\.be/\S+|music\.youtube\.com/watch\?\S+)""",
+            RegexOption.IGNORE_CASE
+        )
     }
 }

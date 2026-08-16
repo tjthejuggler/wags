@@ -42,6 +42,7 @@ import com.example.wags.ui.breathing.ResonanceSessionDetailScreen
 import com.example.wags.ui.breathing.ResonanceSessionScreen
 import com.example.wags.ui.breathing.RfAssessmentHistoryScreen
 import com.example.wags.ui.dashboard.DashboardScreen
+import com.example.wags.ui.meditation.AudioImportScreen
 import com.example.wags.ui.meditation.MeditationHistoryScreen
 import com.example.wags.ui.meditation.MeditationScreen
 import com.example.wags.ui.meditation.MeditationSessionDetailScreen
@@ -98,6 +99,7 @@ object WagsRoutes {
     const val MEDITATION = "meditation"
     const val MEDITATION_HISTORY = "meditation_history"
     const val MEDITATION_SESSION_DETAIL = "meditation_session_detail/{sessionId}"
+    const val AUDIO_IMPORT = "audio_import"
 
     // ── Progressive O₂ ──────────────────────────────────────────────────────
     const val PROGRESSIVE_O2 = "progressive_o2"
@@ -611,6 +613,13 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             arguments = listOf(navArgument("sessionId") { type = NavType.LongType })
         ) {
             MeditationSessionDetailScreen(navController = navController)
+        }
+        // ── Share-to-Wags YouTube audio import ─────────────────────────────────
+        composable(WagsRoutes.AUDIO_IMPORT) {
+            AudioImportScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) }
+            )
         }
         // ── Rapid HR Change ─────────────────────────────────────────────────
         composable(WagsRoutes.RAPID_HR) {

@@ -79,7 +79,8 @@ fun SettingsScreen(
         if (uri != null) {
             context.contentResolver.takePersistableUriPermission(
                 uri,
-                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
             )
             viewModel.setMeditationAudioDir(uri.toString())
         }

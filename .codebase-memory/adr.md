@@ -1,24 +1,28 @@
-# ADR: Meditation session lifecycle — foreground-service ownership, crash isolation, and orphan-recovery safety
+# ADR: On-device YouTube audio import — v2: background service + category chooser
 
-**Date:** 2026-08-15
-**Status:** Accepted
+**Date:** 2026-08-16 (v2)
+**Status:** Accepted & verified end-to-end on device (SM-S918U1, app backgrounded during download)
 
 ## Context
-Two long-standing bugs in the meditation/NSDR flow (evidence: on-device crash log `crash_2026-08-15_15-14-54.txt`, Samsung SM-S918U1, Android 16 / SDK 36, targetSdk 36):
+v1 (2026-08-15) ran the import in `AudioImportViewModel.viewModelScope`: the app had to stay open (and in foreground) during downloads, and imports could only target the meditation library. User requested: (1) downloads that survive closing the app, (2) a Meditation vs Guided Apnea choice after sharing.
 
-1. **Screen-off kill at ~10 min.** `MeditationService` used a plain `Job()` scope: any child-coroutine failure (e.g. an unguarded `recoverOrphanedSessions()` launch) cancelled the whole scope, silently killing the wake-lock renewal job; the 10-minute `WAKE_LOCK_TIMEOUT_MS` then expired exactly when users reported the session dying. Compounding factors: no `MediaSession` while running a `mediaPlayback` FGS (Android 14+ ties this FGS type's legitimacy to an active media session; Samsung One UI enforces aggressively), `MediaPlayer` without `setWakeMode`, and the 2-arg `startForeground()` which on API 34+ activates ALL manifest types (`mediaPlayback|connectedDevice`), requiring `connectedDevice` runtime prerequisites even for monitor-less sessions.
+## Decision (v2)
+1. **`AudioImportService`** (`data/meditation/`, FGS type `dataSync`): owns the import coroutine in `serviceScope`, holds a partial `WakeLock` (30 min cap) so screen-off/Doze doesn't stall the transfer, posts an ongoing progress notification (% + bytes) and a completion/failure notification, then `stopForeground(REMOVE)` + `stopSelf()`. Live UI state is a companion `StateFlow<AudioImportUiState>` (`Idle/Resolving/Downloading/Success/Failed`) — the import screen observes it; `AudioImportViewModel` was deleted.
+2. **Category chooser**: `AudioImportScreen` shows two cards (🧘 Meditation/NSDR, 🤿 Guided Apnea) when idle + URL pending (`AudioImportBus.consumePendingUrl()`), then starts the service. One import at a time (service ignores starts while running).
+3. **Storage**: both categories download into the SAME SAF audio tree. Meditation → root (as before, upsert `meditation_audios` by fileName). Guided apnea → `apnea_guided/` subfolder (matches the user's pre-existing manual folder), registered in `guided_audios` via `GuidedAudioManager` with the tree-based document URI (playable by `MediaPlayer` under the existing tree grant). Re-importing the same video **updates** the row by `sourceUrl` and deletes the superseded file (dedupe). The meditation folder scanner lists direct children only, so subfolder files never leak into the meditation picker.
+4. **Importer refactor**: `YoutubeAudioImporter.download()` core returns `DownloadedAudio(docUri, fileName, title, channel)` with an optional subdirectory (`ensureSubdirectory` creates it via `MIME_TYPE_DIR` on demand); `import()` (meditation, DB upsert) and `downloadToSubfolder()` (no DB) wrap it.
+5. **Process-lifetime guards**: MainActivity's 10-min background `killProcess` timer defers while `AudioImportService.isRunning`; manifest gains `FOREGROUND_SERVICE_DATA_SYNC` + `POST_NOTIFICATIONS` (runtime-requested once, optional — imports run regardless).
 
-2. **"Done" button crash + total data loss.** `deleteIncompleteShorterThan(5s)` ran concurrently with the creation of the new session row (which starts at `durationMs = 0, completed = 0`) and deleted the ACTIVE row. Every 15-s telemetry flush then failed with `SQLiteConstraintException: FOREIGN KEY constraint failed` (caught, silent), and the final unguarded flush at session stop crashed the process — killing the ViewModel's in-flight save. 26 minutes of data lost.
+## Verification
+- Service started (via `run-as … am start-foreground-service --user 0` from adb) with the app backgrounded: FGS active, full 3.4 MB download into real `apnea_guided/`, `guided_audios` row created, service self-stopped, old duplicate file auto-deleted on re-import.
+- Chooser UI confirmed on-screen via uiautomator dump ("What is this audio for?" + both cards).
 
-## Decision
-- **Service owns session audio** exclusively (ViewModel's duplicate MediaPlayer removed); service holds an **active framework `MediaSession`** (STATE_PLAYING) for the whole session and calls `MediaPlayer.setWakeMode(PARTIAL_WAKE_LOCK)`.
-- **`startForeground(id, notification, FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)`** explicitly on API 29+ (subset of manifest types); sticky restarts (`onStartCommand(null)`) also re-enter foreground before recovery+stop to avoid `ForegroundServiceDidNotStartInTime`.
-- **`serviceScope = SupervisorJob() + CoroutineExceptionHandler`** — no child failure can crash the process or cancel siblings (wake-lock renewal survives).
-- **Orphan recovery is safe by construction:** `deleteIncompleteShorterThan` now requires a 10-minute staleness cutoff on `timestamp`; recovery runs sequentially BEFORE the new session row is created; `flushTelemetry()` always refreshes `durationMs` (even with no telemetry) so active rows are never mistaken for orphans; recovery never throws.
-- **Session finalization is atomic:** `MeditationRepository.finalizeSessionWithTelemetry / insertSessionWithTelemetry` wrap UPDATE+DELETE+INSERT in a Room `withTransaction`; the ViewModel save is fully try/caught so a DB failure can never crash the app mid-save (row stays incomplete → recovered on next launch).
-- `Service.onTimeout(fgsType)` (API 35+) emergency-saves the session instead of silently dying.
+## Gotchas discovered
+- `am start-foreground-service` from plain shell fails on non-exported services; from `run-as` it needs `--user 0` (default user -2 triggers INTERACT_ACROSS_USERS denial).
+- YouTube download speed is server-side throttling; not fixable client-side — mitigated by background execution instead.
+- Room WAL again: DB verification must pull db+wal+shm or checkpoint first.
 
 ## Consequences
-- Any future FGS that plays audio must hold an active MediaSession and pass an explicit foreground-service type at runtime.
-- Any coroutine scope hosting wake-lock renewal or other lifecycle-critical jobs must use SupervisorJob + exception handler.
-- DB recovery/cleanup queries must never match rows that a live component could have just created; guard with recency cutoffs and keep "liveness" columns (durationMs) freshly updated.
+- User can share → pick category → close the app immediately; a notification reports completion.
+- Guided apnea imports appear in the existing Guided MP3 picker (guided_audios Flow) with no UI changes needed there.
+- dataSync FGS has a 6 h system cap (irrelevant for audio files); `onTimeout` cancels cleanly with partial-file cleanup.

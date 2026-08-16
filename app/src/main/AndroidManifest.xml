@@ -12,6 +12,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Progress notifications for background audio imports (API 33+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Vibration -->
@@ -73,6 +76,14 @@
                     android:scheme="wags"
                     android:host="spotify-callback" />
             </intent-filter>
+
+            <!-- Share YouTube links from other apps (e.g. the YouTube share
+                 sheet) to import their audio into the meditation folder -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
 
         <service
@@ -87,6 +98,15 @@
         <service
             android:name=".data.meditation.MeditationService"
             android:foregroundServiceType="mediaPlayback|connectedDevice"
+            android:exported="false" />
+
+        <!--
+            AudioImportService - downloads shared YouTube audio in the
+            background so the app can be closed during the download
+        -->
+        <service
+            android:name=".data.meditation.AudioImportService"
+            android:foregroundServiceType="dataSync"
             android:exported="false" />
 
         <!--

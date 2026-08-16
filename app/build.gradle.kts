@@ -102,6 +102,10 @@ dependencies {
     // OkHttp – used for Spotify Web API calls (PKCE token exchange, playback control)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
+    // NewPipe Extractor – resolves direct audio stream URLs from YouTube links
+    // (used by the share-to-Wags meditation audio import). Resolved via JitPack.
+    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.4")
+
     // DocumentFile – SAF folder picker for debug notes output
     implementation("androidx.documentfile:documentfile:1.0.1")
 

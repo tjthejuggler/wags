@@ -25,7 +25,8 @@ class MeditationRepository @Inject constructor(
     private val sessionDao: MeditationSessionDao,
     private val telemetryDao: MeditationTelemetryDao,
     private val devicePrefs: DevicePreferencesRepository,
-    private val youtubeFetcher: YouTubeMetadataFetcher
+    private val youtubeFetcher: YouTubeMetadataFetcher,
+    private val youtubeImporter: YoutubeAudioImporter
 ) {
 
     private companion object {
@@ -34,6 +35,14 @@ class MeditationRepository @Inject constructor(
          * see [recoverOrphanedSessions].
          */
         private const val STALE_SESSION_CUTOFF_MS = 10 * 60 * 1000L // 10 minutes
+
+        /**
+         * Guided-apnea YouTube imports are downloaded into this subfolder of
+         * the audio folder (same folder the user already keeps guided MP3s
+         * in). The folder scanner only looks at direct children, so these
+         * files never leak into the meditation picker.
+         */
+        private const val GUIDED_APNEA_SUBFOLDER = "apnea_guided"
     }
 
     // ── Audio directory preference ─────────────────────────────────────────────
@@ -151,6 +160,45 @@ class MeditationRepository @Inject constructor(
      */
     suspend fun fetchYouTubeMetadata(url: String): YouTubeMetadataFetcher.YoutubeMetadata? =
         if (youtubeFetcher.isYouTubeUrl(url)) youtubeFetcher.fetch(url) else null
+
+    /**
+     * Downloads the audio of a YouTube video on-device into the configured
+     * meditation audio directory (SAF tree) and registers it in the DB with
+     * full metadata (title / channel / source URL) — the shared-to-Wags
+     * import flow. The audio immediately appears in the picker.
+     *
+     * @param onEvent progress callback (invoked on the IO dispatcher).
+     * @throws YoutubeAudioImporter.ImportException on failure, with a
+     *         user-presentable message.
+     */
+    suspend fun importYoutubeAudio(
+        url: String,
+        onEvent: (YoutubeAudioImporter.ImportEvent) -> Unit
+    ): MeditationAudioEntity =
+        youtubeImporter.import(url, requireAudioDirUri(), onEvent)
+
+    /**
+     * Downloads the audio of a guided-apnea YouTube video into the
+     * [GUIDED_APNEA_SUBFOLDER] subfolder of the audio folder WITHOUT any DB
+     * registration — the caller registers it in the guided audio library
+     * (see [com.example.wags.domain.usecase.apnea.GuidedAudioManager]).
+     */
+    suspend fun downloadGuidedApneaAudio(
+        url: String,
+        onEvent: (YoutubeAudioImporter.ImportEvent) -> Unit
+    ): YoutubeAudioImporter.DownloadedAudio =
+        youtubeImporter.downloadToSubfolder(url, requireAudioDirUri(), GUIDED_APNEA_SUBFOLDER, onEvent)
+
+    private fun requireAudioDirUri(): String {
+        val dirUriString = getAudioDirUri()
+        if (dirUriString.isBlank()) {
+            throw YoutubeAudioImporter.ImportException(
+                "No meditation audio folder set. " +
+                    "Choose one in Settings → Meditation Audio Directory first."
+            )
+        }
+        return dirUriString
+    }
 
     // ── Sessions ───────────────────────────────────────────────────────────────
 

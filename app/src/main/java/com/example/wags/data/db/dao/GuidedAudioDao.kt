@@ -18,6 +18,12 @@ interface GuidedAudioDao {
     @Insert
     suspend fun insert(entity: GuidedAudioEntity): Long
 
+    @Update
+    suspend fun update(entity: GuidedAudioEntity)
+
+    @Query("SELECT * FROM guided_audios WHERE sourceUrl = :url LIMIT 1")
+    suspend fun getBySourceUrl(url: String): GuidedAudioEntity?
+
     @Delete
     suspend fun delete(entity: GuidedAudioEntity)
 

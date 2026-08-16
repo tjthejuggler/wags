@@ -74,6 +74,13 @@ class GuidedAudioManager @Inject constructor(
         guidedAudioDao.deleteById(id)
     }
 
+    /** Find a library entry by its source URL (used for import deduplication). */
+    suspend fun findBySourceUrl(sourceUrl: String): GuidedAudioEntity? =
+        guidedAudioDao.getBySourceUrl(sourceUrl)
+
+    /** Update an existing library entry (e.g. after re-importing the same video). */
+    suspend fun updateAudio(audio: GuidedAudioEntity) = guidedAudioDao.update(audio)
+
     /** Get the currently selected audio entity, or null if none selected or not found. */
     suspend fun getSelectedAudio(): GuidedAudioEntity? {
         val id = selectedId
