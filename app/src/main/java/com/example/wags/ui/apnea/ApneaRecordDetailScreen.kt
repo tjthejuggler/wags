@@ -38,6 +38,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.ApneaSessionEntity
+import com.example.wags.data.db.entity.ResonanceSessionEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
 import org.json.JSONObject
 import com.example.wags.domain.model.AudioSetting
@@ -192,6 +193,7 @@ fun ApneaRecordDetailScreen(
                 state.record != null -> {
                     RecordDetailContent(
                         record = state.record!!,
+                        resonanceSession = state.resonanceSession,
                         telemetry = state.telemetry,
                         pbBadges = state.pbBadges,
                         trophyCount = state.trophyCount,
@@ -549,6 +551,7 @@ private fun EditRecordSheet(
 @Composable
 private fun RecordDetailContent(
     record: ApneaRecordEntity,
+    resonanceSession: ResonanceSessionEntity? = null,
     telemetry: List<FreeHoldTelemetryEntity>,
     pbBadges: List<RecordPbBadge>,
     trophyCount: Int = 0,
@@ -641,6 +644,47 @@ private fun RecordDetailContent(
                         label = "Guided Hyper",
                         value = phases.ifEmpty { "Yes" }
                     )
+                }
+                // ── Resonance breathing prep specifics ──────────────────────────
+                if (record.prepType == "RESONANCE") {
+                    val rs = resonanceSession
+                    if (rs != null) {
+                        DetailRow(
+                            label = "Resonance Prep",
+                            value = "%d:%02d min · %.1f bpm · %.1f:1".format(
+                                rs.durationSeconds / 60,
+                                rs.durationSeconds % 60,
+                                rs.breathingRateBpm,
+                                rs.ieRatio
+                            ),
+                            valueColor = TextPrimary
+                        )
+                        DetailRow(
+                            label = "Coherence (mean/max)",
+                            value = "%.2f / %.2f".format(rs.meanCoherenceRatio, rs.maxCoherenceRatio)
+                        )
+                        DetailRow(
+                            label = "High Coherence",
+                            value = "%d:%02d".format(rs.timeInHighCoherence / 60, rs.timeInHighCoherence % 60)
+                        )
+                        DetailRow(
+                            label = "RMSSD / SDNN",
+                            value = "%.0f / %.0f ms".format(rs.meanRmssdMs, rs.meanSdnnMs)
+                        )
+                        DetailRow(
+                            label = "Artifact",
+                            value = "%.1f %%".format(rs.artifactPercent)
+                        )
+                        DetailRow(
+                            label = "Points",
+                            value = "%.1f".format(rs.totalPoints)
+                        )
+                    } else {
+                        DetailRow(
+                            label = "Resonance Prep",
+                            value = "Session not linked"
+                        )
+                    }
                 }
                 DetailRow(label = "Time of Day",
                     value = record.timeOfDay.lowercase().replaceFirstChar { it.uppercase() }

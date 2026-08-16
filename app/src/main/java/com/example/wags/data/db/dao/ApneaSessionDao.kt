@@ -31,6 +31,14 @@ interface ApneaSessionDao {
     @Query("SELECT * FROM apnea_sessions WHERE timestamp = :timestamp AND tableType = :tableType LIMIT 1")
     suspend fun getByTimestampAndType(timestamp: Long, tableType: String): ApneaSessionEntity?
 
+    /**
+     * Wall duration (holds + ventilation) of the session sharing the given timestamp.
+     * Used to estimate when a table/drill record's activity started (records store
+     * the END timestamp). Null when no session row matches (e.g. free holds).
+     */
+    @Query("SELECT totalSessionDurationMs FROM apnea_sessions WHERE timestamp = :timestamp LIMIT 1")
+    suspend fun getTotalSessionDurationByTimestamp(timestamp: Long): Long?
+
     @Query("SELECT * FROM apnea_sessions ORDER BY timestamp ASC")
     suspend fun getAllOnce(): List<ApneaSessionEntity>
 

@@ -120,6 +120,7 @@ fun MinBreathScreen(
                 timeOfDay = state.timeOfDay,
                 posture = state.posture,
                 audio = state.audio,
+                resonancePrepLocked = state.resonancePrepLocked,
                 onLungVolumeChange = { viewModel.setLungVolume(it) },
                 onPrepTypeChange = { viewModel.setPrepType(it) },
                 onTimeOfDayChange = { viewModel.setTimeOfDay(it) },

@@ -60,6 +60,7 @@ import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
 import com.example.wags.domain.usecase.apnea.GuidedAudioManager
 import com.example.wags.domain.usecase.apnea.HyperLockManager
+import com.example.wags.domain.usecase.apnea.ResonancePrepGate
 import com.example.wags.ui.apnea.pip.FreeHoldPipContent
 import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
@@ -209,7 +210,9 @@ data class FreeHoldActiveUiState(
     /** Current eucapnic configuration (when EUCAPNIC_DIAPHRAGMATIC prep type is selected). */
     val eucapnicConfig: com.example.wags.domain.model.EucapnicConfig? = null,
     /** True when eucapnic prep has been completed and the user is ready to start the actual hold. */
-    val eucapnicPrepCompleted: Boolean = false
+    val eucapnicPrepCompleted: Boolean = false,
+    /** True when no resonance breathing session ended within the last ~5 minutes (RESONANCE prep locked). */
+    val resonancePrepLocked: Boolean = false
 )
 
 @HiltViewModel
@@ -226,6 +229,7 @@ class FreeHoldActiveViewModel @Inject constructor(
     private val guidedAudioManager: GuidedAudioManager,
     private val eucapnicConfigRepository: EucapnicConfigRepository,
     private val hyperLockManager: HyperLockManager,
+    private val resonancePrepGate: ResonancePrepGate,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
@@ -309,6 +313,20 @@ class FreeHoldActiveViewModel @Inject constructor(
     )
 
     init {
+        // ── Resonance prep staleness lock ──────────────────────────────────────
+        viewModelScope.launch {
+            resonancePrepGate.isLocked.collect { locked ->
+                _uiState.update { it.copy(resonancePrepLocked = locked) }
+                // Auto-deselect RESONANCE while idle — never yank the setting
+                // mid-hold (the hold already started with valid resonance prep).
+                if (locked && prepType == PrepType.RESONANCE.name &&
+                    !_uiState.value.freeHoldActive
+                ) {
+                    applyPrepType(PrepType.NO_PREP.name)
+                }
+            }
+        }
+
         // Reactively observe eucapnic_prep_completed from savedStateHandle.
         // When the EucapnicPacerScreen pops back to this screen after completing
         // the prep, the ViewModel is already initialised so we must react to the
@@ -459,6 +477,12 @@ class FreeHoldActiveViewModel @Inject constructor(
         if (type == PrepType.HYPER.name) {
             viewModelScope.launch {
                 if (!hyperLockManager.isLocked()) applyPrepType(type)
+            }
+        } else if (type == PrepType.RESONANCE.name) {
+            // RESONANCE prep is staleness-locked: it needs a resonance breathing
+            // session that ended within the last ~5 minutes.
+            viewModelScope.launch {
+                if (!resonancePrepGate.isLockedNow()) applyPrepType(type)
             }
         } else {
             applyPrepType(type)
@@ -1419,6 +1443,7 @@ private fun FreeHoldActiveScreenContent(
                 timeOfDay = state.currentTimeOfDay,
                 posture = state.currentPosture,
                 audio = state.currentAudio,
+                resonancePrepLocked = state.resonancePrepLocked,
                 onLungVolumeChange = { viewModel.updateLungVolume(it) },
                 onPrepTypeChange = { viewModel.updatePrepType(it) },
                 onTimeOfDayChange = { viewModel.updateTimeOfDay(it) },

@@ -32,7 +32,7 @@ import com.example.wags.data.db.entity.*
         ForecastCalibrationEntity::class,
         EucapnicPastConfigurationEntity::class
     ],
-    version = 40,
+    version = 41,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -1073,6 +1073,62 @@ abstract class WagsDatabase : RoomDatabase() {
                     db.execSQL(
                         "ALTER TABLE meditation_sessions ADD COLUMN completed INTEGER NOT NULL DEFAULT 1"
                     )
+                }
+            }
+
+            /**
+             * v40 → v41: Resonance prep tracking.
+             *
+             *  1. Add `resonanceSessionId` to apnea_records — references the
+             *     resonance_sessions row for the breathing session that
+             *     immediately preceded the hold/drill (prepType == RESONANCE).
+             *  2. Retroactively backfill the link for existing RESONANCE-prep
+             *     records: a resonance session qualifies when it ENDED (its
+             *     timestamp is the save/end moment) within the 5-minute window
+             *     before the apnea activity STARTED.
+             *
+             * Activity start estimation:
+             *  - Table/drill records share their timestamp with an apnea_sessions
+             *    row whose totalSessionDurationMs is the full wall duration
+             *    (holds + ventilation), so start ≈ timestamp − totalSessionDurationMs.
+             *  - Free holds have no session row: start ≈ timestamp − durationMs.
+             */
+            val MIGRATION_40_41 = object : Migration(40, 41) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE apnea_records ADD COLUMN resonanceSessionId INTEGER DEFAULT NULL")
+
+                    // Best-effort estimate of when the apnea activity began, in ms.
+                    // Prefers the matching apnea_sessions wall duration; falls back
+                    // to the record's own durationMs (free holds).
+                    db.execSQL("""
+                        UPDATE apnea_records
+                        SET resonanceSessionId = (
+                            SELECT r.sessionId
+                            FROM resonance_sessions r
+                            WHERE r.timestamp <= (
+                                apnea_records.timestamp - COALESCE(
+                                    (SELECT s.totalSessionDurationMs
+                                     FROM apnea_sessions s
+                                     WHERE s.timestamp = apnea_records.timestamp
+                                     LIMIT 1),
+                                    apnea_records.durationMs
+                                )
+                            )
+                            AND r.timestamp >= (
+                                apnea_records.timestamp - COALESCE(
+                                    (SELECT s.totalSessionDurationMs
+                                     FROM apnea_sessions s
+                                     WHERE s.timestamp = apnea_records.timestamp
+                                     LIMIT 1),
+                                    apnea_records.durationMs
+                                ) - 300000
+                            )
+                            ORDER BY r.timestamp DESC
+                            LIMIT 1
+                        )
+                        WHERE prepType = 'RESONANCE'
+                          AND resonanceSessionId IS NULL
+                    """.trimIndent())
                 }
             }
         }

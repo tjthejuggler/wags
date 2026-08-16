@@ -4,6 +4,7 @@ import com.example.wags.data.db.dao.ApneaRecordDao
 import com.example.wags.data.db.dao.ApneaSessionDao
 import com.example.wags.data.db.dao.ApneaSongLogDao
 import com.example.wags.data.db.dao.FreeHoldTelemetryDao
+import com.example.wags.data.db.dao.ResonanceSessionDao
 import com.example.wags.data.db.dao.SettingLastUsedTuple
 import com.example.wags.data.db.dao.buildAllDrillRecordsQuery
 import com.example.wags.data.db.dao.buildBestDrillQuery
@@ -28,6 +29,7 @@ import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.RecordPbBadge
 import com.example.wags.domain.model.TimeOfDay
+import com.example.wags.domain.usecase.apnea.ResonancePrepGate
 import com.example.wags.di.IoDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
@@ -42,6 +44,7 @@ class ApneaRepository @Inject constructor(
     private val telemetryDao: FreeHoldTelemetryDao,
     private val songLogDao: ApneaSongLogDao,
     private val sessionDao: ApneaSessionDao,
+    private val resonanceSessionDao: ResonanceSessionDao,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) {
     fun getLatestRecords(limit: Int = 20): Flow<List<ApneaRecordEntity>> =
@@ -1240,10 +1243,47 @@ class ApneaRepository @Inject constructor(
         dao.getByTimestampAndType(timestamp, tableType)
 
     suspend fun saveRecord(entity: ApneaRecordEntity): Long =
-        dao.insert(entity)
+        withContext(ioDispatcher) { dao.insert(withResonanceLink(entity)) }
 
     suspend fun updateRecord(entity: ApneaRecordEntity) =
-        dao.update(entity)
+        withContext(ioDispatcher) { dao.update(withResonanceLink(entity)) }
+
+    /**
+     * Attaches the resonance breathing session that immediately preceded this
+     * apnea activity when prepType == RESONANCE, and clears any stale link
+     * otherwise. A resonance session qualifies when it ENDED (its timestamp is
+     * the save/end moment) within [ResonancePrepGate.PREP_WINDOW_MS] before the
+     * apnea activity STARTED.
+     */
+    private suspend fun withResonanceLink(entity: ApneaRecordEntity): ApneaRecordEntity {
+        if (entity.prepType != PrepType.RESONANCE.name) {
+            return if (entity.resonanceSessionId == null) entity
+            else entity.copy(resonanceSessionId = null)
+        }
+        if (entity.resonanceSessionId != null) return entity
+
+        val activityStartMs = estimateActivityStartMs(entity)
+        val candidate = resonanceSessionDao.getLatestEndingBefore(activityStartMs) ?: return entity
+        return if (activityStartMs - candidate.timestamp <= ResonancePrepGate.PREP_WINDOW_MS) {
+            entity.copy(resonanceSessionId = candidate.sessionId)
+        } else {
+            entity
+        }
+    }
+
+    /**
+     * Best-effort estimate of when the apnea activity began. Records store the
+     * END timestamp, so walk backwards by the activity duration: table/drill
+     * records share their timestamp with an apnea_sessions row whose
+     * totalSessionDurationMs is the full wall duration (holds + ventilation);
+     * free holds fall back to their own durationMs.
+     */
+    private suspend fun estimateActivityStartMs(entity: ApneaRecordEntity): Long {
+        val sessionDurationMs = entity.tableType?.let {
+            sessionDao.getTotalSessionDurationByTimestamp(entity.timestamp)
+        }
+        return entity.timestamp - (sessionDurationMs ?: entity.durationMs)
+    }
 
     suspend fun deleteRecord(recordId: Long) =
         dao.deleteById(recordId)

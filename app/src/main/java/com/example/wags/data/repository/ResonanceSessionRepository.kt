@@ -22,6 +22,20 @@ class ResonanceSessionRepository @Inject constructor(
 
     suspend fun getById(sessionId: Long): ResonanceSessionEntity? = dao.getById(sessionId)
 
+    /** End timestamp (epoch ms) of the most recent resonance session. Null when none exist. */
+    fun observeLatestEnd(): Flow<Long?> = dao.observeLatestEnd()
+
+    /** One-shot variant of [observeLatestEnd]. */
+    suspend fun getLatestEndOnce(): Long? = dao.getLatestEndOnce()
+
+    /**
+     * Latest resonance session that ended at or before [atMs]. Null when none.
+     * Used to link a RESONANCE-prep apnea record to the breathing session that
+     * preceded it.
+     */
+    suspend fun getLatestEndingBefore(atMs: Long): ResonanceSessionEntity? =
+        dao.getLatestEndingBefore(atMs)
+
     suspend fun deleteByTimestamp(timestamp: Long) = dao.deleteByTimestamp(timestamp)
 
     suspend fun deleteById(sessionId: Long) = dao.deleteById(sessionId)

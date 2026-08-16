@@ -1,18 +1,21 @@
-# ADR: Apnea Stats extremes drill-down — ranked holds list
+# ADR: Resonance prep linking to apnea records (5-minute window)
 
-**Date:** 2026-08-16
-**Status:** Accepted
+Date: 2026-08-16
+Status: Accepted
 
 ## Context
-The Apnea History → Stats tab shows single-record extremes ("Highest HR", "Lowest SpO₂", start/end HR & SpO₂). Users wanted to see ALL holds ranked by the clicked metric, not just the single record holding the extreme. Additionally, clickable stat labels needed a visual affordance (underline).
+Apnea holds/drills can declare prepType = RESONANCE, but the resonance breathing session that preceded the activity was not linked to the record, so its specifics (rate, coherence, HRV) could not be shown in the apnea record details screen. Existing DB rows also needed retroactive linking.
 
 ## Decision
-1. **New screen pair** `HoldsRankedListScreen` / `HoldsRankedListViewModel` (ui/apnea). Route `holds_ranked/{metricKey}/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{audio}/{showAll}` registered in WagsNavGraph. Cards are sorted best-first (lowest-first for "Lowest …", highest-first for "Highest …"); tapping a card opens `apnea_record_detail/{recordId}`.
-2. **Metric taxonomy**: `RankedHoldMetric` enum (11 entries) mirrors the Stats extremes rows. Overall metrics (MAX_HR, MIN_HR, LOWEST_SPO2) read from `apnea_records` columns; start/end metrics read from the first/last `free_hold_telemetry` sample per record via two new bulk DAO queries (`getFirstSamplesOnce` / `getLastSamplesOnce`, GROUP BY recordId) exposed as `ApneaRepository.getFirstTelemetrySamplesOnce/getLastTelemetrySamplesOnce` — one query instead of N per-record queries.
-3. **Filter parity**: the ranked list receives the Stats tab's active settings + showAll flag via nav args and applies the same predicate semantics as the stats SQL (`'ALL'` or exact match) and the same physiological bounds (HR 20–250 bpm, SpO₂ 1–100 %) so rank #1 always matches the extreme shown on the Stats tab.
-4. **Affordance**: labels that open the ranked list are underlined (`TextDecoration.Underline`) and brighter (TextPrimary); the row body keeps its existing tap-to-record-detail behaviour. `HistoryStatsRow` labels with an onClick (time-chart rows) are also underlined.
-5. **SpO₂ chart floor removed**: `ApneaRecordDetailScreen` no longer passes `yMin = 70f` to `LineChart`/`MinBreathSessionChart`; yMin defaults to the sample minimum so the graph extends to the lowest actual reading (yMax stays 100).
+1. **Link storage**: `apnea_records.resonanceSessionId` (nullable FK-by-convention to resonance_sessions.sessionId), added in DB v41.
+2. **Timestamp semantics**: resonance_sessions.timestamp = session END; apnea_records.timestamp = activity END. Activity start is estimated as `record.timestamp - COALESCE(apnea_sessions.totalSessionDurationMs (matched on identical timestamp for table/drill records), record.durationMs)`.
+3. **Linking rule**: a resonance session qualifies if its END falls within [activityStart - 5min, activityStart]. Implemented once in `ApneaRepository.withResonanceLink()` at the saveRecord/updateRecord choke point so all save paths (tables, drills, free holds, MinBreath, ProgressiveO2, Garmin sync) get linking for free.
+4. **Retroactive backfill**: MIGRATION_40_41 runs the same rule in SQL (correlated subquery) for existing RESONANCE-prep rows with NULL resonanceSessionId.
+5. **Prep gate**: `ResonancePrepGate` (@Singleton) exposes `isLocked: Flow<Boolean>` (combine of latest resonance END + 2s ticker) and `isLockedNow()`. Lock engages when no resonance session ended within the last 5 minutes. All four prep-type ViewModels (Apnea, MinBreath, ProgressiveO2, FreeHoldActive) expose `resonancePrepLocked` in UiState, guard RESONANCE selection, and auto-deselect RESONANCE when the window expires.
+6. **UI**: 🔒 badge on the RESONANCE chip in ApneaScreen SettingChip and FreeHoldSettingsDialog (mirrors HyperLockManager badge pattern); locked chips are non-selectable.
+7. **Details screen**: ApneaRecordDetailScreen renders a "Resonance Prep" card (rate, IE ratio, coherence mean/max, high-coherence time, RMSSD/SDNN, artifact %, points) for RESONANCE-prep records, with "Session not linked" fallback.
 
 ## Consequences
-- Adding a new extremes row to the Stats tab requires a matching `RankedHoldMetric` entry and an `onLabelClick` wiring.
-- Bulk boundary-sample queries assume one representative sample per record (SQLite GROUP BY picks one row per group on ties), which matches the existing stats SQL pattern.
+- RESONANCE-prep records saved without a qualifying prior resonance session store resonanceSessionId = NULL and show the fallback row.
+- updateRecord clears the link when prepType changes away from RESONANCE and re-links (via save path) when changed to RESONANCE.
+- The gate is time-based only; it does not verify the linked session belongs to the same user/device (single-user app).

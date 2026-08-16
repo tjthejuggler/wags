@@ -39,6 +39,8 @@ fun FreeHoldSettingsDialog(
     timeOfDay: String,
     posture: String,
     audio: String,
+    /** True when no resonance breathing session ended within the last ~5 minutes (RESONANCE prep locked). */
+    resonancePrepLocked: Boolean = false,
     onLungVolumeChange: (String) -> Unit,
     onPrepTypeChange: (String) -> Unit,
     onTimeOfDayChange: (String) -> Unit,
@@ -76,10 +78,20 @@ fun FreeHoldSettingsDialog(
                 Text("Prep Type", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     PrepType.entries.forEach { type ->
+                        // RESONANCE prep is staleness-locked: it requires a
+                        // resonance breathing session that ended within the last
+                        // ~5 minutes. Show 🔒 and swallow taps while locked.
+                        val resonanceLocked = type == PrepType.RESONANCE && resonancePrepLocked
                         FilterChip(
                             selected = prepType == type.name,
-                            onClick = { onPrepTypeChange(type.name) },
-                            label = { Text(type.shortDisplayName(), style = MaterialTheme.typography.bodySmall) },
+                            onClick = { if (!resonanceLocked) onPrepTypeChange(type.name) },
+                            label = {
+                                Text(
+                                    if (resonanceLocked) "🔒${type.shortDisplayName()}"
+                                    else type.shortDisplayName(),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            },
                             modifier = Modifier.height(30.dp),
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = SurfaceVariant,

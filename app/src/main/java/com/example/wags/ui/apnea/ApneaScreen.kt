@@ -222,6 +222,7 @@ fun ApneaScreen(
                             audio = state.audio,
                             lastUsedPerSetting = state.lastUsedPerSetting,
                             hyperRemainingLockDays = state.hyperRemainingLockDays,
+                            resonancePrepLocked = state.resonancePrepLocked,
                             onLungVolumeChange = { viewModel.setLungVolume(it) },
                             onPrepTypeChange = { viewModel.setPrepType(it) },
                             onTimeOfDayChange = { viewModel.setTimeOfDay(it) },
@@ -661,6 +662,8 @@ private fun ApneaSettingsContent(
     audio: AudioSetting,
     lastUsedPerSetting: Map<String, Map<String, Long>>,
     hyperRemainingLockDays: Int,
+    /** True when no resonance breathing session ended within the last ~5 minutes. */
+    resonancePrepLocked: Boolean,
     onLungVolumeChange: (String) -> Unit,
     onPrepTypeChange: (PrepType) -> Unit,
     onTimeOfDayChange: (TimeOfDay) -> Unit,
@@ -698,7 +701,10 @@ private fun ApneaSettingsContent(
                     label = type.shortDisplayName(),
                     daysSinceUsed = daysSince("prepType", type.name),
                     // Lock badge only on the HYPER chip (lower-right corner)
-                    hyperRemainingLockDays = if (type == PrepType.HYPER) hyperRemainingLockDays else null
+                    hyperRemainingLockDays = if (type == PrepType.HYPER) hyperRemainingLockDays else null,
+                    // Staleness lock on the RESONANCE chip: no resonance breathing
+                    // session ended within the last ~5 minutes.
+                    locked = type == PrepType.RESONANCE && resonancePrepLocked
                 )
             }
         }
@@ -754,7 +760,8 @@ private fun SettingChip(
     onClick: () -> Unit,
     label: String,
     daysSinceUsed: Int?,
-    hyperRemainingLockDays: Int? = null
+    hyperRemainingLockDays: Int? = null,
+    locked: Boolean = false
 ) {
     Box {
         FilterChip(
@@ -786,6 +793,21 @@ private fun SettingChip(
         if (hyperRemainingLockDays != null && hyperRemainingLockDays > 0) {
             Text(
                 text = "🔒$hyperRemainingLockDays",
+                fontSize = 9.sp,
+                lineHeight = 11.sp,
+                color = TextPrimary,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .border(1.dp, TextSecondary, RoundedCornerShape(4.dp))
+                    .padding(horizontal = 2.dp, vertical = 1.dp)
+                    .grayscale()
+            )
+        }
+        // Generic staleness lock (RESONANCE chip) — lower-right corner, shown
+        // only while locked. Clears the moment a fresh resonance session is saved.
+        if (locked && (hyperRemainingLockDays == null || hyperRemainingLockDays <= 0)) {
+            Text(
+                text = "🔒",
                 fontSize = 9.sp,
                 lineHeight = 11.sp,
                 color = TextPrimary,

@@ -84,5 +84,13 @@ data class ApneaRecordEntity(
     val eucapnicBottomPauseSec: Float? = null,
     /** Eucapnic prep: breath depth as a percentage of vital capacity (0–100). Null when prepType != EUCAPNIC_DIAPHRAGMATIC. */
     @ColumnInfo(defaultValue = "NULL")
-    val eucapnicBreathDepthPercent: Int? = null
+    val eucapnicBreathDepthPercent: Int? = null,
+    /**
+     * sessionId of the resonance breathing session that immediately preceded this
+     * hold/drill (prepType == RESONANCE). The resonance session must have ended
+     * within ~5 minutes before the apnea activity started to be linked.
+     * Null when prepType != RESONANCE or no matching resonance session exists.
+     */
+    @ColumnInfo(defaultValue = "NULL")
+    val resonanceSessionId: Long? = null
 )

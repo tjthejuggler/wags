@@ -30,6 +30,7 @@ import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
 import com.example.wags.domain.usecase.apnea.GuidedAudioManager
 import com.example.wags.domain.usecase.apnea.HyperLockManager
+import com.example.wags.domain.usecase.apnea.ResonancePrepGate
 import com.example.wags.domain.usecase.apnea.MinBreathHoldResult
 import com.example.wags.domain.usecase.apnea.MinBreathPhase
 import com.example.wags.domain.usecase.apnea.MinBreathState
@@ -126,7 +127,9 @@ data class MinBreathUiState(
     val newPersonalBest: PersonalBestResult? = null,
     // ── Record-breaking forecast ──────────────────────────────────────────────
     /** Forecast for the current settings combination. Null when insufficient data. */
-    val recordForecast: RecordForecast? = null
+    val recordForecast: RecordForecast? = null,
+    /** True when no resonance breathing session ended within the last ~5 minutes (RESONANCE prep locked). */
+    val resonancePrepLocked: Boolean = false
 )
 
 data class DurationHistory(
@@ -152,6 +155,7 @@ class MinBreathViewModel @Inject constructor(
     private val guidedAudioManager: GuidedAudioManager,
     private val eucapnicConfigRepository: EucapnicConfigRepository,
     private val hyperLockManager: HyperLockManager,
+    private val resonancePrepGate: ResonancePrepGate,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
@@ -234,6 +238,16 @@ class MinBreathViewModel @Inject constructor(
                 voiceEnabled = audioHapticEngine.voiceEnabled,
                 vibrationEnabled = audioHapticEngine.vibrationEnabled
             )
+        }
+
+        // ── Resonance prep staleness lock ──────────────────────────────────────
+        viewModelScope.launch {
+            resonancePrepGate.isLocked.collect { locked ->
+                _uiState.update { it.copy(resonancePrepLocked = locked) }
+                if (locked && _uiState.value.prepType == PrepType.RESONANCE.name) {
+                    applyPrepType(PrepType.NO_PREP.name)
+                }
+            }
         }
 
         // Collect guided audio library from DB
@@ -354,6 +368,12 @@ class MinBreathViewModel @Inject constructor(
         if (v == PrepType.HYPER.name) {
             viewModelScope.launch {
                 if (!hyperLockManager.isLocked()) applyPrepType(v)
+            }
+        } else if (v == PrepType.RESONANCE.name) {
+            // RESONANCE prep is staleness-locked: it needs a resonance breathing
+            // session that ended within the last ~5 minutes.
+            viewModelScope.launch {
+                if (!resonancePrepGate.isLockedNow()) applyPrepType(v)
             }
         } else {
             applyPrepType(v)

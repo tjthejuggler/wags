@@ -48,6 +48,7 @@ import com.example.wags.domain.usecase.apnea.ApneaStateMachine
 import com.example.wags.domain.usecase.apnea.ApneaTableGenerator
 import com.example.wags.domain.usecase.apnea.GuidedAudioManager
 import com.example.wags.domain.usecase.apnea.HyperLockManager
+import com.example.wags.domain.usecase.apnea.ResonancePrepGate
 import com.example.wags.domain.usecase.apnea.forecast.ForecastSettings
 import com.example.wags.domain.usecase.apnea.forecast.RecordForecast
 import com.example.wags.domain.usecase.apnea.forecast.RecordForecastCalculator
@@ -222,6 +223,8 @@ data class ApneaUiState(
     // ── Hyper time-lock + per-setting last-used badges ─────────────────────────
     /** Whole days left until HYPER unlocks (0 = unlocked or never used). */
     val hyperRemainingLockDays: Int = 0,
+    /** True when no resonance breathing session ended within the last ~5 minutes (RESONANCE prep locked). */
+    val resonancePrepLocked: Boolean = false,
     /**
      * Last-use timestamp (epoch ms) per setting column → setting value name.
      * Keys: "lungVolume", "prepType", "timeOfDay", "posture", "audio".
@@ -247,6 +250,7 @@ class ApneaViewModel @Inject constructor(
     private val guidedAudioManager: GuidedAudioManager,
     private val forecastCalibrationDao: ForecastCalibrationDao,
     private val hyperLockManager: HyperLockManager,
+    private val resonancePrepGate: ResonancePrepGate,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
@@ -523,6 +527,19 @@ class ApneaViewModel @Inject constructor(
                 // finishing a HYPER session, or when restoring a stale persisted
                 // selection on launch).
                 if (_prepType.value == PrepType.HYPER && _uiState.value.hyperRemainingLockDays > 0) {
+                    setPrepType(PrepType.NO_PREP)
+                }
+            }
+        }
+        // ── Resonance prep staleness lock ────────────────────────────────────────
+        // RESONANCE prep requires a resonance breathing session that ended within
+        // the last ~5 minutes. The ticker re-emits every couple of seconds so the
+        // lock engages (and the selection auto-deselects) the moment the window
+        // elapses, and clears instantly when a fresh resonance session is saved.
+        viewModelScope.launch {
+            resonancePrepGate.isLocked.collect { locked ->
+                _uiState.update { it.copy(resonancePrepLocked = locked) }
+                if (locked && _prepType.value == PrepType.RESONANCE) {
                     setPrepType(PrepType.NO_PREP)
                 }
             }
@@ -1375,6 +1392,9 @@ class ApneaViewModel @Inject constructor(
     fun setPrepType(type: PrepType) {
         // HYPER is time-locked: ignore attempts to select it while locked.
         if (type == PrepType.HYPER && _uiState.value.hyperRemainingLockDays > 0) return
+        // RESONANCE prep is staleness-locked: no resonance breathing session ended
+        // within the last ~5 minutes.
+        if (type == PrepType.RESONANCE && _uiState.value.resonancePrepLocked) return
 
         _prepType.value = type
         _uiState.update { it.copy(prepType = type) }

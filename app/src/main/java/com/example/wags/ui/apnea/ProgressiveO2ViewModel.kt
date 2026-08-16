@@ -29,6 +29,7 @@ import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
 import com.example.wags.domain.usecase.apnea.GuidedAudioManager
 import com.example.wags.domain.usecase.apnea.HyperLockManager
+import com.example.wags.domain.usecase.apnea.ResonancePrepGate
 import com.example.wags.domain.usecase.apnea.ProgressiveO2Phase
 import com.example.wags.domain.usecase.apnea.ProgressiveO2RoundResult
 import com.example.wags.domain.usecase.apnea.ProgressiveO2State
@@ -124,7 +125,9 @@ data class ProgressiveO2UiState(
     /** True after the guided countdown has completed — button reverts to plain START. */
     val guidedCountdownComplete: Boolean = false,
     /** True when the user wants the guided MP3 to start playing during the hyper countdown. */
-    val startMp3WithHyper: Boolean = false
+    val startMp3WithHyper: Boolean = false,
+    /** True when no resonance breathing session ended within the last ~5 minutes (RESONANCE prep locked). */
+    val resonancePrepLocked: Boolean = false
 )
 
 data class BreathPeriodHistory(
@@ -153,6 +156,7 @@ class ProgressiveO2ViewModel @Inject constructor(
     private val guidedAudioManager: GuidedAudioManager,
     private val eucapnicConfigRepository: EucapnicConfigRepository,
     private val hyperLockManager: HyperLockManager,
+    private val resonancePrepGate: ResonancePrepGate,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
@@ -229,6 +233,16 @@ class ProgressiveO2ViewModel @Inject constructor(
             )
         }
 
+        // ── Resonance prep staleness lock ──────────────────────────────────────
+        viewModelScope.launch {
+            resonancePrepGate.isLocked.collect { locked ->
+                _uiState.update { it.copy(resonancePrepLocked = locked) }
+                if (locked && _uiState.value.prepType == PrepType.RESONANCE.name) {
+                    applyPrepType(PrepType.NO_PREP.name)
+                }
+            }
+        }
+
         // Collect guided audio library from DB
         viewModelScope.launch {
             guidedAudioManager.allAudios.collect { audios ->
@@ -300,6 +314,12 @@ class ProgressiveO2ViewModel @Inject constructor(
         if (v == PrepType.HYPER.name) {
             viewModelScope.launch {
                 if (!hyperLockManager.isLocked()) applyPrepType(v)
+            }
+        } else if (v == PrepType.RESONANCE.name) {
+            // RESONANCE prep is staleness-locked: it needs a resonance breathing
+            // session that ended within the last ~5 minutes.
+            viewModelScope.launch {
+                if (!resonancePrepGate.isLockedNow()) applyPrepType(v)
             }
         } else {
             applyPrepType(v)

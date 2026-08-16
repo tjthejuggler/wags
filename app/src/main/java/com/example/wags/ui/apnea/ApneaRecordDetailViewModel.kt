@@ -9,8 +9,10 @@ import com.example.wags.data.ble.DevicePreferencesRepository
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.ApneaSessionEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
+import com.example.wags.data.db.entity.ResonanceSessionEntity
 import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.data.repository.ApneaSessionRepository
+import com.example.wags.data.repository.ResonanceSessionRepository
 import com.example.wags.data.spotify.SpotifyApiClient
 import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.DrillContext
@@ -65,7 +67,13 @@ data class ApneaRecordDetailUiState(
     /** Index of the currently displayed record in [allRecordIds]. */
     val currentIndex: Int = 0,
     /** Eucapnic configuration used for this record (null if not EUCAPNIC_DIAPHRAGMATIC). */
-    val eucapnicConfig: com.example.wags.domain.model.EucapnicConfig? = null
+    val eucapnicConfig: com.example.wags.domain.model.EucapnicConfig? = null,
+    /**
+     * Resonance breathing session linked to this record (prepType == RESONANCE) —
+     * the session the user completed just before the hold/drill. Null when the
+     * prep type is not RESONANCE or no session could be linked.
+     */
+    val resonanceSession: ResonanceSessionEntity? = null
 )
 
 @HiltViewModel
@@ -73,6 +81,7 @@ class ApneaRecordDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val apneaRepository: ApneaRepository,
     private val sessionRepository: ApneaSessionRepository,
+    private val resonanceSessionRepository: ResonanceSessionRepository,
     private val devicePrefs: DevicePreferencesRepository,
     private val spotifyApiClient: SpotifyApiClient,
     @Named("apnea_prefs") private val prefs: SharedPreferences
@@ -113,6 +122,9 @@ class ApneaRecordDetailViewModel @Inject constructor(
                     // For now, create a default config
                     com.example.wags.domain.model.EucapnicConfig()
                 } else null
+
+                // Load the linked resonance breathing session (RESONANCE prep)
+                val resonanceSession = loadResonanceSession(record)
                 
                 _uiState.update {
                     it.copy(
@@ -125,7 +137,8 @@ class ApneaRecordDetailViewModel @Inject constructor(
                         isLoading    = false,
                         allRecordIds = allIds,
                         currentIndex = startIndex,
-                        eucapnicConfig = eucapnicConfig
+                        eucapnicConfig = eucapnicConfig,
+                        resonanceSession = resonanceSession
                     )
                 }
             }
@@ -159,7 +172,8 @@ class ApneaRecordDetailViewModel @Inject constructor(
                         pbBadges     = badges,
                         trophyCount  = trophyCount,
                         songLog      = songLog,
-                        tableSession = tableSession
+                        tableSession = tableSession,
+                        resonanceSession = loadResonanceSession(record)
                     )
                 }
             }
@@ -201,12 +215,17 @@ class ApneaRecordDetailViewModel @Inject constructor(
                         tableSession = tableSession,
                         isLoading    = false,
                         allRecordIds = newIds,
-                        currentIndex = newIndex
+                        currentIndex = newIndex,
+                        resonanceSession = loadResonanceSession(record)
                     )
                 }
             }
         }
     }
+
+    /** Loads the resonance breathing session linked to the given record, if any. */
+    private suspend fun loadResonanceSession(record: ApneaRecordEntity): ResonanceSessionEntity? =
+        record.resonanceSessionId?.let { resonanceSessionRepository.getById(it) }
 
     // ── Edit sheet ────────────────────────────────────────────────────────────
 
@@ -277,9 +296,20 @@ class ApneaRecordDetailViewModel @Inject constructor(
                 hrDeviceId = state.editHrDeviceId
             )
             apneaRepository.updateRecord(updated)
+            // Re-fetch: the repository may have linked/cleared the resonance
+            // session reference based on the edited prep type.
+            val fresh = apneaRepository.getById(record.recordId) ?: updated
             val badges = apneaRepository.getRecordPbBadges(record.recordId)
-            val trophyCount = computeTrophyCount(record.recordId, updated, badges)
-            _uiState.update { it.copy(record = updated, pbBadges = badges, trophyCount = trophyCount, showEditSheet = false) }
+            val trophyCount = computeTrophyCount(record.recordId, fresh, badges)
+            _uiState.update {
+                it.copy(
+                    record = fresh,
+                    pbBadges = badges,
+                    trophyCount = trophyCount,
+                    showEditSheet = false,
+                    resonanceSession = loadResonanceSession(fresh)
+                )
+            }
         }
     }
 
