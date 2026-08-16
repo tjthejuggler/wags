@@ -421,4 +421,29 @@ interface FreeHoldTelemetryDao {
         ORDER BY t.spO2 ASC LIMIT 1
     """)
     fun getMinEndSpO2RecordIdAll(): Flow<Long?>
+
+    // ── Bulk per-record boundary samples (ranked holds drill-down) ─────────────
+    // One row per record: the first / last telemetry sample, for ALL records at
+    // once. Used by the ranked holds list to compute start/end metrics in a
+    // single query instead of one query per record.
+
+    @Query("""
+        SELECT t.*
+        FROM free_hold_telemetry t
+        INNER JOIN (
+            SELECT recordId, MIN(timestampMs) AS firstTs FROM free_hold_telemetry GROUP BY recordId
+        ) first ON first.recordId = t.recordId AND t.timestampMs = first.firstTs
+        GROUP BY t.recordId
+    """)
+    suspend fun getFirstSamplesOnce(): List<FreeHoldTelemetryEntity>
+
+    @Query("""
+        SELECT t.*
+        FROM free_hold_telemetry t
+        INNER JOIN (
+            SELECT recordId, MAX(timestampMs) AS lastTs FROM free_hold_telemetry GROUP BY recordId
+        ) last ON last.recordId = t.recordId AND t.timestampMs = last.lastTs
+        GROUP BY t.recordId
+    """)
+    suspend fun getLastSamplesOnce(): List<FreeHoldTelemetryEntity>
 }

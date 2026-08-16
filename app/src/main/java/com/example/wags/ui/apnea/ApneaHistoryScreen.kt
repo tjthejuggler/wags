@@ -26,6 +26,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -156,6 +157,19 @@ fun ApneaHistoryScreen(
                     },
                     onTimeChartClick = { metricType, drillType, title ->
                         navController.navigate(WagsRoutes.timeChart(metricType, drillType, title))
+                    },
+                    onRankedHoldsClick = { metricKey ->
+                        navController.navigate(
+                            WagsRoutes.holdsRanked(
+                                metricKey = metricKey,
+                                lungVolume = state.lungVolume,
+                                prepType = state.prepType,
+                                timeOfDay = state.timeOfDay,
+                                posture = state.posture,
+                                audio = state.audio,
+                                showAll = state.showAllStats
+                            )
+                        )
                     },
                     onSetLungVolume = { viewModel.setLungVolume(it) },
                     onSetPrepType   = { viewModel.setPrepType(it) },
@@ -627,6 +641,7 @@ private fun StatsTabContent(
     onToggleShowAll: () -> Unit,
     onRecordClick: (Long) -> Unit,
     onTimeChartClick: (metricType: String, drillType: String, title: String) -> Unit,
+    onRankedHoldsClick: (metricKey: String) -> Unit,
     onSetLungVolume: (String) -> Unit,
     onSetPrepType: (String) -> Unit,
     onSetTimeOfDay: (String) -> Unit,
@@ -703,7 +718,8 @@ private fun StatsTabContent(
             stats = stats,
             trophyStats = state.trophyStats,
             onRecordClick = onRecordClick,
-            onTimeChartClick = onTimeChartClick
+            onTimeChartClick = onTimeChartClick,
+            onRankedHoldsClick = onRankedHoldsClick
         )
     }
 }
@@ -1108,7 +1124,8 @@ private fun ApneaStatsContent(
     stats: ApneaStats,
     trophyStats: TrophyStats = TrophyStats(),
     onRecordClick: (Long) -> Unit,
-    onTimeChartClick: (metricType: String, drillType: String, title: String) -> Unit
+    onTimeChartClick: (metricType: String, drillType: String, title: String) -> Unit,
+    onRankedHoldsClick: (metricKey: String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         // Activity counts
@@ -1207,9 +1224,12 @@ private fun ApneaStatsContent(
             color = TextPrimary
         )
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            HistoryExtremeRow("Highest HR",   stats.maxHrEver?.let { "%.0f bpm".format(it) } ?: "—", stats.maxHrEverRecordId, onRecordClick)
-            HistoryExtremeRow("Lowest HR",    stats.minHrEver?.let { "%.0f bpm".format(it) } ?: "—", stats.minHrEverRecordId, onRecordClick)
-            HistoryExtremeRow("Lowest SpO₂",  stats.lowestSpO2Ever?.let { "$it%" } ?: "—",           stats.lowestSpO2EverRecordId, onRecordClick)
+            HistoryExtremeRow("Highest HR",   stats.maxHrEver?.let { "%.0f bpm".format(it) } ?: "—", stats.maxHrEverRecordId, onRecordClick,
+                onLabelClick = { onRankedHoldsClick(RankedHoldMetric.MAX_HR.key) })
+            HistoryExtremeRow("Lowest HR",    stats.minHrEver?.let { "%.0f bpm".format(it) } ?: "—", stats.minHrEverRecordId, onRecordClick,
+                onLabelClick = { onRankedHoldsClick(RankedHoldMetric.MIN_HR.key) })
+            HistoryExtremeRow("Lowest SpO₂",  stats.lowestSpO2Ever?.let { "$it%" } ?: "—",           stats.lowestSpO2EverRecordId, onRecordClick,
+                onLabelClick = { onRankedHoldsClick(RankedHoldMetric.LOWEST_SPO2.key) })
         }
 
         HorizontalDivider(color = SurfaceVariant)
@@ -1221,10 +1241,14 @@ private fun ApneaStatsContent(
             color = TextPrimary
         )
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            HistoryExtremeRow("Highest HR at start",  stats.maxStartHr?.let { "$it bpm" } ?: "—",  stats.maxStartHrRecordId, onRecordClick)
-            HistoryExtremeRow("Lowest HR at start",   stats.minStartHr?.let { "$it bpm" } ?: "—",  stats.minStartHrRecordId, onRecordClick)
-            HistoryExtremeRow("Highest SpO₂ at start",stats.maxStartSpO2?.let { "$it%" } ?: "—",   stats.maxStartSpO2RecordId, onRecordClick)
-            HistoryExtremeRow("Lowest SpO₂ at start", stats.minStartSpO2?.let { "$it%" } ?: "—",   stats.minStartSpO2RecordId, onRecordClick)
+            HistoryExtremeRow("Highest HR at start",  stats.maxStartHr?.let { "$it bpm" } ?: "—",  stats.maxStartHrRecordId, onRecordClick,
+                onLabelClick = { onRankedHoldsClick(RankedHoldMetric.MAX_START_HR.key) })
+            HistoryExtremeRow("Lowest HR at start",   stats.minStartHr?.let { "$it bpm" } ?: "—",  stats.minStartHrRecordId, onRecordClick,
+                onLabelClick = { onRankedHoldsClick(RankedHoldMetric.MIN_START_HR.key) })
+            HistoryExtremeRow("Highest SpO₂ at start",stats.maxStartSpO2?.let { "$it%" } ?: "—",   stats.maxStartSpO2RecordId, onRecordClick,
+                onLabelClick = { onRankedHoldsClick(RankedHoldMetric.MAX_START_SPO2.key) })
+            HistoryExtremeRow("Lowest SpO₂ at start", stats.minStartSpO2?.let { "$it%" } ?: "—",   stats.minStartSpO2RecordId, onRecordClick,
+                onLabelClick = { onRankedHoldsClick(RankedHoldMetric.MIN_START_SPO2.key) })
         }
 
         HorizontalDivider(color = SurfaceVariant)
@@ -1236,10 +1260,14 @@ private fun ApneaStatsContent(
             color = TextPrimary
         )
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            HistoryExtremeRow("Highest HR at end",   stats.maxEndHr?.let { "$it bpm" } ?: "—",   stats.maxEndHrRecordId, onRecordClick)
-            HistoryExtremeRow("Lowest HR at end",    stats.minEndHr?.let { "$it bpm" } ?: "—",   stats.minEndHrRecordId, onRecordClick)
-            HistoryExtremeRow("Highest SpO₂ at end", stats.maxEndSpO2?.let { "$it%" } ?: "—",    stats.maxEndSpO2RecordId, onRecordClick)
-            HistoryExtremeRow("Lowest SpO₂ at end",  stats.minEndSpO2?.let { "$it%" } ?: "—",    stats.minEndSpO2RecordId, onRecordClick)
+            HistoryExtremeRow("Highest HR at end",   stats.maxEndHr?.let { "$it bpm" } ?: "—",   stats.maxEndHrRecordId, onRecordClick,
+                onLabelClick = { onRankedHoldsClick(RankedHoldMetric.MAX_END_HR.key) })
+            HistoryExtremeRow("Lowest HR at end",    stats.minEndHr?.let { "$it bpm" } ?: "—",    stats.minEndHrRecordId, onRecordClick,
+                onLabelClick = { onRankedHoldsClick(RankedHoldMetric.MIN_END_HR.key) })
+            HistoryExtremeRow("Highest SpO₂ at end", stats.maxEndSpO2?.let { "$it%" } ?: "—",     stats.maxEndSpO2RecordId, onRecordClick,
+                onLabelClick = { onRankedHoldsClick(RankedHoldMetric.MAX_END_SPO2.key) })
+            HistoryExtremeRow("Lowest SpO₂ at end",  stats.minEndSpO2?.let { "$it%" } ?: "—",     stats.minEndSpO2RecordId, onRecordClick,
+                onLabelClick = { onRankedHoldsClick(RankedHoldMetric.MIN_END_SPO2.key) })
         }
     }
 }
@@ -1367,7 +1395,9 @@ private fun HistoryExtremeRow(
     label: String,
     value: String,
     recordId: Long?,
-    onRecordClick: (Long) -> Unit
+    onRecordClick: (Long) -> Unit,
+    /** When set, the label itself opens the ranked list of all holds for this metric. */
+    onLabelClick: (() -> Unit)? = null
 ) {
     val clickable = recordId != null
     Surface(
@@ -1381,7 +1411,15 @@ private fun HistoryExtremeRow(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(label, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+            Text(
+                label,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (onLabelClick != null) TextPrimary else TextSecondary,
+                textDecoration = if (onLabelClick != null) TextDecoration.Underline else null,
+                modifier = Modifier.then(
+                    if (onLabelClick != null) Modifier.clickable { onLabelClick() } else Modifier
+                )
+            )
             Row(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -1413,7 +1451,8 @@ private fun HistoryStatsRow(label: String, value: String, bold: Boolean = false,
             label,
             style = MaterialTheme.typography.bodySmall,
             color = if (bold) TextPrimary else TextSecondary,
-            fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal
+            fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
+            textDecoration = if (onClick != null) TextDecoration.Underline else null
         )
         Text(
             value,

@@ -22,6 +22,7 @@ import com.example.wags.ui.apnea.ApneaTableScreen
 import com.example.wags.ui.apnea.EucapnicPacerScreen
 import com.example.wags.ui.apnea.EucapnicSetupScreen
 import com.example.wags.ui.apnea.FreeHoldActiveScreen
+import com.example.wags.ui.apnea.HoldsRankedListScreen
 import com.example.wags.ui.apnea.PbChartScreen
 import com.example.wags.ui.apnea.TimeChartScreen
 import com.example.wags.ui.apnea.TrophyChartScreen
@@ -120,6 +121,9 @@ object WagsRoutes {
     // ── Time Chart (stats drill-down) ─────────────────────────────────────────
     const val TIME_CHART = "time_chart?metricType={metricType}&drillType={drillType}&title={title}"
 
+    // ── Ranked holds list (stats extremes drill-down) ──────────────────────────
+    const val HOLDS_RANKED = "holds_ranked/{metricKey}/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{audio}/{showAll}"
+
     // ── Rapid HR Change ───────────────────────────────────────────────────────
     const val RAPID_HR = "rapid_hr"
     const val RAPID_HR_HISTORY = "rapid_hr_history"
@@ -215,6 +219,21 @@ object WagsRoutes {
         drillType: String,
         title: String
     ) = "time_chart?metricType=$metricType&drillType=$drillType&title=${URLEncoder.encode(title, "UTF-8")}"
+
+    /**
+     * Navigate to the ranked holds list for a stats extremes metric
+     * (e.g. LOWEST_SPO2, MAX_HR). The settings + showAll flags mirror the
+     * Stats tab context the user clicked from.
+     */
+    fun holdsRanked(
+        metricKey: String,
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        posture: String,
+        audio: String,
+        showAll: Boolean
+    ) = "holds_ranked/$metricKey/$lungVolume/$prepType/$timeOfDay/$posture/$audio/$showAll"
 }
 
 @Composable
@@ -646,6 +665,26 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             TimeChartScreen(
                 onBack = { navController.popBackStack() },
                 onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) }
+            )
+        }
+        // ── Ranked holds list (stats extremes drill-down) ────────────────────
+        composable(
+            route = WagsRoutes.HOLDS_RANKED,
+            arguments = listOf(
+                navArgument("metricKey")  { type = NavType.StringType },
+                navArgument("lungVolume") { type = NavType.StringType; defaultValue = "ALL" },
+                navArgument("prepType")   { type = NavType.StringType; defaultValue = "ALL" },
+                navArgument("timeOfDay")  { type = NavType.StringType; defaultValue = "ALL" },
+                navArgument("posture")    { type = NavType.StringType; defaultValue = "ALL" },
+                navArgument("audio")      { type = NavType.StringType; defaultValue = "ALL" },
+                navArgument("showAll")    { type = NavType.BoolType; defaultValue = false }
+            )
+        ) {
+            HoldsRankedListScreen(
+                onBack = { navController.popBackStack() },
+                onRecordClick = { recordId ->
+                    navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
+                }
             )
         }
         // ── Garmin Watch ────────────────────────────────────────────────────

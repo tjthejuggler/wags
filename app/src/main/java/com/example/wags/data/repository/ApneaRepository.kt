@@ -1256,6 +1256,14 @@ class ApneaRepository @Inject constructor(
     suspend fun getTelemetryForRecord(recordId: Long): List<FreeHoldTelemetryEntity> =
         telemetryDao.getForRecord(recordId)
 
+    /** One-shot: the first telemetry sample of every record (keyed by recordId) — ranked holds drill-down. */
+    suspend fun getFirstTelemetrySamplesOnce(): Map<Long, FreeHoldTelemetryEntity> =
+        withContext(ioDispatcher) { telemetryDao.getFirstSamplesOnce().associateBy { it.recordId } }
+
+    /** One-shot: the last telemetry sample of every record (keyed by recordId) — ranked holds drill-down. */
+    suspend fun getLastTelemetrySamplesOnce(): Map<Long, FreeHoldTelemetryEntity> =
+        withContext(ioDispatcher) { telemetryDao.getLastSamplesOnce().associateBy { it.recordId } }
+
     // ── Song log ──────────────────────────────────────────────────────────────
 
     suspend fun saveSongLog(recordId: Long, songs: List<SpotifySong>) =

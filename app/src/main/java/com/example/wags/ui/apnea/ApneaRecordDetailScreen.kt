@@ -1044,7 +1044,7 @@ private fun RecordDetailContent(
                             sessionDurationMs = sessionTotalDurationMs,
                             holds = sessionHolds,
                             showYLabels = false,
-                            yMin = 70f,
+                            // No yMin floor — the chart extends down to the lowest actual reading
                             yMax = 100f,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1059,7 +1059,7 @@ private fun RecordDetailContent(
                             samples = spO2Values,
                             lineColor = SpO2Blue,
                             unit = "%",
-                            yMin = 70f,
+                            // No yMin floor — the chart extends down to the lowest actual reading
                             yMax = 100f,
                             durationMs = spO2ChartDurationMs,
                             firstContractionMs = record.firstContractionMs,
