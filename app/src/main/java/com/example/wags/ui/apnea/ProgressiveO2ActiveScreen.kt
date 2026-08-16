@@ -37,11 +37,28 @@ import com.example.wags.ui.theme.*
 @Composable
 fun ProgressiveO2ActiveScreen(
     navController: NavController,
-    viewModel: ProgressiveO2ViewModel = hiltViewModel()
+    viewModel: ProgressiveO2ViewModel = hiltViewModel(),
+    eucapnicConfigViewModel: EucapnicConfigViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val eucapnicConfig by eucapnicConfigViewModel.config.collectAsStateWithLifecycle()
     val phase = state.sessionState.phase
     val isActive = phase == ProgressiveO2Phase.HOLD || phase == ProgressiveO2Phase.BREATHING
+
+    // Seed-or-mirror the eucapnic config (EucapnicConfigViewModel is the
+    // persisted app-wide source of truth). Seeds this screen's ViewModel when
+    // it has no config yet; mirrors dialog edits back so they persist and are
+    // shared across screens.
+    LaunchedEffect(state.prepType, eucapnicConfig, state.eucapnicConfig) {
+        if (state.prepType != PrepType.EUCAPNIC_DIAPHRAGMATIC.name) return@LaunchedEffect
+        val screenConfig = state.eucapnicConfig
+        when {
+            screenConfig == null && eucapnicConfig != null ->
+                viewModel.updateEucapnicConfig(eucapnicConfig)
+            screenConfig != null && screenConfig != eucapnicConfig ->
+                eucapnicConfigViewModel.updateConfig(screenConfig)
+        }
+    }
 
     PipSessionHost(
         pipEnabled = true, // always eligible: covers pre-start, active, and result phases

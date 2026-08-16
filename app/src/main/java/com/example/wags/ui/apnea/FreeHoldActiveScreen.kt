@@ -1313,11 +1313,36 @@ fun FreeHoldActiveScreen(
     val pastConfigurations by eucapnicConfigViewModel.pastConfigurations.collectAsStateWithLifecycle()
     val eucapnicConfig by eucapnicConfigViewModel.config.collectAsStateWithLifecycle()
 
-    // Update FreeHoldActiveViewModel with eucapnic config when EUCAPNIC_DIAPHRAGMATIC is selected
-    LaunchedEffect(prepType, eucapnicConfig) {
-        if (prepType == PrepType.EUCAPNIC_DIAPHRAGMATIC.name) {
-            viewModel.updateEucapnicConfig(eucapnicConfig)
+    // Seed-or-mirror the eucapnic config. The EucapnicConfigViewModel is the
+    // app-wide, persisted source of truth:
+    //  • When this screen's ViewModel has no config yet, seed it from the
+    //    shared config (restored from prefs — survives pacer round-trips).
+    //  • When the user edits the config in the dialog here, mirror the change
+    //    back so it persists and is shared with the other apnea screens.
+    //    Data-class equality stops the mirror loop.
+    // The old unconditional push reset the user's config to the default every
+    // time this screen recomposed after returning from the eucapnic pacer.
+    LaunchedEffect(state.currentPrepType, eucapnicConfig, state.eucapnicConfig) {
+        if (state.currentPrepType != PrepType.EUCAPNIC_DIAPHRAGMATIC.name) return@LaunchedEffect
+        val screenConfig = state.eucapnicConfig
+        when {
+            screenConfig == null && eucapnicConfig != null ->
+                viewModel.updateEucapnicConfig(eucapnicConfig)
+            screenConfig != null && screenConfig != eucapnicConfig ->
+                eucapnicConfigViewModel.updateConfig(screenConfig)
         }
+    }
+
+    // Consume the "eucapnic prep completed" result set by EucapnicPacerScreen
+    // when the prep finishes and it pops back here. Reading the saved-state map
+    // directly (get) is deterministic — it does not depend on StateFlow
+    // propagation timing after popBackStack(), so the START button reliably
+    // switches to HOLD mode.
+    LaunchedEffect(Unit) {
+        val completed = navController.currentBackStackEntry
+            ?.savedStateHandle
+            ?.get<Boolean>("eucapnic_prep_completed") ?: false
+        if (completed) viewModel.setEucapnicPrepCompleted(true)
     }
 
     PipSessionHost(

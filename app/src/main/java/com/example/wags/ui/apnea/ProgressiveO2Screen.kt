@@ -46,10 +46,20 @@ fun ProgressiveO2Screen(
     val pastConfigurations by eucapnicConfigViewModel.pastConfigurations.collectAsStateWithLifecycle()
     val eucapnicConfig by eucapnicConfigViewModel.config.collectAsStateWithLifecycle()
 
-    // Update ProgressiveO2ViewModel with eucapnic config when EUCAPNIC_DIAPHRAGMATIC is selected
-    LaunchedEffect(state.prepType, eucapnicConfig) {
-        if (state.prepType == PrepType.EUCAPNIC_DIAPHRAGMATIC.name) {
-            viewModel.updateEucapnicConfig(eucapnicConfig)
+    // Seed-or-mirror the eucapnic config (EucapnicConfigViewModel is the
+    // persisted app-wide source of truth). Seeds this screen's ViewModel when
+    // it has no config yet; mirrors dialog edits back so they persist and are
+    // shared across screens. The old unconditional push reset the user's
+    // config to the default on every recomposition (e.g. returning from the
+    // eucapnic pacer).
+    LaunchedEffect(state.prepType, eucapnicConfig, state.eucapnicConfig) {
+        if (state.prepType != PrepType.EUCAPNIC_DIAPHRAGMATIC.name) return@LaunchedEffect
+        val screenConfig = state.eucapnicConfig
+        when {
+            screenConfig == null && eucapnicConfig != null ->
+                viewModel.updateEucapnicConfig(eucapnicConfig)
+            screenConfig != null && screenConfig != eucapnicConfig ->
+                eucapnicConfigViewModel.updateConfig(screenConfig)
         }
     }
 

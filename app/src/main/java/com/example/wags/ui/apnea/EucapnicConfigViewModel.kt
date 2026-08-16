@@ -1,5 +1,6 @@
 package com.example.wags.ui.apnea
 
+import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.db.dao.EucapnicPastConfigurationDao
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import javax.inject.Named
 
 /**
  * ViewModel for the Eucapnic Diaphragmatic breathing configuration UI.
@@ -29,13 +31,49 @@ import javax.inject.Inject
 @HiltViewModel
 class EucapnicConfigViewModel @Inject constructor(
     private val scalingEngine: EucapnicScalingEngine,
-    private val pastConfigDao: EucapnicPastConfigurationDao
+    private val pastConfigDao: EucapnicPastConfigurationDao,
+    @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
     // ── Current configuration ─────────────────────────────────────────────
 
-    private val _config = MutableStateFlow(EucapnicConfig())
+    // The current config is the app-wide source of truth for eucapnic prep.
+    // It is restored from SharedPreferences on creation so settings survive
+    // navigating between screens (pacer round-trips) and app restarts.
+    private val _config = MutableStateFlow(restoreSavedConfig())
     val config: StateFlow<EucapnicConfig> = _config.asStateFlow()
+
+    /** Set the config and persist it. */
+    private fun setConfig(config: EucapnicConfig) {
+        _config.value = config
+        persist(config)
+    }
+
+    private fun restoreSavedConfig(): EucapnicConfig {
+        if (!prefs.getBoolean(KEY_CONFIG_SAVED, false)) return EucapnicConfig()
+        return EucapnicConfig(
+            prepDurationSec = prefs.getInt(KEY_PREP_DURATION_SEC, 300),
+            breathsPerMin = prefs.getFloat(KEY_BREATHS_PER_MIN, 5.5f),
+            inhaleSec = prefs.getFloat(KEY_INHALE_SEC, 4.0f),
+            topPauseSec = prefs.getFloat(KEY_TOP_PAUSE_SEC, 0.0f),
+            exhaleSec = prefs.getFloat(KEY_EXHALE_SEC, 6.0f),
+            bottomPauseSec = prefs.getFloat(KEY_BOTTOM_PAUSE_SEC, 0.9f),
+            breathDepthPercent = prefs.getInt(KEY_BREATH_DEPTH_PERCENT, 25)
+        )
+    }
+
+    private fun persist(config: EucapnicConfig) {
+        prefs.edit()
+            .putBoolean(KEY_CONFIG_SAVED, true)
+            .putInt(KEY_PREP_DURATION_SEC, config.prepDurationSec)
+            .putFloat(KEY_BREATHS_PER_MIN, config.breathsPerMin)
+            .putFloat(KEY_INHALE_SEC, config.inhaleSec)
+            .putFloat(KEY_TOP_PAUSE_SEC, config.topPauseSec)
+            .putFloat(KEY_EXHALE_SEC, config.exhaleSec)
+            .putFloat(KEY_BOTTOM_PAUSE_SEC, config.bottomPauseSec)
+            .putInt(KEY_BREATH_DEPTH_PERCENT, config.breathDepthPercent)
+            .apply()
+    }
 
     // ── Saved configurations (most recently used first) ───────────────────
 
@@ -50,10 +88,18 @@ class EucapnicConfigViewModel @Inject constructor(
     // ── Individual parameter updates ──────────────────────────────────────
 
     /**
+     * Replace the whole configuration in one call. Used by session screens to
+     * mirror their dialog edits into this shared, persisted source of truth.
+     */
+    fun updateConfig(config: EucapnicConfig) {
+        setConfig(config)
+    }
+
+    /**
      * Update total prep duration. Does not affect BPM or timers.
      */
     fun updatePrepDuration(seconds: Int) {
-        _config.value = _config.value.copy(prepDurationSec = seconds)
+        setConfig(_config.value.copy(prepDurationSec = seconds))
     }
 
     /**
@@ -62,7 +108,7 @@ class EucapnicConfigViewModel @Inject constructor(
      */
     fun updateBpm(newBpm: Float) {
         val clamped = scalingEngine.clampBpm(newBpm)
-        _config.value = scalingEngine.scaleTimersFromBpm(_config.value, clamped)
+        setConfig(scalingEngine.scaleTimersFromBpm(_config.value, clamped))
     }
 
     /**
@@ -70,7 +116,7 @@ class EucapnicConfigViewModel @Inject constructor(
      */
     fun updateInhale(seconds: Float) {
         val updated = _config.value.copy(inhaleSec = seconds)
-        _config.value = scalingEngine.updateBpmFromTimerChange(updated)
+        setConfig(scalingEngine.updateBpmFromTimerChange(updated))
     }
 
     /**
@@ -78,7 +124,7 @@ class EucapnicConfigViewModel @Inject constructor(
      */
     fun updateTopPause(seconds: Float) {
         val updated = _config.value.copy(topPauseSec = seconds)
-        _config.value = scalingEngine.updateBpmFromTimerChange(updated)
+        setConfig(scalingEngine.updateBpmFromTimerChange(updated))
     }
 
     /**
@@ -86,7 +132,7 @@ class EucapnicConfigViewModel @Inject constructor(
      */
     fun updateExhale(seconds: Float) {
         val updated = _config.value.copy(exhaleSec = seconds)
-        _config.value = scalingEngine.updateBpmFromTimerChange(updated)
+        setConfig(scalingEngine.updateBpmFromTimerChange(updated))
     }
 
     /**
@@ -94,14 +140,14 @@ class EucapnicConfigViewModel @Inject constructor(
      */
     fun updateBottomPause(seconds: Float) {
         val updated = _config.value.copy(bottomPauseSec = seconds)
-        _config.value = scalingEngine.updateBpmFromTimerChange(updated)
+        setConfig(scalingEngine.updateBpmFromTimerChange(updated))
     }
 
     /**
      * Update breath depth target. Does not affect BPM or timers.
      */
     fun updateBreathDepth(percent: Int) {
-        _config.value = _config.value.copy(breathDepthPercent = percent)
+        setConfig(_config.value.copy(breathDepthPercent = percent))
     }
 
     // ── Persistence ───────────────────────────────────────────────────────
@@ -132,14 +178,16 @@ class EucapnicConfigViewModel @Inject constructor(
      * and last-used timestamp so it floats to the top of the list.
      */
     fun loadConfiguration(entity: EucapnicPastConfigurationEntity) {
-        _config.value = EucapnicConfig(
-            prepDurationSec = entity.prepDurationSec,
-            breathsPerMin = entity.breathsPerMin,
-            inhaleSec = entity.inhaleSec,
-            topPauseSec = entity.topPauseSec,
-            exhaleSec = entity.exhaleSec,
-            bottomPauseSec = entity.bottomPauseSec,
-            breathDepthPercent = entity.breathDepthPercent
+        setConfig(
+            EucapnicConfig(
+                prepDurationSec = entity.prepDurationSec,
+                breathsPerMin = entity.breathsPerMin,
+                inhaleSec = entity.inhaleSec,
+                topPauseSec = entity.topPauseSec,
+                exhaleSec = entity.exhaleSec,
+                bottomPauseSec = entity.bottomPauseSec,
+                breathDepthPercent = entity.breathDepthPercent
+            )
         )
         viewModelScope.launch {
             pastConfigDao.incrementUseCount(entity.configId, System.currentTimeMillis())
@@ -157,5 +205,13 @@ class EucapnicConfigViewModel @Inject constructor(
 
     companion object {
         private const val DEFAULT_CONFIG_NAME = "Unnamed configuration"
+        private const val KEY_CONFIG_SAVED = "eucapnic_config_saved"
+        private const val KEY_PREP_DURATION_SEC = "eucapnic_prep_duration_sec"
+        private const val KEY_BREATHS_PER_MIN = "eucapnic_breaths_per_min"
+        private const val KEY_INHALE_SEC = "eucapnic_inhale_sec"
+        private const val KEY_TOP_PAUSE_SEC = "eucapnic_top_pause_sec"
+        private const val KEY_EXHALE_SEC = "eucapnic_exhale_sec"
+        private const val KEY_BOTTOM_PAUSE_SEC = "eucapnic_bottom_pause_sec"
+        private const val KEY_BREATH_DEPTH_PERCENT = "eucapnic_breath_depth_percent"
     }
 }
