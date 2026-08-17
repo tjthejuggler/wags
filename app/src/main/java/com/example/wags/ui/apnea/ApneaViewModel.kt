@@ -82,6 +82,16 @@ enum class ApneaSection {
     STATS
 }
 
+/**
+ * Corner-badge info for an accordion section: last-use timestamp (epoch ms)
+ * with ANY settings vs. with the EXACT currently selected settings combo.
+ * Null timestamps mean the session type has never been done under that constraint.
+ */
+data class SectionLastUse(
+    val anySettingsMs: Long? = null,
+    val currentSettingsMs: Long? = null
+)
+
 data class ApneaUiState(
     val apneaState: ApneaState = ApneaState.IDLE,
     val currentRound: Int = 0,
@@ -225,6 +235,18 @@ data class ApneaUiState(
      * Drives the days-since-used badge on each settings chip.
      */
     val lastUsedPerSetting: Map<String, Map<String, Long>> = emptyMap(),
+    /**
+     * Last-use timestamp (epoch ms) per setting column → setting value name,
+     * where the record ALSO matched the currently selected values of ALL other
+     * setting categories. Drives the lower-right combo badge on each settings
+     * chip (recomputed whenever any selection changes).
+     */
+    val lastUsedPerCombo: Map<String, Map<String, Long>> = emptyMap(),
+    /**
+     * Per accordion section: last use with any settings and with the exact
+     * currently selected settings combo. Drives the section corner badges.
+     */
+    val sectionLastUse: Map<ApneaSection, SectionLastUse> = emptyMap(),
 )
 
 @HiltViewModel
@@ -667,6 +689,99 @@ class ApneaViewModel @Inject constructor(
                     Log.w("ApneaVM", "Min Breath forecast computation failed", e)
                 }
             }
+        }
+
+        // ── Combo + section corner badges ────────────────────────────────────────
+        // Recomputed whenever any of the five settings changes (the combo numbers
+        // depend on the whole selection) and when returning from a session
+        // (_forecastRefreshTrigger is bumped on resume and after a record is saved).
+        viewModelScope.launch {
+            combine(
+                combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud ->
+                    listOf(lv, pt.name, tod.name, pos.name, aud.name)
+                },
+                _forecastRefreshTrigger
+            ) { selected, _ -> selected }
+                .collectLatest { sel ->
+                    try {
+                        val records = apneaRepository.getAllRecordsOnce()
+                        val selected = mapOf(
+                            "lungVolume" to sel[0],
+                            "prepType"   to sel[1],
+                            "timeOfDay"  to sel[2],
+                            "posture"    to sel[3],
+                            "audio"      to sel[4]
+                        )
+                        // Chip combo badges: chip's own value + currently selected values
+                        // for every OTHER category.
+                        val comboLast = selected.keys.associateWith { mutableMapOf<String, Long>() }
+                        // Section badges: last use per session type (any settings / exact combo).
+                        var freeAny: Long? = null;  var freeExact: Long? = null
+                        var tableAny: Long? = null; var tableExact: Long? = null
+                        var progAny: Long? = null;  var progExact: Long? = null
+                        var minAny: Long? = null;   var minExact: Long? = null
+                        var ctAny: Long? = null;    var ctExact: Long? = null
+
+                        fun maxTs(current: Long?, ts: Long): Long =
+                            if (current == null || ts > current) ts else current
+
+                        for (r in records) {
+                            val rec = mapOf(
+                                "lungVolume" to r.lungVolume,
+                                "prepType"   to r.prepType,
+                                "timeOfDay"  to r.timeOfDay,
+                                "posture"    to r.posture,
+                                "audio"      to r.audio
+                            )
+                            for (cat in selected.keys) {
+                                val othersMatch = selected.all { (k, v) -> k == cat || rec[k] == v }
+                                if (othersMatch) {
+                                    val perValue = comboLast.getValue(cat)
+                                    val value = rec.getValue(cat)
+                                    perValue[value] = maxOf(perValue[value] ?: 0L, r.timestamp)
+                                }
+                            }
+                            val exact = rec == selected
+                            when (r.tableType) {
+                                null -> {
+                                    freeAny = maxTs(freeAny, r.timestamp)
+                                    if (exact) freeExact = maxTs(freeExact, r.timestamp)
+                                }
+                                "O2", "CO2" -> {
+                                    tableAny = maxTs(tableAny, r.timestamp)
+                                    if (exact) tableExact = maxTs(tableExact, r.timestamp)
+                                }
+                                "PROGRESSIVE_O2" -> {
+                                    progAny = maxTs(progAny, r.timestamp)
+                                    if (exact) progExact = maxTs(progExact, r.timestamp)
+                                }
+                                "MIN_BREATH" -> {
+                                    minAny = maxTs(minAny, r.timestamp)
+                                    if (exact) minExact = maxTs(minExact, r.timestamp)
+                                }
+                                "WONKA_FIRST_CONTRACTION", "WONKA_ENDURANCE" -> {
+                                    ctAny = maxTs(ctAny, r.timestamp)
+                                    if (exact) ctExact = maxTs(ctExact, r.timestamp)
+                                }
+                            }
+                        }
+
+                        _uiState.update {
+                            it.copy(
+                                lastUsedPerCombo = comboLast,
+                                sectionLastUse = mapOf(
+                                    ApneaSection.BEST_TIME          to SectionLastUse(freeAny, freeExact),
+                                    ApneaSection.TABLE_TRAINING     to SectionLastUse(tableAny, tableExact),
+                                    ApneaSection.PROGRESSIVE_O2     to SectionLastUse(progAny, progExact),
+                                    ApneaSection.MIN_BREATH         to SectionLastUse(minAny, minExact),
+                                    ApneaSection.CONTRACTION_TABLES to SectionLastUse(ctAny, ctExact)
+                                )
+                            )
+                        }
+                    } catch (e: Exception) {
+                        Log.w("ApneaVM", "Corner badge computation failed", e)
+                    }
+                }
         }
     }
 

@@ -217,6 +217,7 @@ fun ApneaScreen(
                             posture = state.posture,
                             audio = state.audio,
                             lastUsedPerSetting = state.lastUsedPerSetting,
+                            lastUsedPerCombo = state.lastUsedPerCombo,
                             hyperRemainingLockDays = state.hyperRemainingLockDays,
                             resonancePrepLocked = state.resonancePrepLocked,
                             onLungVolumeChange = { viewModel.setLungVolume(it) },
@@ -241,12 +242,23 @@ fun ApneaScreen(
             ) {
                 Spacer(modifier = Modifier.height(4.dp))
 
+                // Day-granularity "now" — recomputed per composition is fine for whole-day badges
+                val badgeNowMs = remember { System.currentTimeMillis() }
+                fun sectionBadges(section: ApneaSection): SectionCornerBadges {
+                    val info = state.sectionLastUse[section]
+                    return SectionCornerBadges(
+                        daysSinceAny = HyperLockManager.daysSinceUsed(info?.anySettingsMs, badgeNowMs),
+                        daysSinceCombo = HyperLockManager.daysSinceUsed(info?.currentSettingsMs, badgeNowMs)
+                    )
+                }
+
                 // ── Free Hold ─────────────────────────────────────────────────
                 val bestTimeOpen = state.openSection == ApneaSection.BEST_TIME
                 CollapsibleCard(
                     title = "Free Hold",
                     expanded = bestTimeOpen,
-                    onToggle = { viewModel.toggleSection(ApneaSection.BEST_TIME) }
+                    onToggle = { viewModel.toggleSection(ApneaSection.BEST_TIME) },
+                    headerBadges = sectionBadges(ApneaSection.BEST_TIME)
                 ) {
                     FreeHoldContent(
                         freeHoldDurationMs    = state.freeHoldDurationMs,
@@ -289,6 +301,7 @@ fun ApneaScreen(
                     title = "Table Training",
                     expanded = tableTrainingOpen,
                     onToggle = { viewModel.toggleSection(ApneaSection.TABLE_TRAINING) },
+                    headerBadges = sectionBadges(ApneaSection.TABLE_TRAINING),
                     headerExtra = {
                         TableHelpIcon(
                             title = TABLE_TRAINING_HELP_TITLE,
@@ -315,6 +328,7 @@ fun ApneaScreen(
                     title = "Progressive O₂",
                     expanded = progO2Open,
                     onToggle = { viewModel.toggleSection(ApneaSection.PROGRESSIVE_O2) },
+                    headerBadges = sectionBadges(ApneaSection.PROGRESSIVE_O2),
                     headerExtra = {
                         TableHelpIcon(title = PROGRESSIVE_O2_HELP_TITLE, text = PROGRESSIVE_O2_HELP_TEXT)
                     }
@@ -344,6 +358,7 @@ fun ApneaScreen(
                     title = "Min Breath",
                     expanded = minBreathOpen,
                     onToggle = { viewModel.toggleSection(ApneaSection.MIN_BREATH) },
+                    headerBadges = sectionBadges(ApneaSection.MIN_BREATH),
                     headerExtra = {
                         TableHelpIcon(title = MIN_BREATH_HELP_TITLE, text = MIN_BREATH_HELP_TEXT)
                     }
@@ -375,6 +390,7 @@ fun ApneaScreen(
                     title = "Contraction Tables",
                     expanded = contractionTablesOpen,
                     onToggle = { viewModel.toggleSection(ApneaSection.CONTRACTION_TABLES) },
+                    headerBadges = sectionBadges(ApneaSection.CONTRACTION_TABLES),
                     headerExtra = {
                         TableHelpIcon(title = CONTRACTION_TABLES_HELP_TITLE, text = CONTRACTION_TABLES_HELP_TEXT)
                     }
@@ -580,11 +596,35 @@ private fun CollapsibleSectionHeader(
 // Generic collapsible card used for accordion sections
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Corner badges for an accordion section header. Null day counts mean the
+ * session type has never been done under that constraint → rendered as ∞.
+ */
+private data class SectionCornerBadges(
+    val daysSinceAny: Int?,
+    val daysSinceCombo: Int?
+)
+
+/** Tiny bordered number badge used in the corners of section headers. */
+@Composable
+private fun CornerBadge(text: String) {
+    Text(
+        text = text,
+        fontSize = 9.sp,
+        lineHeight = 10.sp,
+        color = TextPrimary,
+        modifier = Modifier
+            .border(1.dp, TextSecondary, RoundedCornerShape(4.dp))
+            .padding(horizontal = 3.dp, vertical = 1.dp)
+    )
+}
+
 @Composable
 private fun CollapsibleCard(
     title: String,
     expanded: Boolean,
     onToggle: () -> Unit,
+    headerBadges: SectionCornerBadges? = null,
     headerExtra: @Composable RowScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -608,6 +648,14 @@ private fun CollapsibleCard(
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     headerExtra()
+                    // Upper badge = days since this session type was done (any settings);
+                    // lower badge = days since it was done with the exact current settings.
+                    headerBadges?.let {
+                        Column(horizontalAlignment = Alignment.End) {
+                            CornerBadge(it.daysSinceAny?.toString() ?: "∞")
+                            CornerBadge(it.daysSinceCombo?.toString() ?: "∞")
+                        }
+                    }
                     Icon(
                         imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
                         contentDescription = if (expanded) "Collapse" else "Expand",
@@ -642,6 +690,7 @@ private fun ApneaSettingsContent(
     posture: Posture,
     audio: AudioSetting,
     lastUsedPerSetting: Map<String, Map<String, Long>>,
+    lastUsedPerCombo: Map<String, Map<String, Long>>,
     hyperRemainingLockDays: Int,
     /** True when no resonance breathing session ended within the last ~5 minutes. */
     resonancePrepLocked: Boolean,
@@ -657,6 +706,10 @@ private fun ApneaSettingsContent(
     fun daysSince(settingKey: String, settingValue: String): Int? =
         HyperLockManager.daysSinceUsed(lastUsedPerSetting[settingKey]?.get(settingValue), nowMs)
 
+    /** Days since this value was used combined with the currently selected values of all other categories. */
+    fun comboDaysSince(settingKey: String, settingValue: String): Int? =
+        HyperLockManager.daysSinceUsed(lastUsedPerCombo[settingKey]?.get(settingValue), nowMs)
+
     Column(
         modifier = Modifier.padding(top = 4.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -668,7 +721,8 @@ private fun ApneaSettingsContent(
                     selected = selectedLungVolume == volume,
                     onClick = { onLungVolumeChange(volume) },
                     label = volume.displayLungVolume(),
-                    daysSinceUsed = daysSince("lungVolume", volume)
+                    daysSinceUsed = daysSince("lungVolume", volume),
+                    daysSinceCombo = comboDaysSince("lungVolume", volume)
                 )
             }
         }
@@ -681,7 +735,8 @@ private fun ApneaSettingsContent(
                     onClick = { onPrepTypeChange(type) },
                     label = type.shortDisplayName(),
                     daysSinceUsed = daysSince("prepType", type.name),
-                    // Lock badge only on the HYPER chip (lower-right corner)
+                    daysSinceCombo = comboDaysSince("prepType", type.name),
+                    // Lock overlay only on the HYPER chip (centered)
                     hyperRemainingLockDays = if (type == PrepType.HYPER) hyperRemainingLockDays else null,
                     // Staleness lock on the RESONANCE chip: no resonance breathing
                     // session ended within the last ~5 minutes.
@@ -697,7 +752,8 @@ private fun ApneaSettingsContent(
                     selected = timeOfDay == tod,
                     onClick = { onTimeOfDayChange(tod) },
                     label = tod.displayName(),
-                    daysSinceUsed = daysSince("timeOfDay", tod.name)
+                    daysSinceUsed = daysSince("timeOfDay", tod.name),
+                    daysSinceCombo = comboDaysSince("timeOfDay", tod.name)
                 )
             }
         }
@@ -709,7 +765,8 @@ private fun ApneaSettingsContent(
                     selected = posture == pos,
                     onClick = { onPostureChange(pos) },
                     label = pos.displayName(),
-                    daysSinceUsed = daysSince("posture", pos.name)
+                    daysSinceUsed = daysSince("posture", pos.name),
+                    daysSinceCombo = comboDaysSince("posture", pos.name)
                 )
             }
         }
@@ -721,7 +778,8 @@ private fun ApneaSettingsContent(
                     selected = audio == aud,
                     onClick = { onAudioChange(aud) },
                     label = aud.displayName(),
-                    daysSinceUsed = daysSince("audio", aud.name)
+                    daysSinceUsed = daysSince("audio", aud.name),
+                    daysSinceCombo = comboDaysSince("audio", aud.name)
                 )
             }
         }
@@ -730,10 +788,13 @@ private fun ApneaSettingsContent(
 }
 
 /**
- * A settings FilterChip with a days-since-used badge (upper-right corner).
- * When [hyperRemainingLockDays] is non-null and > 0 (HYPER chip only), a lock
- * badge (🔒 + remaining days) is shown in the lower-right corner. Nothing is
- * shown when HYPER is unlocked.
+ * A settings FilterChip with corner badges:
+ *  - upper-right: days since this value was last used in any session
+ *    (hidden when never used);
+ *  - lower-right: days since this value was used combined with the currently
+ *    selected values of all other setting categories (∞ when never);
+ *  - centered, slightly transparent lock overlay while HYPER is time-locked
+ *    (🔒 + remaining days) or RESONANCE is staleness-locked (🔒).
  */
 @Composable
 private fun SettingChip(
@@ -741,6 +802,7 @@ private fun SettingChip(
     onClick: () -> Unit,
     label: String,
     daysSinceUsed: Int?,
+    daysSinceCombo: Int? = null,
     hyperRemainingLockDays: Int? = null,
     locked: Boolean = false
 ) {
@@ -768,35 +830,44 @@ private fun SettingChip(
                     .padding(horizontal = 3.dp, vertical = 1.dp)
             )
         }
-        // Hyper lock badge — lower-right corner, shown ONLY while actually
-        // locked. When unlocked nothing is shown: a tiny 🔓 emoji is
-        // illegible at this size and reads as a closed padlock.
+        // Combo days badge — lower-right corner. Shows how many days since this
+        // value was used together with the currently selected values of all the
+        // other categories; ∞ when that combination has never been done.
+        Text(
+            text = daysSinceCombo?.toString() ?: "∞",
+            fontSize = 9.sp,
+            lineHeight = 10.sp,
+            color = TextPrimary,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .border(1.dp, TextSecondary, RoundedCornerShape(4.dp))
+                .padding(horizontal = 3.dp, vertical = 1.dp)
+        )
+        // Hyper lock — centered overlay, slightly transparent. Shown ONLY while
+        // actually locked; nothing when unlocked (a tiny 🔓 emoji is illegible
+        // at this size and reads as a closed padlock).
         if (hyperRemainingLockDays != null && hyperRemainingLockDays > 0) {
             Text(
                 text = "🔒$hyperRemainingLockDays",
-                fontSize = 9.sp,
-                lineHeight = 11.sp,
+                fontSize = 10.sp,
+                lineHeight = 12.sp,
                 color = TextPrimary,
                 modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .border(1.dp, TextSecondary, RoundedCornerShape(4.dp))
-                    .padding(horizontal = 2.dp, vertical = 1.dp)
-                    .grayscale()
+                    .align(Alignment.Center)
+                    .alpha(0.5f)
             )
         }
-        // Generic staleness lock (RESONANCE chip) — lower-right corner, shown
-        // only while locked. Clears the moment a fresh resonance session is saved.
+        // Generic staleness lock (RESONANCE chip) — centered overlay, slightly
+        // transparent. Clears the moment a fresh resonance session is saved.
         if (locked && (hyperRemainingLockDays == null || hyperRemainingLockDays <= 0)) {
             Text(
                 text = "🔒",
-                fontSize = 9.sp,
-                lineHeight = 11.sp,
+                fontSize = 10.sp,
+                lineHeight = 12.sp,
                 color = TextPrimary,
                 modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .border(1.dp, TextSecondary, RoundedCornerShape(4.dp))
-                    .padding(horizontal = 2.dp, vertical = 1.dp)
-                    .grayscale()
+                    .align(Alignment.Center)
+                    .alpha(0.5f)
             )
         }
     }
