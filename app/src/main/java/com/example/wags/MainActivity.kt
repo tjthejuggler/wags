@@ -32,6 +32,7 @@ import com.example.wags.ui.common.pip.PipController
 import com.example.wags.data.meditation.AudioImportService
 import com.example.wags.ui.debug.DebugBubbleOverlay
 import com.example.wags.ui.meditation.AudioImportBus
+import com.example.wags.ui.navigation.SectionShortcutBus
 import com.example.wags.ui.navigation.WagsNavGraph
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.WagsTheme
@@ -149,6 +150,16 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // Navigate straight to a section screen whenever a launcher
+                // app shortcut is tapped (cold start or warm start)
+                LaunchedEffect(navController) {
+                    SectionShortcutBus.requests.collect { section ->
+                        SectionShortcutBus.routeFor(section)?.let { route ->
+                            navController.navigate(route) { launchSingleTop = true }
+                        }
+                    }
+                }
+
                 val isInPip by PipController.isInPipMode.collectAsState()
                 Box {
                     WagsNavGraph(navController = navController)
@@ -187,6 +198,10 @@ class MainActivity : ComponentActivity() {
         // Handle a YouTube link shared from another app (cold start via share sheet)
         if (savedInstanceState == null) {
             handleSharedYouTubeLink(intent)
+
+            // Handle a launcher app shortcut (cold start); warm starts
+            // arrive via onNewIntent
+            handleSectionShortcut(intent)
         }
     }
 
@@ -244,6 +259,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         handleSpotifyRedirect(intent)
         handleSharedYouTubeLink(intent)
+        handleSectionShortcut(intent)
     }
 
     private fun handleSpotifyRedirect(intent: Intent?) {
@@ -273,6 +289,17 @@ class MainActivity : ComponentActivity() {
     private fun extractYouTubeUrl(text: String): String? =
         YOUTUBE_URL_REGEX.find(text)?.value
             ?.trimEnd('.', ',', ';', ':', ')', ']', '}', '>', '"', '\'')
+
+    /**
+     * Handles launcher app-shortcut intents (res/xml/shortcuts.xml). Each
+     * shortcut carries a "section" extra; forwards it to [SectionShortcutBus],
+     * which the nav graph collects to navigate straight to that section.
+     */
+    private fun handleSectionShortcut(intent: Intent?) {
+        if (intent?.action != SectionShortcutBus.ACTION_OPEN_SECTION) return
+        val section = intent.getStringExtra(SectionShortcutBus.EXTRA_SECTION) ?: return
+        SectionShortcutBus.request(section)
+    }
 
     private fun triggerAutoConnect() {
         val allGranted = blePermissions.all {

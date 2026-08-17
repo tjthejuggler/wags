@@ -1,3 +1,15 @@
 <resources>
     <string name="app_name">wags</string>
+
+    <!-- Launcher app shortcuts (one per top-level section) -->
+    <string name="shortcut_apnea_short">Apnea</string>
+    <string name="shortcut_apnea_long">Apnea Training</string>
+    <string name="shortcut_morning_short">Morning</string>
+    <string name="shortcut_morning_long">Morning Readiness</string>
+    <string name="shortcut_hrv_short">HRV</string>
+    <string name="shortcut_hrv_long">HRV Readiness</string>
+    <string name="shortcut_meditation_short">Meditate</string>
+    <string name="shortcut_meditation_long">Meditation</string>
+    <string name="shortcut_resonance_short">Resonance</string>
+    <string name="shortcut_resonance_long">Resonance Breathing</string>
 </resources>

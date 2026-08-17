@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Static launcher shortcuts — one per top-level section of the app.
+    Each shortcut launches MainActivity with ACTION_OPEN_SECTION and a
+    "section" extra that SectionShortcutBus maps to a nav route.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:shortcutId="apnea"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_apnea"
+        android:shortcutShortLabel="@string/shortcut_apnea_short"
+        android:shortcutLongLabel="@string/shortcut_apnea_long">
+        <intent
+            android:action="com.example.wags.action.OPEN_SECTION"
+            android:targetPackage="com.example.wags"
+            android:targetClass="com.example.wags.MainActivity">
+            <extra android:name="section" android:value="apnea" />
+        </intent>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="morning_readiness"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_morning"
+        android:shortcutShortLabel="@string/shortcut_morning_short"
+        android:shortcutLongLabel="@string/shortcut_morning_long">
+        <intent
+            android:action="com.example.wags.action.OPEN_SECTION"
+            android:targetPackage="com.example.wags"
+            android:targetClass="com.example.wags.MainActivity">
+            <extra android:name="section" android:value="morning_readiness" />
+        </intent>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="hrv_readiness"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_hrv"
+        android:shortcutShortLabel="@string/shortcut_hrv_short"
+        android:shortcutLongLabel="@string/shortcut_hrv_long">
+        <intent
+            android:action="com.example.wags.action.OPEN_SECTION"
+            android:targetPackage="com.example.wags"
+            android:targetClass="com.example.wags.MainActivity">
+            <extra android:name="section" android:value="hrv_readiness" />
+        </intent>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="meditation"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_meditation"
+        android:shortcutShortLabel="@string/shortcut_meditation_short"
+        android:shortcutLongLabel="@string/shortcut_meditation_long">
+        <intent
+            android:action="com.example.wags.action.OPEN_SECTION"
+            android:targetPackage="com.example.wags"
+            android:targetClass="com.example.wags.MainActivity">
+            <extra android:name="section" android:value="meditation" />
+        </intent>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="resonance_breathing"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_resonance"
+        android:shortcutShortLabel="@string/shortcut_resonance_short"
+        android:shortcutLongLabel="@string/shortcut_resonance_long">
+        <intent
+            android:action="com.example.wags.action.OPEN_SECTION"
+            android:targetPackage="com.example.wags"
+            android:targetClass="com.example.wags.MainActivity">
+            <extra android:name="section" android:value="resonance_breathing" />
+        </intent>
+    </shortcut>
+
+</shortcuts>

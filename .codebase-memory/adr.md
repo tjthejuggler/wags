@@ -1,17 +1,17 @@
-# ADR: Contraction tables hold immediately at session start
+# ADR: Launcher App Shortcuts for Top-Level Sections
 
 **Date:** 2026-08-17
 **Status:** Accepted
 
 ## Context
-User bug note (2026-08-17): "in Till Contraction Table, there shouldn't be a rest before the first hold." Previously `ContractionTableStateMachine.start()` routed round 1 through `startBreathePhase(1)`, so every session began with a full rest countdown even though the user had nothing to recover from.
+Users need one-tap access from the launcher to each of the five top-level sections: Apnea, Morning Readiness, HRV Readiness, Meditation, and Resonance Breathing. Navigation is a single-Activity Compose NavHost (`WagsNavGraph`) with `MainActivity` in `singleTask` launch mode.
 
 ## Decision
-1. `start()` now transitions straight into `beginCruise(1)` — round 1 begins holding immediately; the BREATHE phase only ever precedes rounds ≥ 2.
-2. The rest schedule was shifted accordingly: `restScheduleMs` is built with `buildRestSchedule(rounds - 1, restStartSec, restEndSec)`, so `restStartSec` ("First rest") is the rest before round 2 and `restEndSec` the rest before the final round. `startBreathePhase(round)` indexes the schedule at `round - 2`. A single-round table therefore has no rest at all.
-3. `ContractionTableRoundResult.restBeforeMs` for round 1 is now 0 (recorded honestly in tableParamsJson).
+- Use **static shortcuts** declared in `res/xml/shortcuts.xml` (bound via `android.app.shortcuts` meta-data on `MainActivity`), one per section. Each shortcut intent uses action `com.example.wags.action.OPEN_SECTION` with a semantic `section` extra (`apnea`, `morning_readiness`, `hrv_readiness`, `meditation`, `resonance_breathing`).
+- Route intents through a new `SectionShortcutBus` (ui/navigation) that mirrors the existing `AudioImportBus` pattern: `MutableSharedFlow(replay = 1)` bridges Activity intent handling to the nav graph, guaranteeing delivery on cold starts before composition collects.
+- `MainActivity.handleSectionShortcut()` is called from `onCreate` (guarded by `savedInstanceState == null` to avoid re-triggering on recreation) and from `onNewIntent` (warm starts). The bus maps section ids to `WagsRoutes` constants (`APNEA_FREE`, `MORNING_READINESS`, `READINESS`, `MEDITATION`, `BREATHING`) so manifest shortcut ids stay decoupled from route strings.
+- Navigation uses `launchSingleTop = true` to avoid duplicate destinations.
 
 ## Consequences
-- Active screen / PiP render phases generically, so starting in CRUISE needed no UI changes beyond removing the now-dead "round 1 breathe" hint.
-- Past-config restore feature (`ContractionTablePastConfig`, derived from tableParamsJson of past sessions, unfiltered) reuses the same JSON fields, so old sessions remain parseable; old sessions' round-1 `restBeforeMs` values stay as recorded.
-- Related decision (same date): history chart x-axis monthly labels show month name only, appending the year on the first label and on year change (HistoryCharts.kt `axisLabels`), fixing the clipped "2026-0" labels on 1y/All timeframes.
+- Adding a new section shortcut requires: drawable icon + strings + `<shortcut>` entry in shortcuts.xml + one mapping line in `SectionShortcutBus.routeFor`.
+- Shortcut ids in the manifest are semantic; route renames only touch Kotlin.
