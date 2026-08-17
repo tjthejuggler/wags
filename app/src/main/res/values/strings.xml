@@ -12,4 +12,12 @@
     <string name="shortcut_meditation_long">Meditation</string>
     <string name="shortcut_resonance_short">Resonance</string>
     <string name="shortcut_resonance_long">Resonance Breathing</string>
+
+    <!-- Exported section-shortcut activities (shown by external app pickers
+         like Tail / Tasker via ActivityInfo.loadLabel()) -->
+    <string name="activity_label_apnea">Apnea</string>
+    <string name="activity_label_morning_readiness">Morning Readiness</string>
+    <string name="activity_label_hrv_readiness">HRV Readiness</string>
+    <string name="activity_label_meditation">Meditation</string>
+    <string name="activity_label_resonance">Resonance Breathing</string>
 </resources>

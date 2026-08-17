@@ -93,6 +93,63 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
+        <!--
+            Exported section-shortcut activities — self-contained trampolines
+            that external automation apps (Tail, Tasker) discover via
+            PackageManager and launch with bare explicit intents (no action,
+            no extras). Each forwards to MainActivity, which routes to the
+            section's nav destination.
+        -->
+        <activity
+            android:name=".shortcuts.ApneaShortcutActivity"
+            android:exported="true"
+            android:label="@string/activity_label_apnea"
+            android:icon="@drawable/ic_shortcut_apnea"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Wags.Shortcut" />
+
+        <activity
+            android:name=".shortcuts.MorningReadinessShortcutActivity"
+            android:exported="true"
+            android:label="@string/activity_label_morning_readiness"
+            android:icon="@drawable/ic_shortcut_morning"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Wags.Shortcut" />
+
+        <activity
+            android:name=".shortcuts.HrvReadinessShortcutActivity"
+            android:exported="true"
+            android:label="@string/activity_label_hrv_readiness"
+            android:icon="@drawable/ic_shortcut_hrv"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Wags.Shortcut" />
+
+        <activity
+            android:name=".shortcuts.MeditationShortcutActivity"
+            android:exported="true"
+            android:label="@string/activity_label_meditation"
+            android:icon="@drawable/ic_shortcut_meditation"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Wags.Shortcut" />
+
+        <activity
+            android:name=".shortcuts.ResonanceShortcutActivity"
+            android:exported="true"
+            android:label="@string/activity_label_resonance"
+            android:icon="@drawable/ic_shortcut_resonance"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Wags.Shortcut" />
+
         <service
             android:name=".data.ble.BleService"
             android:foregroundServiceType="connectedDevice"

@@ -4,4 +4,15 @@
     <style name="Theme.Wags" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/black</item>
     </style>
+
+    <!-- Translucent, animation-free theme for the exported section-shortcut
+         trampoline activities — invisible to the user while they forward to
+         MainActivity and finish(). -->
+    <style name="Theme.Wags.Shortcut">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
 </resources>
