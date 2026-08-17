@@ -1,24 +1,18 @@
-# ADR: Contraction Tables — contraction-driven drill suite replacing the Wonka prototypes
+# ADR: Tail slot split (O2/CO2) + Contraction Tables slots + auto-backfill on connect
 
-**Date:** 2026-08-16
-**Status:** Accepted & Implemented
+**Date:** 2026-08-17
+**Status:** Accepted
 
 ## Context
-The two "Wonka" modalities (`WONKA_FIRST_CONTRACTION`, `WONKA_ENDURANCE`) existed only as never-finished inline sections on ApneaScreen, driven by `AdvancedApneaStateMachine` with fixed-ΔT logic, no per-round persistence ("historical amnesia"), and no stats/history/PB integration. Scientific review recommended a contraction-count architecture, decreasing-rest schedules, per-round result persistence, and T_cruise as a CO₂-tolerance biomarker.
+The Tail (habit app) integration had a single TABLE_TRAINING slot covering both O2 and CO2 tables, and the two new Contraction Tables drills (Till Contraction, Contraction Count) were firing that generic slot. Users wanted per-table-type habits and full history pushed when a new habit connection is made.
 
 ## Decision
-1. **Replace both prototypes with "Contraction Tables"** — a full 3-screen drill (setup/active/detail) following the Progressive O₂ / Min Breath recipe (plans/apnea_drill_screen_guide.md), with two modes in one setup screen:
-   - *Till Contraction*: hold ends at first contraction; headline PB = longest hold (T_cruise).
-   - *Contraction Count*: hold for N contractions (1–50); headline PB = total hold time, partitioned by `drillParamValue = target`.
-2. **New drift-free state machine** (`ContractionTableStateMachine`): epoch-anchored 100 ms wall-clock ticks; phases IDLE→BREATHE→CRUISE→(STRUGGLE)→COMPLETE; per-round `ContractionTableRoundResult` accumulated in state; decreasing rest via linear interpolation rest-start→rest-end.
-3. **Natural-completion observer**: unlike endless Progressive O₂, the fixed-round machine reaches COMPLETE on its own; the ViewModel's state collector detects the phase transition while `isSessionActive` and triggers `stopSession()` (which clears the flag first to prevent re-entry).
-4. **Backward-compatible persistence**: keep legacy `tableType` strings "WONKA_FIRST_CONTRACTION"/"WONKA_ENDURANCE" so existing stats counters, history, ranked lists, record-detail, PB pools, and Tail habit plumbing work without schema changes. 4 entities per session (session+telemetry, record+free-hold telemetry); round log serialized into `tableParamsJson`.
-5. **Delete the dead inline machinery**: AdvancedApneaScreen/ViewModel/StateMachine, WonkaConfig, TrainingModality, ProgressiveO2Generator, the unreachable ADVANCED_APNEA route, and inline session code in ApneaScreen/ApneaViewModel. ApneaScreen exposes one "Contraction Tables" section card → `contraction_table` route.
-6. **Safety**: empty-lung warning dialog on EMPTY lung selection (reference pattern); hyperventilation advisory card when prep = HYPER.
+1. **Slot enum restructure** (`HabitIntegrationRepository.Slot`): TABLE_TRAINING removed, replaced by O2_TABLE (`habit_id_o2_table`) and CO2_TABLE (`habit_id_co2_table`); added TILL_CONTRACTION and CONTRACTION_COUNT slots. A one-time init migration copies any legacy `habit_id_table_training` selection into both new table slots.
+2. **Live increments dispatch by type**: ApneaViewModel COMPLETE handler selects O2_TABLE vs CO2_TABLE via `currentTable.type` (ApneaTableType); ContractionTableViewModel.saveSession selects TILL_CONTRACTION vs CONTRACTION_COUNT via `s.mode`.
+3. **Per-slot backfill architecture** (`HabitBackfillManager`): new `backfillSlot(slot): SlotBackfillResult` aggregates one slot's full per-date history (minutes primary + sessions secondary) and sends the backlog; `backfill()` delegates over all backfillable slots. History dispatch keys on the legacy `ApneaRecordEntity.tableType` strings ("O2", "CO2", "WONKA_FIRST_CONTRACTION", "WONKA_ENDURANCE") which are kept for stats compatibility.
+4. **Auto-backfill on connect**: `SettingsViewModel.selectHabit()` fires `backfillSlot(slot)` in a coroutine after persisting the selection, surfacing a "Backfilled <slot>: N dates (M min, S sessions)" message. Slots without minute-based history (records/readiness/music) are no-ops.
 
 ## Consequences
-- T_cruise decay and Cruise Ratio analytics available per session (Canvas chart on detail screen).
-- PB pools: Till Contraction = one global pool; Contraction Count = pool per target value (DrillContext.contractionCount(target)).
-- Detail screen keyed by sessionId (route `contraction_table_detail/{sessionId}`); ViewModel exposes both completedSessionId and completedRecordId after save.
-- Tail habits: TABLE_TRAINING minutes+count on completion; APNEA_NEW_RECORD on PB.
-- Build verified: `:app:compileDebugKotlin` + `installDebug` (JDK 21; note JAVA_HOME must not point at the snap Android Studio JBR 25).
+- Connecting any habit slot instantly seeds Tail with that activity's complete history (idempotent, Tail SETS per-date values).
+- The manual "Backfill Past Sessions" action reuses the same per-slot path; BackfillResult became a map of Slot→SlotBackfillResult with a generic skipped-slots message.
+- Old TABLE_TRAINING prefs don't orphan: migration seeds both split slots with the same habit.

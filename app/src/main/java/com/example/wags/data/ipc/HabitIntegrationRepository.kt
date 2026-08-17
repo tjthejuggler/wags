@@ -25,7 +25,10 @@ import javax.inject.Singleton
  * habit slot so the user can map different habits to different activities:
  *
  *  • [Slot.FREE_HOLD]           – Apnea free breath hold (personal best)
- *  • [Slot.TABLE_TRAINING]      – Apnea O2 / CO2 table session completion
+ *  • [Slot.O2_TABLE]            – Apnea O₂ table session completion
+ *  • [Slot.CO2_TABLE]           – Apnea CO₂ table session completion
+ *  • [Slot.TILL_CONTRACTION]    – Till Contraction table session completion
+ *  • [Slot.CONTRACTION_COUNT]   – Contraction Count table session completion
  *  • [Slot.MORNING_READINESS]   – Morning Readiness assessment completion
  *  • [Slot.HRV_READINESS]       – HRV Readiness session completion
  *  • [Slot.RESONANCE_BREATHING] – Resonance Breathing session stop
@@ -59,10 +62,15 @@ class HabitIntegrationRepository @Inject constructor(
             nameKey = "habit_name_apnea_new_record",
             label   = "Apnea New Record"
         ),
-        TABLE_TRAINING(
-            idKey   = "habit_id_table_training",
-            nameKey = "habit_name_table_training",
-            label   = "Apnea Table Training"
+        O2_TABLE(
+            idKey   = "habit_id_o2_table",
+            nameKey = "habit_name_o2_table",
+            label   = "O₂ Table Training"
+        ),
+        CO2_TABLE(
+            idKey   = "habit_id_co2_table",
+            nameKey = "habit_name_co2_table",
+            label   = "CO₂ Table Training"
         ),
         MORNING_READINESS(
             idKey   = "habit_id_morning_readiness",
@@ -99,11 +107,46 @@ class HabitIntegrationRepository @Inject constructor(
             nameKey = "habit_name_min_breath",
             label   = "Min Breath"
         ),
+        TILL_CONTRACTION(
+            idKey   = "habit_id_till_contraction",
+            nameKey = "habit_name_till_contraction",
+            label   = "Till Contraction"
+        ),
+        CONTRACTION_COUNT(
+            idKey   = "habit_id_contraction_count",
+            nameKey = "habit_name_contraction_count",
+            label   = "Contraction Count"
+        ),
         MUSIC(
             idKey   = "habit_id_music",
             nameKey = "habit_name_music",
             label   = "Music Session"
         )
+    }
+
+    init {
+        migrateLegacyTableTrainingSlot()
+    }
+
+    /**
+     * One-time migration: the old single TABLE_TRAINING slot was split into
+     * [Slot.O2_TABLE] and [Slot.CO2_TABLE]. If a habit was selected for the
+     * legacy slot, copy it to both new slots (unless they already have one).
+     */
+    private fun migrateLegacyTableTrainingSlot() {
+        val legacyId = prefs.getString("habit_id_table_training", "") ?: ""
+        if (legacyId.isBlank()) return
+        val legacyName = prefs.getString("habit_name_table_training", "") ?: ""
+        val editor = prefs.edit()
+        if ((prefs.getString(Slot.O2_TABLE.idKey, "") ?: "").isBlank()) {
+            editor.putString(Slot.O2_TABLE.idKey, legacyId)
+                .putString(Slot.O2_TABLE.nameKey, legacyName)
+        }
+        if ((prefs.getString(Slot.CO2_TABLE.idKey, "") ?: "").isBlank()) {
+            editor.putString(Slot.CO2_TABLE.idKey, legacyId)
+                .putString(Slot.CO2_TABLE.nameKey, legacyName)
+        }
+        editor.apply()
     }
 
     // ── Content Provider query ────────────────────────────────────────────────

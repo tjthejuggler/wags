@@ -4,6 +4,22 @@
 
 ## Changelog
 
+### 2026-08-17 — Tail integration: O₂/CO₂ slot split, Contraction Tables slots, auto-backfill on connect
+
+**Slot changes** ([`HabitIntegrationRepository.kt`](app/src/main/java/com/example/wags/data/ipc/HabitIntegrationRepository.kt:47))
+- The single `TABLE_TRAINING` slot was **split into `O2_TABLE` + `CO2_TABLE`** — table completions now fire the slot matching the table type that just ran ([`ApneaViewModel`](app/src/main/java/com/example/wags/ui/apnea/ApneaViewModel.kt:694) dispatches on `currentTable.type`).
+- Added **`TILL_CONTRACTION`** and **`CONTRACTION_COUNT`** slots for the two Contraction Tables drills ([`ContractionTableViewModel`](app/src/main/java/com/example/wags/ui/apnea/ContractionTableViewModel.kt:1054) dispatches on `s.mode`); they previously fired the generic table slot.
+- One-time prefs migration copies any legacy `habit_id_table_training` selection to both new table slots.
+- Settings → Tail App Integration shows all four new rows in the slot picker.
+
+**Auto-backfill on new habit connections** ([`HabitBackfillManager.kt`](app/src/main/java/com/example/wags/data/ipc/HabitBackfillManager.kt:40))
+- Restructured around a per-slot `backfillSlot(slot)` API: aggregates that slot's full per-date history (minutes + session counts) and sends the entire backlog to Tail (idempotent — Tail SETS per-date values).
+- [`SettingsViewModel.selectHabit()`](app/src/main/java/com/example/wags/ui/settings/SettingsViewModel.kt:263) now triggers the backfill automatically whenever a slot gets connected, so a freshly connected habit immediately receives its complete history — e.g. connecting the new O₂/CO₂ slots pushes the full table history split by type.
+- The manual "Backfill Past Sessions" button iterates all slots through the same per-slot path; its result message lists skipped slots generically.
+- History mapping via `ApneaRecordEntity.tableType`: `"O2"`→O2_TABLE, `"CO2"`→CO2_TABLE, `"WONKA_FIRST_CONTRACTION"`→TILL_CONTRACTION, `"WONKA_ENDURANCE"`→CONTRACTION_COUNT (legacy strings kept for stats compatibility).
+
+**Habit picker UX** — the inline expanding habit list on each Tail slot row was replaced by a popup dialog ([`HabitPickerDialog`](app/src/main/java/com/example/wags/ui/settings/SettingsScreen.kt:966)) with a search field and an alphabetically sorted, case-insensitively filtered list; the current selection is check-marked and selecting a habit auto-backfills its history.
+
 ### 2026-08-16 — Contraction Tables: full drill suite replacing the Wonka prototypes
 
 **Added: Contraction Tables — two contraction-driven apnea drills with full screen flow** (setup → active → detail), replacing the two never-finished inline "Wonka" sections on the Apnea screen.

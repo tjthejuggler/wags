@@ -699,8 +699,13 @@ class ApneaViewModel @Inject constructor(
                     val tableHoldMinutes = HabitIntegrationRepository.millisToMinutes(
                         _uiState.value.currentTable?.steps?.sumOf { it.apneaDurationMs } ?: 0L
                     )
-                    habitRepo.sendHabitIncrementWithMinutes(Slot.TABLE_TRAINING, tableHoldMinutes)
-                    habitRepo.sendSecondaryValueIncrement(Slot.TABLE_TRAINING, 1)
+                    // Split Tail slots: fire the slot matching the table type that just ran
+                    val tableSlot = when (_uiState.value.currentTable?.type) {
+                        ApneaTableType.CO2 -> Slot.CO2_TABLE
+                        else -> Slot.O2_TABLE
+                    }
+                    habitRepo.sendHabitIncrementWithMinutes(tableSlot, tableHoldMinutes)
+                    habitRepo.sendSecondaryValueIncrement(tableSlot, 1)
                     val uiSnap = _uiState.value
                     // Honor the user's explicit audio choice; never downgrade MUSIC
                     // to SILENCE based on unreliable Spotify track tracking.

@@ -6,8 +6,8 @@ import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.data.repository.MeditationRepository
 import com.example.wags.data.repository.ResonanceSessionRepository
 import com.example.wags.data.repository.RfAssessmentRepository
+import kotlinx.coroutines.delay
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -18,19 +18,31 @@ import javax.inject.Singleton
  * the per-date totals to the Tail habit-tracking app via
  * [HabitIntegrationRepository.sendHabitValuesForDates].
  *
- * This is a one-time "backfill" action triggered manually by the user from
- * the Settings → Tail App Integration screen. It is idempotent: Tail SETS
- * (replaces) the value for each date, so running it multiple times produces
- * the same result.
+ * Two entry points:
+ *  • [backfillSlot] – sends the full history backlog for ONE slot. Used by the
+ *    automatic backfill that fires when a new habit connection is made in
+ *    Settings, so a freshly connected slot immediately receives its entire
+ *    history.
+ *  • [backfill] – sends the backlog for every slot that has history (the
+ *    manual "Backfill Past Sessions" action in Settings).
  *
- * **Slot mapping:**
+ * It is idempotent: Tail SETS (replaces) the value for each date, so running
+ * it multiple times produces the same result.
+ *
+ * **Slot → history mapping:**
  *  • [Slot.RESONANCE_BREATHING] – resonance sessions **and** RF assessments
  *    (both contribute minutes to the same habit slot).
  *  • [Slot.MEDITATION] – meditation / NSDR sessions.
  *  • [Slot.FREE_HOLD] – apnea free-hold records (`tableType == null`).
- *  • [Slot.TABLE_TRAINING] – O₂ / CO₂ table sessions (`tableType` is `"O2"` or `"CO2"`).
+ *  • [Slot.O2_TABLE] – O₂ table sessions (`tableType == "O2"`).
+ *  • [Slot.CO2_TABLE] – CO₂ table sessions (`tableType == "CO2"`).
  *  • [Slot.PROGRESSIVE_O2] – Progressive O₂ drill sessions (`tableType == "PROGRESSIVE_O2"`).
  *  • [Slot.MIN_BREATH] – Min Breath drill sessions (`tableType == "MIN_BREATH"`).
+ *  • [Slot.TILL_CONTRACTION] – Till Contraction drill sessions (`tableType == "WONKA_FIRST_CONTRACTION"`).
+ *  • [Slot.CONTRACTION_COUNT] – Contraction Count drill sessions (`tableType == "WONKA_ENDURANCE"`).
+ *
+ * Slots without minute-based history (new records, readiness scores, music)
+ * have nothing to backfill and return an empty result.
  *
  * **Date handling:** Session timestamps (epoch-ms, UTC) are converted to
  * `yyyy-MM-dd` strings using the device's default timezone, matching how
@@ -45,213 +57,163 @@ class HabitBackfillManager @Inject constructor(
     private val apneaRepo: ApneaRepository
 ) {
 
+    /** Result of backfilling a single slot's history. */
+    data class SlotBackfillResult(
+        val slot: Slot,
+        val dates: Int = 0,
+        val minutes: Int = 0,
+        val sessions: Int = 0,
+        val skipped: Boolean = false
+    )
+
+    /** Result of the full manual backfill — one entry per slot with history. */
     data class BackfillResult(
-        val resonanceDates: Int,
-        val resonanceMinutes: Int,
-        val resonanceSessions: Int,
-        val meditationDates: Int,
-        val meditationMinutes: Int,
-        val meditationSessions: Int,
-        val freeHoldDates: Int,
-        val freeHoldMinutes: Int,
-        val freeHoldSessions: Int,
-        val tableTrainingDates: Int,
-        val tableTrainingMinutes: Int,
-        val tableTrainingSessions: Int,
-        val progressiveO2Dates: Int,
-        val progressiveO2Minutes: Int,
-        val progressiveO2Sessions: Int,
-        val minBreathDates: Int,
-        val minBreathMinutes: Int,
-        val minBreathSessions: Int,
-        val resonanceSkipped: Boolean,
-        val meditationSkipped: Boolean,
-        val freeHoldSkipped: Boolean,
-        val tableTrainingSkipped: Boolean,
-        val progressiveO2Skipped: Boolean,
-        val minBreathSkipped: Boolean
+        val slotResults: Map<Slot, SlotBackfillResult>
     ) {
-        val totalDates: Int get() = resonanceDates + meditationDates +
-            freeHoldDates + tableTrainingDates + progressiveO2Dates + minBreathDates
-        val totalMinutes: Int get() = resonanceMinutes + meditationMinutes +
-            freeHoldMinutes + tableTrainingMinutes + progressiveO2Minutes + minBreathMinutes
-        val totalSessions: Int get() = resonanceSessions + meditationSessions +
-            freeHoldSessions + tableTrainingSessions + progressiveO2Sessions + minBreathSessions
+        val totalDates: Int get() = slotResults.values.sumOf { it.dates }
+        val totalMinutes: Int get() = slotResults.values.sumOf { it.minutes }
+        val totalSessions: Int get() = slotResults.values.sumOf { it.sessions }
+        val skippedSlots: List<Slot> get() = slotResults.values.filter { it.skipped }.map { it.slot }
+    }
+
+    /** Slots that have minute-based history to backfill, in display order. */
+    private val backfillableSlots = listOf(
+        Slot.RESONANCE_BREATHING,
+        Slot.MEDITATION,
+        Slot.FREE_HOLD,
+        Slot.O2_TABLE,
+        Slot.CO2_TABLE,
+        Slot.PROGRESSIVE_O2,
+        Slot.MIN_BREATH,
+        Slot.TILL_CONTRACTION,
+        Slot.CONTRACTION_COUNT
+    )
+
+    /**
+     * Sends the full per-date history backlog for [slot] to its connected Tail
+     * habit. No-op if the slot has no history; reported as skipped if no habit
+     * is selected for the slot.
+     */
+    suspend fun backfillSlot(slot: Slot): SlotBackfillResult {
+        val zone = ZoneId.systemDefault()
+        val (minutesByDate, sessionsByDate) = aggregateForSlot(slot, zone)
+
+        val skipped = habitRepo.getHabitId(slot).isBlank()
+        if (!skipped && minutesByDate.isNotEmpty()) {
+            Log.i(TAG, "Backfill ${slot.name}: ${minutesByDate.size} dates, " +
+                    "${minutesByDate.values.sum()} min, ${sessionsByDate.values.sum()} sessions")
+            habitRepo.sendHabitValuesForDates(slot, minutesByDate)
+            // Small delay to let Tail's mutex-serialised receiver finish the primary write
+            // before we send the secondary broadcast.
+            delay(500)
+            habitRepo.sendSecondaryValuesForDates(slot, sessionsByDate)
+        }
+        return SlotBackfillResult(
+            slot = slot,
+            dates = minutesByDate.size,
+            minutes = minutesByDate.values.sum(),
+            sessions = sessionsByDate.values.sum(),
+            skipped = skipped
+        )
     }
 
     /**
-     * Runs the full retroactive backfill.
-     *
-     * Returns a [BackfillResult] summarising what was sent. Slots with no
-     * habit selected are silently skipped (reported via the `*Skipped` flags).
+     * Runs the full retroactive backfill across every slot with history.
+     * Slots with no habit selected are silently skipped (reported via
+     * [BackfillResult.skippedSlots]).
      */
     suspend fun backfill(): BackfillResult {
-        val zone = ZoneId.systemDefault()
-
-        // ── Resonance Breathing + RF Assessments ──────────────────────────────
-        // Minutes → primary slot (Value 1), session count → secondary_value slot (Value 2)
-        val resonanceMinutesByDate = mutableMapOf<String, Int>()
-        val resonanceSessionsByDate = mutableMapOf<String, Int>()
-
-        // Normal resonance sessions
-        val resonanceSessions = resonanceRepo.getAll()
-        for (session in resonanceSessions) {
-            val dateStr = epochMsToDateStr(session.timestamp, zone)
-            val minutes = HabitIntegrationRepository.secondsToMinutes(session.durationSeconds)
-            resonanceMinutesByDate[dateStr] = (resonanceMinutesByDate[dateStr] ?: 0) + minutes
-            resonanceSessionsByDate[dateStr] = (resonanceSessionsByDate[dateStr] ?: 0) + 1
+        val results = linkedMapOf<Slot, SlotBackfillResult>()
+        for (slot in backfillableSlots) {
+            results[slot] = backfillSlot(slot)
         }
-        Log.i(TAG, "Resonance sessions: ${resonanceSessions.size}, " +
-                "${resonanceMinutesByDate.size} unique dates, " +
-                "${resonanceSessionsByDate.values.sum()} total sessions")
+        return BackfillResult(results)
+    }
 
-        // RF assessments (same habit slot)
-        val assessments = rfAssessmentRepo.getAll()
-        for (assessment in assessments) {
-            val dateStr = epochMsToDateStr(assessment.timestamp, zone)
-            val minutes = HabitIntegrationRepository.secondsToMinutes(assessment.durationSeconds)
-            resonanceMinutesByDate[dateStr] = (resonanceMinutesByDate[dateStr] ?: 0) + minutes
-            resonanceSessionsByDate[dateStr] = (resonanceSessionsByDate[dateStr] ?: 0) + 1
-        }
-        Log.i(TAG, "RF assessments: ${assessments.size} (merged into resonance dates)")
+    // ── Per-slot history aggregation ──────────────────────────────────────────
 
-        val resonanceSkipped = habitRepo.getHabitId(Slot.RESONANCE_BREATHING).isBlank()
-        if (!resonanceSkipped && resonanceMinutesByDate.isNotEmpty()) {
-            Log.i(TAG, "Sending resonance minutes (primary): ${resonanceMinutesByDate.size} dates, " +
-                    "${resonanceMinutesByDate.values.sum()} total minutes")
-            habitRepo.sendHabitValuesForDates(Slot.RESONANCE_BREATHING, resonanceMinutesByDate)
-            // Small delay to let Tail's mutex-serialised receiver finish the primary write
-            // before we send the secondary broadcast.
-            kotlinx.coroutines.delay(500)
-            Log.i(TAG, "Sending resonance sessions (secondary): ${resonanceSessionsByDate.size} dates, " +
-                    "${resonanceSessionsByDate.values.sum()} total sessions")
-            habitRepo.sendSecondaryValuesForDates(Slot.RESONANCE_BREATHING, resonanceSessionsByDate)
-        }
-
-        // ── Meditation ────────────────────────────────────────────────────────
-        // Minutes → primary slot (Value 1), session count → secondary_value slot (Value 2)
-        val meditationMinutesByDate = mutableMapOf<String, Int>()
-        val meditationSessionsByDate = mutableMapOf<String, Int>()
-
-        val meditationSessions = meditationRepo.getAllSessions()
-        for (session in meditationSessions) {
-            val dateStr = epochMsToDateStr(session.timestamp, zone)
-            val minutes = HabitIntegrationRepository.millisToMinutes(session.durationMs)
-            meditationMinutesByDate[dateStr] = (meditationMinutesByDate[dateStr] ?: 0) + minutes
-            meditationSessionsByDate[dateStr] = (meditationSessionsByDate[dateStr] ?: 0) + 1
-        }
-        Log.i(TAG, "Meditation sessions: ${meditationSessions.size}, " +
-                "${meditationMinutesByDate.size} unique dates, " +
-                "${meditationSessionsByDate.values.sum()} total sessions")
-
-        val meditationSkipped = habitRepo.getHabitId(Slot.MEDITATION).isBlank()
-        if (!meditationSkipped && meditationMinutesByDate.isNotEmpty()) {
-            Log.i(TAG, "Sending meditation minutes (primary): ${meditationMinutesByDate.size} dates, " +
-                    "${meditationMinutesByDate.values.sum()} total minutes")
-            habitRepo.sendHabitValuesForDates(Slot.MEDITATION, meditationMinutesByDate)
-            // Small delay to let Tail's mutex-serialised receiver finish the primary write
-            // before we send the secondary broadcast.
-            kotlinx.coroutines.delay(500)
-            Log.i(TAG, "Sending meditation sessions (secondary): ${meditationSessionsByDate.size} dates, " +
-                    "${meditationSessionsByDate.values.sum()} total sessions")
-            habitRepo.sendSecondaryValuesForDates(Slot.MEDITATION, meditationSessionsByDate)
-        }
-
-        // ── Apnea (free holds, tables, progressive O₂, min breath) ────────────
-        //
-        // Every apnea activity saves a single ApneaRecordEntity whose durationMs
-        // is the TOTAL hold time for that session. The tableType field
-        // distinguishes the activity:
-        //   null             → free hold
-        //   "O2" / "CO2"     → O₂/CO₂ table training
-        //   "PROGRESSIVE_O2" → Progressive O₂ drill
-        //   "MIN_BREATH"     → Min Breath drill
-        val freeHoldMinutesByDate = mutableMapOf<String, Int>()
-        val tableTrainingMinutesByDate = mutableMapOf<String, Int>()
-        val progressiveO2MinutesByDate = mutableMapOf<String, Int>()
-        val minBreathMinutesByDate = mutableMapOf<String, Int>()
-        // Session counts → secondary_value slot (Value 2)
-        val freeHoldSessionsByDate = mutableMapOf<String, Int>()
-        val tableTrainingSessionsByDate = mutableMapOf<String, Int>()
-        val progressiveO2SessionsByDate = mutableMapOf<String, Int>()
-        val minBreathSessionsByDate = mutableMapOf<String, Int>()
-
-        val apneaRecords = apneaRepo.getAllRecordsOnce()
-        for (record in apneaRecords) {
-            val dateStr = epochMsToDateStr(record.timestamp, zone)
-            val minutes = HabitIntegrationRepository.millisToMinutes(record.durationMs)
-            val (minuteMap, sessionMap) = when (record.tableType) {
-                null                    -> freeHoldMinutesByDate to freeHoldSessionsByDate
-                "O2", "CO2"             -> tableTrainingMinutesByDate to tableTrainingSessionsByDate
-                "PROGRESSIVE_O2"        -> progressiveO2MinutesByDate to progressiveO2SessionsByDate
-                "MIN_BREATH"            -> minBreathMinutesByDate to minBreathSessionsByDate
-                else                    -> null to null // unknown type — skip
+    /**
+     * Aggregates (minutesByDate, sessionsByDate) for [slot].
+     * Returns empty maps for slots without minute-based history.
+     */
+    private suspend fun aggregateForSlot(
+        slot: Slot,
+        zone: ZoneId
+    ): Pair<Map<String, Int>, Map<String, Int>> = when (slot) {
+        Slot.RESONANCE_BREATHING -> {
+            // Resonance sessions + RF assessments share one habit slot
+            val minutes = mutableMapOf<String, Int>()
+            val sessions = mutableMapOf<String, Int>()
+            for (session in resonanceRepo.getAll()) {
+                addSession(
+                    minutes, sessions,
+                    dateStr = epochMsToDateStr(session.timestamp, zone),
+                    minutes = HabitIntegrationRepository.secondsToMinutes(session.durationSeconds)
+                )
             }
-            if (minuteMap != null && sessionMap != null) {
-                minuteMap[dateStr] = (minuteMap[dateStr] ?: 0) + minutes
-                sessionMap[dateStr] = (sessionMap[dateStr] ?: 0) + 1
+            for (assessment in rfAssessmentRepo.getAll()) {
+                addSession(
+                    minutes, sessions,
+                    dateStr = epochMsToDateStr(assessment.timestamp, zone),
+                    minutes = HabitIntegrationRepository.secondsToMinutes(assessment.durationSeconds)
+                )
             }
+            minutes to sessions
         }
-        Log.i(TAG, "Apnea records: ${apneaRecords.size} | " +
-                "freeHold=${freeHoldMinutesByDate.size} dates, " +
-                "table=${tableTrainingMinutesByDate.size} dates, " +
-                "progO2=${progressiveO2MinutesByDate.size} dates, " +
-                "minBreath=${minBreathMinutesByDate.size} dates")
-
-        val freeHoldSkipped = habitRepo.getHabitId(Slot.FREE_HOLD).isBlank()
-        if (!freeHoldSkipped && freeHoldMinutesByDate.isNotEmpty()) {
-            habitRepo.sendHabitValuesForDates(Slot.FREE_HOLD, freeHoldMinutesByDate)
-            kotlinx.coroutines.delay(500)
-            habitRepo.sendSecondaryValuesForDates(Slot.FREE_HOLD, freeHoldSessionsByDate)
+        Slot.MEDITATION -> {
+            val minutes = mutableMapOf<String, Int>()
+            val sessions = mutableMapOf<String, Int>()
+            for (session in meditationRepo.getAllSessions()) {
+                addSession(
+                    minutes, sessions,
+                    dateStr = epochMsToDateStr(session.timestamp, zone),
+                    minutes = HabitIntegrationRepository.millisToMinutes(session.durationMs)
+                )
+            }
+            minutes to sessions
         }
+        // Apnea-backed slots — dispatched on ApneaRecordEntity.tableType
+        Slot.FREE_HOLD         -> apneaMaps(setOf(null), zone)
+        Slot.O2_TABLE          -> apneaMaps(setOf("O2"), zone)
+        Slot.CO2_TABLE         -> apneaMaps(setOf("CO2"), zone)
+        Slot.PROGRESSIVE_O2    -> apneaMaps(setOf("PROGRESSIVE_O2"), zone)
+        Slot.MIN_BREATH        -> apneaMaps(setOf("MIN_BREATH"), zone)
+        // Legacy tableType strings kept from the original Wonka prototypes
+        Slot.TILL_CONTRACTION  -> apneaMaps(setOf("WONKA_FIRST_CONTRACTION"), zone)
+        Slot.CONTRACTION_COUNT -> apneaMaps(setOf("WONKA_ENDURANCE"), zone)
+        // No minute-based history to backfill (records, readiness, music)
+        else -> emptyMap<String, Int>() to emptyMap()
+    }
 
-        val tableTrainingSkipped = habitRepo.getHabitId(Slot.TABLE_TRAINING).isBlank()
-        if (!tableTrainingSkipped && tableTrainingMinutesByDate.isNotEmpty()) {
-            habitRepo.sendHabitValuesForDates(Slot.TABLE_TRAINING, tableTrainingMinutesByDate)
-            kotlinx.coroutines.delay(500)
-            habitRepo.sendSecondaryValuesForDates(Slot.TABLE_TRAINING, tableTrainingSessionsByDate)
+    /**
+     * Aggregates apnea records whose tableType is in [types] into per-date
+     * minute and session-count maps.
+     */
+    private suspend fun apneaMaps(
+        types: Set<String?>,
+        zone: ZoneId
+    ): Pair<Map<String, Int>, Map<String, Int>> {
+        val minutes = mutableMapOf<String, Int>()
+        val sessions = mutableMapOf<String, Int>()
+        for (record in apneaRepo.getAllRecordsOnce()) {
+            if (record.tableType !in types) continue
+            addSession(
+                minutes, sessions,
+                dateStr = epochMsToDateStr(record.timestamp, zone),
+                minutes = HabitIntegrationRepository.millisToMinutes(record.durationMs)
+            )
         }
+        return minutes to sessions
+    }
 
-        val progressiveO2Skipped = habitRepo.getHabitId(Slot.PROGRESSIVE_O2).isBlank()
-        if (!progressiveO2Skipped && progressiveO2MinutesByDate.isNotEmpty()) {
-            habitRepo.sendHabitValuesForDates(Slot.PROGRESSIVE_O2, progressiveO2MinutesByDate)
-            kotlinx.coroutines.delay(500)
-            habitRepo.sendSecondaryValuesForDates(Slot.PROGRESSIVE_O2, progressiveO2SessionsByDate)
-        }
-
-        val minBreathSkipped = habitRepo.getHabitId(Slot.MIN_BREATH).isBlank()
-        if (!minBreathSkipped && minBreathMinutesByDate.isNotEmpty()) {
-            habitRepo.sendHabitValuesForDates(Slot.MIN_BREATH, minBreathMinutesByDate)
-            kotlinx.coroutines.delay(500)
-            habitRepo.sendSecondaryValuesForDates(Slot.MIN_BREATH, minBreathSessionsByDate)
-        }
-
-        return BackfillResult(
-            resonanceDates         = resonanceMinutesByDate.size,
-            resonanceMinutes       = resonanceMinutesByDate.values.sum(),
-            resonanceSessions      = resonanceSessionsByDate.values.sum(),
-            meditationDates        = meditationMinutesByDate.size,
-            meditationMinutes      = meditationMinutesByDate.values.sum(),
-            meditationSessions     = meditationSessionsByDate.values.sum(),
-            freeHoldDates          = freeHoldMinutesByDate.size,
-            freeHoldMinutes        = freeHoldMinutesByDate.values.sum(),
-            freeHoldSessions       = freeHoldSessionsByDate.values.sum(),
-            tableTrainingDates     = tableTrainingMinutesByDate.size,
-            tableTrainingMinutes   = tableTrainingMinutesByDate.values.sum(),
-            tableTrainingSessions  = tableTrainingSessionsByDate.values.sum(),
-            progressiveO2Dates     = progressiveO2MinutesByDate.size,
-            progressiveO2Minutes   = progressiveO2MinutesByDate.values.sum(),
-            progressiveO2Sessions  = progressiveO2SessionsByDate.values.sum(),
-            minBreathDates         = minBreathMinutesByDate.size,
-            minBreathMinutes       = minBreathMinutesByDate.values.sum(),
-            minBreathSessions      = minBreathSessionsByDate.values.sum(),
-            resonanceSkipped       = resonanceSkipped,
-            meditationSkipped      = meditationSkipped,
-            freeHoldSkipped        = freeHoldSkipped,
-            tableTrainingSkipped   = tableTrainingSkipped,
-            progressiveO2Skipped   = progressiveO2Skipped,
-            minBreathSkipped       = minBreathSkipped
-        )
+    private fun addSession(
+        minutesByDate: MutableMap<String, Int>,
+        sessionsByDate: MutableMap<String, Int>,
+        dateStr: String,
+        minutes: Int
+    ) {
+        minutesByDate[dateStr] = (minutesByDate[dateStr] ?: 0) + minutes
+        sessionsByDate[dateStr] = (sessionsByDate[dateStr] ?: 0) + 1
     }
 
     /** Converts an epoch-ms timestamp to a `yyyy-MM-dd` string in [zone]. */

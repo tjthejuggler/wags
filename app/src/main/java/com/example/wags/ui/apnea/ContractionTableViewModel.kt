@@ -1052,10 +1052,13 @@ class ContractionTableViewModel @Inject constructor(
         }
 
         // Fire Tail habit for every completed contraction-table session
+        // (mode-specific slot: Till Contraction vs Contraction Count)
         try {
             val holdMinutes = HabitIntegrationRepository.millisToMinutes(totalHoldTimeMs)
-            habitRepo.sendHabitIncrementWithMinutes(Slot.TABLE_TRAINING, holdMinutes)
-            habitRepo.sendSecondaryValueIncrement(Slot.TABLE_TRAINING, 1)
+            val slot = if (s.mode == ContractionTableMode.TILL_CONTRACTION) Slot.TILL_CONTRACTION
+                       else Slot.CONTRACTION_COUNT
+            habitRepo.sendHabitIncrementWithMinutes(slot, holdMinutes)
+            habitRepo.sendSecondaryValueIncrement(slot, 1)
         } catch (_: Exception) {}
 
         // Fire music habit if applicable (once per TimeOfDay per day)

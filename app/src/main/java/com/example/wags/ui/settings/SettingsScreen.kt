@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.ui.res.painterResource
 import com.example.wags.R
 import androidx.compose.material3.*
@@ -382,7 +383,8 @@ fun SettingsScreen(
                     habitAppUnavailable     = state.habitAppUnavailable,
                     freeHoldHabit           = state.freeHoldHabit,
                     apneaNewRecordHabit     = state.apneaNewRecordHabit,
-                    tableTrainingHabit      = state.tableTrainingHabit,
+                    o2TableHabit            = state.o2TableHabit,
+                    co2TableHabit           = state.co2TableHabit,
                     morningReadinessHabit   = state.morningReadinessHabit,
                     hrvReadinessHabit       = state.hrvReadinessHabit,
                     resonanceBreathingHabit = state.resonanceBreathingHabit,
@@ -390,6 +392,8 @@ fun SettingsScreen(
                     rapidHrChangeHabit      = state.rapidHrChangeHabit,
                     progressiveO2Habit      = state.progressiveO2Habit,
                     minBreathHabit          = state.minBreathHabit,
+                    tillContractionHabit    = state.tillContractionHabit,
+                    contractionCountHabit   = state.contractionCountHabit,
                     musicHabit              = state.musicHabit,
                     onSelectHabit           = { slot, entry -> viewModel.selectHabit(slot, entry) },
                     onClearHabit            = { slot -> viewModel.clearHabit(slot) },
@@ -743,7 +747,8 @@ private fun TailAppIntegrationCard(
     habitAppUnavailable: Boolean,
     freeHoldHabit: HabitSlotSelection,
     apneaNewRecordHabit: HabitSlotSelection,
-    tableTrainingHabit: HabitSlotSelection,
+    o2TableHabit: HabitSlotSelection,
+    co2TableHabit: HabitSlotSelection,
     morningReadinessHabit: HabitSlotSelection,
     hrvReadinessHabit: HabitSlotSelection,
     resonanceBreathingHabit: HabitSlotSelection,
@@ -751,6 +756,8 @@ private fun TailAppIntegrationCard(
     rapidHrChangeHabit: HabitSlotSelection,
     progressiveO2Habit: HabitSlotSelection,
     minBreathHabit: HabitSlotSelection,
+    tillContractionHabit: HabitSlotSelection,
+    contractionCountHabit: HabitSlotSelection,
     musicHabit: HabitSlotSelection,
     onSelectHabit: (Slot, HabitEntry) -> Unit,
     onClearHabit: (Slot) -> Unit,
@@ -761,7 +768,7 @@ private fun TailAppIntegrationCard(
     onBackfill: () -> Unit = {},
     onDismissBackfillMsg: () -> Unit = {}
 ) {
-    var expandedSlot by remember { mutableStateOf<Slot?>(null) }
+    var pickerSlot by remember { mutableStateOf<Slot?>(null) }
 
     Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
         Column(
@@ -816,9 +823,12 @@ private fun TailAppIntegrationCard(
             val slots = listOf(
                 Slot.FREE_HOLD           to freeHoldHabit,
                 Slot.APNEA_NEW_RECORD    to apneaNewRecordHabit,
-                Slot.TABLE_TRAINING      to tableTrainingHabit,
+                Slot.O2_TABLE            to o2TableHabit,
+                Slot.CO2_TABLE           to co2TableHabit,
                 Slot.PROGRESSIVE_O2      to progressiveO2Habit,
                 Slot.MIN_BREATH          to minBreathHabit,
+                Slot.TILL_CONTRACTION    to tillContractionHabit,
+                Slot.CONTRACTION_COUNT   to contractionCountHabit,
                 Slot.MORNING_READINESS   to morningReadinessHabit,
                 Slot.HRV_READINESS       to hrvReadinessHabit,
                 Slot.RESONANCE_BREATHING to resonanceBreathingHabit,
@@ -829,20 +839,28 @@ private fun TailAppIntegrationCard(
 
             slots.forEachIndexed { index, (slot, selection) ->
                 HabitSlotRow(
-                    slot       = slot,
-                    selection  = selection,
-                    habitList  = habitList,
-                    isExpanded = expandedSlot == slot,
-                    onToggle   = { expandedSlot = if (expandedSlot == slot) null else slot },
-                    onSelect   = { entry ->
-                        onSelectHabit(slot, entry)
-                        expandedSlot = null
-                    },
-                    onClear    = { onClearHabit(slot) }
+                    slot      = slot,
+                    selection = selection,
+                    onClick   = { pickerSlot = slot },
+                    onClear   = { onClearHabit(slot) }
                 )
                 if (index < slots.lastIndex) {
                     HorizontalDivider(color = SurfaceVariant)
                 }
+            }
+
+            // Searchable habit-picker popup for the slot being configured
+            pickerSlot?.let { slot ->
+                HabitPickerDialog(
+                    slot        = slot,
+                    habitList   = habitList,
+                    selectedId  = slots.firstOrNull { it.first == slot }?.second?.habitId ?: "",
+                    onSelect    = { entry ->
+                        onSelectHabit(slot, entry)
+                        pickerSlot = null
+                    },
+                    onDismiss   = { pickerSlot = null }
+                )
             }
 
             // ── Retroactive backfill ───────────────────────────────────────────
@@ -859,9 +877,9 @@ private fun TailAppIntegrationCard(
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
-                        "Send minutes (and meditation session counts) from all " +
-                                "past resonance breathing, assessments, meditation, " +
-                                "and apnea sessions to Tail.",
+                        "Send minutes and session counts from all past sessions " +
+                                "to Tail. Connecting a new habit backfills its " +
+                                "history automatically.",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondary
                     )
@@ -908,82 +926,154 @@ private fun TailAppIntegrationCard(
 private fun HabitSlotRow(
     slot: Slot,
     selection: HabitSlotSelection,
-    habitList: List<HabitEntry>,
-    isExpanded: Boolean,
-    onToggle: () -> Unit,
-    onSelect: (HabitEntry) -> Unit,
+    onClick: () -> Unit,
     onClear: () -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(slot.label, style = MaterialTheme.typography.bodyMedium)
-                if (selection.isSet) {
-                    Text(
-                        selection.displayName,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = ReadinessGreen
-                    )
-                } else {
-                    Text(
-                        "Not set",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
-                    )
-                }
-            }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (selection.isSet) {
-                    IconButton(onClick = onClear, modifier = Modifier.size(32.dp)) {
-                        Icon(
-                            Icons.Default.Clear,
-                            contentDescription = "Clear",
-                            tint = TextSecondary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-                OutlinedButton(
-                    onClick = onToggle,
-                    modifier = Modifier.height(32.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
-                ) {
-                    Text(
-                        if (selection.isSet) "Change" else "Set",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-        }
-
-        if (isExpanded) {
-            Spacer(Modifier.height(8.dp))
-            if (habitList.isEmpty()) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(slot.label, style = MaterialTheme.typography.bodyMedium)
+            if (selection.isSet) {
                 Text(
-                    "No habits available. Tap Refresh above.",
+                    selection.displayName,
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary,
-                    modifier = Modifier.padding(start = 4.dp)
+                    color = ReadinessGreen
                 )
             } else {
-                habitList.forEach { entry ->
-                    HabitPickerRow(
-                        entry      = entry,
-                        isSelected = entry.habitId == selection.habitId,
-                        onClick    = { onSelect(entry) }
+                Text(
+                    "Not set",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (selection.isSet) {
+                IconButton(onClick = onClear, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        Icons.Default.Clear,
+                        contentDescription = "Clear",
+                        tint = TextSecondary,
+                        modifier = Modifier.size(16.dp)
                     )
                 }
+            }
+            OutlinedButton(
+                onClick = onClick,
+                modifier = Modifier.height(32.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
+            ) {
+                Text(
+                    if (selection.isSet) "Change" else "Set",
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
     }
+}
+
+/**
+ * Searchable, alphabetically sorted habit picker popup for a Tail slot.
+ * Opens when the slot's "Set"/"Change" button is tapped.
+ */
+@Composable
+private fun HabitPickerDialog(
+    slot: Slot,
+    habitList: List<HabitEntry>,
+    selectedId: String,
+    onSelect: (HabitEntry) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var query by remember { mutableStateOf("") }
+
+    val filtered = remember(habitList, query) {
+        val sorted = habitList.sortedBy { it.habitName.lowercase() }
+        if (query.isBlank()) sorted
+        else sorted.filter { it.habitName.contains(query.trim(), ignoreCase = true) }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceDark,
+        title = {
+            Column {
+                Text("Select Habit", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    slot.label,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Search habits") },
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = null, tint = TextSecondary)
+                    },
+                    trailingIcon = {
+                        if (query.isNotEmpty()) {
+                            IconButton(onClick = { query = "" }) {
+                                Icon(
+                                    Icons.Default.Clear,
+                                    contentDescription = "Clear search",
+                                    tint = TextSecondary
+                                )
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.small
+                )
+                Spacer(Modifier.height(8.dp))
+                when {
+                    habitList.isEmpty() ->
+                        Text(
+                            "No habits available. Tap Refresh on the Tail card.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                    filtered.isEmpty() ->
+                        Text(
+                            "No habits match \"${query.trim()}\".",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                    else ->
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 360.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            // No explicit key: Tail can return duplicate/blank habit
+                            // ids (id == habit name), which would crash LazyColumn.
+                            items(filtered) { entry ->
+                                HabitPickerRow(
+                                    entry      = entry,
+                                    isSelected = entry.habitId == selectedId,
+                                    onClick    = { onSelect(entry) }
+                                )
+                            }
+                        }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 @Composable

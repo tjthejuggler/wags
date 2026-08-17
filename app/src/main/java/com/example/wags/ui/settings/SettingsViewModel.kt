@@ -2,6 +2,7 @@ package com.example.wags.ui.settings
 
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.ble.AutoConnectManager
@@ -58,7 +59,8 @@ data class SettingsUiState(
     val habitAppUnavailable: Boolean = false,
     val freeHoldHabit: HabitSlotSelection = HabitSlotSelection(),
     val apneaNewRecordHabit: HabitSlotSelection = HabitSlotSelection(),
-    val tableTrainingHabit: HabitSlotSelection = HabitSlotSelection(),
+    val o2TableHabit: HabitSlotSelection = HabitSlotSelection(),
+    val co2TableHabit: HabitSlotSelection = HabitSlotSelection(),
     val morningReadinessHabit: HabitSlotSelection = HabitSlotSelection(),
     val hrvReadinessHabit: HabitSlotSelection = HabitSlotSelection(),
     val resonanceBreathingHabit: HabitSlotSelection = HabitSlotSelection(),
@@ -66,6 +68,8 @@ data class SettingsUiState(
     val rapidHrChangeHabit: HabitSlotSelection = HabitSlotSelection(),
     val progressiveO2Habit: HabitSlotSelection = HabitSlotSelection(),
     val minBreathHabit: HabitSlotSelection = HabitSlotSelection(),
+    val tillContractionHabit: HabitSlotSelection = HabitSlotSelection(),
+    val contractionCountHabit: HabitSlotSelection = HabitSlotSelection(),
     val musicHabit: HabitSlotSelection = HabitSlotSelection(),
     // ── Habit backfill (retroactive minute export to Tail) ─────────────────────
     val isBackfilling: Boolean = false,
@@ -138,7 +142,8 @@ class SettingsViewModel @Inject constructor(
             habitAppUnavailable     = habit.habitAppUnavailable,
             freeHoldHabit           = habit.freeHoldHabit,
             apneaNewRecordHabit     = habit.apneaNewRecordHabit,
-            tableTrainingHabit      = habit.tableTrainingHabit,
+            o2TableHabit            = habit.o2TableHabit,
+            co2TableHabit           = habit.co2TableHabit,
             morningReadinessHabit   = habit.morningReadinessHabit,
             hrvReadinessHabit       = habit.hrvReadinessHabit,
             resonanceBreathingHabit = habit.resonanceBreathingHabit,
@@ -146,6 +151,8 @@ class SettingsViewModel @Inject constructor(
             rapidHrChangeHabit      = habit.rapidHrChangeHabit,
             progressiveO2Habit      = habit.progressiveO2Habit,
             minBreathHabit          = habit.minBreathHabit,
+            tillContractionHabit    = habit.tillContractionHabit,
+            contractionCountHabit   = habit.contractionCountHabit,
             musicHabit              = habit.musicHabit
         )
     }.combine(_exportImportState) { state, exportImport ->
@@ -177,7 +184,8 @@ class SettingsViewModel @Inject constructor(
             meditationAudioDirUri   = devicePrefs.meditationAudioDirUri,
             freeHoldHabit           = slotSelection(Slot.FREE_HOLD),
             apneaNewRecordHabit     = slotSelection(Slot.APNEA_NEW_RECORD),
-            tableTrainingHabit      = slotSelection(Slot.TABLE_TRAINING),
+            o2TableHabit            = slotSelection(Slot.O2_TABLE),
+            co2TableHabit           = slotSelection(Slot.CO2_TABLE),
             morningReadinessHabit   = slotSelection(Slot.MORNING_READINESS),
             hrvReadinessHabit       = slotSelection(Slot.HRV_READINESS),
             resonanceBreathingHabit = slotSelection(Slot.RESONANCE_BREATHING),
@@ -185,6 +193,8 @@ class SettingsViewModel @Inject constructor(
             rapidHrChangeHabit      = slotSelection(Slot.RAPID_HR_CHANGE),
             progressiveO2Habit      = slotSelection(Slot.PROGRESSIVE_O2),
             minBreathHabit          = slotSelection(Slot.MIN_BREATH),
+            tillContractionHabit    = slotSelection(Slot.TILL_CONTRACTION),
+            contractionCountHabit   = slotSelection(Slot.CONTRACTION_COUNT),
             debugModeEnabled        = debugPrefs.debugModeEnabled,
             debugFileDirUri         = debugPrefs.debugFileDirUri
         )
@@ -264,6 +274,30 @@ class SettingsViewModel @Inject constructor(
         habitRepo.setHabit(slot, entry)
         val selection = HabitSlotSelection(entry.habitId, entry.habitName)
         _habitState.update { it.copySlot(slot, selection) }
+        backfillSlotHistory(slot)
+    }
+
+    /**
+     * Auto-backfill: when a slot gets a NEW habit connection, push that
+     * slot's entire per-date history backlog to Tail so the habit starts
+     * with complete data. Silently does nothing for slots without history.
+     */
+    private fun backfillSlotHistory(slot: Slot) {
+        viewModelScope.launch {
+            try {
+                val result = habitBackfillManager.backfillSlot(slot)
+                if (!result.skipped && result.dates > 0) {
+                    _backfillState.update {
+                        it.copy(
+                            backfillMessage = "Backfilled ${slot.label}: ${result.dates} dates " +
+                                    "(${result.minutes} min, ${result.sessions} sessions) sent to Tail."
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("SettingsVM", "Auto-backfill failed for ${slot.name}", e)
+            }
+        }
     }
 
     fun clearHabit(slot: Slot) {
@@ -274,9 +308,9 @@ class SettingsViewModel @Inject constructor(
     // ── Retroactive backfill ───────────────────────────────────────────────────
 
     /**
-     * Aggregates minutes from all past resonance-breathing, RF-assessment, and
-     * meditation sessions, then sends per-date totals to Tail. Idempotent —
-     * Tail SETS (replaces) the value for each date.
+     * Aggregates minutes from all past sessions, then sends per-date totals
+     * to Tail for every connected habit slot. Idempotent — Tail SETS
+     * (replaces) the value for each date.
      */
     fun backfillHabitMinutes() {
         viewModelScope.launch {
@@ -292,23 +326,8 @@ class SettingsViewModel @Inject constructor(
                         append(", ${result.totalSessions} sessions")
                     }
                     append(") to Tail.")
-                    if (result.resonanceSkipped) {
-                        append(" Resonance habit not selected — skipped.")
-                    }
-                    if (result.meditationSkipped) {
-                        append(" Meditation habit not selected — skipped.")
-                    }
-                    if (result.freeHoldSkipped) {
-                        append(" Free Hold habit not selected — skipped.")
-                    }
-                    if (result.tableTrainingSkipped) {
-                        append(" Table Training habit not selected — skipped.")
-                    }
-                    if (result.progressiveO2Skipped) {
-                        append(" Progressive O₂ habit not selected — skipped.")
-                    }
-                    if (result.minBreathSkipped) {
-                        append(" Min Breath habit not selected — skipped.")
+                    result.skippedSlots.forEach { slot ->
+                        append(" ${slot.label} habit not selected — skipped.")
                     }
                 }
                 _backfillState.update {
@@ -399,7 +418,8 @@ class SettingsViewModel @Inject constructor(
     private fun buildInitialHabitState() = HabitPartialState(
         freeHoldHabit           = slotSelection(Slot.FREE_HOLD),
         apneaNewRecordHabit     = slotSelection(Slot.APNEA_NEW_RECORD),
-        tableTrainingHabit      = slotSelection(Slot.TABLE_TRAINING),
+        o2TableHabit            = slotSelection(Slot.O2_TABLE),
+        co2TableHabit           = slotSelection(Slot.CO2_TABLE),
         morningReadinessHabit   = slotSelection(Slot.MORNING_READINESS),
         hrvReadinessHabit       = slotSelection(Slot.HRV_READINESS),
         resonanceBreathingHabit = slotSelection(Slot.RESONANCE_BREATHING),
@@ -407,6 +427,8 @@ class SettingsViewModel @Inject constructor(
         rapidHrChangeHabit      = slotSelection(Slot.RAPID_HR_CHANGE),
         progressiveO2Habit      = slotSelection(Slot.PROGRESSIVE_O2),
         minBreathHabit          = slotSelection(Slot.MIN_BREATH),
+        tillContractionHabit    = slotSelection(Slot.TILL_CONTRACTION),
+        contractionCountHabit   = slotSelection(Slot.CONTRACTION_COUNT),
         musicHabit              = slotSelection(Slot.MUSIC)
     )
 }
@@ -419,7 +441,8 @@ private data class HabitPartialState(
     val habitAppUnavailable: Boolean = false,
     val freeHoldHabit: HabitSlotSelection = HabitSlotSelection(),
     val apneaNewRecordHabit: HabitSlotSelection = HabitSlotSelection(),
-    val tableTrainingHabit: HabitSlotSelection = HabitSlotSelection(),
+    val o2TableHabit: HabitSlotSelection = HabitSlotSelection(),
+    val co2TableHabit: HabitSlotSelection = HabitSlotSelection(),
     val morningReadinessHabit: HabitSlotSelection = HabitSlotSelection(),
     val hrvReadinessHabit: HabitSlotSelection = HabitSlotSelection(),
     val resonanceBreathingHabit: HabitSlotSelection = HabitSlotSelection(),
@@ -427,12 +450,15 @@ private data class HabitPartialState(
     val rapidHrChangeHabit: HabitSlotSelection = HabitSlotSelection(),
     val progressiveO2Habit: HabitSlotSelection = HabitSlotSelection(),
     val minBreathHabit: HabitSlotSelection = HabitSlotSelection(),
+    val tillContractionHabit: HabitSlotSelection = HabitSlotSelection(),
+    val contractionCountHabit: HabitSlotSelection = HabitSlotSelection(),
     val musicHabit: HabitSlotSelection = HabitSlotSelection()
 ) {
     fun copySlot(slot: HabitIntegrationRepository.Slot, value: HabitSlotSelection) = when (slot) {
         HabitIntegrationRepository.Slot.FREE_HOLD           -> copy(freeHoldHabit = value)
         HabitIntegrationRepository.Slot.APNEA_NEW_RECORD    -> copy(apneaNewRecordHabit = value)
-        HabitIntegrationRepository.Slot.TABLE_TRAINING      -> copy(tableTrainingHabit = value)
+        HabitIntegrationRepository.Slot.O2_TABLE            -> copy(o2TableHabit = value)
+        HabitIntegrationRepository.Slot.CO2_TABLE           -> copy(co2TableHabit = value)
         HabitIntegrationRepository.Slot.MORNING_READINESS   -> copy(morningReadinessHabit = value)
         HabitIntegrationRepository.Slot.HRV_READINESS       -> copy(hrvReadinessHabit = value)
         HabitIntegrationRepository.Slot.RESONANCE_BREATHING -> copy(resonanceBreathingHabit = value)
@@ -440,6 +466,8 @@ private data class HabitPartialState(
         HabitIntegrationRepository.Slot.RAPID_HR_CHANGE     -> copy(rapidHrChangeHabit = value)
         HabitIntegrationRepository.Slot.PROGRESSIVE_O2      -> copy(progressiveO2Habit = value)
         HabitIntegrationRepository.Slot.MIN_BREATH          -> copy(minBreathHabit = value)
+        HabitIntegrationRepository.Slot.TILL_CONTRACTION    -> copy(tillContractionHabit = value)
+        HabitIntegrationRepository.Slot.CONTRACTION_COUNT   -> copy(contractionCountHabit = value)
         HabitIntegrationRepository.Slot.MUSIC               -> copy(musicHabit = value)
     }
 }
