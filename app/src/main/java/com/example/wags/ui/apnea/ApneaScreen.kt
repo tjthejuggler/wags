@@ -607,13 +607,13 @@ private data class SectionCornerBadges(
 
 /** Tiny bordered number badge used in the corners of section headers. */
 @Composable
-private fun CornerBadge(text: String) {
+private fun CornerBadge(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
         fontSize = 9.sp,
         lineHeight = 10.sp,
         color = TextPrimary,
-        modifier = Modifier
+        modifier = modifier
             .border(1.dp, TextSecondary, RoundedCornerShape(4.dp))
             .padding(horizontal = 3.dp, vertical = 1.dp)
     )
@@ -628,52 +628,68 @@ private fun CollapsibleCard(
     headerExtra: @Composable RowScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onToggle),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f)
-                )
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onToggle)
+                        // Keep the header clear of the corner badges that float
+                        // to the right of the expand arrow.
+                        .then(if (headerBadges != null) Modifier.padding(end = 20.dp) else Modifier),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    headerExtra()
-                    // Upper badge = days since this session type was done (any settings);
-                    // lower badge = days since it was done with the exact current settings.
-                    headerBadges?.let {
-                        Column(horizontalAlignment = Alignment.End) {
-                            CornerBadge(it.daysSinceAny?.toString() ?: "∞")
-                            CornerBadge(it.daysSinceCombo?.toString() ?: "∞")
-                        }
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        headerExtra()
+                        Icon(
+                            imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                            contentDescription = if (expanded) "Collapse" else "Expand",
+                            tint = TextSecondary
+                        )
                     }
-                    Icon(
-                        imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                        contentDescription = if (expanded) "Collapse" else "Expand",
-                        tint = TextSecondary
+                }
+                AnimatedVisibility(
+                    visible = expanded,
+                    enter = expandVertically(),
+                    exit = shrinkVertically()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(top = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        content = content
                     )
                 }
             }
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically(),
-                exit = shrinkVertically()
-            ) {
-                Column(
-                    modifier = Modifier.padding(top = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    content = content
-                )
-            }
+        }
+
+        // Days-since badges float in the card's top-right / bottom-right corners,
+        // beyond the expand arrow — above it and below it respectively.
+        // Upper badge = days since this session type was done (any settings);
+        // lower badge = days since it was done with the exact current settings.
+        headerBadges?.let {
+            CornerBadge(
+                text = it.daysSinceAny?.toString() ?: "∞",
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 3.dp, end = 4.dp)
+            )
+            CornerBadge(
+                text = it.daysSinceCombo?.toString() ?: "∞",
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(bottom = 3.dp, end = 4.dp)
+            )
         }
     }
 }

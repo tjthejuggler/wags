@@ -115,9 +115,11 @@ data class ContractionTableState(
  *    decrement-per-delay implementation).
  *  - Per-round results are accumulated in state (no historical amnesia), enabling
  *    intra-session cruise-decay analytics.
- *  - The rest schedule linearly interpolates from restStartSec (round 1) to
- *    restEndSec (final round). Equal values give a classic fixed-rest table;
- *    restEnd < restStart gives a progressive-overload "falling rest" table.
+ *  - The first hold starts immediately (no rest before it — there is nothing
+ *    to recover from yet). The rest schedule linearly interpolates from
+ *    restStartSec (before round 2) to restEndSec (before the final round).
+ *    Equal values give a classic fixed-rest table; restEnd < restStart gives
+ *    a progressive-overload "falling rest" table.
  */
 @Singleton
 class ContractionTableStateMachine @Inject constructor() {
@@ -134,8 +136,9 @@ class ContractionTableStateMachine @Inject constructor() {
     // ── Public API ──────────────────────────────────────────────────────────
 
     /**
-     * Begins a contraction table session. Round 1 starts in the BREATHE phase
-     * with the first scheduled rest.
+     * Begins a contraction table session. Round 1 starts immediately with its
+     * hold (CRUISE) — there is no rest before the first hold. The configured
+     * rest schedule covers the breaths between rounds (round 2 … N).
      */
     fun start(
         mode: ContractionTableMode,
@@ -146,13 +149,15 @@ class ContractionTableStateMachine @Inject constructor() {
         scope: CoroutineScope
     ) {
         this.scope = scope
-        restScheduleMs = buildRestSchedule(rounds, restStartSec, restEndSec)
+        // One rest entry per inter-round breath (rounds 2..N); round 1 holds
+        // straight away, so a single-round table has no rest at all.
+        restScheduleMs = buildRestSchedule((rounds - 1).coerceAtLeast(0), restStartSec, restEndSec)
         _state.value = ContractionTableState(
             mode = mode,
             totalRounds = rounds,
             contractionTarget = if (mode == ContractionTableMode.CONTRACTION_COUNT) contractionTarget else 0
         )
-        startBreathePhase(1)
+        beginCruise(1)
     }
 
     /**
@@ -260,7 +265,8 @@ class ContractionTableStateMachine @Inject constructor() {
     // ── Private helpers ─────────────────────────────────────────────────────
 
     private fun startBreathePhase(round: Int) {
-        val restMs = restScheduleMs.getOrElse(round - 1) { restScheduleMs.lastOrNull() ?: 0L }
+        // Only ever called for round ≥ 2 — round 1 starts directly with its hold.
+        val restMs = restScheduleMs.getOrElse(round - 2) { restScheduleMs.lastOrNull() ?: 0L }
         _state.value = _state.value.copy(
             phase = ContractionTablePhase.BREATHE,
             currentRound = round,

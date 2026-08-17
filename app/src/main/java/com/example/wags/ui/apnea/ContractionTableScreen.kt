@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -18,6 +20,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -111,6 +115,7 @@ fun ContractionTableScreen(
         var showPastConfigurationsDialog by remember { mutableStateOf(false) }
         var showSaveConfigurationDialog by remember { mutableStateOf(false) }
         var saveConfigurationName by remember { mutableStateOf("") }
+        var showPastTableConfigsDialog by remember { mutableStateOf(false) }
 
         // Empty-lung safety warning — shown once per screen entry, before any drill starts
         var showEmptyLungWarning by remember { mutableStateOf(false) }
@@ -224,6 +229,17 @@ fun ContractionTableScreen(
                     showSaveConfigurationDialog = true
                 },
                 onDismiss = { showPastConfigurationsDialog = false }
+            )
+        }
+
+        if (showPastTableConfigsDialog) {
+            PastTableConfigsDialog(
+                configs = state.pastConfigs,
+                onSelect = { config ->
+                    viewModel.applyPastConfig(config)
+                    showPastTableConfigsDialog = false
+                },
+                onDismiss = { showPastTableConfigsDialog = false }
             )
         }
 
@@ -347,7 +363,8 @@ fun ContractionTableScreen(
                 onSetRounds = { viewModel.setRounds(it) },
                 onSetRestStart = { viewModel.setRestStartSec(it) },
                 onSetRestEnd = { viewModel.setRestEndSec(it) },
-                onSetTarget = { viewModel.setContractionTarget(it) }
+                onSetTarget = { viewModel.setContractionTarget(it) },
+                onPastConfigsClick = { showPastTableConfigsDialog = true }
             )
 
             // 2c. Hyperventilation advisory — hyperventilation delays contractions
@@ -555,7 +572,8 @@ private fun TableConfigSection(
     onSetRounds: (Int) -> Unit,
     onSetRestStart: (Int) -> Unit,
     onSetRestEnd: (Int) -> Unit,
-    onSetTarget: (Int) -> Unit
+    onSetTarget: (Int) -> Unit,
+    onPastConfigsClick: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -609,6 +627,22 @@ private fun TableConfigSection(
                     canDecrement = state.contractionTarget > ContractionTableViewModel.MIN_TARGET,
                     canIncrement = state.contractionTarget < ContractionTableViewModel.MAX_TARGET
                 )
+            }
+
+            // Past configurations — quick restore of a setup used before
+            if (state.pastConfigs.isNotEmpty()) {
+                OutlinedButton(
+                    onClick = onPastConfigsClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, TextSecondary)
+                ) {
+                    Text(
+                        "🕘  Past Configurations",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = TextPrimary
+                    )
+                }
             }
 
             // Rest schedule preview
@@ -876,4 +910,129 @@ fun buildContractionTableFilterSummary(state: ContractionTableUiState): String {
             .getOrDefault(state.filterAudio)
     )
     return if (parts.isEmpty()) "All Sessions" else parts.joinToString(" · ")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Past Configurations dialog (table setups used in past sessions)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Modal dialog listing every distinct table configuration the user has trained
+ * with, most recent first. Tapping a card applies that configuration to the
+ * current setup (switching mode when needed) and closes the dialog.
+ */
+@Composable
+private fun PastTableConfigsDialog(
+    configs: List<ContractionTablePastConfig>,
+    onSelect: (ContractionTablePastConfig) -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .fillMaxHeight(0.75f),
+            shape = MaterialTheme.shapes.large,
+            color = SurfaceDark,
+            tonalElevation = 6.dp
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // ── Header ─────────────────────────────────────────────────
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Past Configurations",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    TextButton(onClick = onDismiss) {
+                        Text("Close", color = TextSecondary)
+                    }
+                }
+
+                // ── Configuration list ──────────────────────────────────────
+                if (configs.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "No past configurations yet",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextSecondary
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(
+                            items = configs,
+                            key = { "${it.mode.name}|${it.rounds}|${it.restStartSec}|${it.restEndSec}|${it.contractionTarget}" }
+                        ) { config ->
+                            PastTableConfigCard(
+                                config = config,
+                                onClick = { onSelect(config) }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PastTableConfigCard(
+    config: ContractionTablePastConfig,
+    onClick: () -> Unit
+) {
+    val dateFormat = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = SurfaceVariant),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            Text(
+                text = if (config.mode == ContractionTableMode.TILL_CONTRACTION) "Till Contraction" else "Contraction Count",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextPrimary,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = config.summary,
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "Used ${config.useCount}×  ·  last ${dateFormat.format(Date(config.lastUsedMs))}",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextDisabled
+            )
+        }
+    }
 }

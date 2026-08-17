@@ -64,7 +64,7 @@ data class ContractionTableUiState(
     val mode: ContractionTableMode = ContractionTableMode.TILL_CONTRACTION,
     /** Number of rounds in the table (1-indexed). */
     val rounds: Int = ContractionTableViewModel.DEFAULT_TILL_ROUNDS,
-    /** Rest before round 1 (seconds). */
+    /** First rest — before round 2, since round 1 holds immediately (seconds). */
     val restStartSec: Int = ContractionTableViewModel.DEFAULT_TILL_REST_START_SEC,
     /** Rest before the final round (seconds) — linearly interpolated between. */
     val restEndSec: Int = ContractionTableViewModel.DEFAULT_TILL_REST_END_SEC,
@@ -80,6 +80,8 @@ data class ContractionTableUiState(
     val completedRecordId: Long? = null,
     // ── History ────────────────────────────────────────────────────────────────
     val pastSessions: List<ContractionTableHistoryEntry> = emptyList(),
+    /** Distinct configurations the user has actually trained with (most recent first). */
+    val pastConfigs: List<ContractionTablePastConfig> = emptyList(),
     // ── Apnea settings (read from SharedPreferences) ──────────────────────────
     val lungVolume: String = "FULL",
     val prepType: String = "NO_PREP",
@@ -139,6 +141,29 @@ data class ContractionTableHistoryEntry(
     /** Average cruise ratio (cruise / total hold) across rounds with a logged contraction. */
     val avgCruiseRatio: Float?
 )
+
+/**
+ * A distinct table configuration the user has trained with before, derived
+ * from past sessions' tableParamsJson (independent of the history filters).
+ */
+data class ContractionTablePastConfig(
+    val mode: ContractionTableMode,
+    val rounds: Int,
+    val restStartSec: Int,
+    val restEndSec: Int,
+    val contractionTarget: Int,
+    val useCount: Int = 1,
+    /** Epoch ms of the most recent session that used this configuration. */
+    val lastUsedMs: Long = 0L
+) {
+    /** Short human-readable summary, e.g. "8 rounds · 90→60s rest" or "6 rounds · 120→60s rest · 8c". */
+    val summary: String
+        get() = if (mode == ContractionTableMode.TILL_CONTRACTION) {
+            "$rounds rounds · $restStartSec→${restEndSec}s rest"
+        } else {
+            "$rounds rounds · $restStartSec→${restEndSec}s rest · ${contractionTarget}c"
+        }
+}
 
 // ── ViewModel ───────────────────────────────────────────────────────────────
 
@@ -387,6 +412,24 @@ class ContractionTableViewModel @Inject constructor(
     fun setContractionTarget(value: Int) {
         val clamped = value.coerceIn(MIN_TARGET, MAX_TARGET)
         _uiState.update { it.copy(contractionTarget = clamped) }
+        persistCurrentModeConfig()
+        refreshForecast()
+        loadPersonalBests()
+    }
+
+    /** Applies a previously-used configuration to the current setup (switching mode when needed). */
+    fun applyPastConfig(config: ContractionTablePastConfig) {
+        if (config.mode != _uiState.value.mode) {
+            setMode(config.mode) // persists the old mode's config, restores the new mode's
+        }
+        _uiState.update {
+            it.copy(
+                rounds = config.rounds.coerceIn(MIN_ROUNDS, MAX_ROUNDS),
+                restStartSec = config.restStartSec.coerceIn(MIN_REST_SEC, MAX_REST_SEC),
+                restEndSec = config.restEndSec.coerceIn(MIN_REST_SEC, MAX_REST_SEC),
+                contractionTarget = config.contractionTarget.coerceIn(MIN_TARGET, MAX_TARGET)
+            )
+        }
         persistCurrentModeConfig()
         refreshForecast()
         loadPersonalBests()
@@ -747,25 +790,36 @@ class ContractionTableViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val s = _uiState.value
-                val wonkaRecords = apneaRepository.getAllRecordsOnce()
+                val allTableRecords = apneaRepository.getAllRecordsOnce()
                     .filter { it.tableType == TABLE_TYPE_TILL || it.tableType == TABLE_TYPE_COUNT }
-                    .let { records ->
-                        var result = records
-                        if (s.filterLungVolume.isNotEmpty()) result = result.filter { it.lungVolume == s.filterLungVolume }
-                        if (s.filterPrepType.isNotEmpty()) result = result.filter { it.prepType == s.filterPrepType }
-                        if (s.filterTimeOfDay.isNotEmpty()) result = result.filter { it.timeOfDay == s.filterTimeOfDay }
-                        if (s.filterPosture.isNotEmpty()) result = result.filter { it.posture == s.filterPosture }
-                        if (s.filterAudio.isNotEmpty()) result = result.filter { it.audio == s.filterAudio }
-                        result
-                    }
                 val sessionMap = sessionRepository.getAllSessionsOnce().associateBy { it.timestamp }
 
-                val entries = wonkaRecords.mapNotNull { record ->
+                // Distinct configurations the user has actually trained with —
+                // derived from ALL sessions, independent of the history filters.
+                val pastConfigs = allTableRecords.mapNotNull { record ->
+                    val params = sessionMap[record.timestamp]?.tableParamsJson ?: return@mapNotNull null
+                    parsePastConfig(record.timestamp, params)
+                }.groupBy { "${it.mode.name}|${it.rounds}|${it.restStartSec}|${it.restEndSec}|${it.contractionTarget}" }
+                    .map { (_, uses) ->
+                        uses.first().copy(
+                            useCount = uses.size,
+                            lastUsedMs = uses.maxOf { it.lastUsedMs }
+                        )
+                    }.sortedByDescending { it.lastUsedMs }
+
+                var filtered = allTableRecords
+                if (s.filterLungVolume.isNotEmpty()) filtered = filtered.filter { it.lungVolume == s.filterLungVolume }
+                if (s.filterPrepType.isNotEmpty()) filtered = filtered.filter { it.prepType == s.filterPrepType }
+                if (s.filterTimeOfDay.isNotEmpty()) filtered = filtered.filter { it.timeOfDay == s.filterTimeOfDay }
+                if (s.filterPosture.isNotEmpty()) filtered = filtered.filter { it.posture == s.filterPosture }
+                if (s.filterAudio.isNotEmpty()) filtered = filtered.filter { it.audio == s.filterAudio }
+
+                val entries = filtered.mapNotNull { record ->
                     val session = sessionMap[record.timestamp] ?: return@mapNotNull null
                     parseHistoryEntry(record.recordId, record.timestamp, session.tableParamsJson)
                 }.sortedByDescending { it.timestamp }
 
-                _uiState.update { it.copy(pastSessions = entries) }
+                _uiState.update { it.copy(pastSessions = entries, pastConfigs = pastConfigs) }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to load session history", e)
             }
@@ -1195,6 +1249,28 @@ class ContractionTableViewModel @Inject constructor(
             )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse session params at $timestamp", e)
+            null
+        }
+    }
+
+    /** Extracts the configuration fields from a session's tableParamsJson. */
+    private fun parsePastConfig(timestamp: Long, paramsJson: String): ContractionTablePastConfig? {
+        return try {
+            val json = JSONObject(paramsJson)
+            val mode = try {
+                ContractionTableMode.valueOf(json.optString("mode", ContractionTableMode.TILL_CONTRACTION.name))
+            } catch (_: Exception) { ContractionTableMode.TILL_CONTRACTION }
+            ContractionTablePastConfig(
+                mode = mode,
+                rounds = json.optInt("rounds", 0),
+                restStartSec = json.optInt("restStartSec", 0),
+                restEndSec = json.optInt("restEndSec", 0),
+                contractionTarget = json.optInt("contractionTarget", 0),
+                useCount = 1,
+                lastUsedMs = timestamp
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to parse past config at $timestamp", e)
             null
         }
     }

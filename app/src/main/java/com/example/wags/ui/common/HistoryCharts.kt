@@ -325,6 +325,25 @@ fun ScrollableLineChartCanvas(
         }
     }
 
+    // X-axis label strings. Monthly aggregates ("yyyy-MM") show just the month
+    // name; the year is appended on the first label and whenever it changes
+    // (e.g. "Aug '26", "Sep", …, "Jan '27"). Daily labels stay "Aug 14".
+    val axisLabels: List<String> = run {
+        var prevYear: String? = null
+        labelIndices.map { idx ->
+            val raw = points[idx].dateLabel
+            val parts = raw.split("-")
+            if (parts.size == 2) {
+                val year = parts[0]
+                val withYear = prevYear == null || year != prevYear
+                prevYear = year
+                if (withYear) "${monthName(parts[1])} '${year.takeLast(2)}" else monthName(parts[1])
+            } else {
+                shortDate(raw)
+            }
+        }
+    }
+
     val scrollState = rememberScrollState()
 
     // Auto-scroll to the end (newest data) once the chart is laid out
@@ -431,11 +450,11 @@ fun ScrollableLineChartCanvas(
                         .fillMaxWidth()
                         .height(xAxisHeightDp.dp)
                 ) {
-                    labelIndices.forEach { idx ->
+                    labelIndices.forEachIndexed { labelPos, idx ->
                         val xPx = idx * xStepPx
                         val xDp = with(density) { xPx.toDp() }
                         val labelWidthEst = 36.dp
-                        val dateStr = shortDate(points[idx].dateLabel)
+                        val dateStr = axisLabels[labelPos]
                         // Clamp so labels don't overflow the left/right edges
                         val clampedX = (xDp - labelWidthEst / 2)
                             .coerceAtLeast(0.dp)

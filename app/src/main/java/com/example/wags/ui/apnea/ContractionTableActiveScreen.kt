@@ -203,9 +203,7 @@ private fun ActiveContent(
 
         // ── Phase-specific hint ─────────────────────────────────────────
         val hint = when (phase) {
-            ContractionTablePhase.BREATHE ->
-                if (session.currentRound == 1) "Breathe easy and relax before the first hold"
-                else "Recover — breathe normally and relax"
+            ContractionTablePhase.BREATHE -> "Recover — breathe normally and relax"
             ContractionTablePhase.CRUISE ->
                 if (state.mode == ContractionTableMode.TILL_CONTRACTION)
                     "Hold until your diaphragm contracts for the first time"
