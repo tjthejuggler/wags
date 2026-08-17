@@ -205,6 +205,21 @@ fun ApneaScreen(
                         expanded = state.settingsExpanded,
                         onToggle = { viewModel.toggleSettings() }
                     )
+                    // One-line settings summary — only visible while the section is
+                    // collapsed; when expanded the full settings are shown instead.
+                    AnimatedVisibility(
+                        visible = !state.settingsExpanded,
+                        enter = expandVertically(),
+                        exit = shrinkVertically()
+                    ) {
+                        ApneaSettingsSummaryBanner(
+                            lungVolume = state.selectedLungVolume,
+                            prepType   = state.prepType.name,
+                            timeOfDay  = state.timeOfDay.name,
+                            posture    = state.posture.name,
+                            audio      = state.audio.name
+                        )
+                    }
                     AnimatedVisibility(
                         visible = state.settingsExpanded,
                         enter = expandVertically(),
