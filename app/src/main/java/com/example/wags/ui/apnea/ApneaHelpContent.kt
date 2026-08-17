@@ -93,23 +93,21 @@ Logic:
 
 Effect: Trains breath efficiency and mental readiness. Forces you to commit to the next hold with minimal recovery."""
 
-internal const val WONKA_HELP_TITLE = "Wonka Tables (Contraction-Driven)"
-internal const val WONKA_HELP_TEXT = """Purpose: Uses your body's own contraction signals as the training trigger, building awareness of your physiological limits.
+internal const val CONTRACTION_TABLES_HELP_TITLE = "Contraction Tables"
+internal const val CONTRACTION_TABLES_HELP_TEXT = """Purpose: Uses your body's own contraction signals as the training trigger, building CO₂ tolerance and awareness of your physiological limits.
 
-Mode 1 — Till First Contraction:
-• Timer counts up until you log your first contraction
-• Round ends immediately at first contraction
-• Trains you to identify your "cruising phase"
+Mode 1 — Till Contraction:
+• Hold ends the moment you log your first diaphragmatic contraction
+• The hold time IS your cruise phase (T_cruise) — a direct CO₂-tolerance biomarker
+• Decreasing rest between rounds progressively accumulates CO₂
 
-Mode 2 — Endurance (+X seconds):
-• Timer counts up until first contraction (T_cruise)
-• Then counts down X seconds of "struggle phase"
-• Total Hold = T_cruise + X
-• Formula: T_total = T_cruise + ΔT_endurance
+Mode 2 — Contraction Count:
+• Hold continues for a target number of contractions after the first
+• Trains struggle-phase tolerance and mental resilience under rising CO₂
 
-Variables:
-• T_cruise = Time from start to first contraction
-• ΔT_endurance = User-defined endurance delta (default 45s)"""
+Analytics:
+• T_cruise decay across rounds shows your CO₂ buffer depleting
+• Cruise Ratio = cruise ÷ total hold — higher means more easy phase"""
 
 internal const val TABLE_TRAINING_HELP_TITLE = "Table Training"
 internal const val TABLE_TRAINING_HELP_TEXT = """Tables are structured breath-hold protocols that systematically stress either your CO₂ tolerance or O₂ capacity.

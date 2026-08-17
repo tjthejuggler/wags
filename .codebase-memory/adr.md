@@ -1,21 +1,24 @@
-# ADR: Eucapnic config persistence + seed-or-mirror sync pattern
+# ADR: Contraction Tables — contraction-driven drill suite replacing the Wonka prototypes
 
-Date: 2026-08-16
-Status: Accepted
+**Date:** 2026-08-16
+**Status:** Accepted & Implemented
 
 ## Context
-Two bugs in apnea session screens with EUCAPNIC_DIAPHRAGMATIC prep type:
-1. After completing eucapnic pacer prep in free hold flow, the START button still read "EUCAPNIC" and re-entered the pacer instead of switching to HOLD mode. The `eucapnic_prep_completed` flag set by EucapnicPacerScreen on `previousBackStackEntry.savedStateHandle` was consumed via `savedStateHandle.getStateFlow()` collector in FreeHoldActiveViewModel init — StateFlow propagation after popBackStack proved unreliable at runtime.
-2. Eucapnic config reset to defaults after returning from pacer. Root causes: (a) EucapnicConfigViewModel kept config only in memory (`MutableStateFlow(EucapnicConfig())` = defaults per instance); (b) every session screen had an unconditional `LaunchedEffect(prepType, eucapnicConfig)` pushing ECVM config into the session VM on every recomposition, clobbering user-edited config with defaults when returning from the pacer.
+The two "Wonka" modalities (`WONKA_FIRST_CONTRACTION`, `WONKA_ENDURANCE`) existed only as never-finished inline sections on ApneaScreen, driven by `AdvancedApneaStateMachine` with fixed-ΔT logic, no per-round persistence ("historical amnesia"), and no stats/history/PB integration. Scientific review recommended a contraction-count architecture, decreasing-rest schedules, per-round result persistence, and T_cruise as a CO₂-tolerance biomarker.
 
 ## Decision
-1. **EucapnicConfigViewModel** now persists config to SharedPreferences (`apnea_prefs`, keys prefixed `eucapnic_`) on every mutation via private `setConfig()`; restores on construction; exposes public `updateConfig()` for mirroring.
-2. **Seed-or-mirror pattern** in all session screens (FreeHoldActiveScreen, MinBreathScreen, ProgressiveO2Screen, ApneaTableScreen, ProgressiveO2ActiveScreen): `LaunchedEffect` seeds session VM with ECVM config only when session VM has none; otherwise mirrors session VM config back to ECVM when they diverge. Data-class equality terminates the mirror loop.
-3. **Deterministic result consumption**: FreeHoldActiveScreen reads `navController.currentBackStackEntry?.savedStateHandle?.get<Boolean>("eucapnic_prep_completed")` in a `LaunchedEffect(Unit)` instead of relying on StateFlow collection timing.
-4. FreeHoldActiveScreen uses live `state.currentPrepType` (editable via settings dialog) rather than static `prepType` nav arg as the sync gate.
+1. **Replace both prototypes with "Contraction Tables"** — a full 3-screen drill (setup/active/detail) following the Progressive O₂ / Min Breath recipe (plans/apnea_drill_screen_guide.md), with two modes in one setup screen:
+   - *Till Contraction*: hold ends at first contraction; headline PB = longest hold (T_cruise).
+   - *Contraction Count*: hold for N contractions (1–50); headline PB = total hold time, partitioned by `drillParamValue = target`.
+2. **New drift-free state machine** (`ContractionTableStateMachine`): epoch-anchored 100 ms wall-clock ticks; phases IDLE→BREATHE→CRUISE→(STRUGGLE)→COMPLETE; per-round `ContractionTableRoundResult` accumulated in state; decreasing rest via linear interpolation rest-start→rest-end.
+3. **Natural-completion observer**: unlike endless Progressive O₂, the fixed-round machine reaches COMPLETE on its own; the ViewModel's state collector detects the phase transition while `isSessionActive` and triggers `stopSession()` (which clears the flag first to prevent re-entry).
+4. **Backward-compatible persistence**: keep legacy `tableType` strings "WONKA_FIRST_CONTRACTION"/"WONKA_ENDURANCE" so existing stats counters, history, ranked lists, record-detail, PB pools, and Tail habit plumbing work without schema changes. 4 entities per session (session+telemetry, record+free-hold telemetry); round log serialized into `tableParamsJson`.
+5. **Delete the dead inline machinery**: AdvancedApneaScreen/ViewModel/StateMachine, WonkaConfig, TrainingModality, ProgressiveO2Generator, the unreachable ADVANCED_APNEA route, and inline session code in ApneaScreen/ApneaViewModel. ApneaScreen exposes one "Contraction Tables" section card → `contraction_table` route.
+6. **Safety**: empty-lung warning dialog on EMPTY lung selection (reference pattern); hyperventilation advisory card when prep = HYPER.
 
 ## Consequences
-- Eucapnic config survives process death and navigation; user edits in session settings dialogs propagate back to the shared ECVM.
-- Min Breath / Progressive O2 active screens auto-start sessions (no START-button flag needed); they only needed the config clobber fix.
-- ProgressiveO2ActiveScreen previously had NO ECVM wiring despite having a settings dialog; it now participates in seed-or-mirror.
-- Build requires JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 (Android Studio snap JBR is JDK 25, too new for Gradle 8.13).
+- T_cruise decay and Cruise Ratio analytics available per session (Canvas chart on detail screen).
+- PB pools: Till Contraction = one global pool; Contraction Count = pool per target value (DrillContext.contractionCount(target)).
+- Detail screen keyed by sessionId (route `contraction_table_detail/{sessionId}`); ViewModel exposes both completedSessionId and completedRecordId after save.
+- Tail habits: TABLE_TRAINING minutes+count on completion; APNEA_NEW_RECORD on PB.
+- Build verified: `:app:compileDebugKotlin` + `installDebug` (JDK 21; note JAVA_HOME must not point at the snap Android Studio JBR 25).

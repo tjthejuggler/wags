@@ -46,11 +46,7 @@ import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.model.TableDifficulty
 import com.example.wags.domain.model.TableLength
-import com.example.wags.domain.model.TrainingModality
-import com.example.wags.domain.model.WonkaConfig
 import com.example.wags.domain.usecase.apnea.HyperLockManager
-import com.example.wags.domain.usecase.apnea.AdvancedApneaPhase
-import com.example.wags.domain.usecase.apnea.AdvancedApneaState
 import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.InfoHelpBubble
@@ -373,45 +369,30 @@ fun ApneaScreen(
                     )
                 }
 
-                // ── Wonka: Till Contraction ───────────────────────────────────
-                val wonkaContractionOpen = state.openSection == ApneaSection.WONKA_CONTRACTION
+                // ── Contraction Tables ────────────────────────────────────────
+                val contractionTablesOpen = state.openSection == ApneaSection.CONTRACTION_TABLES
                 CollapsibleCard(
-                    title = "Wonka: Till Contraction",
-                    expanded = wonkaContractionOpen,
-                    onToggle = { viewModel.toggleSection(ApneaSection.WONKA_CONTRACTION) },
+                    title = "Contraction Tables",
+                    expanded = contractionTablesOpen,
+                    onToggle = { viewModel.toggleSection(ApneaSection.CONTRACTION_TABLES) },
                     headerExtra = {
-                        TableHelpIcon(title = WONKA_HELP_TITLE, text = WONKA_HELP_TEXT)
+                        TableHelpIcon(title = CONTRACTION_TABLES_HELP_TITLE, text = CONTRACTION_TABLES_HELP_TEXT)
                     }
                 ) {
-                    InlineAdvancedSessionContent(
-                        modality = TrainingModality.WONKA_FIRST_CONTRACTION,
-                        activeModality = state.activeModalitySession,
-                        advancedState = state.advancedSessionState,
-                        onStart = { viewModel.startAdvancedSession(TrainingModality.WONKA_FIRST_CONTRACTION) },
-                        onStop = { viewModel.stopAdvancedSession() },
-                        onBreathTaken = { viewModel.signalBreathTaken() },
-                        onFirstContraction = { viewModel.signalFirstContraction() }
-                    )
-                }
-
-                // ── Wonka: Endurance ──────────────────────────────────────────
-                val wonkaEnduranceOpen = state.openSection == ApneaSection.WONKA_ENDURANCE
-                CollapsibleCard(
-                    title = "Wonka: Endurance",
-                    expanded = wonkaEnduranceOpen,
-                    onToggle = { viewModel.toggleSection(ApneaSection.WONKA_ENDURANCE) },
-                    headerExtra = {
-                        TableHelpIcon(title = WONKA_HELP_TITLE, text = WONKA_HELP_TEXT)
-                    }
-                ) {
-                    InlineAdvancedSessionContent(
-                        modality = TrainingModality.WONKA_ENDURANCE,
-                        activeModality = state.activeModalitySession,
-                        advancedState = state.advancedSessionState,
-                        onStart = { viewModel.startAdvancedSession(TrainingModality.WONKA_ENDURANCE) },
-                        onStop = { viewModel.stopAdvancedSession() },
-                        onBreathTaken = { viewModel.signalBreathTaken() },
-                        onFirstContraction = { viewModel.signalFirstContraction() }
+                    DrillSectionContent(
+                        bestTimeMs = state.contractionTableBestMs,
+                        trophyCategory = state.contractionTableTrophyCategory,
+                        paramLabel = "Till Contraction · Contraction Count",
+                        description = "Contraction-driven tables: hold until your first contraction, or for a " +
+                            "target number of contractions, with decreasing rest between rounds.",
+                        buttonLabel = "Open Contraction Tables",
+                        recordForecast = null,
+                        onOpenDrill = { navController.navigate(WagsRoutes.CONTRACTION_TABLE) },
+                        onTrophyClick = {
+                            navController.navigate(
+                                WagsRoutes.personalBests(drillType = "WONKA_FIRST_CONTRACTION")
+                            )
+                        }
                     )
                 }
 
@@ -1170,189 +1151,6 @@ private fun TableTrainingConfigContent(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Inline Advanced Session Content
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun InlineAdvancedSessionContent(
-    modality: TrainingModality,
-    activeModality: TrainingModality?,
-    advancedState: AdvancedApneaState,
-    enabled: Boolean = true,
-    onStart: () -> Unit,
-    onStop: () -> Unit,
-    onBreathTaken: () -> Unit,
-    onFirstContraction: () -> Unit
-) {
-    val isThisActive = activeModality == modality
-    val anotherActive = activeModality != null && activeModality != modality
-
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (!enabled) {
-            Text(
-                "Set a Personal Best in Table Training to enable this.",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary
-            )
-        }
-
-        if (anotherActive) {
-            Text(
-                "Another session is currently active. Stop it first.",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary
-            )
-        }
-
-        if (!isThisActive) {
-            // Idle — show Start button
-            Button(
-                onClick = onStart,
-                enabled = enabled && !anotherActive,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = ButtonSuccess, contentColor = TextPrimary)
-            ) { Text("Start Session") }
-        } else {
-            // Active session UI
-            AdvancedSessionRunningContent(
-                modality = modality,
-                state = advancedState,
-                onBreathTaken = onBreathTaken,
-                onFirstContraction = onFirstContraction,
-                onStop = onStop
-            )
-        }
-    }
-}
-
-@Composable
-private fun AdvancedSessionRunningContent(
-    modality: TrainingModality,
-    state: AdvancedApneaState,
-    onBreathTaken: () -> Unit,
-    onFirstContraction: () -> Unit,
-    onStop: () -> Unit
-) {
-    // Round progress
-    if (state.totalRounds > 0) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    "Round ${state.currentRound} / ${state.totalRounds}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary
-                )
-                Text(
-                    state.phase.displayLabel(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = state.phase.phaseColor()
-                )
-            }
-            LinearProgressIndicator(
-                progress = {
-                    if (state.totalRounds > 0) state.currentRound.toFloat() / state.totalRounds else 0f
-                },
-                modifier = Modifier.fillMaxWidth(),
-                color = state.phase.phaseColor()
-            )
-        }
-    }
-
-    // Phase timer card
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = SurfaceVariant)
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                state.phase.displayLabel(),
-                style = MaterialTheme.typography.titleMedium,
-                color = state.phase.phaseColor()
-            )
-            when (state.phase) {
-                AdvancedApneaPhase.WAITING_FOR_BREATH -> {
-                    Text("Waiting for breath…", style = MaterialTheme.typography.headlineSmall, color = TextSecondary)
-                }
-                AdvancedApneaPhase.WONKA_CRUISING -> {
-                    Text(formatMmSs(state.timerMs), style = MaterialTheme.typography.displayMedium, color = ApneaHold, fontWeight = FontWeight.Bold)
-                    Text("Counting up — log first contraction", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                }
-                AdvancedApneaPhase.WONKA_ENDURANCE -> {
-                    Text(formatMmSs(state.timerMs), style = MaterialTheme.typography.displayMedium, color = ApneaHold, fontWeight = FontWeight.Bold)
-                    Text("Endurance — cruised ${formatMmSs(state.cruisingElapsedMs)}", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                }
-                AdvancedApneaPhase.COMPLETE -> {
-                    Text("Session Complete! 🎉", style = MaterialTheme.typography.headlineSmall, color = TextPrimary,
-                        modifier = Modifier.grayscale())
-                }
-                AdvancedApneaPhase.IDLE -> Unit
-                else -> {
-                    Text(formatMmSs(state.timerMs), style = MaterialTheme.typography.displayMedium, color = state.phase.phaseColor(), fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-    }
-
-    // Action buttons
-    when (state.phase) {
-        AdvancedApneaPhase.WAITING_FOR_BREATH -> {
-            Button(
-                onClick = onBreathTaken,
-                modifier = Modifier.fillMaxWidth().height(64.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = ButtonSuccess, contentColor = TextPrimary)
-            ) { Text("ONE BREATH TAKEN →", style = MaterialTheme.typography.titleMedium) }
-        }
-        AdvancedApneaPhase.WONKA_CRUISING -> {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .pointerInput(Unit) { detectTapGestures(onDoubleTap = { onFirstContraction() }) },
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = onFirstContraction,
-                    modifier = Modifier.fillMaxWidth().height(64.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = ButtonDanger, contentColor = TextPrimary)
-                ) { Text("LOG CONTRACTION", style = MaterialTheme.typography.titleMedium) }
-                Text(
-                    "or double-tap anywhere",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextSecondary,
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                )
-            }
-        }
-        AdvancedApneaPhase.COMPLETE -> {
-            Button(
-                onClick = onStop,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = ButtonPrimary)
-            ) { Text("Done") }
-            return
-        }
-        else -> Unit
-    }
-
-    // Stop button (always shown while session is running, except COMPLETE which has Done)
-    if (state.phase != AdvancedApneaPhase.COMPLETE && state.phase != AdvancedApneaPhase.IDLE) {
-        OutlinedButton(
-            onClick = onStop,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
-        ) { Text("Stop Session") }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Shared helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1368,35 +1166,6 @@ internal fun formatMs(ms: Long): String {
     val seconds = totalSeconds % 60L
     val centis = (ms % 1000L) / 10L
     return if (minutes > 0) "${minutes}m ${seconds}s" else "${seconds}.${centis.toString().padStart(2, '0')}s"
-}
-
-private fun formatMmSs(ms: Long): String {
-    val totalSecs = (ms / 1000L).coerceAtLeast(0L)
-    val mins = totalSecs / 60
-    val secs = totalSecs % 60
-    return "%02d:%02d".format(mins, secs)
-}
-
-private fun AdvancedApneaPhase.displayLabel(): String = when (this) {
-    AdvancedApneaPhase.IDLE               -> "Ready"
-    AdvancedApneaPhase.VENTILATION        -> "Breathe"
-    AdvancedApneaPhase.APNEA              -> "Hold"
-    AdvancedApneaPhase.WAITING_FOR_BREATH -> "One Breath"
-    AdvancedApneaPhase.WONKA_CRUISING     -> "Cruising"
-    AdvancedApneaPhase.WONKA_ENDURANCE    -> "Endurance"
-    AdvancedApneaPhase.RECOVERY           -> "Recovery"
-    AdvancedApneaPhase.COMPLETE           -> "Complete"
-}
-
-private fun AdvancedApneaPhase.phaseColor(): Color = when (this) {
-    AdvancedApneaPhase.IDLE               -> TextSecondary
-    AdvancedApneaPhase.VENTILATION        -> ApneaVentilation
-    AdvancedApneaPhase.APNEA              -> ApneaHold
-    AdvancedApneaPhase.WAITING_FOR_BREATH -> TextSecondary
-    AdvancedApneaPhase.WONKA_CRUISING     -> ApneaHold
-    AdvancedApneaPhase.WONKA_ENDURANCE    -> TextSecondary
-    AdvancedApneaPhase.RECOVERY           -> ApneaRecovery
-    AdvancedApneaPhase.COMPLETE           -> TextPrimary
 }
 
 @Composable

@@ -61,9 +61,6 @@ object ScreenContextMapper {
         "apnea_table" to ScreenContext(
             "Apnea Table", "ui/apnea/ApneaTableScreen.kt", "ApneaTableScreen"
         ),
-        "advanced_apnea" to ScreenContext(
-            "Advanced Apnea", "ui/apnea/AdvancedApneaScreen.kt", "AdvancedApneaScreen, AdvancedApneaViewModel"
-        ),
         "session" to ScreenContext(
             "Session", "ui/session/SessionScreen.kt", "SessionScreen, SessionViewModel"
         ),

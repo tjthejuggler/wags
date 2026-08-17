@@ -121,6 +121,9 @@ fun EucapnicPacerScreen(
                 "MIN_BREATH" -> {
                     navController.navigate(WagsRoutes.MIN_BREATH_ACTIVE)
                 }
+                "WONKA_FIRST_CONTRACTION", "WONKA_ENDURANCE" -> {
+                    navController.navigate(WagsRoutes.CONTRACTION_TABLE_ACTIVE)
+                }
                 "APNEA_TABLE" -> {
                     navController.navigate(WagsRoutes.APNEA_TABLE)
                 }

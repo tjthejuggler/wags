@@ -58,8 +58,8 @@ data class ApneaEventType(
             ApneaEventType("CO₂ Table",              "CO2"),
             ApneaEventType("Progressive O₂",         "PROGRESSIVE_O2"),
             ApneaEventType("Min Breath",             "MIN_BREATH"),
-            ApneaEventType("Wonka: Contraction",     "WONKA_FIRST_CONTRACTION"),
-            ApneaEventType("Wonka: Endurance",       "WONKA_ENDURANCE"),
+            ApneaEventType("Till Contraction",     "WONKA_FIRST_CONTRACTION"),
+            ApneaEventType("Contraction Count",       "WONKA_ENDURANCE"),
         )
 
         /** All tableTypeValues that are "real" DB types (excludes the PB sentinel). */
@@ -348,8 +348,8 @@ class AllApneaRecordsViewModel @Inject constructor(
      *   - O₂ Table / CO₂ Table      → hold duration (ms) — longest hold in the session
      *   - Progressive O₂            → hold duration (ms)
      *   - Min Breath                → hold duration (ms)
-     *   - Wonka: Contraction        → firstContractionMs (time to first contraction)
-     *   - Wonka: Endurance          → hold duration (ms)
+     *   - Till Contraction        → firstContractionMs (time to first contraction)
+     *   - Contraction Count          → hold duration (ms)
      */
     private fun buildChartData(
         s: AllApneaRecordsUiState,

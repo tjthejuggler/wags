@@ -1141,8 +1141,8 @@ private fun ApneaStatsContent(
             "CO₂ Table"           to stats.co2TableCount,
             "Progressive O₂"      to stats.progressiveO2Count,
             "Min Breath"          to stats.minBreathCount,
-            "Wonka: Contraction"  to stats.wonkaContractionCount,
-            "Wonka: Endurance"    to stats.wonkaEnduranceCount,
+            "Till Contraction"  to stats.wonkaContractionCount,
+            "Contraction Count"    to stats.wonkaEnduranceCount,
         )
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             activities.forEach { (label, count) ->

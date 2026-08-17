@@ -4,6 +4,19 @@
 
 ## Changelog
 
+### 2026-08-16 — Contraction Tables: full drill suite replacing the Wonka prototypes
+
+**Added: Contraction Tables — two contraction-driven apnea drills with full screen flow** (setup → active → detail), replacing the two never-finished inline "Wonka" sections on the Apnea screen.
+
+- **Till Contraction** (`WONKA_FIRST_CONTRACTION`): each hold ends the moment you log your first diaphragmatic contraction. Hold time = T_cruise, a direct CO₂-tolerance biomarker. PB headline = longest hold.
+- **Contraction Count** (`WONKA_ENDURANCE`): hold continues for a target number of contractions (1–50) after the first. PB headline = total hold time, partitioned into PB pools by target (`drillParamValue`).
+- Both modes use **decreasing rest** (linear interpolation from rest-start to rest-end across rounds) for progressive CO₂ accumulation, configurable rounds (1–20) and rest bounds (15–300 s).
+- New files: [`ContractionTableStateMachine.kt`](app/src/main/java/com/example/wags/domain/usecase/apnea/ContractionTableStateMachine.kt:123) (epoch-anchored drift-free timing, per-round results — no historical amnesia), [`ContractionTableViewModel.kt`](app/src/main/java/com/example/wags/ui/apnea/ContractionTableViewModel.kt:143), [`ContractionTableScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ContractionTableScreen.kt:47) (setup: mode selector, steppers, PB, filters, Spotify/guided audio, eucapnic prep, empty-lung warning, hyperventilation advisory), [`ContractionTableActiveScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ContractionTableActiveScreen.kt:36) + [`ContractionTablePipContent.kt`](app/src/main/java/com/example/wags/ui/apnea/pip/ContractionTablePipContent.kt:27) (PiP with phase-aware actions), [`ContractionTableDetailScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ContractionTableDetailScreen.kt:34) with a **cruise-decay chart** and per-round cruise-ratio analytics.
+- **Persistence** follows the standard 4-entity recipe: `ApneaSessionEntity` (with `tableParamsJson` round log) + `TelemetryEntity`, `ApneaRecordEntity` + `FreeHoldTelemetryEntity`. Legacy `tableType` strings kept so existing stats/history/rankings/calendar plumbing works unchanged.
+- **Integration**: Tail habits fire on completion (`TABLE_TRAINING` minutes + count, `APNEA_NEW_RECORD` on PB); stats counters, history labels ("Till Contraction" / "Contraction Count"), ranked lists, record-detail labels, PB screens (`DrillContext.CONTRACTION_TILL` / `contractionCount(target)`), and the eucapnic pacer completion dispatch all wired.
+- Natural completion is detected by a phase-transition observer in the ViewModel (the fixed-round machine reaches COMPLETE on its own, unlike endless Progressive O₂).
+
+**Removed: dead inline Wonka machinery** — deleted `AdvancedApneaScreen.kt`, `AdvancedApneaViewModel.kt`, `AdvancedApneaStateMachine.kt`, `WonkaConfig.kt`, `TrainingModality.kt`, `ProgressiveO2Generator.kt`, the unreachable `ADVANCED_APNEA` nav route, and the inline session composables/state in `ApneaScreen`/`ApneaViewModel`. The Apnea screen now shows a single "Contraction Tables" section card that opens the new setup screen, matching the Progressive O₂ / Min Breath pattern.
 
 ### 2026-08-09 — Tail integration: apnea hold-time minutes + backfill
 

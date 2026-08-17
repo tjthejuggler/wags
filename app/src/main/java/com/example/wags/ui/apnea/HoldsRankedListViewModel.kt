@@ -170,7 +170,7 @@ private fun drillLabel(tableType: String?): String = when (tableType) {
     "CO2"                     -> "CO₂ Table"
     "PROGRESSIVE_O2"          -> "Progressive O₂"
     "MIN_BREATH"              -> "Min Breath"
-    "WONKA_FIRST_CONTRACTION" -> "Wonka: Contraction"
-    "WONKA_ENDURANCE"         -> "Wonka: Endurance"
+    "WONKA_FIRST_CONTRACTION" -> "Till Contraction"
+    "WONKA_ENDURANCE"         -> "Contraction Count"
     else                      -> tableType
 }

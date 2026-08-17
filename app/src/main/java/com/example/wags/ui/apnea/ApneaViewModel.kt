@@ -35,13 +35,8 @@ import com.example.wags.domain.model.SpotifySong
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.model.TableDifficulty
 import com.example.wags.domain.model.TableLength
-import com.example.wags.domain.model.TrainingModality
-import com.example.wags.domain.model.WonkaConfig
 import com.example.wags.domain.model.EucapnicConfig
-import com.example.wags.domain.usecase.apnea.AdvancedApneaPhase
 import com.example.wags.domain.usecase.breathing.EucapnicScalingEngine
-import com.example.wags.domain.usecase.apnea.AdvancedApneaState
-import com.example.wags.domain.usecase.apnea.AdvancedApneaStateMachine
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
 import com.example.wags.domain.usecase.apnea.ApneaState
 import com.example.wags.domain.usecase.apnea.ApneaStateMachine
@@ -81,8 +76,7 @@ enum class ApneaSection {
     TABLE_TRAINING,   // PB + length/difficulty config + O2/CO2 launch buttons
     PROGRESSIVE_O2,
     MIN_BREATH,
-    WONKA_CONTRACTION,
-    WONKA_ENDURANCE,
+    CONTRACTION_TABLES,
     RECENT_RECORDS,
     SESSION_ANALYTICS,
     STATS
@@ -135,6 +129,11 @@ data class ApneaUiState(
     val minBreathBestMs: Long = 0L,
     /** Trophy category for the Min Breath best record. */
     val minBreathTrophyCategory: PersonalBestCategory? = null,
+    // ── Contraction Tables trophy display ─────────────────────────────────────
+    /** Best hold duration for Till Contraction mode + current settings. */
+    val contractionTableBestMs: Long = 0L,
+    /** Trophy category for the Till Contraction best record. */
+    val contractionTableTrophyCategory: PersonalBestCategory? = null,
     val selectedLength: TableLength = TableLength.MEDIUM,
     val selectedDifficulty: TableDifficulty = TableDifficulty.MEDIUM,
     // Contraction tracking
@@ -161,11 +160,6 @@ data class ApneaUiState(
     // ── New personal best dialog ──────────────────────────────────────────────
     /** Non-null when a new personal best was just set — contains the broadest beaten category. */
     val newPersonalBest: PersonalBestResult? = null,
-    // ── Inline advanced-modality session state ────────────────────────────────
-    /** Which modality (if any) has an active inline session running. */
-    val activeModalitySession: TrainingModality? = null,
-    /** Live state from the AdvancedApneaStateMachine for the currently running inline session. */
-    val advancedSessionState: AdvancedApneaState = AdvancedApneaState(),
     // ── Stats ─────────────────────────────────────────────────────────────────
     /** Stats filtered by the current settings (lungVolume + prepType + timeOfDay). */
     val filteredStats: ApneaStats = ApneaStats(),
@@ -241,7 +235,6 @@ class ApneaViewModel @Inject constructor(
     private val sessionRepository: ApneaSessionRepository,
     private val tableGenerator: ApneaTableGenerator,
     private val stateMachine: ApneaStateMachine,
-    private val advancedStateMachine: AdvancedApneaStateMachine,
     private val audioHapticEngine: ApneaAudioHapticEngine,
     private val habitRepo: HabitIntegrationRepository,
     private val spotifyManager: SpotifyManager,
@@ -287,7 +280,6 @@ class ApneaViewModel @Inject constructor(
      */
     private val oximeterSamples = mutableListOf<Pair<Long, OximeterReading>>()
     private var oximeterCollectionJob: Job? = null
-    private var advancedSessionStartMs: Long = 0L
     /**
      * Captured at hold-start: true when the oximeter is the primary device
      * (no Polar connected). When false, any oximeter readings that arrive
@@ -403,16 +395,6 @@ class ApneaViewModel @Inject constructor(
         viewModelScope.launch {
             stateMachine.remainingSeconds.collect { secs ->
                 _uiState.update { it.copy(remainingSeconds = secs) }
-            }
-        }
-
-        // Mirror advanced state machine into UI state
-        viewModelScope.launch {
-            advancedStateMachine.state.collect { advState ->
-                _uiState.update { it.copy(advancedSessionState = advState) }
-                if (advState.phase == AdvancedApneaPhase.COMPLETE) {
-                    saveAdvancedSession(advState)
-                }
             }
         }
 
@@ -581,6 +563,24 @@ class ApneaViewModel @Inject constructor(
                         )
                     }
                 }
+        }
+        // ── Contraction Tables best + trophy (Till Contraction, current settings) ──
+        viewModelScope.launch {
+            combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud ->
+                arrayOf(lv, pt, tod, pos, aud)
+            }.collectLatest { arr ->
+                val lv = arr[0] as String; val pt = (arr[1] as PrepType).name
+                val tod = (arr[2] as TimeOfDay).name; val pos = (arr[3] as Posture).name
+                val aud = (arr[4] as AudioSetting).name
+                val drill = DrillContext.CONTRACTION_TILL
+                val result = apneaRepository.getDrillBestAndTrophy(drill, lv, pt, tod, pos, aud)
+                _uiState.update {
+                    it.copy(
+                        contractionTableBestMs = result?.first ?: 0L,
+                        contractionTableTrophyCategory = result?.second
+                    )
+                }
+            }
         }
 
         // ── Record-breaking forecast: recompute with 150 ms debounce when settings change ──
@@ -832,29 +832,6 @@ class ApneaViewModel @Inject constructor(
                     apneaRepository.saveTelemetry(samples)
                 }
             }
-        }
-    }
-
-    private fun saveAdvancedSession(advState: AdvancedApneaState) {
-        viewModelScope.launch {
-            val modality = _uiState.value.activeModalitySession ?: return@launch
-            val pbMs = prefs.getLong("pb_ms", 0L)
-            val totalDurationMs = System.currentTimeMillis() - advancedSessionStartMs
-            val entity = ApneaSessionEntity(
-                timestamp = System.currentTimeMillis(),
-                tableType = modality.name,
-                tableVariant = _uiState.value.selectedLength.name,
-                tableParamsJson = "{}",
-                pbAtSessionMs = pbMs,
-                totalSessionDurationMs = totalDurationMs,
-                contractionTimestampsJson = "[]",
-                maxHrBpm = null,
-                lowestSpO2 = null,
-                roundsCompleted = advState.currentRound,
-                totalRounds = advState.totalRounds,
-                hrDeviceId = hrDataSource.activeHrDeviceLabel()
-            )
-            sessionRepository.saveSession(entity)
         }
     }
 
@@ -1584,57 +1561,6 @@ class ApneaViewModel @Inject constructor(
         }
     }
 
-    // ── Inline advanced-modality sessions ────────────────────────────────────
-
-    fun startAdvancedSession(modality: TrainingModality, wonkaConfig: WonkaConfig = WonkaConfig()) {
-        val pbMs = _uiState.value.personalBestMs
-        val length = _uiState.value.selectedLength
-        advancedSessionStartMs = System.currentTimeMillis()
-        _uiState.update { it.copy(activeModalitySession = modality) }
-        advancedStateMachine.start(modality, length, pbMs, wonkaConfig, viewModelScope)
-        // Start Spotify if MUSIC is selected.
-        // Song was pre-loaded in selectSong() — just resume playback.
-        if (_audio.value == AudioSetting.MUSIC) {
-            spotifyManager.startTracking()
-            spotifyManager.sendPlayCommand()
-        }
-        // Start guided audio if GUIDED is selected
-        if (_audio.value == AudioSetting.GUIDED) {
-            viewModelScope.launch {
-                guidedAudioManager.preparePlayback()
-                guidedAudioManager.startPlayback()
-            }
-        }
-    }
-
-    fun stopAdvancedSession() {
-        val tracksPlayed = if (_audio.value == AudioSetting.MUSIC) {
-            val tracks = spotifyManager.stopTracking()
-            spotifyManager.sendPauseAndRewindCommand()
-            tracks
-        } else emptyList()
-        // Stop guided audio if GUIDED was selected
-        if (_audio.value == AudioSetting.GUIDED) {
-            guidedAudioManager.stopPlayback()
-        }
-        advancedStateMachine.stop()
-        _uiState.update { it.copy(activeModalitySession = null) }
-        // Persist any tracks played to song history
-        if (tracksPlayed.isNotEmpty()) {
-            persistSongHistory(tracksPlayed.map { SpotifySong(it.title, it.artist, null, it.spotifyUri, it.startedAtMs, it.endedAtMs) })
-        }
-    }
-
-    fun signalBreathTaken() {
-        advancedStateMachine.signalBreathTaken()
-        audioHapticEngine.announceHoldBegin()
-    }
-
-    fun signalFirstContraction() {
-        advancedStateMachine.signalFirstContraction()
-        audioHapticEngine.vibrateContractionLogged()
-    }
-
     // ── Song picker (for table / advanced sessions on the main screen) ────────
 
     /**
@@ -1863,6 +1789,5 @@ class ApneaViewModel @Inject constructor(
         audioHapticEngine.shutdown()
         guidedAudioManager.stopPlayback()
         stateMachine.stop()
-        advancedStateMachine.stop()
     }
 }

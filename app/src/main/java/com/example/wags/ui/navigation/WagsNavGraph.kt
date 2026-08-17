@@ -10,15 +10,15 @@ import androidx.navigation.navArgument
 import java.net.URLDecoder
 import java.net.URLEncoder
 import com.example.wags.domain.model.EucapnicConfig
-import com.example.wags.domain.model.TableLength
-import com.example.wags.domain.model.TrainingModality
 import com.example.wags.domain.usecase.breathing.RfProtocol
-import com.example.wags.ui.apnea.AdvancedApneaScreen
 import com.example.wags.ui.apnea.AllApneaRecordsScreen
 import com.example.wags.ui.apnea.ApneaHistoryScreen
 import com.example.wags.ui.apnea.ApneaRecordDetailScreen
 import com.example.wags.ui.apnea.ApneaScreen
 import com.example.wags.ui.apnea.ApneaTableScreen
+import com.example.wags.ui.apnea.ContractionTableActiveScreen
+import com.example.wags.ui.apnea.ContractionTableDetailScreen
+import com.example.wags.ui.apnea.ContractionTableScreen
 import com.example.wags.ui.apnea.EucapnicPacerScreen
 import com.example.wags.ui.apnea.EucapnicSetupScreen
 import com.example.wags.ui.apnea.FreeHoldActiveScreen
@@ -68,7 +68,6 @@ object WagsRoutes {
     const val BREATHING = "breathing"
     const val APNEA_FREE = "apnea_free"
     const val APNEA_TABLE = "apnea_table/{tableType}"
-    const val ADVANCED_APNEA = "advanced_apnea/{modality}/{length}"
     const val SESSION = "session/{sessionType}"
     const val MORNING_READINESS = "morning_readiness"
     const val MORNING_READINESS_HISTORY = "morning_readiness_history"
@@ -111,6 +110,11 @@ object WagsRoutes {
     const val MIN_BREATH = "min_breath"
     const val MIN_BREATH_ACTIVE = "min_breath_active"
 
+    // ── Contraction Tables (Till Contraction / Contraction Count) ────────────
+    const val CONTRACTION_TABLE = "contraction_table"
+    const val CONTRACTION_TABLE_ACTIVE = "contraction_table_active"
+    const val CONTRACTION_TABLE_DETAIL = "contraction_table_detail/{sessionId}"
+
     // ── Eucapnic Diaphragmatic Breathing ───────────────────────────────────────
     const val EUCAPNIC_SETUP = "eucapnic_setup/{lungVolume}/{timeOfDay}/{posture}/{audio}/{sessionType}"
     const val EUCAPNIC_PACER = "eucapnic_pacer/{lungVolume}/{timeOfDay}/{posture}/{audio}/{sessionType}?prepDurationSec={prepDurationSec}&breathsPerMin={breathsPerMin}&inhaleSec={inhaleSec}&topPauseSec={topPauseSec}&exhaleSec={exhaleSec}&bottomPauseSec={bottomPauseSec}&breathDepthPercent={breathDepthPercent}"
@@ -132,7 +136,6 @@ object WagsRoutes {
     fun rapidHrDetail(sessionId: Long) = "rapid_hr_detail/$sessionId"
 
     fun apneaTable(type: String) = "apnea_table/$type"
-    fun advancedApnea(modality: String, length: String) = "advanced_apnea/$modality/$length"
     fun session(type: String) = "session/$type"
     fun sessionAnalytics(sessionId: Long) = "session_analytics/$sessionId"
     fun rfAssessmentRun(protocol: String, vibration: Boolean = false, colors: Boolean = false, customDuration: Int = 0, posture: String = "LAYING") =
@@ -161,6 +164,7 @@ object WagsRoutes {
         "resonance_session?vibration=$vibration&duration=$duration&infinity=$infinity&rate=$rate"
     fun resonanceSessionDetail(sessionId: Long) = "resonance_session_detail/$sessionId"
     fun progressiveO2Detail(sessionId: Long) = "progressive_o2_detail/$sessionId"
+    fun contractionTableDetail(sessionId: Long) = "contraction_table_detail/$sessionId"
 
     fun eucapnicSetup(
         lungVolume: String,
@@ -358,19 +362,6 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             val tableType = backStackEntry.arguments?.getString("tableType") ?: "O2"
             ApneaTableScreen(navController = navController, tableType = tableType)
         }
-        composable(WagsRoutes.ADVANCED_APNEA) { backStackEntry ->
-            val modalityStr = backStackEntry.arguments?.getString("modality") ?: "PROGRESSIVE_O2"
-            val lengthStr = backStackEntry.arguments?.getString("length") ?: "MEDIUM"
-            val modality = runCatching { TrainingModality.valueOf(modalityStr) }
-                .getOrDefault(TrainingModality.PROGRESSIVE_O2)
-            val length = runCatching { TableLength.valueOf(lengthStr) }
-                .getOrDefault(TableLength.MEDIUM)
-            AdvancedApneaScreen(
-                navController = navController,
-                modality = modality,
-                length = length
-            )
-        }
         // ── Progressive O₂ ──────────────────────────────────────────────────
         composable(WagsRoutes.PROGRESSIVE_O2) {
             ProgressiveO2Screen(navController = navController)
@@ -390,6 +381,19 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
         }
         composable(WagsRoutes.MIN_BREATH_ACTIVE) {
             MinBreathActiveScreen(navController = navController)
+        }
+        // ── Contraction Tables (Till Contraction / Contraction Count) ─────────
+        composable(WagsRoutes.CONTRACTION_TABLE) {
+            ContractionTableScreen(navController = navController)
+        }
+        composable(WagsRoutes.CONTRACTION_TABLE_ACTIVE) {
+            ContractionTableActiveScreen(navController = navController)
+        }
+        composable(
+            route = WagsRoutes.CONTRACTION_TABLE_DETAIL,
+            arguments = listOf(navArgument("sessionId") { type = NavType.LongType })
+        ) {
+            ContractionTableDetailScreen(navController = navController)
         }
         composable(
             route = WagsRoutes.EUCAPNIC_SETUP,
