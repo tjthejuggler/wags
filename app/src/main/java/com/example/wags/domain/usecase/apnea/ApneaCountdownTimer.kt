@@ -11,7 +11,9 @@ import javax.inject.Inject
 
 /**
  * Countdown timer for apnea state transitions.
- * Emits remaining seconds and fires callbacks at 10s, 5s, 3s, 2s, 1s before transition.
+ * Emits remaining seconds and fires the warning callback once per second so
+ * consumers (voice announcements, vibration warnings) can filter their own
+ * trigger points — including user-configurable warning windows.
  */
 class ApneaCountdownTimer @Inject constructor() {
 
@@ -20,13 +22,10 @@ class ApneaCountdownTimer @Inject constructor() {
 
     private var timerJob: Job? = null
 
-    companion object {
-        private val WARNING_POINTS = setOf(120L, 60L, 30L, 10L, 9L, 8L, 7L, 6L, 5L, 4L, 3L, 2L, 1L)
-    }
-
     /**
      * Start countdown from [durationMs].
-     * [onWarning] fires at 120s, 60s, 30s, 10s–1s remaining.
+     * [onWarning] fires every second with the remaining seconds
+     * (consumers filter their own trigger points).
      * [onComplete] fires when countdown reaches 0.
      */
     fun start(
@@ -43,9 +42,7 @@ class ApneaCountdownTimer @Inject constructor() {
                 delay(1000L)
                 remaining--
                 _remainingSeconds.value = remaining
-                if (remaining in WARNING_POINTS) {
-                    onWarning(remaining)
-                }
+                onWarning(remaining)
             }
             onComplete()
         }

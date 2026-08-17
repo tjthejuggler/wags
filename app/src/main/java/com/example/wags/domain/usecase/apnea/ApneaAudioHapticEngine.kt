@@ -69,6 +69,31 @@ class ApneaAudioHapticEngine @Inject constructor(
         get() = prefs.getBoolean(KEY_PB_INDICATION_VIBRATION, true)
         set(value) { prefs.edit().putBoolean(KEY_PB_INDICATION_VIBRATION, value).apply() }
 
+    // ── Configurable vibration warnings (hold / breath ending) ────────────────
+
+    /** Vibration warning played during the final seconds of a hold. */
+    var holdWarning: ApneaVibrationWarningConfig
+        get() = loadWarningConfig(KEY_HOLD_WARNING_PREFIX, ApneaVibrationWarningConfig.HOLD_DEFAULT)
+        set(value) = saveWarningConfig(KEY_HOLD_WARNING_PREFIX, value)
+
+    /**
+     * Vibration warning played during the final seconds of a breathe phase.
+     * When [breathSameAsHold] is true this value is ignored and the hold
+     * warning is used for both.
+     */
+    var breathWarning: ApneaVibrationWarningConfig
+        get() = loadWarningConfig(KEY_BREATH_WARNING_PREFIX, ApneaVibrationWarningConfig.BREATH_DEFAULT)
+        set(value) = saveWarningConfig(KEY_BREATH_WARNING_PREFIX, value)
+
+    /** When true, breath and hold warnings share the [holdWarning] config. */
+    var breathSameAsHold: Boolean
+        get() = prefs.getBoolean(KEY_BREATH_SAME_AS_HOLD, false)
+        set(value) { prefs.edit().putBoolean(KEY_BREATH_SAME_AS_HOLD, value).apply() }
+
+    val effectiveHoldWarning: ApneaVibrationWarningConfig get() = holdWarning
+    val effectiveBreathWarning: ApneaVibrationWarningConfig
+        get() = if (breathSameAsHold) holdWarning else breathWarning
+
     init {
         tts = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
@@ -131,29 +156,48 @@ class ApneaAudioHapticEngine @Inject constructor(
     }
 
     /**
-     * Single short tick (80ms) fired once per second during the last 10s of a
-     * breathing (VENTILATION) phase — warns the user that the next hold is coming.
-     *
-     * @param isLastTick when true, fires an extra-long 400ms pulse at high amplitude
-     *                   to signal "hold starts NOW".
+     * Plays the full breath-ending warning waveform (beats + optional final
+     * pulse). Call exactly once when the breathe-phase countdown enters the
+     * configured warning window — the waveform then runs autonomously and is
+     * aligned to end with the phase.
      */
-    fun vibrateBreathingCountdownTick(isLastTick: Boolean = false) {
-        if (!vibrationEnabled) return
-        if (isLastTick) {
-            vibrator.vibrate(VibrationEffect.createOneShot(400L, AMPLITUDE_HIGH))
-        } else {
-            vibrator.vibrate(VibrationEffect.createOneShot(80L, AMPLITUDE_MEDIUM))
-        }
+    fun playBreathWarning() = playWarning(effectiveBreathWarning)
+
+    /**
+     * Plays the full hold-ending warning waveform (beats + optional final
+     * pulse). Call exactly once when the hold countdown enters the configured
+     * warning window.
+     */
+    fun playHoldWarning() = playWarning(effectiveHoldWarning)
+
+    /** Stops any in-flight warning waveform (phase changed / session stopped). */
+    fun cancelWarningVibrations() {
+        try { vibrator.cancel() } catch (_: Exception) {}
     }
 
-    /** Single longer 500ms pulse to signal the end of a hold (stop holding). */
-    fun vibrateHoldEnd() {
+    /**
+     * True when the hold-ending countdown's final pulse already covers the
+     * moment the hold ends — callers can then skip the generic hold-end buzz.
+     */
+    fun holdEndCoveredByWarning(): Boolean =
+        vibrationEnabled && effectiveHoldWarning.enabled && effectiveHoldWarning.finalPulseEnabled
+
+    /**
+     * Single longer 500ms pulse to signal the end of a hold (stop holding).
+     *
+     * @param countdownCovered pass true when this transition follows a
+     *   countdown-driven hold whose final-second pulse (when enabled) already
+     *   covers the end moment — the generic buzz is then skipped.
+     */
+    fun vibrateHoldEnd(countdownCovered: Boolean = false) {
         if (!vibrationEnabled) return
+        if (countdownCovered && holdEndCoveredByWarning()) return
         vibrator.vibrate(VibrationEffect.createOneShot(500L, AMPLITUDE_HIGH))
     }
 
     /** 3 long 300ms pulses with 100ms gaps for abort/safety. Always fires regardless of settings. */
     fun vibrateAbort() {
+        cancelWarningVibrations()
         val timings = longArrayOf(0L, 300L, 100L, 300L, 100L, 300L)
         val amplitudes = intArrayOf(0, AMPLITUDE_HIGH, 0, AMPLITUDE_HIGH, 0, AMPLITUDE_HIGH)
         vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
@@ -234,6 +278,77 @@ class ApneaAudioHapticEngine @Inject constructor(
     }
 
     /**
+     * Builds and plays a warning waveform from [cfg]:
+     * beat pulses at [ApneaVibrationWarningConfig.intervalSec] intervals for
+     * the whole window minus the final pulse, then (optionally) one long
+     * final pulse ending exactly when the phase ends.
+     */
+    private fun playWarning(cfg: ApneaVibrationWarningConfig) {
+        if (!vibrationEnabled || !cfg.enabled || cfg.windowSec <= 0) return
+
+        val windowMs = cfg.windowMs
+        val finalMs = if (cfg.finalPulseEnabled)
+            cfg.finalPulseMs.toLong().coerceIn(0L, windowMs * 4 / 5) else 0L
+        val beatWindowMs = (windowMs - finalMs).coerceAtLeast(0L)
+        val intervalMs = cfg.intervalMs.toLong().coerceIn(250L, 2000L)
+        val pulseMs = (intervalMs * 2 / 5).coerceIn(40L, 200L)
+            .coerceAtMost(intervalMs - 100L).coerceAtLeast(20L)
+
+        val timings = mutableListOf<Long>()
+        val amplitudes = mutableListOf<Int>()
+        val beatAmp = cfg.beatAmplitude.coerceAtLeast(1)
+        var cursor = 0L          // end of the last scheduled segment
+        var nextBeatStart = 0L   // where the next beat pulse begins
+
+        while (nextBeatStart + pulseMs <= beatWindowMs) {
+            if (nextBeatStart > cursor) {              // silent gap before beat
+                timings += nextBeatStart - cursor
+                amplitudes += 0
+            }
+            timings += pulseMs
+            amplitudes += beatAmp
+            cursor = nextBeatStart + pulseMs
+            nextBeatStart += intervalMs
+        }
+        if (finalMs > 0L) {
+            if (beatWindowMs > cursor) {               // silence before final
+                timings += beatWindowMs - cursor
+                amplitudes += 0
+            }
+            timings += finalMs
+            amplitudes += cfg.finalAmplitude.coerceAtLeast(1)
+        }
+        if (timings.isEmpty()) return
+
+        vibrator.vibrate(VibrationEffect.createWaveform(timings.toLongArray(), amplitudes.toIntArray(), -1))
+    }
+
+    private fun loadWarningConfig(
+        prefix: String,
+        default: ApneaVibrationWarningConfig
+    ): ApneaVibrationWarningConfig = ApneaVibrationWarningConfig(
+        enabled = prefs.getBoolean("${prefix}enabled", default.enabled),
+        windowSec = prefs.getInt("${prefix}window_sec", default.windowSec),
+        intensityPct = prefs.getInt("${prefix}intensity", default.intensityPct),
+        intervalMs = prefs.getInt("${prefix}interval_ms", default.intervalMs),
+        finalPulseEnabled = prefs.getBoolean("${prefix}final_enabled", default.finalPulseEnabled),
+        finalPulseMs = prefs.getInt("${prefix}final_ms", default.finalPulseMs),
+        finalIntensityPct = prefs.getInt("${prefix}final_intensity", default.finalIntensityPct)
+    )
+
+    private fun saveWarningConfig(prefix: String, cfg: ApneaVibrationWarningConfig) {
+        prefs.edit()
+            .putBoolean("${prefix}enabled", cfg.enabled)
+            .putInt("${prefix}window_sec", cfg.windowSec)
+            .putInt("${prefix}intensity", cfg.intensityPct)
+            .putInt("${prefix}interval_ms", cfg.intervalMs)
+            .putBoolean("${prefix}final_enabled", cfg.finalPulseEnabled)
+            .putInt("${prefix}final_ms", cfg.finalPulseMs)
+            .putInt("${prefix}final_intensity", cfg.finalIntensityPct)
+            .apply()
+    }
+
+    /**
      * Speaks [text] with a 500ms silence prefix so the beginning of the word
      * is not clipped by the audio system waking up.
      */
@@ -269,6 +384,9 @@ class ApneaAudioHapticEngine @Inject constructor(
         const val KEY_PB_INDICATION_ENABLED = "pb_indication_enabled"
         const val KEY_PB_INDICATION_SOUND = "pb_indication_sound"
         const val KEY_PB_INDICATION_VIBRATION = "pb_indication_vibration"
+        private const val KEY_HOLD_WARNING_PREFIX = "apnea_vib_hold_"
+        private const val KEY_BREATH_WARNING_PREFIX = "apnea_vib_breath_"
+        private const val KEY_BREATH_SAME_AS_HOLD = "apnea_vib_breath_same_as_hold"
 
         /** Strong references to in-flight PB indication players. */
         private val activePbPlayers = mutableSetOf<MediaPlayer>()

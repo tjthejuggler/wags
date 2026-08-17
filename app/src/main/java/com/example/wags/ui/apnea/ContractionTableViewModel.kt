@@ -214,8 +214,9 @@ class ContractionTableViewModel @Inject constructor(
     private var telemetryJob: Job? = null
     private var sessionStartMs: Long = 0L
 
-    // Track previous phase for audio/haptic cues
+    // Track previous phase + timer for audio/haptic cues (edge-triggered warnings)
     private var previousPhase: ContractionTablePhase = ContractionTablePhase.IDLE
+    private var previousTimerMs: Long = 0L
 
     // Spotify tracks played during the session (captured at stop time)
     private var trackedSongs: List<SpotifySong> = emptyList()
@@ -1008,13 +1009,29 @@ class ContractionTableViewModel @Inject constructor(
 
     private fun handlePhaseTransition(state: ContractionTableState) {
         if (state.phase == previousPhase) {
-            // Same phase — check for breathing countdown tick
-            if (state.phase == ContractionTablePhase.BREATHE && state.timerMs in 1000..10_000) {
-                val isLast = state.timerMs <= 1000L
-                audioHapticEngine.vibrateBreathingCountdownTick(isLastTick = isLast)
+            // Same phase — edge-trigger the breath warning waveform exactly
+            // once, when the countdown crosses into the configured warning
+            // window. (State ticks arrive frequently, so a plain range check
+            // would fire repeatedly.)
+            if (state.phase == ContractionTablePhase.BREATHE) {
+                val warning = audioHapticEngine.effectiveBreathWarning
+                if (warning.enabled &&
+                    previousTimerMs > warning.windowMs &&
+                    state.timerMs <= warning.windowMs
+                ) {
+                    audioHapticEngine.playBreathWarning()
+                }
             }
+            previousTimerMs = state.timerMs
             return
         }
+
+        // Phase changed — stop any in-flight warning waveform.
+        // (Holds in this table are open-ended — they end on contractions or
+        // user input, not a countdown — so only the breathe phase carries a
+        // warning and the hold-end buzz always fires plainly.)
+        audioHapticEngine.cancelWarningVibrations()
+        previousTimerMs = state.timerMs
 
         when (state.phase) {
             ContractionTablePhase.BREATHE -> {

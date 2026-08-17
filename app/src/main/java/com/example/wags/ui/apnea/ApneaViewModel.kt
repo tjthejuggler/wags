@@ -791,12 +791,18 @@ class ApneaViewModel @Inject constructor(
     private fun onStateChanged(state: ApneaState) {
         when (state) {
             ApneaState.APNEA -> {
+                // Stop any in-flight breath warning waveform before the hold starts.
+                audioHapticEngine.cancelWarningVibrations()
                 audioHapticEngine.announceHoldBegin()
                 onApneaPhaseStarted()
             }
             ApneaState.VENTILATION -> {
-                // Single longer vibration: signals the user to stop holding
-                audioHapticEngine.vibrateHoldEnd()
+                // Stop any in-flight hold warning waveform, then signal the end
+                // of the hold. When the hold countdown's final-second pulse is
+                // enabled it already covers this moment, so the generic buzz is
+                // skipped to avoid stacking vibrations.
+                audioHapticEngine.cancelWarningVibrations()
+                audioHapticEngine.vibrateHoldEnd(countdownCovered = true)
                 audioHapticEngine.announceBreath()
                 // Capture hold duration for the contraction summary card
                 val table = _uiState.value.currentTable
@@ -1098,6 +1104,7 @@ class ApneaViewModel @Inject constructor(
             guidedAudioManager.stopPlayback()
         }
         stateMachine.stop()
+        audioHapticEngine.cancelWarningVibrations()
         if (tableTracksPlayed.isNotEmpty()) {
             persistSongHistory(tableTracksPlayed.map { SpotifySong(it.title, it.artist, null, it.spotifyUri, it.startedAtMs, it.endedAtMs) })
         }
@@ -1122,17 +1129,34 @@ class ApneaViewModel @Inject constructor(
             guidedAudioManager.stopPlayback()
         }
         stateMachine.stop()
+        audioHapticEngine.cancelWarningVibrations()
         // Do NOT save the session or fire tail increments
     }
 
     private fun onWarning(remainingSeconds: Long) {
+        // announceTimeRemaining internally filters to its own cue points
+        // (120/60/30/10..1), so the per-second callback is a no-op for voice
+        // outside those points.
         audioHapticEngine.announceTimeRemaining(remainingSeconds.toInt())
-        // During the VENTILATION (breathing) phase, fire a single tick vibration every
-        // second for the last 10 seconds — warns the user the next hold is approaching.
-        // Read directly from the StateFlow (always current) to avoid race with _uiState collector.
-        if (stateMachine.state.value == ApneaState.VENTILATION && remainingSeconds in 1L..10L) {
-            val isLast = remainingSeconds == 1L
-            audioHapticEngine.vibrateBreathingCountdownTick(isLastTick = isLast)
+
+        // Fire the configurable warning waveform exactly once, when the
+        // countdown enters the configured warning window for the current phase.
+        // Read directly from the StateFlow (always current) to avoid race with
+        // the _uiState collector.
+        when (stateMachine.state.value) {
+            ApneaState.VENTILATION -> {
+                val warning = audioHapticEngine.effectiveBreathWarning
+                if (warning.enabled && remainingSeconds == warning.windowMs / 1000L) {
+                    audioHapticEngine.playBreathWarning()
+                }
+            }
+            ApneaState.APNEA -> {
+                val warning = audioHapticEngine.effectiveHoldWarning
+                if (warning.enabled && remainingSeconds == warning.windowMs / 1000L) {
+                    audioHapticEngine.playHoldWarning()
+                }
+            }
+            else -> Unit
         }
     }
 

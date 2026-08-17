@@ -262,10 +262,14 @@ fun SettingsScreen(
                     colors = CardDefaults.cardColors(containerColor = SurfaceDark),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
@@ -298,6 +302,18 @@ fun SettingsScreen(
                         ) {
                             Text("+", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
                         }
+                    }
+
+                    ApneaVibrationSettingsSection(
+                        settings = state.apneaVibration,
+                        onVoiceEnabledChange = viewModel::setApneaVoiceEnabled,
+                        onVibrationEnabledChange = viewModel::setApneaVibrationEnabled,
+                        onBreathSameAsHoldChange = viewModel::setApneaBreathSameAsHold,
+                        onHoldWarningChange = viewModel::setApneaHoldWarning,
+                        onBreathWarningChange = viewModel::setApneaBreathWarning,
+                        onTestHoldWarning = viewModel::testApneaHoldWarning,
+                        onTestBreathWarning = viewModel::testApneaBreathWarning
+                    )
                     }
                 }
             }

@@ -19,6 +19,8 @@ import com.example.wags.data.spotify.SpotifyAuthManager
 import com.example.wags.domain.model.BleConnectionState
 import com.example.wags.domain.model.HabitEntry
 import com.example.wags.domain.model.ScannedDevice
+import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
+import com.example.wags.domain.usecase.apnea.ApneaVibrationWarningConfig
 import com.example.wags.domain.usecase.apnea.HyperLockManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,6 +41,17 @@ data class HabitSlotSelection(
     val isSet: Boolean get() = habitId.isNotBlank()
     val displayName: String get() = habitName.ifBlank { habitId }
 }
+
+// ── Apnea audio/haptics settings (mirrored from ApneaAudioHapticEngine) ───────
+
+data class ApneaVibrationSettings(
+    val voiceEnabled: Boolean = true,
+    val vibrationEnabled: Boolean = true,
+    val holdWarning: ApneaVibrationWarningConfig = ApneaVibrationWarningConfig.HOLD_DEFAULT,
+    val breathWarning: ApneaVibrationWarningConfig = ApneaVibrationWarningConfig.BREATH_DEFAULT,
+    /** When true, breaths use the [holdWarning] config as well. */
+    val breathSameAsHold: Boolean = false
+)
 
 // ── UI state ──────────────────────────────────────────────────────────────────
 
@@ -88,7 +101,9 @@ data class SettingsUiState(
     val debugFileDirUri: String = "",
     // ── Apnea ─────────────────────────────────────────────────────────────────
     /** Days required between HYPER prep sessions (0 disables the lock). */
-    val hyperLockDays: Int = HyperLockManager.DEFAULT_LOCK_DAYS
+    val hyperLockDays: Int = HyperLockManager.DEFAULT_LOCK_DAYS,
+    /** Apnea voice/vibration indication + customizable warning vibrations. */
+    val apneaVibration: ApneaVibrationSettings = ApneaVibrationSettings()
 )
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
@@ -105,13 +120,15 @@ class SettingsViewModel @Inject constructor(
     private val dataExportImportRepo: DataExportImportRepository,
     private val spotifyAuthManager: SpotifyAuthManager,
     private val debugPrefs: DebugPreferences,
-    private val hyperLockManager: HyperLockManager
+    private val hyperLockManager: HyperLockManager,
+    private val apneaAudioHapticEngine: ApneaAudioHapticEngine
 ) : ViewModel() {
 
     private val _habitState = MutableStateFlow(buildInitialHabitState())
     private val _exportImportState = MutableStateFlow(ExportImportPartialState())
     private val _backfillState = MutableStateFlow(BackfillPartialState())
     private val _hyperLockDays = MutableStateFlow(hyperLockManager.lockDays)
+    private val _apneaVibrationState = MutableStateFlow(loadApneaVibrationSettings())
 
     val uiState: StateFlow<SettingsUiState> = combine(
         deviceManager.connectionState,
@@ -177,6 +194,8 @@ class SettingsViewModel @Inject constructor(
         )
     }.combine(_hyperLockDays) { state, days ->
         state.copy(hyperLockDays = days)
+    }.combine(_apneaVibrationState) { state, apneaVibration ->
+        state.copy(apneaVibration = apneaVibration)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -207,6 +226,50 @@ class SettingsViewModel @Inject constructor(
         hyperLockManager.setLockDays(days)
         _hyperLockDays.value = hyperLockManager.lockDays
     }
+
+    private fun loadApneaVibrationSettings() = ApneaVibrationSettings(
+        voiceEnabled = apneaAudioHapticEngine.voiceEnabled,
+        vibrationEnabled = apneaAudioHapticEngine.vibrationEnabled,
+        holdWarning = apneaAudioHapticEngine.holdWarning,
+        breathWarning = apneaAudioHapticEngine.breathWarning,
+        breathSameAsHold = apneaAudioHapticEngine.breathSameAsHold
+    )
+
+    private fun refreshApneaVibrationState() {
+        _apneaVibrationState.value = loadApneaVibrationSettings()
+    }
+
+    fun setApneaVoiceEnabled(enabled: Boolean) {
+        apneaAudioHapticEngine.voiceEnabled = enabled
+        refreshApneaVibrationState()
+    }
+
+    fun setApneaVibrationEnabled(enabled: Boolean) {
+        apneaAudioHapticEngine.vibrationEnabled = enabled
+        refreshApneaVibrationState()
+    }
+
+    fun setApneaHoldWarning(config: ApneaVibrationWarningConfig) {
+        apneaAudioHapticEngine.holdWarning = config
+        refreshApneaVibrationState()
+    }
+
+    fun setApneaBreathWarning(config: ApneaVibrationWarningConfig) {
+        apneaAudioHapticEngine.breathWarning = config
+        refreshApneaVibrationState()
+    }
+
+    /** When enabled, the breath warning mirrors the hold warning config. */
+    fun setApneaBreathSameAsHold(same: Boolean) {
+        apneaAudioHapticEngine.breathSameAsHold = same
+        refreshApneaVibrationState()
+    }
+
+    /** Preview the configured hold-ending warning vibration. */
+    fun testApneaHoldWarning() = apneaAudioHapticEngine.playHoldWarning()
+
+    /** Preview the configured breath-ending warning vibration. */
+    fun testApneaBreathWarning() = apneaAudioHapticEngine.playBreathWarning()
 
     // ── Unified scan ─────────────────────────────────────────────────────────
 

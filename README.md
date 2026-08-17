@@ -4,6 +4,28 @@
 
 ## Changelog
 
+### 2026-08-17 — Apnea settings section + customizable hold/breath vibration warnings
+
+**Apnea section in Settings** ([`SettingsScreen.kt`](app/src/main/java/com/example/wags/ui/settings/SettingsScreen.kt:260))
+- The existing "Apnea" card (Hyper lock days) now also holds the apnea audio/haptics settings: **Voice Announcements** and **Vibration** master toggles (same persisted toggles as the 🔊/〰 icons on drill screens), plus the new vibration warning customization below.
+
+**Customizable vibration warnings** ([`ApneaVibrationWarningConfig.kt`](app/src/main/java/com/example/wags/domain/usecase/apnea/ApneaVibrationWarningConfig.kt))
+- Two independent warnings — one for **holds ending**, one for **breaths ending** — each configurable for: **warning length** (1–20 s before the phase ends), **intensity** (0–100 %), **beat rapidness** (pulse every ¼–2 s, snapped to quarter-second steps), and an optional **final-second indicator** (a special long, intense pulse covering the last moment, with its own length 0.2–2 s and intensity).
+- Example: hold warning = 5 s window, 80 % intensity, one beat per second, then a 1 s 100 % pulse at the final second — exactly the reference setup, and the shipped default.
+- **"Same vibration for holds & breaths"** toggle links both warnings to a single config.
+- Each editor has a **Test Vibration** button to preview the pattern.
+- Warnings are played as a single `VibrationEffect.createWaveform` aligned to end exactly with the phase ([`playWarning`](app/src/main/java/com/example/wags/domain/usecase/apnea/ApneaAudioHapticEngine.kt:286)); when the hold final-second pulse is enabled it replaces the old generic 500 ms hold-end buzz so vibrations don't stack.
+
+**Where warnings fire**
+- O₂/CO₂ tables ([`ApneaViewModel.onWarning`](app/src/main/java/com/example/wags/ui/apnea/ApneaViewModel.kt:1134)): [`ApneaCountdownTimer`](app/src/main/java/com/example/wags/domain/usecase/apnea/ApneaCountdownTimer.kt:16) now reports every remaining second (voice cues still filter their own points internally), and each phase edge-triggers its warning when the countdown enters the configured window.
+- Progressive O₂ ([`handlePhaseTransition`](app/src/main/java/com/example/wags/ui/apnea/ProgressiveO2ViewModel.kt:913)): edge-detected crossing into the window for both HOLD and BREATHING (state ticks arrive every ~100 ms, so the trigger fires exactly once).
+- Contraction Tables ([`handlePhaseTransition`](app/src/main/java/com/example/wags/ui/apnea/ContractionTableViewModel.kt:1011)): breath warning only — holds there are open-ended (end on contractions/user input), so no hold countdown exists.
+- Phase changes and session stop/cancel cancel any in-flight warning waveform; the safety abort pattern always fires.
+
+**Files changed**
+- **New**: [`ApneaVibrationWarningConfig.kt`](app/src/main/java/com/example/wags/domain/usecase/apnea/ApneaVibrationWarningConfig.kt), [`ApneaVibrationSettingsSection.kt`](app/src/main/java/com/example/wags/ui/settings/ApneaVibrationSettingsSection.kt)
+- **Modified**: [`ApneaAudioHapticEngine.kt`](app/src/main/java/com/example/wags/domain/usecase/apnea/ApneaAudioHapticEngine.kt) (persisted configs in `apnea_prefs`, waveform playback, `vibrateHoldEnd(countdownCovered)`, removed per-tick `vibrateBreathingCountdownTick`), [`ApneaCountdownTimer.kt`](app/src/main/java/com/example/wags/domain/usecase/apnea/ApneaCountdownTimer.kt), [`ApneaViewModel.kt`](app/src/main/java/com/example/wags/ui/apnea/ApneaViewModel.kt), [`ProgressiveO2ViewModel.kt`](app/src/main/java/com/example/wags/ui/apnea/ProgressiveO2ViewModel.kt), [`ContractionTableViewModel.kt`](app/src/main/java/com/example/wags/ui/apnea/ContractionTableViewModel.kt), [`SettingsViewModel.kt`](app/src/main/java/com/example/wags/ui/settings/SettingsViewModel.kt), [`SettingsScreen.kt`](app/src/main/java/com/example/wags/ui/settings/SettingsScreen.kt)
+
 ### 2026-08-17 — Till Contraction: average-hold record, hold-screen simplification, partial-table back-out
 
 **Record = average hold time** ([`ContractionTableStateMachine.kt`](app/src/main/java/com/example/wags/domain/usecase/apnea/ContractionTableStateMachine.kt:106))

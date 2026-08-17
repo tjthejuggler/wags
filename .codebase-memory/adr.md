@@ -1,20 +1,22 @@
-# ADR: Till Contraction record semantics and partial-table handling
+# ADR: Waveform-based, edge-triggered apnea vibration warnings
 
 **Date:** 2026-08-17
 **Status:** Accepted
 
 ## Context
-The Till Contraction drill (ContractionTableMode.TILL_CONTRACTION, tableType `WONKA_FIRST_CONTRACTION`) previously used the longest single hold as its record headline. The hold screen also carried "End Hold" and "Stop Table" buttons that muddied the drill's single-action nature (the first contraction IS the end of the hold).
+Apnea drills (O₂/CO₂ tables, Progressive O₂, Contraction Tables) warned users of ending phases via per-tick single-shot vibrations (`vibrateBreathingCountdownTick` fired from every state emission, ~100 ms apart in Progressive O₂ — repeatedly within a second) with hard-coded durations/intensities. Users need fully customizable warnings: separate hold-ending and breath-ending warnings with configurable window length, intensity, beat rapidness, an optional final-second long/intense pulse, and a "same for both" link.
 
 ## Decision
-1. **Record metric = average hold time across all holds of a table.** `ContractionTableState.averageHoldMs` (mean of per-round `totalHoldMs`) is stored as the record's `durationMs` and compared in all PB pools. DB migration 41→42 recomputes legacy TILL records from `apnea_sessions.tableParamsJson` so old and new records are comparable.
-2. **Hold UI = one huge First Contraction button** (150 dp). No End Hold, no Stop Table in TILL mode; Contraction Count keeps its existing controls. A record card at the bottom of the active screen shows the avg-hold record + running table average.
-3. **Early end = back out.** Backing out of an active TILL table opens a dialog:
-   - *Keep for stats* → `ContractionTableViewModel.savePartialSession()` saves session + record with `ApneaRecordEntity.countsAsRecord = false` (new column, DB v42). Hold minutes fire to Tail; the session appears in history tagged "partial".
-   - *Discard* → `cancelSession()` wipes everything.
-4. **Exclusion mechanism:** `addDrillFilter` in ApneaRecordDao appends `countsAsRecord = 1` to every drill PB query; `countByTableTypeAll` and the record-forecast record filter also exclude non-counting records. Partial tables therefore never affect records, PBs, forecasts, or tables-done counters, but remain in history and stats.
+1. **Single waveform per warning instead of per-tick pulses.** `ApneaAudioHapticEngine.playWarning()` builds one `VibrationEffect.createWaveform` (beats at the configured interval + optional final pulse) aligned to end exactly when the phase ends. Triggered exactly ONCE via edge detection when the countdown crosses into the configured window.
+   - O₂/CO₂ tables: `ApneaCountdownTimer` now fires `onWarning` every second (voice cues filter internally); `ApneaViewModel.onWarning` compares `remainingSeconds == windowSec`.
+   - Progressive O₂ / Contraction Tables: `previousTimerMs > windowMs && timerMs <= windowMs` edge detection in `handlePhaseTransition` (ticks arrive every ~100 ms).
+2. **Config model** `ApneaVibrationWarningConfig` (enabled, windowSec, intensityPct, intervalSec, finalPulseEnabled, finalPulseMs, finalIntensityPct) persisted in `apnea_prefs` SharedPreferences; `breathSameAsHold` flag makes breaths reuse the hold config.
+3. **Hold-end de-duplication:** when the hold countdown's final pulse is enabled, natural HOLD→BREATHE transitions skip the generic 500 ms `vibrateHoldEnd(countdownCovered = true)`; manual ends (endHoldEarly, stopFreeHold) always buzz.
+4. **Cancellation:** every phase change and session stop/cancel calls `cancelWarningVibrations()`; the safety abort pattern cancels then fires.
+5. **Scope:** Contraction Table holds are open-ended (end on contractions/user input) → no hold countdown there, only the breath warning. Free holds / Min Breath unaffected.
+6. **UI:** Settings → Apnea card hosts voice/vibration master toggles + warning editors (sliders) + "Same vibration for holds & breaths" toggle + Test buttons.
 
 ## Consequences
-- Partial tables are visible in history but flagged; users comparing records see only fully-run tables in PB pools.
-- PiP Stop in TILL mode routes to the partial-save path (no dialog available in PiP).
-- Tables with zero finished holds that are backed out of are discarded outright (nothing to keep).
+- Arbitrary beat intervals are possible without depending on driver tick rate; timing stays accurate even if UI ticks jitter.
+- The old `vibrateBreathingCountdownTick` API was removed; all three drill ViewModels were migrated.
+- Defaults: hold = 5 s @ 80 %, 1 s beats, 1 s final @ 100 % (the reference setup); breath = 10 s @ 60 %, 1 s ticks, 400 ms final (mirrors legacy behaviour).
