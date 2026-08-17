@@ -4,6 +4,22 @@
 
 ## Changelog
 
+### 2026-08-17 — Till Contraction: average-hold record, hold-screen simplification, partial-table back-out
+
+**Record = average hold time** ([`ContractionTableStateMachine.kt`](app/src/main/java/com/example/wags/domain/usecase/apnea/ContractionTableStateMachine.kt:106))
+- The Till-Contraction record metric changed from "longest single hold" to the **average hold time across all holds of a table** — a table breaks the record when its mean hold beats every previous table's mean hold ([`saveSession`](app/src/main/java/com/example/wags/ui/apnea/ContractionTableViewModel.kt:1078) stores `averageHoldMs` as the headline `durationMs`).
+- New `ContractionTableState.averageHoldMs` computed property; the completion summary, PiP result headline and the setup screen's record line ("Record · avg hold") all show it.
+- DB **v41 → v42** ([`WagsDatabase.kt`](app/src/main/java/com/example/wags/data/db/WagsDatabase.kt:1136)): legacy `WONKA_FIRST_CONTRACTION` records are recomputed from their session's per-round JSON so old and new records stay comparable.
+
+**Hold screen = one huge button** ([`ContractionTableActiveScreen.kt`](app/src/main/java/com/example/wags/ui/apnea/ContractionTableActiveScreen.kt:316))
+- During a Till-Contraction hold the only control is a full-width 150 dp **First Contraction** button — no "End Hold", no "Stop Table" (Contraction Count keeps its existing controls). A Till table simply runs to its last round.
+- A **record card at the bottom** of the active screen shows the average-hold record for the current settings plus the running average of the table in progress.
+
+**Back-out flow for early-ended tables**
+- Backing out of an active Till-Contraction table (system back or ←) opens a dialog: **Keep for stats** saves the partial table — hold minutes fire to Tail, the session lands in history marked "partial" — but it never counts as a completed table, never enters any record/PB pool, and doesn't tick the tables-done counter. **Discard** wipes it as if it never happened ([`savePartialSession`](app/src/main/java/com/example/wags/ui/apnea/ContractionTableViewModel.kt:898) / [`EndEarlyTableDialog`](app/src/main/java/com/example/wags/ui/apnea/ContractionTableActiveScreen.kt:478)).
+- New `ApneaRecordEntity.countsAsRecord` flag (DB v42): every drill PB query ([`addDrillFilter`](app/src/main/java/com/example/wags/data/db/dao/ApneaRecordDao.kt:42)), the tables-done counters and the record forecast exclude non-counting records.
+- PiP "Stop" in Till mode keeps the table for stats (same partial path); tables with no finished holds are discarded outright.
+
 ### 2026-08-17 — Tail integration: O₂/CO₂ slot split, Contraction Tables slots, auto-backfill on connect
 
 **Slot changes** ([`HabitIntegrationRepository.kt`](app/src/main/java/com/example/wags/data/ipc/HabitIntegrationRepository.kt:47))

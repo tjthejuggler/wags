@@ -58,10 +58,21 @@ private fun ContractionTableActiveScreenContent(
             phase == ContractionTablePhase.STRUGGLE
 
     // ── Guards ───────────────────────────────────────────────────────────
-    SessionBackHandler(enabled = isActive) {
-        viewModel.cancelSession()
-        navController.popBackStack(WagsRoutes.CONTRACTION_TABLE, inclusive = false)
+    // Till Contraction deliberately has no on-screen "end table" button —
+    // backing out is the only escape hatch, so it asks what to do with the
+    // partial table instead of silently discarding it.
+    var showEndEarlyDialog by remember { mutableStateOf(false) }
+
+    fun backOutOfSession() {
+        if (isActive && state.mode == ContractionTableMode.TILL_CONTRACTION) {
+            showEndEarlyDialog = true
+        } else {
+            if (isActive) viewModel.cancelSession()
+            navController.popBackStack(WagsRoutes.CONTRACTION_TABLE, inclusive = false)
+        }
     }
+
+    SessionBackHandler(enabled = isActive) { backOutOfSession() }
     KeepScreenOn(enabled = isActive || phase == ContractionTablePhase.COMPLETE)
 
     // ── Auto-start ──────────────────────────────────────────────────────
@@ -84,6 +95,23 @@ private fun ContractionTableActiveScreenContent(
         )
     }
 
+    // ── End-early dialog (Till Contraction back-out) ──────────────────
+    if (showEndEarlyDialog) {
+        EndEarlyTableDialog(
+            onSave = {
+                showEndEarlyDialog = false
+                viewModel.savePartialSession()
+                navController.popBackStack(WagsRoutes.CONTRACTION_TABLE, inclusive = false)
+            },
+            onDiscard = {
+                showEndEarlyDialog = false
+                viewModel.cancelSession()
+                navController.popBackStack(WagsRoutes.CONTRACTION_TABLE, inclusive = false)
+            },
+            onDismiss = { showEndEarlyDialog = false }
+        )
+    }
+
     Scaffold(
         containerColor = BackgroundDark,
         topBar = {
@@ -95,10 +123,7 @@ private fun ContractionTableActiveScreenContent(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = {
-                        if (isActive) viewModel.cancelSession()
-                        navController.popBackStack(WagsRoutes.CONTRACTION_TABLE, inclusive = false)
-                    }) {
+                    IconButton(onClick = { backOutOfSession() }) {
                         Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                     }
                 },
@@ -289,29 +314,51 @@ private fun ActiveContent(
         // ── Primary action button ───────────────────────────────────────
         when (phase) {
             ContractionTablePhase.CRUISE -> {
-                Button(
-                    onClick = { viewModel.logFirstContraction() },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(72.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = ButtonPrimary)
-                ) {
-                    Text(
-                        text = "First Contraction",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = { viewModel.endHoldEarly() },
-                    modifier = Modifier.fillMaxWidth(),
-                    border = BorderStroke(1.dp, TextSecondary),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
-                ) {
-                    Text("End Hold", style = MaterialTheme.typography.titleSmall)
+                if (state.mode == ContractionTableMode.TILL_CONTRACTION) {
+                    // The single action of a Till-Contraction hold: the
+                    // contraction IS the end of the hold, so the button is
+                    // deliberately huge and unmissable mid-hold.
+                    Button(
+                        onClick = { viewModel.logFirstContraction() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(150.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = ButtonPrimary)
+                    ) {
+                        Text(
+                            text = "First Contraction",
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                } else {
+                    Button(
+                        onClick = { viewModel.logFirstContraction() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(72.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = ButtonPrimary)
+                    ) {
+                        Text(
+                            text = "First Contraction",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = { viewModel.endHoldEarly() },
+                        modifier = Modifier.fillMaxWidth(),
+                        border = BorderStroke(1.dp, TextSecondary),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
+                    ) {
+                        Text("End Hold", style = MaterialTheme.typography.titleSmall)
+                    }
                 }
             }
             ContractionTablePhase.STRUGGLE -> {
@@ -345,20 +392,111 @@ private fun ActiveContent(
 
         Spacer(Modifier.height(12.dp))
 
-        // ── Stop button ─────────────────────────────────────────────────
-        OutlinedButton(
-            onClick = { viewModel.stopSession() },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            border = BorderStroke(2.dp, TextSecondary),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
-        ) {
-            Text("Stop Table", style = MaterialTheme.typography.titleMedium)
+        // ── Stop button (Contraction Count only — a Till-Contraction table
+        //    runs to its last round; ending early means backing out) ──────
+        if (state.mode == ContractionTableMode.CONTRACTION_COUNT) {
+            OutlinedButton(
+                onClick = { viewModel.stopSession() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                border = BorderStroke(2.dp, TextSecondary),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
+            ) {
+                Text("Stop Table", style = MaterialTheme.typography.titleMedium)
+            }
+
+            Spacer(Modifier.height(12.dp))
         }
 
-        Spacer(Modifier.height(12.dp))
+        // ── Record card (Till Contraction) — the average-hold record the
+        //    current table is trying to beat ─────────────────────────────
+        if (state.mode == ContractionTableMode.TILL_CONTRACTION) {
+            TillRecordCard(
+                recordMs = state.personalBestCurrentSettingsMs,
+                sessionAvgMs = session.averageHoldMs
+            )
+            Spacer(Modifier.height(12.dp))
+        }
     }
+}
+
+// ── Till-Contraction record card ────────────────────────────────────────────
+
+/**
+ * The record for a Till-Contraction table is the AVERAGE hold time across all
+ * holds of a table — this card shows that record (for the current settings)
+ * plus the running average of the table in progress.
+ */
+@Composable
+private fun TillRecordCard(
+    recordMs: Long?,
+    sessionAvgMs: Long
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Record · Average Hold",
+                style = MaterialTheme.typography.labelMedium,
+                color = TextSecondary
+            )
+            Text(
+                text = recordMs?.let { formatMs(it) } ?: "—",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary
+            )
+            if (sessionAvgMs > 0L) {
+                Text(
+                    text = "This table: avg ${formatMs(sessionAvgMs)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
+        }
+    }
+}
+
+// ── End-early dialog ────────────────────────────────────────────────────────
+
+/**
+ * Shown when the user backs out of an active Till-Contraction table.
+ * Save → the partial table feeds hold-time stats and history but never
+ * counts as a completed table or towards any record.
+ * Discard → the table is wiped as if it never happened.
+ */
+@Composable
+private fun EndEarlyTableDialog(
+    onSave: () -> Unit,
+    onDiscard: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("End table early?") },
+        text = {
+            Text(
+                "Keep this partial table? It will be added to your hold-time " +
+                    "stats and history, but it won't count as a completed " +
+                    "table or towards any record."
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onSave) { Text("Keep for stats") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDiscard) { Text("Discard") }
+        }
+    )
 }
 
 // ── COMPLETE — session summary ──────────────────────────────────────────────
@@ -409,6 +547,9 @@ private fun CompleteContent(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 SummaryRow("Rounds completed", "$completedRounds / ${rounds.size}")
+                if (state.mode == ContractionTableMode.TILL_CONTRACTION) {
+                    SummaryRow("Average hold", formatMs(session.averageHoldMs))
+                }
                 session.bestCruiseMs?.let { SummaryRow("Best cruise", formatMs(it)) }
                 SummaryRow("Longest hold", formatMs(session.longestHoldMs))
                 SummaryRow("Total hold time", formatMs(session.totalHoldTimeMs))

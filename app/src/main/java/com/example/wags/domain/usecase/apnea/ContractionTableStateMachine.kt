@@ -101,6 +101,17 @@ data class ContractionTableState(
     /** Longest total hold achieved in this session (0 when none). */
     val longestHoldMs: Long
         get() = roundResults.maxOfOrNull { it.totalHoldMs } ?: 0L
+
+    /**
+     * Average total hold time across all recorded rounds (0 when none).
+     * This is the Till-Contraction record metric: a table's headline number
+     * is the mean hold of its rounds, not the single best round.
+     */
+    val averageHoldMs: Long
+        get() {
+            val holds = roundResults.map { it.totalHoldMs }.filter { it > 0L }
+            return if (holds.isEmpty()) 0L else holds.sum() / holds.size
+        }
 }
 
 // ── State machine ───────────────────────────────────────────────────────────

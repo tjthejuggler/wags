@@ -32,7 +32,7 @@ import com.example.wags.data.db.entity.*
         ForecastCalibrationEntity::class,
         EucapnicPastConfigurationEntity::class
     ],
-    version = 41,
+    version = 42,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -1129,6 +1129,66 @@ abstract class WagsDatabase : RoomDatabase() {
                         WHERE prepType = 'RESONANCE'
                           AND resonanceSessionId IS NULL
                     """.trimIndent())
+                }
+            }
+
+            /**
+             * v41 → v42: Till-Contraction record semantics + partial-table flag.
+             *
+             *  1. Add `countsAsRecord` to apnea_records — records saved from a
+             *     table the user ended early (and chose to keep) are excluded
+             *     from record / personal-best pools and "tables done" counters,
+             *     but still feed hold-time stats and history.
+             *
+             *  2. The Till-Contraction record metric changes from "longest
+             *     single hold" to "average hold across all holds of the table".
+             *     Existing WONKA_FIRST_CONTRACTION records are recomputed from
+             *     the per-round data stored in the matching apnea_sessions row
+             *     (joined on timestamp), so old and new records are comparable.
+             */
+            val MIGRATION_41_42 = object : Migration(41, 42) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "ALTER TABLE apnea_records ADD COLUMN countsAsRecord INTEGER NOT NULL DEFAULT 1"
+                    )
+
+                    // Recompute legacy Till-Contraction headline durations as
+                    // the average of the table's per-round totalHoldMs values.
+                    val updates = mutableListOf<Pair<Long, Long>>() // recordId → avgMs
+                    db.query(
+                        "SELECT r.recordId, s.tableParamsJson FROM apnea_records r " +
+                            "JOIN apnea_sessions s ON s.timestamp = r.timestamp " +
+                            "WHERE r.tableType = 'WONKA_FIRST_CONTRACTION'"
+                    ).use { cursor ->
+                        val idIdx = cursor.getColumnIndex("recordId")
+                        val jsonIdx = cursor.getColumnIndex("tableParamsJson")
+                        while (cursor.moveToNext()) {
+                            val recordId = cursor.getLong(idIdx)
+                            val json = cursor.getString(jsonIdx) ?: continue
+                            val avgMs = parseTillAverageHoldMs(json) ?: continue
+                            updates.add(recordId to avgMs)
+                        }
+                    }
+                    for ((recordId, avgMs) in updates) {
+                        db.execSQL(
+                            "UPDATE apnea_records SET durationMs = ? WHERE recordId = ?",
+                            arrayOf<Any>(avgMs, recordId)
+                        )
+                    }
+                }
+
+                /** Mean of totalHoldMs across rounds (> 0 only); null when unparsable/empty. */
+                private fun parseTillAverageHoldMs(paramsJson: String): Long? = try {
+                    val rounds = org.json.JSONObject(paramsJson).optJSONArray("roundResults")
+                        ?: return null
+                    val holds = mutableListOf<Long>()
+                    for (i in 0 until rounds.length()) {
+                        val holdMs = rounds.getJSONObject(i).optLong("totalHoldMs", 0L)
+                        if (holdMs > 0L) holds.add(holdMs)
+                    }
+                    if (holds.isEmpty()) null else holds.sum() / holds.size
+                } catch (_: Exception) {
+                    null
                 }
             }
         }

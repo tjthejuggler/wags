@@ -68,7 +68,12 @@ fun ContractionTablePipContent(
                     if (session.phase == ContractionTablePhase.CRUISE) viewModel.logFirstContraction()
                     else viewModel.logContraction()
                 }
-                PipActionIds.STOP              -> viewModel.stopSession()
+                PipActionIds.STOP              -> {
+                    // Till Contraction has no stop button — an early stop from
+                    // PiP keeps the table for stats only (never record-eligible).
+                    if (state.mode == ContractionTableMode.TILL_CONTRACTION) viewModel.savePartialSession()
+                    else viewModel.stopSession()
+                }
                 PipActionIds.AGAIN             -> viewModel.restartSameSession()
             }
         }
@@ -81,7 +86,7 @@ fun ContractionTablePipContent(
                 val rounds = session.roundResults
                 val completedRounds = rounds.count { it.completed }
                 val headline = if (state.mode == ContractionTableMode.TILL_CONTRACTION) {
-                    formatPipMs(session.longestHoldMs)
+                    formatPipMs(session.averageHoldMs)
                 } else {
                     formatPipMs(session.totalHoldTimeMs)
                 }

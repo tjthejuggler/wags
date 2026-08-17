@@ -656,10 +656,16 @@ private fun TableConfigSection(
                 color = TextSecondary
             )
 
-            // Personal best for the current config + settings
+            // Personal best for the current config + settings.
+            // Till Contraction's record metric is the average hold across the
+            // table's holds — keep the label explicit about that.
             state.personalBestCurrentSettingsMs?.let { best ->
                 Text(
-                    text = "Best (these settings): ${formatMs(best)}",
+                    text = if (state.mode == ContractionTableMode.TILL_CONTRACTION) {
+                        "Record · avg hold (these settings): ${formatMs(best)}"
+                    } else {
+                        "Best (these settings): ${formatMs(best)}"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.Medium,
                     color = TextPrimary
@@ -852,7 +858,11 @@ private fun PastSessionsSection(
                             color = TextPrimary
                         )
                         Text(
-                            text = "${item.configLabel}  ·  ${dateFormat.format(Date(item.timestamp))}",
+                            text = buildString {
+                                append(item.configLabel)
+                                if (item.partial) append("  ·  partial")
+                                append("  ·  ").append(dateFormat.format(Date(item.timestamp)))
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondary
                         )

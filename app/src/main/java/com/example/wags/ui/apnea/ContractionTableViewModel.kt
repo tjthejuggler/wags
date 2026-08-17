@@ -139,7 +139,9 @@ data class ContractionTableHistoryEntry(
     val longestHoldMs: Long,
     val totalHoldMs: Long,
     /** Average cruise ratio (cruise / total hold) across rounds with a logged contraction. */
-    val avgCruiseRatio: Float?
+    val avgCruiseRatio: Float?,
+    /** True when the user ended this table early and kept it — stats only, never record-eligible. */
+    val partial: Boolean = false
 )
 
 /**
@@ -278,7 +280,7 @@ class ContractionTableViewModel @Inject constructor(
                 try {
                     val s = _uiState.value
                     val records = apneaRepository.getAllRecordsOnce()
-                        .filter { it.tableType == s.mode.tableType() }
+                        .filter { it.tableType == s.mode.tableType() && it.countsAsRecord }
                     val settings = ForecastSettings(
                         lungVolume = s.lungVolume,
                         prepType = s.prepType,
@@ -816,7 +818,7 @@ class ContractionTableViewModel @Inject constructor(
 
                 val entries = filtered.mapNotNull { record ->
                     val session = sessionMap[record.timestamp] ?: return@mapNotNull null
-                    parseHistoryEntry(record.recordId, record.timestamp, session.tableParamsJson)
+                    parseHistoryEntry(record.recordId, record.timestamp, session.tableParamsJson, record.countsAsRecord)
                 }.sortedByDescending { it.timestamp }
 
                 _uiState.update { it.copy(pastSessions = entries, pastConfigs = pastConfigs) }
@@ -874,11 +876,29 @@ class ContractionTableViewModel @Inject constructor(
     }
 
     /**
-     * Stops the session and saves the record. Called when the user taps Stop,
-     * when the table finishes its final round (completion observer in init),
-     * or when a hold is bailed out of and no rounds remain.
+     * Stops the session and saves a record-eligible record. Called when the
+     * user taps Stop (Contraction Count), when the table finishes its final
+     * round (completion observer in init), or from PiP.
      */
-    fun stopSession() {
+    fun stopSession() = finalizeSession(countsAsRecord = true)
+
+    /**
+     * Ends the table early but keeps it: the session and its hold time are
+     * saved for stats/history, yet the record is flagged [ApneaRecordEntity.countsAsRecord]
+     * = false — it never competes for records/PBs and doesn't count as a
+     * completed table. Tables with no finished holds are simply discarded.
+     */
+    fun savePartialSession() {
+        val hasRounds = stateMachine.state.value.roundResults.isNotEmpty() ||
+                stateMachine.state.value.phase.let { it == ContractionTablePhase.CRUISE || it == ContractionTablePhase.STRUGGLE }
+        if (!hasRounds) {
+            cancelSession() // nothing happened yet — wipe it as if it never existed
+            return
+        }
+        finalizeSession(countsAsRecord = false)
+    }
+
+    private fun finalizeSession(countsAsRecord: Boolean) {
         if (!_uiState.value.isSessionActive) return // Already stopped/saved
 
         // Stop telemetry collection first for a stable snapshot
@@ -912,7 +932,7 @@ class ContractionTableViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                val (sessionId, recordId) = saveSession(finalState)
+                val (sessionId, recordId) = saveSession(finalState, countsAsRecord)
                 _uiState.update { it.copy(completedSessionId = sessionId, completedRecordId = recordId) }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to save session", e)
@@ -1020,7 +1040,10 @@ class ContractionTableViewModel @Inject constructor(
 
     // ── Session saving ──────────────────────────────────────────────────────
 
-    private suspend fun saveSession(finalState: ContractionTableState): Pair<Long, Long> {
+    private suspend fun saveSession(
+        finalState: ContractionTableState,
+        countsAsRecord: Boolean = true
+    ): Pair<Long, Long> {
         val now = System.currentTimeMillis()
         val totalDurationMs = now - sessionStartMs
         val s = _uiState.value
@@ -1060,20 +1083,23 @@ class ContractionTableViewModel @Inject constructor(
         // 2. Save ApneaRecordEntity.
         //
         // Headline duration semantics per mode:
-        //  - TILL_CONTRACTION: longest single-round hold (== longest cruise) —
-        //    the drill's goal is extending the easy phase.
+        //  - TILL_CONTRACTION: AVERAGE hold time across all holds of the table —
+        //    this is the record metric: a table beats the record when its mean
+        //    hold is higher than any previous table's mean hold.
         //  - CONTRACTION_COUNT: total hold time across the session (consistent
         //    with Progressive O₂), partitioned into PB pools by the target.
         val totalHoldTimeMs = finalState.totalHoldTimeMs
-        val longestHoldMs = finalState.longestHoldMs
-        val headlineDurationMs = if (s.mode == ContractionTableMode.TILL_CONTRACTION) longestHoldMs else totalHoldTimeMs
+        val headlineDurationMs = if (s.mode == ContractionTableMode.TILL_CONTRACTION) {
+            finalState.averageHoldMs
+        } else totalHoldTimeMs
 
         // First contraction of round 1 feeds the forecast feature extractor.
         val firstContractionMs = finalState.roundResults.firstOrNull()?.cruiseMs
 
-        // Check broader PB BEFORE saving so queries compare against prior records only
+        // Check broader PB BEFORE saving so queries compare against prior records only.
+        // Partial (early-ended) tables never compete for records.
         val drill = currentDrillContext()
-        val pbResult = if (headlineDurationMs > 0L) {
+        val pbResult = if (countsAsRecord && headlineDurationMs > 0L) {
             apneaRepository.checkBroaderPersonalBest(
                 drill, headlineDurationMs, s.lungVolume, s.prepType, s.timeOfDay, s.posture, s.audio
             )
@@ -1095,7 +1121,8 @@ class ContractionTableViewModel @Inject constructor(
                 audio = s.audio,
                 drillParamValue = if (s.mode == ContractionTableMode.CONTRACTION_COUNT) s.contractionTarget else null,
                 firstContractionMs = firstContractionMs,
-                guidedAudioName = if (s.audio == AudioSetting.GUIDED.name) s.guidedSelectedName else null
+                guidedAudioName = if (s.audio == AudioSetting.GUIDED.name) s.guidedSelectedName else null,
+                countsAsRecord = countsAsRecord
             )
         )
 
@@ -1105,14 +1132,18 @@ class ContractionTableViewModel @Inject constructor(
             try { habitRepo.sendHabitIncrement(Slot.APNEA_NEW_RECORD) } catch (_: Exception) {}
         }
 
-        // Fire Tail habit for every completed contraction-table session
-        // (mode-specific slot: Till Contraction vs Contraction Count)
+        // Fire Tail habit for every kept contraction-table session
+        // (mode-specific slot: Till Contraction vs Contraction Count).
+        // Hold minutes always count; the "tables done" counter only ticks for
+        // tables that were not ended early.
         try {
             val holdMinutes = HabitIntegrationRepository.millisToMinutes(totalHoldTimeMs)
             val slot = if (s.mode == ContractionTableMode.TILL_CONTRACTION) Slot.TILL_CONTRACTION
                        else Slot.CONTRACTION_COUNT
             habitRepo.sendHabitIncrementWithMinutes(slot, holdMinutes)
-            habitRepo.sendSecondaryValueIncrement(slot, 1)
+            if (countsAsRecord) {
+                habitRepo.sendSecondaryValueIncrement(slot, 1)
+            }
         } catch (_: Exception) {}
 
         // Fire music habit if applicable (once per TimeOfDay per day)
@@ -1196,7 +1227,8 @@ class ContractionTableViewModel @Inject constructor(
     private fun parseHistoryEntry(
         recordId: Long,
         timestamp: Long,
-        paramsJson: String
+        paramsJson: String,
+        countsAsRecord: Boolean = true
     ): ContractionTableHistoryEntry? {
         return try {
             val json = JSONObject(paramsJson)
@@ -1245,7 +1277,8 @@ class ContractionTableViewModel @Inject constructor(
                 bestCruiseMs = bestCruise,
                 longestHoldMs = longestHold,
                 totalHoldMs = totalHold,
-                avgCruiseRatio = if (ratioCount > 0) ratioSum / ratioCount else null
+                avgCruiseRatio = if (ratioCount > 0) ratioSum / ratioCount else null,
+                partial = !countsAsRecord
             )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse session params at $timestamp", e)

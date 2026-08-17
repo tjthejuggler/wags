@@ -56,6 +56,8 @@ private fun addDrillFilter(
             args += drill.drillParamValue
         }
     }
+    // Records kept from early-ended tables never compete for records/PBs.
+    conditions += "${prefix}countsAsRecord = 1"
 }
 
 // ── Generalized drill-aware query builders ───────────────────────────────────
@@ -736,7 +738,7 @@ interface ApneaRecordDao {
     @Query("SELECT COUNT(*) FROM apnea_records WHERE tableType IS NULL")
     fun countFreeHoldsAll(): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM apnea_records WHERE tableType = :tableType")
+    @Query("SELECT COUNT(*) FROM apnea_records WHERE tableType = :tableType AND countsAsRecord = 1")
     fun countByTableTypeAll(tableType: String): Flow<Int>
 
     @Query("SELECT COALESCE(SUM(durationMs), 0) FROM apnea_records WHERE tableType IS NULL")

@@ -92,5 +92,13 @@ data class ApneaRecordEntity(
      * Null when prepType != RESONANCE or no matching resonance session exists.
      */
     @ColumnInfo(defaultValue = "NULL")
-    val resonanceSessionId: Long? = null
+    val resonanceSessionId: Long? = null,
+    /**
+     * False when this record came from a table the user ended early (backed out
+     * of) and chose to keep: it still feeds hold-time stats and history, but it
+     * is excluded from every record / personal-best pool and from the
+     * "tables done" counters.
+     */
+    @ColumnInfo(defaultValue = "1")
+    val countsAsRecord: Boolean = true
 )
