@@ -70,6 +70,18 @@ fun ContractionTableScreen(
         }
     }
 
+    // Consume the "eucapnic prep completed" result set by EucapnicPacerScreen
+    // when the prep finishes and it pops back here. The handle key is cleared
+    // immediately so a later return to this screen doesn't resurrect the flag;
+    // the START button switches to START HOLD until the table is started.
+    LaunchedEffect(Unit) {
+        val handle = navController.currentBackStackEntry?.savedStateHandle
+        if (handle?.get<Boolean>("eucapnic_prep_completed") == true) {
+            handle["eucapnic_prep_completed"] = false
+            viewModel.setEucapnicPrepCompleted(true)
+        }
+    }
+
     // Reset filters to current settings every time this screen is entered
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -383,26 +395,36 @@ fun ContractionTableScreen(
             )
 
             // 4. Start button
+            val isEucapnicPrep = state.prepType == PrepType.EUCAPNIC_DIAPHRAGMATIC.name &&
+                    state.eucapnicConfig != null
+
             Button(
                 onClick = {
-                    if (state.prepType == PrepType.EUCAPNIC_DIAPHRAGMATIC.name && state.eucapnicConfig != null) {
-                        val config = state.eucapnicConfig!!
-                        navController.navigate(
-                            WagsRoutes.eucapnicPacer(
-                                lungVolume = state.lungVolume,
-                                timeOfDay = state.timeOfDay,
-                                posture = state.posture,
-                                audio = state.audio,
-                                sessionType = state.mode.tableType(),
-                                prepDurationSec = config.prepDurationSec,
-                                breathsPerMin = config.breathsPerMin,
-                                inhaleSec = config.inhaleSec,
-                                topPauseSec = config.topPauseSec,
-                                exhaleSec = config.exhaleSec,
-                                bottomPauseSec = config.bottomPauseSec,
-                                breathDepthPercent = config.breathDepthPercent
+                    if (isEucapnicPrep) {
+                        if (state.eucapnicPrepCompleted) {
+                            // Eucapnic prep already done — start the table. Consume
+                            // the flag so the next table begins with a fresh prep.
+                            viewModel.setEucapnicPrepCompleted(false)
+                            navController.navigate(WagsRoutes.CONTRACTION_TABLE_ACTIVE)
+                        } else {
+                            val config = state.eucapnicConfig!!
+                            navController.navigate(
+                                WagsRoutes.eucapnicPacer(
+                                    lungVolume = state.lungVolume,
+                                    timeOfDay = state.timeOfDay,
+                                    posture = state.posture,
+                                    audio = state.audio,
+                                    sessionType = state.mode.tableType(),
+                                    prepDurationSec = config.prepDurationSec,
+                                    breathsPerMin = config.breathsPerMin,
+                                    inhaleSec = config.inhaleSec,
+                                    topPauseSec = config.topPauseSec,
+                                    exhaleSec = config.exhaleSec,
+                                    bottomPauseSec = config.bottomPauseSec,
+                                    breathDepthPercent = config.breathDepthPercent
+                                )
                             )
-                        )
+                        }
                     } else {
                         navController.navigate(WagsRoutes.CONTRACTION_TABLE_ACTIVE)
                     }
@@ -414,7 +436,11 @@ fun ContractionTableScreen(
                 colors = ButtonDefaults.buttonColors(containerColor = ButtonPrimary)
             ) {
                 Text(
-                    "Start",
+                    when {
+                        isEucapnicPrep && state.eucapnicPrepCompleted -> "START HOLD"
+                        isEucapnicPrep -> "START EUCAPNIC"
+                        else -> "Start"
+                    },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary

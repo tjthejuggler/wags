@@ -1417,7 +1417,7 @@ private fun FreeHoldActiveScreenContent(
         containerColor = BackgroundDark,
         topBar = {
             TopAppBar(
-                title = { Text("Breath Hold", style = MaterialTheme.typography.titleMedium) },
+                title = { Text("Free Hold", style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = {
                         if (state.freeHoldActive) viewModel.cancelFreeHold()

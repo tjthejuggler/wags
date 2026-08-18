@@ -63,6 +63,18 @@ fun ProgressiveO2Screen(
         }
     }
 
+    // Consume the "eucapnic prep completed" result set by EucapnicPacerScreen
+    // when the prep finishes and it pops back here. The handle key is cleared
+    // immediately so a later return to this screen doesn't resurrect the flag;
+    // the START button switches to START HOLD until the session is started.
+    LaunchedEffect(Unit) {
+        val handle = navController.currentBackStackEntry?.savedStateHandle
+        if (handle?.get<Boolean>("eucapnic_prep_completed") == true) {
+            handle["eucapnic_prep_completed"] = false
+            viewModel.setEucapnicPrepCompleted(true)
+        }
+    }
+
     // Reset filters to current settings every time this screen is entered
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -402,27 +414,37 @@ fun ProgressiveO2Screen(
                     && state.guidedHyperEnabled
                     && !state.guidedCountdownComplete
 
+            val isEucapnicPrep = state.prepType == PrepType.EUCAPNIC_DIAPHRAGMATIC.name &&
+                    state.eucapnicConfig != null
+
             Button(
                 onClick = {
-                    if (state.prepType == PrepType.EUCAPNIC_DIAPHRAGMATIC.name && state.eucapnicConfig != null) {
-                        // Navigate to eucapnic pacer screen with the current config
-                        val config = state.eucapnicConfig!!
-                        navController.navigate(
-                            WagsRoutes.eucapnicPacer(
-                                lungVolume = state.lungVolume,
-                                timeOfDay = state.timeOfDay,
-                                posture = state.posture,
-                                audio = state.audio,
-                                sessionType = "PROGRESSIVE_O2",
-                                prepDurationSec = config.prepDurationSec,
-                                breathsPerMin = config.breathsPerMin,
-                                inhaleSec = config.inhaleSec,
-                                topPauseSec = config.topPauseSec,
-                                exhaleSec = config.exhaleSec,
-                                bottomPauseSec = config.bottomPauseSec,
-                                breathDepthPercent = config.breathDepthPercent
+                    if (isEucapnicPrep) {
+                        if (state.eucapnicPrepCompleted) {
+                            // Eucapnic prep already done — start the session. Consume
+                            // the flag so the next session begins with a fresh prep.
+                            viewModel.setEucapnicPrepCompleted(false)
+                            navController.navigate(WagsRoutes.PROGRESSIVE_O2_ACTIVE)
+                        } else {
+                            // Navigate to eucapnic pacer screen with the current config
+                            val config = state.eucapnicConfig!!
+                            navController.navigate(
+                                WagsRoutes.eucapnicPacer(
+                                    lungVolume = state.lungVolume,
+                                    timeOfDay = state.timeOfDay,
+                                    posture = state.posture,
+                                    audio = state.audio,
+                                    sessionType = "PROGRESSIVE_O2",
+                                    prepDurationSec = config.prepDurationSec,
+                                    breathsPerMin = config.breathsPerMin,
+                                    inhaleSec = config.inhaleSec,
+                                    topPauseSec = config.topPauseSec,
+                                    exhaleSec = config.exhaleSec,
+                                    bottomPauseSec = config.bottomPauseSec,
+                                    breathDepthPercent = config.breathDepthPercent
+                                )
                             )
-                        )
+                        }
                     } else if (useGuidedStart) {
                         viewModel.showGuidedCountdown()
                     } else {
@@ -436,7 +458,11 @@ fun ProgressiveO2Screen(
                 colors = ButtonDefaults.buttonColors(containerColor = ButtonPrimary)
             ) {
                 Text(
-                    "Start",
+                    when {
+                        isEucapnicPrep && state.eucapnicPrepCompleted -> "START HOLD"
+                        isEucapnicPrep -> "START EUCAPNIC"
+                        else -> "Start"
+                    },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary

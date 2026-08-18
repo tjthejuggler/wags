@@ -118,6 +118,8 @@ data class ContractionTableUiState(
     val recordForecast: RecordForecast? = null,
     // ── Eucapnic Diaphragmatic Breathing ───────────────────────────────────────
     val eucapnicConfig: EucapnicConfig? = null,
+    /** True after the eucapnic pacer completed — the start button switches to START HOLD. */
+    val eucapnicPrepCompleted: Boolean = false,
     // ── Safety ─────────────────────────────────────────────────────────────────
     /** True when the prep type is HYPER — the setup screen shows a hypoxia advisory. */
     val isHyperPrep: Boolean = false,
@@ -586,6 +588,15 @@ class ContractionTableViewModel @Inject constructor(
 
     fun updateEucapnicConfig(config: EucapnicConfig) {
         _uiState.update { it.copy(eucapnicConfig = config) }
+    }
+
+    /**
+     * Mark eucapnic prep as completed (called after returning from the
+     * eucapnic pacer screen). Consumed — and reset to false — when the
+     * user starts the table, so every new table begins with a fresh prep.
+     */
+    fun setEucapnicPrepCompleted(completed: Boolean) {
+        _uiState.update { it.copy(eucapnicPrepCompleted = completed) }
     }
 
     // ── Song picker ─────────────────────────────────────────────────────────

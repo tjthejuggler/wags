@@ -70,6 +70,8 @@ data class ProgressiveO2UiState(
     // ── Eucapnic Diaphragmatic Breathing ───────────────────────────────────────
     /** Current eucapnic configuration (when EUCAPNIC_DIAPHRAGMATIC prep type is selected). */
     val eucapnicConfig: com.example.wags.domain.model.EucapnicConfig? = null,
+    /** True after the eucapnic pacer completed — the start button switches to START HOLD. */
+    val eucapnicPrepCompleted: Boolean = false,
     // ── Apnea settings (read from SharedPreferences) ─────────────────────────
     val lungVolume: String = "FULL",
     val prepType: String = "NO_PREP",
@@ -551,6 +553,15 @@ class ProgressiveO2ViewModel @Inject constructor(
      */
     fun loadEucapnicConfiguration(config: EucapnicConfig) {
         _uiState.update { it.copy(eucapnicConfig = config) }
+    }
+
+    /**
+     * Mark eucapnic prep as completed (called after returning from the
+     * eucapnic pacer screen). Consumed — and reset to false — when the
+     * user starts the session, so every new session begins with a fresh prep.
+     */
+    fun setEucapnicPrepCompleted(completed: Boolean) {
+        _uiState.update { it.copy(eucapnicPrepCompleted = completed) }
     }
 
     // ── Song picker ─────────────────────────────────────────────────────────

@@ -1,18 +1,17 @@
-# ADR: Dashboard days-since corner badges
+# ADR: Unified eucapnic prep completion flow — pop back to setup screen with START HOLD
 
 **Date:** 2026-08-18
-**Status:** Accepted
+**Status:** Accepted (implemented)
 
 ## Context
-The apnea section shows tiny bordered corner badges (CornerBadge in ApneaScreen.kt) with whole days since each drill type was last performed (∞ when never). The user wanted the same squares on every session-type card on the main dashboard, and the 'Sessions' section label replaced by a 2.dp separator line (card borders are 1.dp).
+The eucapnic pacer (EucapnicPacerScreen) dispatched on `sessionType` when the prep completed: FREE_HOLD popped back to the Free Hold setup screen with the `eucapnic_prep_completed` savedStateHandle flag, but MIN_BREATH / PROGRESSIVE_O2 / CONTRACTION_TABLE navigated directly to their active screens, which auto-start the hold via `LaunchedEffect(Unit)`. This caused the hold to begin immediately after prep with no user confirmation — inconsistent with the Free Hold flow and unsafe UX for apnea training.
 
 ## Decision
-- Reuse the exact badge semantics: `HyperLockManager.daysSinceUsed(lastUsedMs, nowMs)` (whole days, null → ∞), with `now` captured via `remember { System.currentTimeMillis() }` per composition — day granularity makes ticking unnecessary, matching ApneaScreen.
-- Data source: one lightweight `SELECT MAX(timestamp)` Flow per session table (morning_readiness, daily_readings, apnea_records, meditation_sessions, rapid_hr_sessions; resonance already had `observeLatestEnd`). Exposed as repository passthroughs and combined in DashboardViewModel into `SessionLastUse` (raw epoch-ms values; day math done in the composable).
-- UI: local `CornerBadge` copy in DashboardScreen.kt (apnea's is private), floated TopEnd over each NavigationCard via Box overlay; the trailing arrow row gets 20.dp end padding when a badge is present, mirroring DrillCard.
-- 'Sessions' header replaced with `HorizontalDivider(thickness = 2.dp, color = CardBorder)`.
+1. **EucapnicPacerScreen** completion is now session-type agnostic: it always sets `eucapnic_prep_completed = true` on `navController.previousBackStackEntry?.savedStateHandle` and calls `popBackStack()`. No direct navigation to active screens.
+2. Every apnea setup screen that supports EUCAPNIC_DIAPHRAGMATIC prep (Min Breath, Progressive O₂, Contraction Tables — Free Hold already had it) consumes the flag in a `LaunchedEffect(Unit)`: reads it from `currentBackStackEntry?.savedStateHandle`, **clears it** (sets to false) to prevent flag resurrection on later back-stack returns, and pushes the value into ViewModel state via `setEucapnicPrepCompleted(true)`.
+3. The START button on each setup screen switches behavior/label based on `eucapnicPrepCompleted`: "START EUCAPNIC" → launches the pacer; "START HOLD" → navigates to the active screen (which then auto-starts the hold deliberately). Starting the hold consumes the flag (`setEucapnicPrepCompleted(false)`), so every new session requires a fresh eucapnic prep.
 
 ## Consequences
-- DashboardViewModel now injects ResonanceSessionRepository, ApneaRepository, MeditationRepository, RapidHrRepository (all additive; Hilt).
-- Badges briefly show ∞ on first frame before flows emit — same behavior as the apnea screen.
-- All DAO/repository changes are additive; no existing callers affected.
+- Consistent, deliberate hold-start UX across all apnea drills that use eucapnic prep.
+- The `eucapnic_prep_completed` savedStateHandle key is the single inter-screen contract for this flow; new setup screens integrating the pacer must implement the same consume-and-clear pattern.
+- Files touched: EucapnicPacerScreen.kt, MinBreathScreen.kt, MinBreathViewModel.kt, ProgressiveO2Screen.kt, ProgressiveO2ViewModel.kt, ContractionTableScreen.kt, ContractionTableViewModel.kt, FreeHoldActiveScreen.kt (title fix "Breath Hold" → "Free Hold").

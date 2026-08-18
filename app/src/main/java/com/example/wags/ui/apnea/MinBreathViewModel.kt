@@ -71,6 +71,8 @@ data class MinBreathUiState(
     // ── Eucapnic Diaphragmatic Breathing ───────────────────────────────────────
     /** Current eucapnic configuration (when EUCAPNIC_DIAPHRAGMATIC prep type is selected). */
     val eucapnicConfig: com.example.wags.domain.model.EucapnicConfig? = null,
+    /** True after the eucapnic pacer completed — the start button switches to START HOLD. */
+    val eucapnicPrepCompleted: Boolean = false,
     // Final vitals (captured at session completion - used in CompleteContent)
     val finalHr: Int? = null,
     val finalSpO2: Int? = null,
@@ -591,6 +593,15 @@ class MinBreathViewModel @Inject constructor(
      */
     fun loadEucapnicConfiguration(config: EucapnicConfig) {
         _uiState.update { it.copy(eucapnicConfig = config) }
+    }
+
+    /**
+     * Mark eucapnic prep as completed (called after returning from the
+     * eucapnic pacer screen). Consumed — and reset to false — when the
+     * user starts the hold, so every new session begins with a fresh prep.
+     */
+    fun setEucapnicPrepCompleted(completed: Boolean) {
+        _uiState.update { it.copy(eucapnicPrepCompleted = completed) }
     }
 
     fun showGuidedCountdown() {

@@ -100,42 +100,18 @@ fun EucapnicPacerScreen(
         initialConfig?.let { viewModel.startPrep(it) }
     }
 
-    // Handle completion - navigate to the appropriate active screen based on sessionType
+    // Handle completion — pop back to the setup screen that launched this
+    // pacer (Free Hold, Min Breath, Progressive O₂ or Contraction Tables)
+    // and mark the eucapnic prep as completed. The setup screen's START
+    // button then switches from "START EUCAPNIC" to "START HOLD" so the
+    // user deliberately begins the hold — the same flow everywhere.
     LaunchedEffect(isComplete) {
         if (isComplete) {
-            when (sessionType) {
-                "FREE_HOLD" -> {
-                    // Pop back to the existing FreeHoldActiveScreen and mark
-                    // eucapnic prep as completed so the user can start the hold.
-                    // Using popBackStack avoids stacking duplicate FreeHoldActive
-                    // screens and keeps the back navigation clean.
-                    navController.previousBackStackEntry
-                        ?.savedStateHandle
-                        ?.set("eucapnic_prep_completed", true)
+            navController.previousBackStackEntry
+                ?.savedStateHandle
+                ?.set("eucapnic_prep_completed", true)
 
-                    navController.popBackStack()
-                }
-                "PROGRESSIVE_O2" -> {
-                    navController.navigate(WagsRoutes.PROGRESSIVE_O2_ACTIVE)
-                }
-                "MIN_BREATH" -> {
-                    navController.navigate(WagsRoutes.MIN_BREATH_ACTIVE)
-                }
-                "WONKA_FIRST_CONTRACTION", "WONKA_ENDURANCE" -> {
-                    navController.navigate(WagsRoutes.CONTRACTION_TABLE_ACTIVE)
-                }
-                "APNEA_TABLE" -> {
-                    navController.navigate(WagsRoutes.APNEA_TABLE)
-                }
-                else -> {
-                    // Default to free hold for unknown session types — pop back
-                    navController.previousBackStackEntry
-                        ?.savedStateHandle
-                        ?.set("eucapnic_prep_completed", true)
-
-                    navController.popBackStack()
-                }
-            }
+            navController.popBackStack()
         }
     }
 
