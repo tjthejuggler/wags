@@ -42,21 +42,6 @@ Formula: Total Hold = T_cruise + T_struggle
 Efficiency = T_cruise / T_total × 100%
 """
 
-private const val SCATTER_HELP_TITLE = "Hypoxic Resistance Scatter Plot"
-private const val SCATTER_HELP_CONTENT = """
-Maps your historical PB attempts against late-stage contraction frequency.
-
-X-axis: Your Personal Best (PB) at the time of each session
-Y-axis: Number of contractions in the final 30 seconds of holds
-
-Interpretation:
-• High PB + Low late contractions = High hypoxic resistance
-• Low PB + High late contractions = Normal beginner pattern
-• Trend moving right + down = Improving hypoxic tolerance
-
-This chart reveals whether your PB improvements are driven by CO₂ tolerance or true O₂ efficiency.
-"""
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SessionAnalyticsScreen(
@@ -127,59 +112,6 @@ fun SessionAnalyticsScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SessionAnalyticsHistoryScreen(
-    navController: NavController,
-    viewModel: SessionAnalyticsViewModel = hiltViewModel()
-) {
-    val hypoxicScatter by viewModel.hypoxicScatter.collectAsStateWithLifecycle()
-    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
-
-    LaunchedEffect(Unit) {
-        viewModel.loadHistoricalData()
-    }
-
-    Scaffold(
-        containerColor = BackgroundDark,
-        topBar = {
-            TopAppBar(
-                title = { Text("Session Analytics") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
-                    }
-                },
-                actions = {
-                    LiveSensorActionsNav(navController)
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
-            )
-        }
-    ) { padding ->
-        if (isLoading) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                item {
-                    HypoxicScatterSection(dataPoints = hypoxicScatter)
-                }
-            }
-        }
-    }
-}
-
 @Composable
 private fun ContractionDeltaSection(
     sessionDate: String,
@@ -205,38 +137,6 @@ private fun ContractionDeltaSection(
             ContractionDeltaChart(dataPoints = dataPoints)
 
             ChartLegend()
-        }
-    }
-}
-
-@Composable
-private fun HypoxicScatterSection(
-    dataPoints: List<SessionAnalyticsViewModel.HypoxicScatterPoint>
-) {
-    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "Hypoxic Resistance History",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f)
-                )
-                InfoHelpBubble(
-                    title = SCATTER_HELP_TITLE,
-                    content = SCATTER_HELP_CONTENT
-                )
-            }
-
-            HypoxicScatterPlot(dataPoints = dataPoints)
-
-            Text(
-                "Each dot = one session. X = PB at time, Y = late contractions",
-                style = MaterialTheme.typography.labelSmall,
-                color = TextSecondary
-            )
         }
     }
 }
@@ -285,54 +185,6 @@ fun ContractionDeltaChart(
                 color = StruggleOrange,
                 topLeft = Offset(x, size.height - struggleHeight),
                 size = Size(barWidth, struggleHeight)
-            )
-        }
-    }
-}
-
-@Composable
-fun HypoxicScatterPlot(
-    dataPoints: List<SessionAnalyticsViewModel.HypoxicScatterPoint>,
-    modifier: Modifier = Modifier
-) {
-    if (dataPoints.isEmpty()) {
-        Box(
-            modifier = modifier.fillMaxWidth().height(200.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                "No historical session data available",
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        return
-    }
-
-    val minPb = dataPoints.minOf { it.pbMs }
-    val maxPb = dataPoints.maxOf { it.pbMs }.coerceAtLeast(minPb + 1L)
-    val maxContractions = dataPoints.maxOf { it.lateContractionCount }.coerceAtLeast(1)
-    val minTimestamp = dataPoints.minOf { it.sessionTimestamp }
-    val maxTimestamp = dataPoints.maxOf { it.sessionTimestamp }.coerceAtLeast(minTimestamp + 1L)
-
-    Canvas(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(220.dp)
-            .padding(16.dp)
-    ) {
-        dataPoints.forEach { point ->
-            val x = ((point.pbMs - minPb).toFloat() / (maxPb - minPb)) * size.width
-            val y = size.height - ((point.lateContractionCount.toFloat() / maxContractions) * size.height)
-
-            // Recency: newer sessions are brighter (higher alpha)
-            val recency = (point.sessionTimestamp - minTimestamp).toFloat() /
-                    (maxTimestamp - minTimestamp)
-            val alpha = 0.3f + recency * 0.7f
-
-            drawCircle(
-                color = EcgCyan.copy(alpha = alpha),
-                radius = 8f,
-                center = Offset(x, y)
             )
         }
     }

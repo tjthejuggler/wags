@@ -91,6 +91,7 @@ fun MinBreathScreen(
                     }
                 },
                 actions = {
+                    TableHelpIcon(title = "Min Breath", text = MIN_BREATH_HELP_TEXT)
                     LiveSensorActions(liveHr = state.liveHr, liveSpO2 = state.liveSpO2, onClick = { navController.navigate(WagsRoutes.SETTINGS) })
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)

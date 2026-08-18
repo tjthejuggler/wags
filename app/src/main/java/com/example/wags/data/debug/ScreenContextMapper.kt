@@ -79,9 +79,6 @@ object ScreenContextMapper {
         "session_analytics" to ScreenContext(
             "Session Analytics", "ui/apnea/SessionAnalyticsScreen.kt", "SessionAnalyticsScreen, SessionAnalyticsViewModel"
         ),
-        "session_analytics_history" to ScreenContext(
-            "Session Analytics History", "ui/apnea/SessionAnalyticsScreen.kt", "SessionAnalyticsHistoryScreen"
-        ),
         "rf_assessment_picker" to ScreenContext(
             "RF Assessment Picker", "ui/breathing/AssessmentPickerScreen.kt", "AssessmentPickerScreen"
         ),

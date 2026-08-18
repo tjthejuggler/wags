@@ -81,7 +81,9 @@ Variables:
 • n = Round number (1-indexed)
 • Number of rounds set by Session Length (4 / 8 / 12)
 
-Effect: Both hold and rest grow together, preventing excessive CO₂ buildup while extending hypoxic exposure progressively."""
+Effect: Both hold and rest grow together, preventing excessive CO₂ buildup while extending hypoxic exposure progressively.
+
+How it works: Endless breath-hold drill: 15s → 30s → 45s → … with a configurable breathing period between holds."""
 
 internal const val MIN_BREATH_HELP_TITLE = "Minimum Breath (One-Breath) Training"
 internal const val MIN_BREATH_HELP_TEXT = """Purpose: Removes the fixed rest timer — you control recovery by signaling when you've taken exactly one breath.
@@ -91,7 +93,9 @@ Logic:
 • You take one full exhale + inhale
 • Tap "One Breath Taken" → next hold begins immediately
 
-Effect: Trains breath efficiency and mental readiness. Forces you to commit to the next hold with minimal recovery."""
+Effect: Trains breath efficiency and mental readiness. Forces you to commit to the next hold with minimal recovery.
+
+How it works: Choose a session duration, then minimize your breathing time. You control when to hold and when to breathe."""
 
 internal const val CONTRACTION_TABLES_HELP_TITLE = "Contraction Tables"
 internal const val CONTRACTION_TABLES_HELP_TEXT = """Purpose: Uses your body's own contraction signals as the training trigger, building CO₂ tolerance and awareness of your physiological limits.
@@ -107,7 +111,9 @@ Mode 2 — Contraction Count:
 
 Analytics:
 • T_cruise decay across rounds shows your CO₂ buffer depleting
-• Cruise Ratio = cruise ÷ total hold — higher means more easy phase"""
+• Cruise Ratio = cruise ÷ total hold — higher means more easy phase
+
+How it works: Contraction-driven tables: hold until your first contraction, or for a target number of contractions, with decreasing rest between rounds."""
 
 internal const val TABLE_TRAINING_HELP_TITLE = "Table Training"
 internal const val TABLE_TRAINING_HELP_TEXT = """Tables are structured breath-hold protocols that systematically stress either your CO₂ tolerance or O₂ capacity.

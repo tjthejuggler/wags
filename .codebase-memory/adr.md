@@ -1,16 +1,15 @@
-# ADR: Apnea prep-type session snapshot & edit-driven PB notification
-
-**Date:** 2026-08-18
-**Status:** Accepted
+# ADR: Global "breathing" brightness pulse via draw-phase scrim
 
 ## Context
-Two defects: (1) `ResonancePrepGate.isLocked` (5-min staleness, 2s ticker) was collected unguarded by drill ViewModels, which force-flipped RESONANCE→NO_PREP mid-session, corrupting the saved record and PB evaluation. (2) `ApneaRecordDetailViewModel.saveEdits()` updated records without re-evaluating PB, so an edit that made a record a PB (e.g. NO_PREP→RESONANCE) never fired the Tail `APNEA_NEW_RECORD` habit increment.
+User wanted all UI text and card borders across every screen to pulse in brightness together, in a slow-rhythmic-breathing rhythm (~6 breaths/min, 10 s cycle), preserving relative brightness differences between elements. An earlier iteration animated each card border individually (`pulsingCardBorder()`), which (a) was too subtle and (b) could not cover text without touching hundreds of `Text` call sites.
 
 ## Decision
-1. **Lock gates only session START.** All collectors of `resonancePrepGate.isLocked` (and the analogous hyper lock) must be guarded by an idle/session-inactive check before auto-deselecting the prep type.
-2. **Session-start prep snapshot.** Drill ViewModels capture `sessionPrepType` in `startSession()`; `saveSession()` uses `sessionPrepType ?: currentState.prepType` for both `checkBroaderPersonalBest()` and the `ApneaRecordEntity`; cleared on `cancelSession()`. Mid-session setting changes can never rewrite history.
-3. **Edit-driven PB transition notify.** `saveEdits()` captures `heldPbBefore` (via `holdsCurrentPb()`: `getRecordPbBadges().any { isCurrent }` for free holds, `getAllPersonalBests(drill)` for drills), and fires `HabitIntegrationRepository.Slot.APNEA_NEW_RECORD` exactly once on a none→PB transition. Harmless re-edits of an already-PB record do not re-fire.
+Replace per-element border animation with a single global `BreathingOverlay` (`ui/theme/BreathingOverlay.kt`) mounted once in `MainActivity`'s root `Box`, on top of `WagsNavGraph` (hidden in PiP). It is a full-screen black scrim whose alpha animates 0 → 0.45 over 5 s and back (FastOutSlowInEasing, RepeatMode.Reverse). Because the dimming is multiplicative, ALL content (text, borders, cards) pulses by the same relative amount in the same rhythm while keeping relative brightness hierarchy. Card borders reverted to static `BorderStroke(1.dp, CardBorder)` so they don't double-pulse.
+
+## Performance
+The animated alpha is read inside `Modifier.graphicsLayer { alpha = dim }` — a draw-phase-only read, so no per-frame recomposition; each step is a cheap re-draw of one node. The Box has no pointer-input modifiers, so touches pass through to the UI underneath.
 
 ## Consequences
-- Applied in: ProgressiveO2ViewModel, MinBreathViewModel, ContractionTableViewModel, ApneaViewModel (idle guards), ApneaRecordDetailViewModel (PB transition).
-- Retroactive Tail credit for a missed PB point can be delivered via `adb shell run-as com.example.wags am broadcast --user 0 -a com.example.tail.ACTION_INCREMENT_HABIT -p com.example.tail --es EXTRA_HABIT_ID "<habit name>"` (run-as supplies the signature permission; `--user 0` avoids the user -2 SecurityException). Habit names live in wags `habit_integration_prefs` (`habit_id_apnea_new_record`).
+- Dialogs/AlertDialogs render in separate windows and therefore do NOT pulse.
+- System status bar / keyboard do not pulse.
+- Any future "pulse strength" tuning lives in one place (targetValue in BreathingOverlay.kt).

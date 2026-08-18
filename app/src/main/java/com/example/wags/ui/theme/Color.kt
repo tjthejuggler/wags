@@ -50,3 +50,6 @@ val ApneaRecovery    = Color(0xFFB0B0B0)
 val ButtonPrimary = Color(0xFF444444)
 val ButtonDanger  = Color(0xFF333333)
 val ButtonSuccess = Color(0xFF3A3A3A)
+
+// Card outlines — thin border shared by dashboard and apnea drill cards
+val CardBorder = Color(0xFFB8B8B8)   // light grey (slightly off-white)

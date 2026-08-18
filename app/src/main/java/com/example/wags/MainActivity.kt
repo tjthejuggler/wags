@@ -35,6 +35,7 @@ import com.example.wags.ui.meditation.AudioImportBus
 import com.example.wags.ui.navigation.SectionShortcutBus
 import com.example.wags.ui.navigation.WagsNavGraph
 import com.example.wags.ui.navigation.WagsRoutes
+import com.example.wags.ui.theme.BreathingOverlay
 import com.example.wags.ui.theme.WagsTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -173,6 +174,12 @@ class MainActivity : ComponentActivity() {
                             debugPrefs = debugPrefs,
                             debugNoteRepo = debugNoteRepo
                         )
+                    }
+                    // Global breathing scrim — the whole UI (all text, borders,
+                    // cards on every screen) pulses together in the slow-
+                    // breathing rhythm. Hidden in PiP.
+                    if (!isInPip) {
+                        BreathingOverlay()
                     }
                 }
             }

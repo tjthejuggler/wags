@@ -1,15 +1,24 @@
 package com.example.wags.ui.apnea
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.wags.ui.theme.TextPrimary
 import com.example.wags.ui.theme.TextSecondary
 
 /**
@@ -34,6 +43,8 @@ fun ApneaSettingsSummaryBanner(
     timeOfDay: String,
     posture: String,
     audio: String,
+    /** Pre-formatted days-since-exact-combo badge text ("42" or "∞"); null = no badge. */
+    comboDaysSince: String? = null,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -49,17 +60,36 @@ fun ApneaSettingsSummaryBanner(
         append(audio.displayAudioBanner())
     }
 
-    Text(
-        text = summary,
-        style = MaterialTheme.typography.labelSmall,
-        color = TextSecondary,
-        textAlign = TextAlign.Center,
-        textDecoration = if (onClick != null) TextDecoration.Underline else TextDecoration.None,
+    Row(
         modifier = modifier
             .fillMaxWidth()
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-    )
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Square badge: days since any session was done with the exact current
+        // settings combination. Only rendered where a value is supplied.
+        if (comboDaysSince != null) {
+            Text(
+                text = comboDaysSince,
+                fontSize = 9.sp,
+                lineHeight = 10.sp,
+                color = TextPrimary,
+                modifier = Modifier
+                    .border(1.dp, TextSecondary, RoundedCornerShape(4.dp))
+                    .padding(horizontal = 3.dp, vertical = 1.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+        Text(
+            text = summary,
+            style = MaterialTheme.typography.labelSmall,
+            color = TextSecondary,
+            textAlign = TextAlign.Center,
+            textDecoration = if (onClick != null) TextDecoration.Underline else TextDecoration.None
+        )
+    }
 }
 
 // ── Display helpers for raw string keys ──────────────────────────────────────
@@ -68,6 +98,8 @@ internal fun String.displayPrepTypeBanner(): String = when (uppercase()) {
     "NO_PREP"   -> "No Prep"
     "RESONANCE" -> "Resonance"
     "HYPER"     -> "Hyper"
+    // Don't spell out the raw enum key — keep the collapsed line compact.
+    "EUCAPNIC_DIAPHRAGMATIC" -> "Eucapnic"
     else        -> lowercase().replaceFirstChar { it.uppercase() }
 }
 

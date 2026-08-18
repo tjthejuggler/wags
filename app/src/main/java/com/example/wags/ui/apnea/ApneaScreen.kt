@@ -6,6 +6,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,7 +24,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -44,12 +44,9 @@ import com.example.wags.ui.apnea.forecast.RecordForecastSummary
 import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TimeOfDay
-import com.example.wags.domain.model.TableDifficulty
-import com.example.wags.domain.model.TableLength
 import com.example.wags.domain.usecase.apnea.HyperLockManager
 import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
-import com.example.wags.ui.common.InfoHelpBubble
 import com.example.wags.ui.common.LockPortrait
 import com.example.wags.ui.common.StatsAndSensorActionsNav
 import com.example.wags.ui.common.grayscale
@@ -200,10 +197,37 @@ fun ApneaScreen(
                 tonalElevation = 2.dp
             ) {
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                    // Days since ANY session was done with the exact current settings
+                    // combo (∞ when never). Shown next to the title when expanded and
+                    // in the collapsed summary line.
+                    val headerNowMs = remember { System.currentTimeMillis() }
+                    val comboDaysSince = remember(
+                        state.lastUsedPerCombo, state.selectedLungVolume, state.prepType,
+                        state.timeOfDay, state.posture, state.audio
+                    ) {
+                        val selectedByKey = mapOf(
+                            "lungVolume" to state.selectedLungVolume,
+                            "prepType"   to state.prepType.name,
+                            "timeOfDay"  to state.timeOfDay.name,
+                            "posture"    to state.posture.name,
+                            "audio"      to state.audio.name
+                        )
+                        // lastUsedPerCombo[key][selectedValue] is the last time a record
+                        // matched that value AND the currently selected values of every
+                        // other category — i.e. the exact current combination.
+                        val comboLastMs = selectedByKey.entries.firstNotNullOfOrNull { (key, value) ->
+                            state.lastUsedPerCombo[key]?.get(value)
+                        }
+                        HyperLockManager.daysSinceUsed(comboLastMs, headerNowMs)
+                    }
                     CollapsibleSectionHeader(
                         title = "Settings",
                         expanded = state.settingsExpanded,
-                        onToggle = { viewModel.toggleSettings() }
+                        onToggle = { viewModel.toggleSettings() },
+                        // The badge lives in the collapsed summary line while
+                        // collapsed and moves up next to the label when
+                        // expanded — never shown in both places at once.
+                        comboDaysBadge = if (state.settingsExpanded) (comboDaysSince?.toString() ?: "∞") else null
                     )
                     // One-line settings summary — only visible while the section is
                     // collapsed; when expanded the full settings are shown instead.
@@ -217,7 +241,8 @@ fun ApneaScreen(
                             prepType   = state.prepType.name,
                             timeOfDay  = state.timeOfDay.name,
                             posture    = state.posture.name,
-                            audio      = state.audio.name
+                            audio      = state.audio.name,
+                            comboDaysSince = comboDaysSince?.toString() ?: "∞"
                         )
                     }
                     AnimatedVisibility(
@@ -246,16 +271,16 @@ fun ApneaScreen(
                 }
             }
 
-            // ── Scrollable accordion body ─────────────────────────────────────
+            // ── Scrollable drill-card list ─────────────────────────────────────
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp)
-                    .padding(bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(2.dp))
 
                 // Day-granularity "now" — recomputed per composition is fine for whole-day badges
                 val badgeNowMs = remember { System.currentTimeMillis() }
@@ -268,11 +293,23 @@ fun ApneaScreen(
                 }
 
                 // ── Free Hold ─────────────────────────────────────────────────
-                val bestTimeOpen = state.openSection == ApneaSection.BEST_TIME
-                CollapsibleCard(
+                // The whole card acts as the start button → FreeHoldActiveScreen.
+                DrillCard(
                     title = "Free Hold",
-                    expanded = bestTimeOpen,
-                    onToggle = { viewModel.toggleSection(ApneaSection.BEST_TIME) },
+                    onClick = {
+                        // Always navigate to FreeHoldActiveScreen
+                        // Eucapnic config button will be shown there when EUCAPNIC_DIAPHRAGMATIC is selected
+                        navController.navigate(
+                            WagsRoutes.freeHoldActive(
+                                lungVolume = state.selectedLungVolume,
+                                prepType   = state.prepType.name,
+                                timeOfDay  = state.timeOfDay.name,
+                                posture    = state.posture.name,
+                                showTimer  = state.showTimer,
+                                audio      = state.audio.name
+                            )
+                        )
+                    },
                     headerBadges = sectionBadges(ApneaSection.BEST_TIME)
                 ) {
                     FreeHoldContent(
@@ -284,20 +321,6 @@ fun ApneaScreen(
                         bestTimeTrophyCategory = state.bestTimeTrophyCategory,
                         recordForecast         = state.recordForecast,
                         onAutoSet              = { viewModel.autoSetBestSettings() },
-                        onStartHold = {
-                            // Always navigate to FreeHoldActiveScreen
-                            // Eucapnic config button will be shown there when EUCAPNIC_DIAPHRAGMATIC is selected
-                            navController.navigate(
-                                WagsRoutes.freeHoldActive(
-                                    lungVolume = state.selectedLungVolume,
-                                    prepType   = state.prepType.name,
-                                    timeOfDay  = state.timeOfDay.name,
-                                    posture    = state.posture.name,
-                                    showTimer  = state.showTimer,
-                                    audio      = state.audio.name
-                                )
-                            )
-                        },
                         onBestTimeClick = { recordId ->
                             navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
                         },
@@ -310,52 +333,17 @@ fun ApneaScreen(
                     )
                 }
 
-                // ── Table Training (config + O2/CO2 launch) ───────────────────
-                val tableTrainingOpen = state.openSection == ApneaSection.TABLE_TRAINING
-                CollapsibleCard(
-                    title = "Table Training",
-                    expanded = tableTrainingOpen,
-                    onToggle = { viewModel.toggleSection(ApneaSection.TABLE_TRAINING) },
-                    headerBadges = sectionBadges(ApneaSection.TABLE_TRAINING),
-                    headerExtra = {
-                        TableHelpIcon(
-                            title = TABLE_TRAINING_HELP_TITLE,
-                            text = TABLE_TRAINING_HELP_TEXT
-                        )
-                    }
-                ) {
-                    TableTrainingConfigContent(
-                        personalBestMs = state.personalBestMs,
-                        bestTimeForSettingsMs = state.bestTimeForSettingsMs,
-                        selectedLength = state.selectedLength,
-                        selectedDifficulty = state.selectedDifficulty,
-                        onSetPersonalBest = { viewModel.setPersonalBest(it) },
-                        onLengthSelected = { viewModel.setLength(it) },
-                        onDifficultySelected = { viewModel.setDifficulty(it) },
-                        onNavigateO2 = { navController.navigate(WagsRoutes.apneaTable("O2")) },
-                        onNavigateCo2 = { navController.navigate(WagsRoutes.apneaTable("CO2")) }
-                    )
-                }
-
-                // ── Progressive O2 ────────────────────────────────────────────
-                val progO2Open = state.openSection == ApneaSection.PROGRESSIVE_O2
-                CollapsibleCard(
+                // ── Progressive O₂ ────────────────────────────────────────────
+                DrillCard(
                     title = "Progressive O₂",
-                    expanded = progO2Open,
-                    onToggle = { viewModel.toggleSection(ApneaSection.PROGRESSIVE_O2) },
-                    headerBadges = sectionBadges(ApneaSection.PROGRESSIVE_O2),
-                    headerExtra = {
-                        TableHelpIcon(title = PROGRESSIVE_O2_HELP_TITLE, text = PROGRESSIVE_O2_HELP_TEXT)
-                    }
+                    onClick = { navController.navigate(WagsRoutes.PROGRESSIVE_O2) },
+                    headerBadges = sectionBadges(ApneaSection.PROGRESSIVE_O2)
                 ) {
-                    DrillSectionContent(
+                    DrillSummaryContent(
                         bestTimeMs = state.progO2BestMs,
                         trophyCategory = state.progO2TrophyCategory,
                         paramLabel = "${state.progO2BreathPeriodSec}s breath period",
-                        description = "Endless breath-hold drill: 15s → 30s → 45s → … with a configurable breathing period between holds.",
-                        buttonLabel = "Open Progressive O₂",
                         recordForecast = state.progO2RecordForecast,
-                        onOpenDrill = { navController.navigate(WagsRoutes.PROGRESSIVE_O2) },
                         onTrophyClick = {
                             navController.navigate(
                                 WagsRoutes.personalBests(
@@ -368,26 +356,16 @@ fun ApneaScreen(
                 }
 
                 // ── Min Breath ────────────────────────────────────────────────
-                val minBreathOpen = state.openSection == ApneaSection.MIN_BREATH
-                CollapsibleCard(
+                DrillCard(
                     title = "Min Breath",
-                    expanded = minBreathOpen,
-                    onToggle = { viewModel.toggleSection(ApneaSection.MIN_BREATH) },
-                    headerBadges = sectionBadges(ApneaSection.MIN_BREATH),
-                    headerExtra = {
-                        TableHelpIcon(title = MIN_BREATH_HELP_TITLE, text = MIN_BREATH_HELP_TEXT)
-                    }
+                    onClick = { navController.navigate(WagsRoutes.MIN_BREATH) },
+                    headerBadges = sectionBadges(ApneaSection.MIN_BREATH)
                 ) {
-                    DrillSectionContent(
+                    DrillSummaryContent(
                         bestTimeMs = state.minBreathBestMs,
                         trophyCategory = state.minBreathTrophyCategory,
                         paramLabel = "${state.minBreathSessionDurationSec / 60.0}min session",
-                        description = "Choose a session duration, then minimize your breathing time. " +
-                            "You control when to hold and when to breathe.",
-                        buttonLabel = "Open Min Breath",
-                        buttonColor = ButtonPrimary,
                         recordForecast = state.minBreathRecordForecast,
-                        onOpenDrill = { navController.navigate(WagsRoutes.MIN_BREATH) },
                         onTrophyClick = {
                             navController.navigate(
                                 WagsRoutes.personalBests(
@@ -400,25 +378,16 @@ fun ApneaScreen(
                 }
 
                 // ── Contraction Tables ────────────────────────────────────────
-                val contractionTablesOpen = state.openSection == ApneaSection.CONTRACTION_TABLES
-                CollapsibleCard(
+                DrillCard(
                     title = "Contraction Tables",
-                    expanded = contractionTablesOpen,
-                    onToggle = { viewModel.toggleSection(ApneaSection.CONTRACTION_TABLES) },
-                    headerBadges = sectionBadges(ApneaSection.CONTRACTION_TABLES),
-                    headerExtra = {
-                        TableHelpIcon(title = CONTRACTION_TABLES_HELP_TITLE, text = CONTRACTION_TABLES_HELP_TEXT)
-                    }
+                    onClick = { navController.navigate(WagsRoutes.CONTRACTION_TABLE) },
+                    headerBadges = sectionBadges(ApneaSection.CONTRACTION_TABLES)
                 ) {
-                    DrillSectionContent(
+                    DrillSummaryContent(
                         bestTimeMs = state.contractionTableBestMs,
                         trophyCategory = state.contractionTableTrophyCategory,
                         paramLabel = "Till Contraction · Contraction Count",
-                        description = "Contraction-driven tables: hold until your first contraction, or for a " +
-                            "target number of contractions, with decreasing rest between rounds.",
-                        buttonLabel = "Open Contraction Tables",
                         recordForecast = null,
-                        onOpenDrill = { navController.navigate(WagsRoutes.CONTRACTION_TABLE) },
                         onTrophyClick = {
                             navController.navigate(
                                 WagsRoutes.personalBests(drillType = "WONKA_FIRST_CONTRACTION")
@@ -427,19 +396,20 @@ fun ApneaScreen(
                     )
                 }
 
-                // ── Session Analytics ─────────────────────────────────────────
-                val analyticsOpen = state.openSection == ApneaSection.SESSION_ANALYTICS
-                CollapsibleCard(
-                    title = "Session Analytics",
-                    expanded = analyticsOpen,
-                    onToggle = { viewModel.toggleSection(ApneaSection.SESSION_ANALYTICS) }
+                // ── Table Training (normal O₂/CO₂ tables) ────────────────────
+                // Whole card opens the dedicated table configuration screen.
+                DrillCard(
+                    title = "Table Training",
+                    onClick = { navController.navigate(WagsRoutes.TABLE_TRAINING) },
+                    headerBadges = sectionBadges(ApneaSection.TABLE_TRAINING)
                 ) {
-                    OutlinedButton(
-                        onClick = { navController.navigate(WagsRoutes.SESSION_ANALYTICS_HISTORY) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("📊 View Session Analytics", modifier = Modifier.grayscale())
-                    }
+                    // Just name the two table types — the current PB/length/
+                    // difficulty configuration lives on the Table Training screen.
+                    Text(
+                        "CO₂ and O₂",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
                 }
             }
         }
@@ -587,6 +557,7 @@ private fun CollapsibleSectionHeader(
     title: String,
     expanded: Boolean,
     onToggle: () -> Unit,
+    comboDaysBadge: String? = null,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -597,7 +568,16 @@ private fun CollapsibleSectionHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            // Days since any session was done with the exact current settings
+            // combo (∞ when never). Rendered only while expanded — while
+            // collapsed the badge lives in the summary line instead.
+            comboDaysBadge?.let { CornerBadge(text = it) }
+        }
         Icon(
             imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
             contentDescription = if (expanded) "Collapse" else "Expand",
@@ -608,7 +588,9 @@ private fun CollapsibleSectionHeader(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Generic collapsible card used for accordion sections
+// Compact always-visible drill card. The whole card is clickable and acts as
+// the start button for that session type; each session-type screen carries its
+// own info button, and the days-since corner badges remain in the header.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -635,61 +617,46 @@ private fun CornerBadge(text: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun CollapsibleCard(
+private fun DrillCard(
     title: String,
-    expanded: Boolean,
-    onToggle: () -> Unit,
+    onClick: () -> Unit,
     headerBadges: SectionCornerBadges? = null,
-    headerExtra: @Composable RowScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit
 ) {
     Box(modifier = Modifier.fillMaxWidth()) {
-        Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Card(
+            onClick = onClick,
+            colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+            // Thin grey outline (brightness pulse comes from the global BreathingOverlay)
+            border = BorderStroke(1.dp, CardBorder)
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(onClick = onToggle)
                         // Keep the header clear of the corner badges that float
-                        // to the right of the expand arrow.
+                        // to the right edge of the card.
                         .then(if (headerBadges != null) Modifier.padding(end = 20.dp) else Modifier),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         title,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f)
                     )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        headerExtra()
-                        Icon(
-                            imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                            contentDescription = if (expanded) "Collapse" else "Expand",
-                            tint = TextSecondary
-                        )
-                    }
+                    // Same trailing arrow as the main-screen navigation cards
+                    Text("→", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                 }
-                AnimatedVisibility(
-                    visible = expanded,
-                    enter = expandVertically(),
-                    exit = shrinkVertically()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(top = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        content = content
-                    )
-                }
+                content()
             }
         }
 
-        // Days-since badges float in the card's top-right / bottom-right corners,
-        // beyond the expand arrow — above it and below it respectively.
+        // Days-since badges float in the card's top-right / bottom-right corners.
         // Upper badge = days since this session type was done (any settings);
         // lower badge = days since it was done with the exact current settings.
         headerBadges?.let {
@@ -956,7 +923,6 @@ private fun FreeHoldContent(
     bestTimeTrophyCategory: PersonalBestCategory?,
     recordForecast: RecordForecast? = null,
     onAutoSet: () -> Unit = {},
-    onStartHold: () -> Unit,
     onBestTimeClick: (Long) -> Unit = {},
     onLastTimeClick: (Long) -> Unit = {},
     onTrophyClick: () -> Unit = {}
@@ -964,14 +930,14 @@ private fun FreeHoldContent(
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        // Personal best for current settings — big trophies + big time
+        // Personal best for current settings — trophies + time (compact)
         if (bestTimeMs > 0L) {
             val trophies = bestTimeTrophyCategory?.trophyEmojis() ?: "🏆"
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -980,14 +946,14 @@ private fun FreeHoldContent(
                     // Trophies → navigate to Personal Bests screen
                     Text(
                         trophies,
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.clickable { onTrophyClick() }.grayscale()
                     )
-                    Text(" ", style = MaterialTheme.typography.headlineSmall)
+                    Text(" ", style = MaterialTheme.typography.titleMedium)
                     // Duration → navigate to record detail
                     Text(
                         formatMs(bestTimeMs),
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.titleMedium,
                         color = TextPrimary,
                         fontWeight = FontWeight.Bold,
                         modifier = if (bestTimeRecordId != null)
@@ -1001,7 +967,7 @@ private fun FreeHoldContent(
                 if (displayLast > 0L) {
                     Text(
                         "last: ${formatMs(displayLast)}",
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
                         color = TextSecondary,
                         modifier = if (lastTimeRecordId != null)
                             Modifier.clickable { onLastTimeClick(lastTimeRecordId) }
@@ -1016,7 +982,7 @@ private fun FreeHoldContent(
             if (displayLast > 0L) {
                 Text(
                     "last: ${formatMs(displayLast)}",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary,
                     modifier = if (lastTimeRecordId != null)
                         Modifier.clickable { onLastTimeClick(lastTimeRecordId) }
@@ -1026,43 +992,35 @@ private fun FreeHoldContent(
             }
         }
 
-        // ── Record-breaking forecast ──────────────────────────────────────────
+        // ── Record-breaking forecast (with auto set) ─────────────────────────
         RecordForecastSummary(forecast = recordForecast, onAutoSet = onAutoSet)
-
-        Button(
-            onClick = onStartHold,
-            colors = ButtonDefaults.buttonColors(containerColor = ButtonSuccess, contentColor = TextPrimary),
-            modifier = Modifier.fillMaxWidth()
-        ) { Text("Start Hold") }
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Drill Section Content — reusable trophy + button for Progressive O₂, Min Breath, etc.
+// Drill Summary Content — compact trophy row for Progressive O₂, Min Breath, etc.
+// Each drill's explanation lives in its info popup; opening the drill is done
+// by tapping the whole card.
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun DrillSectionContent(
+private fun DrillSummaryContent(
     bestTimeMs: Long,
     trophyCategory: PersonalBestCategory?,
     paramLabel: String = "",
-    description: String,
-    buttonLabel: String,
-    buttonColor: Color = ButtonDefaults.buttonColors().containerColor,
     recordForecast: RecordForecast? = null,
-    onOpenDrill: () -> Unit,
     onTrophyClick: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         // Param label (e.g. "60s breath period", "5min session")
         if (paramLabel.isNotEmpty()) {
             Text(
                 paramLabel,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelSmall,
                 color = TextSecondary
             )
         }
@@ -1076,13 +1034,13 @@ private fun DrillSectionContent(
             ) {
                 Text(
                     trophies,
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.clickable { onTrophyClick() }.grayscale()
                 )
-                Text(" ", style = MaterialTheme.typography.headlineSmall)
+                Text(" ", style = MaterialTheme.typography.titleMedium)
                 Text(
                     formatMs(bestTimeMs),
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.titleMedium,
                     color = TextPrimary,
                     fontWeight = FontWeight.Bold
                 )
@@ -1091,164 +1049,6 @@ private fun DrillSectionContent(
 
         // ── Record-breaking forecast ──────────────────────────────────────────
         RecordForecastSummary(forecast = recordForecast, showAutoSet = false)
-
-        Text(
-            description,
-            style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary
-        )
-        Button(
-            onClick = onOpenDrill,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = buttonColor)
-        ) {
-            Text(buttonLabel)
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Table Training Config Content (PB + length/difficulty)
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun TableTrainingConfigContent(
-    personalBestMs: Long,
-    bestTimeForSettingsMs: Long,
-    selectedLength: TableLength,
-    selectedDifficulty: TableDifficulty,
-    onSetPersonalBest: (Long) -> Unit,
-    onLengthSelected: (TableLength) -> Unit,
-    onDifficultySelected: (TableDifficulty) -> Unit,
-    onNavigateO2: () -> Unit,
-    onNavigateCo2: () -> Unit
-) {
-    var pbInput by remember { mutableStateOf("") }
-
-    // Auto-fill the text field from best free hold time
-    LaunchedEffect(bestTimeForSettingsMs) {
-        if (bestTimeForSettingsMs > 0L) {
-            pbInput = (bestTimeForSettingsMs / 1000L).toString()
-            // Also auto-set the PB if it hasn't been set yet
-            if (personalBestMs <= 0L) {
-                onSetPersonalBest(bestTimeForSettingsMs)
-            }
-        }
-    }
-
-    // Keep text field in sync when PB is set from elsewhere (e.g. auto-set from ViewModel)
-    LaunchedEffect(personalBestMs) {
-        if (personalBestMs > 0L && pbInput.isEmpty()) {
-            pbInput = (personalBestMs / 1000L).toString()
-        }
-    }
-
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (personalBestMs > 0L) {
-            Text(
-                "Personal Best: ${personalBestMs / 1000L}s",
-                style = MaterialTheme.typography.bodyLarge,
-                color = TextPrimary
-            )
-        }
-
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                value = pbInput,
-                onValueChange = { pbInput = it },
-                label = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Personal Best (seconds)")
-                        InfoHelpBubble(title = PB_HELP_TITLE, content = PB_HELP_CONTENT)
-                    }
-                },
-                modifier = Modifier.weight(1f),
-                singleLine = true
-            )
-            Button(onClick = {
-                pbInput.toLongOrNull()?.let { onSetPersonalBest(it * 1000L) }
-            }) { Text("Set") }
-        }
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Session Length", style = MaterialTheme.typography.bodyMedium)
-            InfoHelpBubble(title = LENGTH_DIFFICULTY_HELP_TITLE, content = LENGTH_DIFFICULTY_HELP_CONTENT)
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(
-                TableLength.SHORT  to "Short (4)",
-                TableLength.MEDIUM to "Medium (8)",
-                TableLength.LONG   to "Long (12)"
-            ).forEach { (length, label) ->
-                FilterChip(
-                    selected = selectedLength == length,
-                    onClick = { onLengthSelected(length) },
-                    label = { Text(label) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = SurfaceVariant,
-                        selectedLabelColor = TextPrimary
-                    )
-                )
-            }
-        }
-
-        Text("Difficulty", style = MaterialTheme.typography.bodyMedium)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(
-                TableDifficulty.EASY   to "Easy",
-                TableDifficulty.MEDIUM to "Medium",
-                TableDifficulty.HARD   to "Hard"
-            ).forEach { (difficulty, label) ->
-                FilterChip(
-                    selected = selectedDifficulty == difficulty,
-                    onClick = { onDifficultySelected(difficulty) },
-                    label = { Text(label) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = SurfaceVariant,
-                        selectedLabelColor = TextPrimary
-                    )
-                )
-            }
-        }
-
-        if (personalBestMs <= 0L) {
-            Text(
-                "Set a Personal Best above to enable the tables.",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary
-            )
-        }
-
-        HorizontalDivider(color = SurfaceVariant)
-
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Button(
-                onClick = onNavigateO2,
-                enabled = personalBestMs > 0L,
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = ButtonPrimary)
-            ) { Text("Start O2 Table") }
-            TableHelpIcon(title = O2_HELP_TITLE, text = O2_HELP_TEXT)
-        }
-
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Button(
-                onClick = onNavigateCo2,
-                enabled = personalBestMs > 0L,
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = ButtonPrimary)
-            ) { Text("Start CO2 Table") }
-            TableHelpIcon(title = CO2_HELP_TITLE, text = CO2_HELP_TEXT)
-        }
     }
 }
 
@@ -1271,7 +1071,7 @@ internal fun formatMs(ms: Long): String {
 }
 
 @Composable
-private fun TableHelpIcon(title: String, text: String) {
+internal fun TableHelpIcon(title: String, text: String) {
     var showDialog by remember { mutableStateOf(false) }
 
     IconButton(onClick = { showDialog = true }) {

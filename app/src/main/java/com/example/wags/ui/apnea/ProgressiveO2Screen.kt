@@ -94,6 +94,7 @@ fun ProgressiveO2Screen(
                     }
                 },
                 actions = {
+                    TableHelpIcon(title = "Progressive O\u2082", text = PROGRESSIVE_O2_HELP_TEXT)
                     LiveSensorActions(liveHr = state.liveHr, liveSpO2 = state.liveSpO2, onClick = { navController.navigate(WagsRoutes.SETTINGS) })
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)

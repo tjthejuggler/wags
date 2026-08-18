@@ -60,6 +60,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -67,9 +68,9 @@ import javax.inject.Inject
 import javax.inject.Named
 
 /**
- * Identifies which accordion section is currently open.
- * Settings is controlled separately (independent toggle).
- * Only one of these can be open at a time.
+ * Identifies a drill section on the main apnea screen.
+ * Used to key the per-section last-use corner badges
+ * (any settings vs. exact current settings combo).
  */
 enum class ApneaSection {
     BEST_TIME,
@@ -160,13 +161,8 @@ data class ApneaUiState(
     val liveOxHr: Int? = null,
     val liveOxSpO2: Int? = null,
     // ── UI layout state ───────────────────────────────────────────────────────
-    /** Settings panel is independently collapsible (not part of the accordion). */
-    val settingsExpanded: Boolean = true,
-    /**
-     * The one accordion section that is currently open.
-     * BEST_TIME is open by default; null means all accordion sections are collapsed.
-     */
-    val openSection: ApneaSection? = ApneaSection.BEST_TIME,
+    /** Settings panel is independently collapsible; starts collapsed by default. */
+    val settingsExpanded: Boolean = false,
     // ── New personal best dialog ──────────────────────────────────────────────
     /** Non-null when a new personal best was just set — contains the broadest beaten category. */
     val newPersonalBest: PersonalBestResult? = null,
@@ -374,6 +370,14 @@ class ApneaViewModel @Inject constructor(
                 isGuidedMode = savedAudio == AudioSetting.GUIDED,
                 guidedSelectedId = guidedAudioManager.selectedId
             )
+        }
+
+        // ── Fresh app open: default to the most neglected viable combination ──
+        // Guarded so it runs at most once per app process — later ApneaViewModel
+        // instances (table/drill screens) must not clobber the user's choices.
+        if (!lruDefaultsApplied) {
+            lruDefaultsApplied = true
+            applyLeastRecentlyUsedDefaults()
         }
 
         // Collect guided audio library from DB
@@ -1511,6 +1515,109 @@ class ApneaViewModel @Inject constructor(
         }
     }
 
+    // ── Least-recently-used default settings (fresh app open) ─────────────────
+
+    /**
+     * On a fresh app open, select the most neglected viable settings combination:
+     * the exact combo (lung volume + prep + posture + audio, at the current time
+     * of day) that was used longest ago — or never used — preferring combos whose
+     * member values have each gone unused the longest.
+     *
+     * Constraints:
+     *  - locked prep types are never selected (HYPER under its time lock,
+     *    RESONANCE without a resonance session that ended < ~5 min ago);
+     *  - time of day is always taken from the current clock.
+     */
+    private fun applyLeastRecentlyUsedDefaults() {
+        viewModelScope.launch {
+            try {
+                val now = System.currentTimeMillis()
+                val records = apneaRepository.getAllRecordsOnce()
+
+                // Per-setting-value last-use timestamps across ALL records.
+                val lastUsed = mutableMapOf<String, MutableMap<String, Long>>()
+                for (record in records) {
+                    val ts = record.timestamp
+                    fun mark(key: String, value: String?) {
+                        if (value.isNullOrBlank()) return
+                        lastUsed.getOrPut(key) { mutableMapOf() }.merge(value, ts, ::maxOf)
+                    }
+                    mark("lungVolume", record.lungVolume)
+                    mark("prepType", record.prepType)
+                    mark("posture", record.posture)
+                    mark("audio", record.audio)
+                }
+                fun lastUsedMs(key: String, value: String): Long? = lastUsed[key]?.get(value)
+
+                // Whole days since this value was last used anywhere; never-used
+                // values get a huge sentinel so they always outrank used ones.
+                fun stalenessDays(key: String, value: String): Long {
+                    val ms = lastUsedMs(key, value) ?: return NEVER_USED_STALENESS_DAYS
+                    return (now - ms) / HyperLockManager.MS_PER_DAY
+                }
+
+                // Locked prep types are not candidates.
+                val hyperLocked = HyperLockManager.remainingLockDays(
+                    lastUsedMs("prepType", PrepType.HYPER.name),
+                    hyperLockManager.lockDays,
+                    now
+                ) > 0
+                val resonanceLocked = resonancePrepGate.isLocked.first()
+                val prepCandidates = PrepType.entries.filterNot {
+                    (it == PrepType.HYPER && hyperLocked) ||
+                        (it == PrepType.RESONANCE && resonanceLocked)
+                }
+                if (prepCandidates.isEmpty()) return@launch
+
+                val tod = TimeOfDay.fromCurrentTime()
+
+                // Last time the EXACT combo (incl. current time of day) was used.
+                fun comboLastUsedMs(lv: String, pt: PrepType, pos: Posture, aud: AudioSetting): Long? =
+                    records.asSequence()
+                        .filter {
+                            it.lungVolume == lv && it.prepType == pt.name &&
+                                it.timeOfDay == tod.name && it.posture == pos.name && it.audio == aud.name
+                        }
+                        .maxOfOrNull { it.timestamp }
+
+                var bestLv = "FULL"; var bestPt = PrepType.NO_PREP
+                var bestPos = Posture.LAYING; var bestAud = AudioSetting.SILENCE
+                var bestComboDays = -1L; var bestMemberDays = -1L
+                for (lv in LRU_LUNG_VOLUME_CANDIDATES) {
+                    for (pt in prepCandidates) {
+                        for (pos in LRU_POSTURE_CANDIDATES) {
+                            for (aud in AudioSetting.entries) {
+                                val comboMs = comboLastUsedMs(lv, pt, pos, aud)
+                                val comboDays = if (comboMs == null) NEVER_USED_STALENESS_DAYS
+                                else (now - comboMs) / HyperLockManager.MS_PER_DAY
+                                val memberDays = stalenessDays("lungVolume", lv) +
+                                    stalenessDays("prepType", pt.name) +
+                                    stalenessDays("posture", pos.name) +
+                                    stalenessDays("audio", aud.name)
+                                // Primary: whole-combo staleness (never used wins).
+                                // Tie-break: most total member-value staleness.
+                                if (comboDays > bestComboDays ||
+                                    (comboDays == bestComboDays && memberDays > bestMemberDays)
+                                ) {
+                                    bestComboDays = comboDays; bestMemberDays = memberDays
+                                    bestLv = lv; bestPt = pt; bestPos = pos; bestAud = aud
+                                }
+                            }
+                        }
+                    }
+                }
+
+                setLungVolume(bestLv)
+                setPrepType(bestPt)
+                setPosture(bestPos)
+                setAudio(bestAud)
+                setTimeOfDay(tod)
+            } catch (e: Exception) {
+                Log.w("ApneaVM", "Failed to apply least-recently-used default settings", e)
+            }
+        }
+    }
+
     fun setLungVolume(volume: String) {
         _lungVolume.value = volume
         _uiState.update { it.copy(selectedLungVolume = volume) }
@@ -1699,17 +1806,6 @@ class ApneaViewModel @Inject constructor(
      */
     fun refreshForecast() {
         _forecastRefreshTrigger.value++
-    }
-
-    /**
-     * Opens [section] if it is currently closed; closes it if it is already open.
-     * Only one accordion section can be open at a time (settings is independent).
-     */
-    fun toggleSection(section: ApneaSection) {
-        _uiState.update { state ->
-            val newOpen = if (state.openSection == section) null else section
-            state.copy(openSection = newOpen)
-        }
     }
 
     // ── Song picker (for table / advanced sessions on the main screen) ────────
@@ -1933,6 +2029,19 @@ class ApneaViewModel @Inject constructor(
      */
     fun loadEucapnicConfiguration(config: EucapnicConfig) {
         _uiState.update { it.copy(eucapnicConfig = config) }
+    }
+
+    companion object {
+        /** Sentinel "staleness" for setting values that have never been used. */
+        private const val NEVER_USED_STALENESS_DAYS = 100_000L
+
+        /** Candidate orders chosen so exact ties resolve to the classic defaults. */
+        private val LRU_LUNG_VOLUME_CANDIDATES = listOf("FULL", "PARTIAL", "EMPTY")
+        private val LRU_POSTURE_CANDIDATES = listOf(Posture.LAYING, Posture.SITTING)
+
+        /** Guard: LRU defaults are applied at most once per app process. */
+        @Volatile
+        private var lruDefaultsApplied = false
     }
 
     override fun onCleared() {

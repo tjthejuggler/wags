@@ -101,6 +101,7 @@ fun ContractionTableScreen(
                     }
                 },
                 actions = {
+                    TableHelpIcon(title = "Contraction Tables", text = CONTRACTION_TABLES_HELP_TEXT)
                     LiveSensorActions(liveHr = state.liveHr, liveSpO2 = state.liveSpO2, onClick = { navController.navigate(WagsRoutes.SETTINGS) })
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)

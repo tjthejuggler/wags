@@ -26,17 +26,8 @@ class SessionAnalyticsViewModel @Inject constructor(
         val struggleMs: Long    // time from first contraction to end
     )
 
-    data class HypoxicScatterPoint(
-        val pbMs: Long,
-        val lateContractionCount: Int,  // contractions in last 30s of hold
-        val sessionTimestamp: Long
-    )
-
     private val _contractionDeltas = MutableStateFlow<List<ContractionDeltaPoint>>(emptyList())
     val contractionDeltas: StateFlow<List<ContractionDeltaPoint>> = _contractionDeltas.asStateFlow()
-
-    private val _hypoxicScatter = MutableStateFlow<List<HypoxicScatterPoint>>(emptyList())
-    val hypoxicScatter: StateFlow<List<HypoxicScatterPoint>> = _hypoxicScatter.asStateFlow()
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -73,32 +64,4 @@ class SessionAnalyticsViewModel @Inject constructor(
         }
     }
 
-    fun loadHistoricalData() {
-        viewModelScope.launch(ioDispatcher) {
-            _isLoading.value = true
-            try {
-                val sessions = sessionRepository.getRecentSessions(50)
-                val scatterPoints = sessions.mapNotNull { session ->
-                    val contractions = contractionDao.getForSession(session.sessionId)
-                    if (contractions.isEmpty()) return@mapNotNull null
-
-                    val estimatedHoldMs = session.totalSessionDurationMs /
-                            session.totalRounds.coerceAtLeast(1)
-                    val lateThresholdMs = estimatedHoldMs - 30_000L
-                    val lateContractions = contractions.count {
-                        it.elapsedInRoundMs >= lateThresholdMs
-                    }
-
-                    HypoxicScatterPoint(
-                        pbMs = session.pbAtSessionMs,
-                        lateContractionCount = lateContractions,
-                        sessionTimestamp = session.timestamp
-                    )
-                }
-                _hypoxicScatter.value = scatterPoints
-            } finally {
-                _isLoading.value = false
-            }
-        }
-    }
 }

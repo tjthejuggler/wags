@@ -16,6 +16,7 @@ import com.example.wags.ui.apnea.ApneaHistoryScreen
 import com.example.wags.ui.apnea.ApneaRecordDetailScreen
 import com.example.wags.ui.apnea.ApneaScreen
 import com.example.wags.ui.apnea.ApneaTableScreen
+import com.example.wags.ui.apnea.TableTrainingScreen
 import com.example.wags.ui.apnea.ContractionTableActiveScreen
 import com.example.wags.ui.apnea.ContractionTableDetailScreen
 import com.example.wags.ui.apnea.ContractionTableScreen
@@ -32,7 +33,6 @@ import com.example.wags.ui.apnea.MinBreathScreen
 import com.example.wags.ui.apnea.ProgressiveO2ActiveScreen
 import com.example.wags.ui.apnea.ProgressiveO2DetailScreen
 import com.example.wags.ui.apnea.ProgressiveO2Screen
-import com.example.wags.ui.apnea.SessionAnalyticsHistoryScreen
 import com.example.wags.ui.apnea.SessionAnalyticsScreen
 import com.example.wags.ui.breathing.AssessmentPickerScreen
 import com.example.wags.ui.breathing.AssessmentResultScreen
@@ -68,6 +68,7 @@ object WagsRoutes {
     const val BREATHING = "breathing"
     const val APNEA_FREE = "apnea_free"
     const val APNEA_TABLE = "apnea_table/{tableType}"
+    const val TABLE_TRAINING = "table_training"
     const val SESSION = "session/{sessionType}"
     const val MORNING_READINESS = "morning_readiness"
     const val MORNING_READINESS_HISTORY = "morning_readiness_history"
@@ -76,7 +77,6 @@ object WagsRoutes {
     const val HRV_READINESS_DETAIL = "hrv_readiness_detail/{readingId}"
     const val SETTINGS = "settings"
     const val SESSION_ANALYTICS = "session_analytics/{sessionId}"
-    const val SESSION_ANALYTICS_HISTORY = "session_analytics_history"
     const val RF_ASSESSMENT_PICKER = "rf_assessment_picker"
     const val RF_ASSESSMENT_RUN = "rf_assessment_run/{protocol}?vibration={vibration}&colors={colors}&customDuration={customDuration}&posture={posture}"
     const val RF_ASSESSMENT_RESULT = "rf_assessment_result/{sessionTimestamp}"
@@ -362,6 +362,10 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
             val tableType = backStackEntry.arguments?.getString("tableType") ?: "O2"
             ApneaTableScreen(navController = navController, tableType = tableType)
         }
+        // ── Table Training setup (normal O₂/CO₂ table configuration) ─────────
+        composable(WagsRoutes.TABLE_TRAINING) {
+            TableTrainingScreen(navController = navController)
+        }
         // ── Progressive O₂ ──────────────────────────────────────────────────
         composable(WagsRoutes.PROGRESSIVE_O2) {
             ProgressiveO2Screen(navController = navController)
@@ -504,9 +508,6 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
         ) { backStackEntry ->
             val sessionId = backStackEntry.arguments?.getLong("sessionId") ?: 0L
             SessionAnalyticsScreen(navController = navController, sessionId = sessionId)
-        }
-        composable(WagsRoutes.SESSION_ANALYTICS_HISTORY) {
-            SessionAnalyticsHistoryScreen(navController = navController)
         }
         composable(
             route = WagsRoutes.APNEA_ALL_RECORDS,

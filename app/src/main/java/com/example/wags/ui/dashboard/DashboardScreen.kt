@@ -1,5 +1,6 @@
 package com.example.wags.ui.dashboard
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -145,6 +146,7 @@ private fun TodayHrvReadinessCard(
     Card(
         onClick = onClick,
         colors = CardDefaults.cardColors(containerColor = SurfaceVariant),
+        border = BorderStroke(1.dp, CardBorder),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -191,6 +193,7 @@ private fun TodayMorningReadinessCard(
         // No morning readiness done today — show a placeholder card
         Card(
             colors = CardDefaults.cardColors(containerColor = SurfaceVariant),
+            border = BorderStroke(1.dp, CardBorder),
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
@@ -224,6 +227,7 @@ private fun TodayMorningReadinessCard(
     Card(
         onClick = onClick,
         colors = CardDefaults.cardColors(containerColor = SurfaceVariant),
+        border = BorderStroke(1.dp, CardBorder),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -272,6 +276,7 @@ private fun NavigationCard(title: String, subtitle: String, onClick: () -> Unit)
     Card(
         onClick = onClick,
         colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+        border = BorderStroke(1.dp, CardBorder),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
