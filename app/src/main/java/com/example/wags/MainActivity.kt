@@ -162,13 +162,13 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val isInPip by PipController.isInPipMode.collectAsState()
+                val navBackStackEntry by navController.currentBackStackEntryAsState()
+                val currentRoute = navBackStackEntry?.destination?.route
                 Box {
                     WagsNavGraph(navController = navController)
                     // Debug bubble overlay — hidden in PiP mode so it doesn't
                     // appear inside the small PiP window
                     if (!isInPip) {
-                        val navBackStackEntry by navController.currentBackStackEntryAsState()
-                        val currentRoute = navBackStackEntry?.destination?.route
                         DebugBubbleOverlay(
                             currentRoute = currentRoute,
                             debugPrefs = debugPrefs,
@@ -176,10 +176,15 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     // Global breathing scrim — the whole UI (all text, borders,
-                    // cards on every screen) pulses together in the slow-
-                    // breathing rhythm. Hidden in PiP.
+                    // cards on every screen) pulses in the slow-breathing
+                    // rhythm. On the main screen and the main apnea screen the
+                    // pulse travels top→bottom so stacked cards pulse as a
+                    // cascading wave. Hidden in PiP.
                     if (!isInPip) {
-                        BreathingOverlay()
+                        BreathingOverlay(
+                            wave = currentRoute == WagsRoutes.DASHBOARD ||
+                                currentRoute == WagsRoutes.APNEA_FREE
+                        )
                     }
                 }
             }
