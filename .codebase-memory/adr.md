@@ -1,22 +1,16 @@
-# ADR: Waveform-based, edge-triggered apnea vibration warnings
+# ADR: Apnea prep-type session snapshot & edit-driven PB notification
 
-**Date:** 2026-08-17
+**Date:** 2026-08-18
 **Status:** Accepted
 
 ## Context
-Apnea drills (O₂/CO₂ tables, Progressive O₂, Contraction Tables) warned users of ending phases via per-tick single-shot vibrations (`vibrateBreathingCountdownTick` fired from every state emission, ~100 ms apart in Progressive O₂ — repeatedly within a second) with hard-coded durations/intensities. Users need fully customizable warnings: separate hold-ending and breath-ending warnings with configurable window length, intensity, beat rapidness, an optional final-second long/intense pulse, and a "same for both" link.
+Two defects: (1) `ResonancePrepGate.isLocked` (5-min staleness, 2s ticker) was collected unguarded by drill ViewModels, which force-flipped RESONANCE→NO_PREP mid-session, corrupting the saved record and PB evaluation. (2) `ApneaRecordDetailViewModel.saveEdits()` updated records without re-evaluating PB, so an edit that made a record a PB (e.g. NO_PREP→RESONANCE) never fired the Tail `APNEA_NEW_RECORD` habit increment.
 
 ## Decision
-1. **Single waveform per warning instead of per-tick pulses.** `ApneaAudioHapticEngine.playWarning()` builds one `VibrationEffect.createWaveform` (beats at the configured interval + optional final pulse) aligned to end exactly when the phase ends. Triggered exactly ONCE via edge detection when the countdown crosses into the configured window.
-   - O₂/CO₂ tables: `ApneaCountdownTimer` now fires `onWarning` every second (voice cues filter internally); `ApneaViewModel.onWarning` compares `remainingSeconds == windowSec`.
-   - Progressive O₂ / Contraction Tables: `previousTimerMs > windowMs && timerMs <= windowMs` edge detection in `handlePhaseTransition` (ticks arrive every ~100 ms).
-2. **Config model** `ApneaVibrationWarningConfig` (enabled, windowSec, intensityPct, intervalSec, finalPulseEnabled, finalPulseMs, finalIntensityPct) persisted in `apnea_prefs` SharedPreferences; `breathSameAsHold` flag makes breaths reuse the hold config.
-3. **Hold-end de-duplication:** when the hold countdown's final pulse is enabled, natural HOLD→BREATHE transitions skip the generic 500 ms `vibrateHoldEnd(countdownCovered = true)`; manual ends (endHoldEarly, stopFreeHold) always buzz.
-4. **Cancellation:** every phase change and session stop/cancel calls `cancelWarningVibrations()`; the safety abort pattern cancels then fires.
-5. **Scope:** Contraction Table holds are open-ended (end on contractions/user input) → no hold countdown there, only the breath warning. Free holds / Min Breath unaffected.
-6. **UI:** Settings → Apnea card hosts voice/vibration master toggles + warning editors (sliders) + "Same vibration for holds & breaths" toggle + Test buttons.
+1. **Lock gates only session START.** All collectors of `resonancePrepGate.isLocked` (and the analogous hyper lock) must be guarded by an idle/session-inactive check before auto-deselecting the prep type.
+2. **Session-start prep snapshot.** Drill ViewModels capture `sessionPrepType` in `startSession()`; `saveSession()` uses `sessionPrepType ?: currentState.prepType` for both `checkBroaderPersonalBest()` and the `ApneaRecordEntity`; cleared on `cancelSession()`. Mid-session setting changes can never rewrite history.
+3. **Edit-driven PB transition notify.** `saveEdits()` captures `heldPbBefore` (via `holdsCurrentPb()`: `getRecordPbBadges().any { isCurrent }` for free holds, `getAllPersonalBests(drill)` for drills), and fires `HabitIntegrationRepository.Slot.APNEA_NEW_RECORD` exactly once on a none→PB transition. Harmless re-edits of an already-PB record do not re-fire.
 
 ## Consequences
-- Arbitrary beat intervals are possible without depending on driver tick rate; timing stays accurate even if UI ticks jitter.
-- The old `vibrateBreathingCountdownTick` API was removed; all three drill ViewModels were migrated.
-- Defaults: hold = 5 s @ 80 %, 1 s beats, 1 s final @ 100 % (the reference setup); breath = 10 s @ 60 %, 1 s ticks, 400 ms final (mirrors legacy behaviour).
+- Applied in: ProgressiveO2ViewModel, MinBreathViewModel, ContractionTableViewModel, ApneaViewModel (idle guards), ApneaRecordDetailViewModel (PB transition).
+- Retroactive Tail credit for a missed PB point can be delivered via `adb shell run-as com.example.wags am broadcast --user 0 -a com.example.tail.ACTION_INCREMENT_HABIT -p com.example.tail --es EXTRA_HABIT_ID "<habit name>"` (run-as supplies the signature permission; `--user 0` avoids the user -2 SecurityException). Habit names live in wags `habit_integration_prefs` (`habit_id_apnea_new_record`).

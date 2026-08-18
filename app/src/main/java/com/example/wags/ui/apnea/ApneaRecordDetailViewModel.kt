@@ -10,6 +10,7 @@ import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.ApneaSessionEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
 import com.example.wags.data.db.entity.ResonanceSessionEntity
+import com.example.wags.data.ipc.HabitIntegrationRepository
 import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.data.repository.ApneaSessionRepository
 import com.example.wags.data.repository.ResonanceSessionRepository
@@ -82,6 +83,7 @@ class ApneaRecordDetailViewModel @Inject constructor(
     private val apneaRepository: ApneaRepository,
     private val sessionRepository: ApneaSessionRepository,
     private val resonanceSessionRepository: ResonanceSessionRepository,
+    private val habitRepo: HabitIntegrationRepository,
     private val devicePrefs: DevicePreferencesRepository,
     private val spotifyApiClient: SpotifyApiClient,
     @Named("apnea_prefs") private val prefs: SharedPreferences
@@ -287,6 +289,12 @@ class ApneaRecordDetailViewModel @Inject constructor(
         val record = _uiState.value.record ?: return
         val state  = _uiState.value
         viewModelScope.launch {
+            // Captured BEFORE the edit: whether this record currently holds any
+            // current personal best. Compared against the post-edit state below
+            // so an edit that newly creates a PB fires the Tail record-broken
+            // event exactly once.
+            val heldPbBefore = holdsCurrentPb(record.recordId, record, state.pbBadges)
+
             val updated = record.copy(
                 lungVolume = state.editLungVolume,
                 prepType   = state.editPrepType.name,
@@ -301,6 +309,17 @@ class ApneaRecordDetailViewModel @Inject constructor(
             val fresh = apneaRepository.getById(record.recordId) ?: updated
             val badges = apneaRepository.getRecordPbBadges(record.recordId)
             val trophyCount = computeTrophyCount(record.recordId, fresh, badges)
+
+            // An edit can turn a record into a personal best (e.g. correcting a
+            // prep type that was wrongly recorded). That is a record-broken event
+            // too — notify Tail, but only on the none→PB transition so harmless
+            // re-edits never double-fire.
+            if (!heldPbBefore && holdsCurrentPb(record.recordId, fresh, badges)) {
+                try {
+                    habitRepo.sendHabitIncrement(HabitIntegrationRepository.Slot.APNEA_NEW_RECORD)
+                } catch (_: Exception) { }
+            }
+
             _uiState.update {
                 it.copy(
                     record = fresh,
@@ -417,6 +436,27 @@ class ApneaRecordDetailViewModel @Inject constructor(
                 _uiState.update { it.copy(songLog = refreshed) }
             }
         }
+    }
+
+    /**
+     * True when this record is the current personal best for at least one
+     * settings combo — free holds hold a current PB badge, drill records are
+     * listed in their drill context's personal-best entries.
+     *
+     * Used by [saveEdits] to detect the none→PB transition caused by an edit
+     * (e.g. correcting a wrongly-recorded prep type) so the Tail record-broken
+     * event fires for it.
+     */
+    private suspend fun holdsCurrentPb(
+        recordId: Long,
+        record: ApneaRecordEntity,
+        pbBadges: List<RecordPbBadge>
+    ): Boolean {
+        if (record.tableType == null) {
+            return pbBadges.any { it.isCurrent }
+        }
+        val drill = DrillContext.fromNavArgs(record.tableType, record.drillParamValue)
+        return apneaRepository.getAllPersonalBests(drill).any { it.recordId == recordId }
     }
 
     /**

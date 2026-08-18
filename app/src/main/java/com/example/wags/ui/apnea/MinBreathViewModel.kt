@@ -191,6 +191,13 @@ class MinBreathViewModel @Inject constructor(
     private val telemetrySamples = mutableListOf<TelemetrySample>()
     private var telemetryJob: Job? = null
     private var sessionStartMs: Long = 0L
+    /**
+     * Prep type captured at session start. The saved record and its personal-best
+     * evaluation use this snapshot, guaranteeing a session that started as
+     * RESONANCE is recorded as RESONANCE even if the staleness lock engages
+     * while the session is still running (or in the instant between stop and save).
+     */
+    private var sessionPrepType: String? = null
 
     // Per-breath-period duration tracking (indexed by hold number that preceded the breath)
     private val breathDurations = mutableMapOf<Int, Long>()
@@ -244,7 +251,13 @@ class MinBreathViewModel @Inject constructor(
         viewModelScope.launch {
             resonancePrepGate.isLocked.collect { locked ->
                 _uiState.update { it.copy(resonancePrepLocked = locked) }
-                if (locked && _uiState.value.prepType == PrepType.RESONANCE.name) {
+                // Auto-deselect RESONANCE only while idle — never yank the setting
+                // mid-session. The rule is that a resonance-prepped session cannot
+                // *start* after the 5-minute window; once the session has started
+                // with RESONANCE it stays RESONANCE for its entire duration.
+                if (locked && _uiState.value.prepType == PrepType.RESONANCE.name &&
+                    !_uiState.value.isSessionActive
+                ) {
                     applyPrepType(PrepType.NO_PREP.name)
                 }
             }
@@ -796,6 +809,7 @@ class MinBreathViewModel @Inject constructor(
     fun startSession() {
         val durationMs = _uiState.value.sessionDurationSec * 1000L
         sessionStartMs = System.currentTimeMillis()
+        sessionPrepType = _uiState.value.prepType
         breathDurations.clear()
         _uiState.update { it.copy(
             isSessionActive = true,
@@ -930,6 +944,7 @@ class MinBreathViewModel @Inject constructor(
         // init-block observer from saving when it sees COMPLETE.
         _uiState.update { it.copy(isSessionActive = false) }
         stateMachine.stop()
+        sessionPrepType = null
         // Do NOT save the session or fire tail increments
     }
 
@@ -1025,6 +1040,9 @@ class MinBreathViewModel @Inject constructor(
         // 2. Save ApneaRecordEntity (total hold time as durationMs for Min Breath)
         val totalHoldTimeMs = finalState.totalHoldTimeMs
 
+        // Prep type comes from the session-start snapshot so the record reflects
+        // what the session actually started with.
+        val sessionPrep = sessionPrepType
         val currentState = _uiState.value
 
         // Honor the user's explicit audio choice. Never downgrade MUSIC to SILENCE
@@ -1037,7 +1055,7 @@ class MinBreathViewModel @Inject constructor(
         val pbResult = if (totalHoldTimeMs > 0L) {
             apneaRepository.checkBroaderPersonalBest(
                 drill, totalHoldTimeMs,
-                currentState.lungVolume, currentState.prepType, currentState.timeOfDay,
+                currentState.lungVolume, sessionPrep ?: currentState.prepType, currentState.timeOfDay,
                 currentState.posture, effectiveAudio
             )
         } else null
@@ -1050,7 +1068,7 @@ class MinBreathViewModel @Inject constructor(
                 timestamp = now,
                 durationMs = totalHoldTimeMs,
                 lungVolume = currentState.lungVolume,
-                prepType = currentState.prepType,
+                prepType = sessionPrep ?: currentState.prepType,
                 minHrBpm = minHr?.toFloat() ?: 0f,
                 maxHrBpm = maxHr?.toFloat() ?: 0f,
                 tableType = "MIN_BREATH",

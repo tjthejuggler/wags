@@ -213,6 +213,13 @@ class ContractionTableViewModel @Inject constructor(
     private val telemetrySamples = mutableListOf<TelemetrySample>()
     private var telemetryJob: Job? = null
     private var sessionStartMs: Long = 0L
+    /**
+     * Prep type captured at session start. The saved record and its personal-best
+     * evaluation use this snapshot, guaranteeing a session that started as
+     * RESONANCE is recorded as RESONANCE even if the staleness lock engages
+     * while the session is still running (or in the instant between stop and save).
+     */
+    private var sessionPrepType: String? = null
 
     // Track previous phase + timer for audio/haptic cues (edge-triggered warnings)
     private var previousPhase: ContractionTablePhase = ContractionTablePhase.IDLE
@@ -234,7 +241,13 @@ class ContractionTableViewModel @Inject constructor(
         viewModelScope.launch {
             resonancePrepGate.isLocked.collect { locked ->
                 _uiState.update { it.copy(resonancePrepLocked = locked) }
-                if (locked && _uiState.value.prepType == PrepType.RESONANCE.name) {
+                // Auto-deselect RESONANCE only while idle — never yank the setting
+                // mid-session. The rule is that a resonance-prepped session cannot
+                // *start* after the 5-minute window; once the session has started
+                // with RESONANCE it stays RESONANCE for its entire duration.
+                if (locked && _uiState.value.prepType == PrepType.RESONANCE.name &&
+                    !_uiState.value.isSessionActive
+                ) {
                     applyPrepType(PrepType.NO_PREP.name)
                 }
             }
@@ -834,6 +847,7 @@ class ContractionTableViewModel @Inject constructor(
     fun startSession() {
         val s = _uiState.value
         sessionStartMs = System.currentTimeMillis()
+        sessionPrepType = s.prepType
         _uiState.update { it.copy(isSessionActive = true, completedSessionId = null, completedRecordId = null) }
 
         // Start Spotify if MUSIC is selected (song pre-loaded in selectSong()).
@@ -962,6 +976,7 @@ class ContractionTableViewModel @Inject constructor(
 
         _uiState.update { it.copy(isSessionActive = false) }
         stateMachine.stop()
+        sessionPrepType = null
         // Do NOT save the session or fire habit increments
     }
 
@@ -1064,6 +1079,9 @@ class ContractionTableViewModel @Inject constructor(
         val now = System.currentTimeMillis()
         val totalDurationMs = now - sessionStartMs
         val s = _uiState.value
+        // Prep type comes from the session-start snapshot so the record reflects
+        // what the session actually started with.
+        val sessionPrep = sessionPrepType
         val deviceLabel = hrDataSource.activeHrDeviceLabel()
         val telemetrySnapshot = telemetrySamples.toList()
         telemetrySamples.clear()
@@ -1118,7 +1136,7 @@ class ContractionTableViewModel @Inject constructor(
         val drill = currentDrillContext()
         val pbResult = if (countsAsRecord && headlineDurationMs > 0L) {
             apneaRepository.checkBroaderPersonalBest(
-                drill, headlineDurationMs, s.lungVolume, s.prepType, s.timeOfDay, s.posture, s.audio
+                drill, headlineDurationMs, s.lungVolume, sessionPrep ?: s.prepType, s.timeOfDay, s.posture, s.audio
             )
         } else null
 
@@ -1127,7 +1145,7 @@ class ContractionTableViewModel @Inject constructor(
                 timestamp = now,
                 durationMs = headlineDurationMs,
                 lungVolume = s.lungVolume,
-                prepType = s.prepType,
+                prepType = sessionPrep ?: s.prepType,
                 minHrBpm = minHr?.toFloat() ?: 0f,
                 maxHrBpm = maxHr?.toFloat() ?: 0f,
                 tableType = s.mode.tableType(),

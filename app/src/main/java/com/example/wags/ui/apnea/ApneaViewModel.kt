@@ -543,7 +543,14 @@ class ApneaViewModel @Inject constructor(
         viewModelScope.launch {
             resonancePrepGate.isLocked.collect { locked ->
                 _uiState.update { it.copy(resonancePrepLocked = locked) }
-                if (locked && _prepType.value == PrepType.RESONANCE) {
+                // Auto-deselect RESONANCE only while idle — never yank the setting
+                // mid-session (free hold or table). The rule is that a
+                // resonance-prepped activity cannot *start* after the 5-minute
+                // window; once it has started with RESONANCE it stays RESONANCE.
+                if (locked && _prepType.value == PrepType.RESONANCE &&
+                    stateMachine.state.value == ApneaState.IDLE &&
+                    !_uiState.value.freeHoldActive
+                ) {
                     setPrepType(PrepType.NO_PREP)
                 }
             }

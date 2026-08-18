@@ -187,6 +187,13 @@ class ProgressiveO2ViewModel @Inject constructor(
     private val telemetrySamples = mutableListOf<TelemetrySample>()
     private var telemetryJob: Job? = null
     private var sessionStartMs: Long = 0L
+    /**
+     * Prep type captured at session start. The saved record and its personal-best
+     * evaluation use this snapshot, guaranteeing a session that started as
+     * RESONANCE is recorded as RESONANCE even if the staleness lock engages
+     * while the session is still running (or in the instant between stop and save).
+     */
+    private var sessionPrepType: String? = null
 
     // Track previous phase + timer for audio/haptic cues (edge-triggered warnings)
     private var previousPhase: ProgressiveO2Phase = ProgressiveO2Phase.IDLE
@@ -238,7 +245,13 @@ class ProgressiveO2ViewModel @Inject constructor(
         viewModelScope.launch {
             resonancePrepGate.isLocked.collect { locked ->
                 _uiState.update { it.copy(resonancePrepLocked = locked) }
-                if (locked && _uiState.value.prepType == PrepType.RESONANCE.name) {
+                // Auto-deselect RESONANCE only while idle — never yank the setting
+                // mid-session. The rule is that a resonance-prepped session cannot
+                // *start* after the 5-minute window; once the session has started
+                // with RESONANCE it stays RESONANCE for its entire duration.
+                if (locked && _uiState.value.prepType == PrepType.RESONANCE.name &&
+                    !_uiState.value.isSessionActive
+                ) {
                     applyPrepType(PrepType.NO_PREP.name)
                 }
             }
@@ -770,6 +783,7 @@ class ProgressiveO2ViewModel @Inject constructor(
     fun startSession() {
         val breathPeriodMs = _uiState.value.breathPeriodSec * 1000L
         sessionStartMs = System.currentTimeMillis()
+        sessionPrepType = _uiState.value.prepType
         _uiState.update { it.copy(isSessionActive = true, completedRecordId = null) }
 
         // Start Spotify if MUSIC is selected.
@@ -877,6 +891,7 @@ class ProgressiveO2ViewModel @Inject constructor(
 
         _uiState.update { it.copy(isSessionActive = false) }
         stateMachine.stop()
+        sessionPrepType = null
         // Do NOT save the session or fire tail increments
     }
 
@@ -1003,10 +1018,12 @@ class ProgressiveO2ViewModel @Inject constructor(
         // 2. Save ApneaRecordEntity (total hold time across all rounds as durationMs)
         val totalHoldTimeMs = finalState.totalHoldTimeMs
 
-        // Use settings from UI state (already in sync with SharedPreferences)
+        // Use settings from UI state (already in sync with SharedPreferences).
+        // Prep type comes from the session-start snapshot so the record reflects
+        // what the session actually started with.
         val currentState = _uiState.value
         val lungVolume = currentState.lungVolume
-        val prepType = currentState.prepType
+        val prepType = sessionPrepType ?: currentState.prepType
         val timeOfDay = currentState.timeOfDay
         val posture = currentState.posture
         val audio = currentState.audio
