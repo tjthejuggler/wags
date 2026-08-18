@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -219,13 +222,24 @@ fun SongPickerDialog(
     // Sort state
     var sortOption by remember { mutableStateOf(SongSortOption.RECENT) }
     var sortAscending by remember { mutableStateOf(false) } // false = descending (most recent first)
+    // Search filter state
+    var searchQuery by remember { mutableStateOf("") }
 
-    val sortedSongs = remember(songs, sortOption, sortAscending) {
+    // Filter by title/artist (case-insensitive) before sorting.
+    val visibleSongs = remember(songs, searchQuery) {
+        val q = searchQuery.trim()
+        if (q.isEmpty()) songs
+        else songs.filter {
+            it.title.contains(q, ignoreCase = true) || it.artist.contains(q, ignoreCase = true)
+        }
+    }
+
+    val sortedSongs = remember(visibleSongs, sortOption, sortAscending) {
         val sorted = when (sortOption) {
-            SongSortOption.RECENT -> songs // already ordered by most recent from the loader
-            SongSortOption.TITLE -> songs.sortedBy { it.title.lowercase() }
-            SongSortOption.ARTIST -> songs.sortedBy { it.artist.lowercase() }
-            SongSortOption.LENGTH -> songs.sortedBy { it.durationMs }
+            SongSortOption.RECENT -> visibleSongs // already ordered by most recent from the loader
+            SongSortOption.TITLE -> visibleSongs.sortedBy { it.title.lowercase() }
+            SongSortOption.ARTIST -> visibleSongs.sortedBy { it.artist.lowercase() }
+            SongSortOption.LENGTH -> visibleSongs.sortedBy { it.durationMs }
         }
         // For RECENT, default descending = most recent first (original order).
         // For others, default ascending = A→Z / shortest first.
@@ -275,6 +289,42 @@ fun SongPickerDialog(
         },
         text = {
             Column {
+                // Search field — only show when the library has songs
+                if (!isLoading && songs.isNotEmpty()) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = {
+                            Text("Search title or artist", style = MaterialTheme.typography.bodySmall)
+                        },
+                        singleLine = true,
+                        leadingIcon = {
+                            Icon(Icons.Default.Search, contentDescription = null, tint = TextSecondary)
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(
+                                        Icons.Default.Clear,
+                                        contentDescription = "Clear search",
+                                        tint = TextSecondary
+                                    )
+                                }
+                            }
+                        },
+                        textStyle = MaterialTheme.typography.bodySmall.copy(color = TextPrimary),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = TextSecondary,
+                            unfocusedBorderColor = SurfaceDark,
+                            focusedPlaceholderColor = TextDisabled,
+                            unfocusedPlaceholderColor = TextDisabled,
+                            cursorColor = TextPrimary
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
                 // Sort chips row — only show when there are songs to sort
                 if (!isLoading && songs.isNotEmpty()) {
                     SortChipRow(
@@ -314,6 +364,21 @@ fun SongPickerDialog(
                         ) {
                             Text(
                                 "No songs recorded yet.\nDo a breath hold with Music to build your library!",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TextSecondary,
+                                modifier = Modifier.padding(16.dp)
+                            )
+                        }
+                    }
+                    sortedSongs.isEmpty() -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "No songs match \"${searchQuery.trim()}\".",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = TextSecondary,
                                 modifier = Modifier.padding(16.dp)
