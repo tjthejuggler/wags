@@ -51,6 +51,9 @@ class MorningReadinessRepository @Inject constructor(
         return dao.observeTodayLatest(startOfDay)
     }
 
+    /** Timestamp (epoch ms) of the most recent morning readiness reading. Null when none exist. */
+    fun observeLatestTimestamp(): Flow<Long?> = dao.observeLatestTimestamp()
+
     // 7-day acute baseline: ln(RMSSD) values
     suspend fun getAcuteBaselineLnRmssd(): List<Double> {
         val since = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(7)

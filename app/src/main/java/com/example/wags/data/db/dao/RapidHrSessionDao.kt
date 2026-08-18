@@ -24,6 +24,10 @@ interface RapidHrSessionDao {
     @Query("SELECT * FROM rapid_hr_sessions ORDER BY timestamp DESC")
     fun observeAll(): Flow<List<RapidHrSessionEntity>>
 
+    /** Timestamp (epoch ms) of the most recent rapid-HR session. Null when none exist. */
+    @Query("SELECT MAX(timestamp) FROM rapid_hr_sessions")
+    fun observeLatestEnd(): Flow<Long?>
+
     @Query("SELECT * FROM rapid_hr_sessions ORDER BY timestamp DESC")
     suspend fun getAll(): List<RapidHrSessionEntity>
 

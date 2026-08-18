@@ -93,6 +93,9 @@ class ApneaRepository @Inject constructor(
     suspend fun getLastHyperUseOnce(): Long? =
         withContext(ioDispatcher) { dao.getLastHyperUseOnce() }
 
+    /** Most recent timestamp of any apnea record (any session type). Null when none exist. */
+    fun observeLatestTimestamp(): Flow<Long?> = dao.observeLatestTimestamp()
+
     /** Last-use timestamp per setting column/value across ALL records (any session type). */
     fun observeLastUsedPerSetting(): Flow<List<SettingLastUsedTuple>> =
         dao.observeLastUsedPerSetting()

@@ -1,15 +1,18 @@
-# ADR: Global "breathing" brightness pulse via draw-phase scrim
+# ADR: Dashboard days-since corner badges
+
+**Date:** 2026-08-18
+**Status:** Accepted
 
 ## Context
-User wanted all UI text and card borders across every screen to pulse in brightness together, in a slow-rhythmic-breathing rhythm (~6 breaths/min, 10 s cycle), preserving relative brightness differences between elements. An earlier iteration animated each card border individually (`pulsingCardBorder()`), which (a) was too subtle and (b) could not cover text without touching hundreds of `Text` call sites.
+The apnea section shows tiny bordered corner badges (CornerBadge in ApneaScreen.kt) with whole days since each drill type was last performed (∞ when never). The user wanted the same squares on every session-type card on the main dashboard, and the 'Sessions' section label replaced by a 2.dp separator line (card borders are 1.dp).
 
 ## Decision
-Replace per-element border animation with a single global `BreathingOverlay` (`ui/theme/BreathingOverlay.kt`) mounted once in `MainActivity`'s root `Box`, on top of `WagsNavGraph` (hidden in PiP). It is a full-screen black scrim whose alpha animates 0 → 0.45 over 5 s and back (FastOutSlowInEasing, RepeatMode.Reverse). Because the dimming is multiplicative, ALL content (text, borders, cards) pulses by the same relative amount in the same rhythm while keeping relative brightness hierarchy. Card borders reverted to static `BorderStroke(1.dp, CardBorder)` so they don't double-pulse.
-
-## Performance
-The animated alpha is read inside `Modifier.graphicsLayer { alpha = dim }` — a draw-phase-only read, so no per-frame recomposition; each step is a cheap re-draw of one node. The Box has no pointer-input modifiers, so touches pass through to the UI underneath.
+- Reuse the exact badge semantics: `HyperLockManager.daysSinceUsed(lastUsedMs, nowMs)` (whole days, null → ∞), with `now` captured via `remember { System.currentTimeMillis() }` per composition — day granularity makes ticking unnecessary, matching ApneaScreen.
+- Data source: one lightweight `SELECT MAX(timestamp)` Flow per session table (morning_readiness, daily_readings, apnea_records, meditation_sessions, rapid_hr_sessions; resonance already had `observeLatestEnd`). Exposed as repository passthroughs and combined in DashboardViewModel into `SessionLastUse` (raw epoch-ms values; day math done in the composable).
+- UI: local `CornerBadge` copy in DashboardScreen.kt (apnea's is private), floated TopEnd over each NavigationCard via Box overlay; the trailing arrow row gets 20.dp end padding when a badge is present, mirroring DrillCard.
+- 'Sessions' header replaced with `HorizontalDivider(thickness = 2.dp, color = CardBorder)`.
 
 ## Consequences
-- Dialogs/AlertDialogs render in separate windows and therefore do NOT pulse.
-- System status bar / keyboard do not pulse.
-- Any future "pulse strength" tuning lives in one place (targetValue in BreathingOverlay.kt).
+- DashboardViewModel now injects ResonanceSessionRepository, ApneaRepository, MeditationRepository, RapidHrRepository (all additive; Hilt).
+- Badges briefly show ∞ on first frame before flows emit — same behavior as the apnea screen.
+- All DAO/repository changes are additive; no existing callers affected.

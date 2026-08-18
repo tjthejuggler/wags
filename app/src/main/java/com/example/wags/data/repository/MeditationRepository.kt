@@ -204,6 +204,9 @@ class MeditationRepository @Inject constructor(
 
     fun observeSessions(): Flow<List<MeditationSessionEntity>> = sessionDao.observeAll()
 
+    /** Timestamp (epoch ms) of the most recent meditation session. Null when none exist. */
+    fun observeLatestEnd(): Flow<Long?> = sessionDao.observeLatestEnd()
+
     suspend fun getAllSessions(): List<MeditationSessionEntity> = sessionDao.getAll()
 
     suspend fun getSessionById(id: Long): MeditationSessionEntity? = sessionDao.getById(id)

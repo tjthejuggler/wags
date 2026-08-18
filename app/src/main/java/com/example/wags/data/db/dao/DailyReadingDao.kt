@@ -12,6 +12,10 @@ interface DailyReadingDao {
     @Query("SELECT * FROM daily_readings ORDER BY timestamp DESC LIMIT :limit")
     fun getLatest(limit: Int): Flow<List<DailyReadingEntity>>
 
+    /** Timestamp (epoch ms) of the most recent HRV readiness reading. Null when none exist. */
+    @Query("SELECT MAX(timestamp) FROM daily_readings")
+    fun observeLatestTimestamp(): Flow<Long?>
+
     @Query("SELECT * FROM daily_readings WHERE timestamp >= :startOfDayMs ORDER BY timestamp DESC LIMIT 1")
     fun observeTodayLatest(startOfDayMs: Long): Flow<DailyReadingEntity?>
 

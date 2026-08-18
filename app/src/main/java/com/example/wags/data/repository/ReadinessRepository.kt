@@ -25,6 +25,9 @@ class ReadinessRepository @Inject constructor(
         return dao.observeTodayLatest(startOfDay)
     }
 
+    /** Timestamp (epoch ms) of the most recent HRV readiness reading. Null when none exist. */
+    fun observeLatestTimestamp(): Flow<Long?> = dao.observeLatestTimestamp()
+
     suspend fun getAll(): List<DailyReadingEntity> =
         dao.getAll()
 

@@ -1,7 +1,9 @@
 package com.example.wags.ui.dashboard
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
@@ -12,11 +14,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.db.entity.DailyReadingEntity
 import com.example.wags.data.db.entity.MorningReadinessEntity
+import com.example.wags.domain.usecase.apnea.HyperLockManager
 import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.LiveSensorActionsNav
@@ -33,6 +37,12 @@ fun DashboardScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     LockPortrait()
+
+    // Day-granularity "now" — recomputed per composition is fine for whole-day
+    // badges (same approach as the apnea section corner badges).
+    val badgeNowMs = remember { System.currentTimeMillis() }
+    fun daysSinceBadge(lastUsedMs: Long?): String =
+        HyperLockManager.daysSinceUsed(lastUsedMs, badgeNowMs)?.toString() ?: "∞"
 
     Scaffold(
         containerColor = BackgroundDark,
@@ -90,40 +100,66 @@ fun DashboardScreen(
                 )
             }
 
+            // ── Separator between the today-cards and the session cards ─────────
+            // Slightly thicker than the 1.dp card borders for visual separation.
             item {
-                Text(
-                    "Sessions",
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(vertical = 8.dp)
+                HorizontalDivider(
+                    thickness = 2.dp,
+                    color = CardBorder,
+                    modifier = Modifier.padding(vertical = 4.dp)
                 )
             }
             item {
-                NavigationCard("Morning Readiness", "Full ANS readiness: supine → stand protocol") {
+                NavigationCard(
+                    "Morning Readiness",
+                    "Full ANS readiness: supine → stand protocol",
+                    daysBadge = daysSinceBadge(state.sessionLastUse.morningReadinessMs)
+                ) {
                     navController.navigate(WagsRoutes.MORNING_READINESS)
                 }
             }
             item {
-                NavigationCard("HRV Readiness", "Quick 2-min resting HRV measurement") {
+                NavigationCard(
+                    "HRV Readiness",
+                    "Quick 2-min resting HRV measurement",
+                    daysBadge = daysSinceBadge(state.sessionLastUse.hrvReadinessMs)
+                ) {
                     navController.navigate(WagsRoutes.READINESS)
                 }
             }
             item {
-                NavigationCard("Resonance Breathing", "Coherence biofeedback") {
+                NavigationCard(
+                    "Resonance Breathing",
+                    "Coherence biofeedback",
+                    daysBadge = daysSinceBadge(state.sessionLastUse.resonanceMs)
+                ) {
                     navController.navigate(WagsRoutes.BREATHING)
                 }
             }
             item {
-                NavigationCard("Apnea Training", "Free hold & table sessions") {
+                NavigationCard(
+                    "Apnea Training",
+                    "Free hold & table sessions",
+                    daysBadge = daysSinceBadge(state.sessionLastUse.apneaMs)
+                ) {
                     navController.navigate(WagsRoutes.APNEA_FREE)
                 }
             }
             item {
-                NavigationCard("Meditation / NSDR", "Audio-guided sessions with HR tracking") {
+                NavigationCard(
+                    "Meditation / NSDR",
+                    "Audio-guided sessions with HR tracking",
+                    daysBadge = daysSinceBadge(state.sessionLastUse.meditationMs)
+                ) {
                     navController.navigate(WagsRoutes.MEDITATION)
                 }
             }
             item {
-                NavigationCard("Rapid HR Change", "Time how fast you can shift your heart rate") {
+                NavigationCard(
+                    "Rapid HR Change",
+                    "Time how fast you can shift your heart rate",
+                    daysBadge = daysSinceBadge(state.sessionLastUse.rapidHrMs)
+                ) {
                     navController.navigate(WagsRoutes.RAPID_HR)
                 }
             }
@@ -271,26 +307,63 @@ private fun TodayMorningReadinessCard(
 
 // ── Navigation card ───────────────────────────────────────────────────────────
 
+/**
+ * Tiny bordered number badge — same style as the apnea section corner badges.
+ * Shows whole days since the session type was last done (∞ when never).
+ */
 @Composable
-private fun NavigationCard(title: String, subtitle: String, onClick: () -> Unit) {
-    Card(
-        onClick = onClick,
-        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
-        border = BorderStroke(1.dp, CardBorder),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+private fun CornerBadge(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        fontSize = 9.sp,
+        lineHeight = 10.sp,
+        color = TextPrimary,
+        modifier = modifier
+            .border(1.dp, TextSecondary, RoundedCornerShape(4.dp))
+            .padding(horizontal = 3.dp, vertical = 1.dp)
+    )
+}
+
+@Composable
+private fun NavigationCard(
+    title: String,
+    subtitle: String,
+    daysBadge: String? = null,
+    onClick: () -> Unit
+) {
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Card(
+            onClick = onClick,
+            colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+            border = BorderStroke(1.dp, CardBorder),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Column {
-                Text(title, style = MaterialTheme.typography.titleLarge)
-                Text(subtitle, style = MaterialTheme.typography.bodyMedium)
+            Row(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .fillMaxWidth()
+                    // Keep the trailing arrow clear of the corner badge that
+                    // floats at the card's top-right edge.
+                    .then(if (daysBadge != null) Modifier.padding(end = 20.dp) else Modifier),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(title, style = MaterialTheme.typography.titleLarge)
+                    Text(subtitle, style = MaterialTheme.typography.bodyMedium)
+                }
+                Text("→", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
             }
-            Text("→", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
+        }
+
+        // Days-since badge floats in the card's top-right corner.
+        daysBadge?.let {
+            CornerBadge(
+                text = it,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 3.dp, end = 4.dp)
+            )
         }
     }
 }

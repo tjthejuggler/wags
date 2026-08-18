@@ -257,6 +257,10 @@ interface ApneaRecordDao {
     @Query("SELECT * FROM apnea_records ORDER BY timestamp DESC LIMIT :limit")
     fun getLatest(limit: Int): Flow<List<ApneaRecordEntity>>
 
+    /** Timestamp (epoch ms) of the most recent apnea record of any type. Null when none exist. */
+    @Query("SELECT MAX(timestamp) FROM apnea_records")
+    fun observeLatestTimestamp(): Flow<Long?>
+
     /** All records ever, newest first — used for the calendar tab. */
     @Query("SELECT * FROM apnea_records ORDER BY timestamp DESC")
     fun observeAll(): Flow<List<ApneaRecordEntity>>

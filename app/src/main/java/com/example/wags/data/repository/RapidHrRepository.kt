@@ -23,6 +23,9 @@ class RapidHrRepository @Inject constructor(
     fun observeAll(): Flow<List<RapidHrSessionEntity>> =
         sessionDao.observeAll()
 
+    /** Timestamp (epoch ms) of the most recent rapid-HR session. Null when none exist. */
+    fun observeLatestEnd(): Flow<Long?> = sessionDao.observeLatestEnd()
+
     fun observeByDirection(direction: String): Flow<List<RapidHrSessionEntity>> =
         sessionDao.observeByDirection(direction)
 

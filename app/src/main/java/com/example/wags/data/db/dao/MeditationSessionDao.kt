@@ -20,6 +20,10 @@ interface MeditationSessionDao {
     @Query("SELECT * FROM meditation_sessions ORDER BY timestamp DESC")
     fun observeAll(): Flow<List<MeditationSessionEntity>>
 
+    /** Timestamp (epoch ms) of the most recent meditation session. Null when none exist. */
+    @Query("SELECT MAX(timestamp) FROM meditation_sessions")
+    fun observeLatestEnd(): Flow<Long?>
+
     @Query("SELECT * FROM meditation_sessions ORDER BY timestamp DESC")
     suspend fun getAll(): List<MeditationSessionEntity>
 
