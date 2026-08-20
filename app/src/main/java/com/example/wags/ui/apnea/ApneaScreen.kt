@@ -315,7 +315,13 @@ fun ApneaScreen(
                             )
                         )
                     },
-                    headerBadges = sectionBadges(ApneaSection.BEST_TIME)
+                    headerBadges = sectionBadges(ApneaSection.BEST_TIME),
+                    headerAction = {
+                        AutoSetMenuButton(
+                            onEasiest = { viewModel.autoSetBestSettings() },
+                            onRecord = { viewModel.autoSetRecordBest() }
+                        )
+                    }
                 ) {
                     val flash by viewModel.flashMessage.collectAsStateWithLifecycle()
                     val context = LocalContext.current
@@ -334,8 +340,6 @@ fun ApneaScreen(
                         lastTimeRecordId      = state.lastFreeHoldForSettingsRecordId,
                         bestTimeTrophyCategory = state.bestTimeTrophyCategory,
                         recordForecast         = state.recordForecast,
-                        onAutoSet              = { viewModel.autoSetBestSettings() },
-                        onAutoSetRecord        = { viewModel.autoSetRecordBest() },
                         onBestTimeClick = { recordId ->
                             navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
                         },
@@ -352,7 +356,13 @@ fun ApneaScreen(
                 DrillCard(
                     title = "Progressive O₂",
                     onClick = { navController.navigate(WagsRoutes.PROGRESSIVE_O2) },
-                    headerBadges = sectionBadges(ApneaSection.PROGRESSIVE_O2)
+                    headerBadges = sectionBadges(ApneaSection.PROGRESSIVE_O2),
+                    headerAction = {
+                        AutoSetMenuButton(
+                            onEasiest = { viewModel.autoSetEasiestDrill(ApneaSection.PROGRESSIVE_O2) },
+                            onRecord = { viewModel.autoSetRecordDrill(ApneaSection.PROGRESSIVE_O2) }
+                        )
+                    }
                 ) {
                     DrillSummaryContent(
                         bestTimeMs = state.progO2BestMs,
@@ -374,7 +384,13 @@ fun ApneaScreen(
                 DrillCard(
                     title = "Min Breath",
                     onClick = { navController.navigate(WagsRoutes.MIN_BREATH) },
-                    headerBadges = sectionBadges(ApneaSection.MIN_BREATH)
+                    headerBadges = sectionBadges(ApneaSection.MIN_BREATH),
+                    headerAction = {
+                        AutoSetMenuButton(
+                            onEasiest = { viewModel.autoSetEasiestDrill(ApneaSection.MIN_BREATH) },
+                            onRecord = { viewModel.autoSetRecordDrill(ApneaSection.MIN_BREATH) }
+                        )
+                    }
                 ) {
                     DrillSummaryContent(
                         bestTimeMs = state.minBreathBestMs,
@@ -396,7 +412,13 @@ fun ApneaScreen(
                 DrillCard(
                     title = "Contraction Tables",
                     onClick = { navController.navigate(WagsRoutes.CONTRACTION_TABLE) },
-                    headerBadges = sectionBadges(ApneaSection.CONTRACTION_TABLES)
+                    headerBadges = sectionBadges(ApneaSection.CONTRACTION_TABLES),
+                    headerAction = {
+                        // No forecast for contraction tables — "record" only.
+                        AutoSetMenuButton(
+                            onRecord = { viewModel.autoSetRecordDrill(ApneaSection.CONTRACTION_TABLES) }
+                        )
+                    }
                 ) {
                     DrillSummaryContent(
                         bestTimeMs = state.contractionTableBestMs,
@@ -636,6 +658,7 @@ private fun DrillCard(
     title: String,
     onClick: () -> Unit,
     headerBadges: SectionCornerBadges? = null,
+    headerAction: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Box(modifier = Modifier.fillMaxWidth()) {
@@ -664,6 +687,9 @@ private fun DrillCard(
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f)
                     )
+                    // Optional header action (e.g. the "auto set" menu) sits
+                    // immediately left of the arrow, vertically aligned with the title.
+                    headerAction?.invoke()
                     // Same trailing arrow as the main-screen navigation cards
                     Text("→", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                 }
@@ -950,8 +976,6 @@ private fun FreeHoldContent(
     lastTimeRecordId: Long?,
     bestTimeTrophyCategory: PersonalBestCategory?,
     recordForecast: RecordForecast? = null,
-    onAutoSet: () -> Unit = {},
-    onAutoSetRecord: () -> Unit = {},
     onBestTimeClick: (Long) -> Unit = {},
     onLastTimeClick: (Long) -> Unit = {},
     onTrophyClick: () -> Unit = {}
@@ -1021,12 +1045,8 @@ private fun FreeHoldContent(
             }
         }
 
-        // ── Record-breaking forecast (with auto set) ─────────────────────────
-        RecordForecastSummary(
-            forecast = recordForecast,
-            onAutoSet = onAutoSet,
-            onAutoSetRecord = onAutoSetRecord
-        )
+        // ── Record-breaking forecast ─────────────────────────────────────────
+        RecordForecastSummary(forecast = recordForecast)
     }
 }
 
@@ -1081,7 +1101,7 @@ private fun DrillSummaryContent(
         }
 
         // ── Record-breaking forecast ──────────────────────────────────────────
-        RecordForecastSummary(forecast = recordForecast, showAutoSet = false)
+        RecordForecastSummary(forecast = recordForecast)
     }
 }
 

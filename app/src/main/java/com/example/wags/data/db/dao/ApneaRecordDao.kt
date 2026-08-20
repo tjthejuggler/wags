@@ -713,15 +713,43 @@ interface ApneaRecordDao {
         audio: String
     ): BestRecordTuple?
 
-    /** Best free-hold record (full entity) for a single time bucket — all other settings relaxed. */
+    /**
+     * Best free-hold records (full entities, longest first) for a single time
+     * bucket — all other settings relaxed. Returns several candidates so the
+     * caller can skip records whose prep type is currently locked.
+     */
     @Query("""
         SELECT * FROM apnea_records
         WHERE tableType IS NULL
           AND $TOD_MATCH
         ORDER BY durationMs DESC
-        LIMIT 1
+        LIMIT :limit
     """)
-    suspend fun getBestFreeHoldForBucket(timeOfDay: String): ApneaRecordEntity?
+    suspend fun getBestFreeHoldsForBucket(timeOfDay: String, limit: Int): List<ApneaRecordEntity>
+
+    /**
+     * Best drill records (full entities, longest first) for a single time
+     * bucket, with the other settings relaxed. Pass a specific
+     * [drillParamValue] to restrict to that configuration, or null to include
+     * every configuration — used by the drill "Record" auto-set action, which
+     * prefers the current configuration but falls back to configurations that
+     * actually have records. Only records that count for PBs are considered.
+     */
+    @Query("""
+        SELECT * FROM apnea_records
+        WHERE tableType = :tableType
+          AND (:drillParamValue IS NULL OR drillParamValue = :drillParamValue)
+          AND countsAsRecord = 1
+          AND $TOD_MATCH
+        ORDER BY durationMs DESC
+        LIMIT :limit
+    """)
+    suspend fun getBestDrillRecordsForBucket(
+        tableType: String,
+        drillParamValue: Int?,
+        timeOfDay: String,
+        limit: Int
+    ): List<ApneaRecordEntity>
 
     // ── All free holds matching dynamic filters (for chart) ──────────────────
 

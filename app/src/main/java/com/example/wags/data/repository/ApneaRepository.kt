@@ -179,13 +179,33 @@ class ApneaRepository @Inject constructor(
         dao.getBestFreeHoldRecordId(lungVolume, prepType, normTod(timeOfDay), posture, audio)
 
     /**
-     * Full best free-hold record for a single time bucket (hour bucket in
+     * Best free-hold records for a single time bucket (hour bucket in
      * By-the-Hour mode, Morning/Day/Night otherwise) with all other settings
-     * relaxed — used by the "Record" auto-set action.
+     * relaxed, longest first — used by the "Record" auto-set action. Returns
+     * multiple candidates so the caller can skip records whose prep type is
+     * currently locked (HYPER time-lock / RESONANCE staleness-lock).
      */
-    suspend fun getBestFreeHoldForTimeBucket(timeOfDay: String): ApneaRecordEntity? =
+    suspend fun getBestFreeHoldsForTimeBucket(timeOfDay: String, limit: Int = 50): List<ApneaRecordEntity> =
         withContext(ioDispatcher) {
-            dao.getBestFreeHoldForBucket(normTod(timeOfDay))
+            dao.getBestFreeHoldsForBucket(normTod(timeOfDay), limit)
+        }
+
+    /**
+     * Best drill records for a single time bucket (hour bucket in By-the-Hour
+     * mode, Morning/Day/Night otherwise), longest first, with the other
+     * settings relaxed. Pass a specific [drillParamValue] to restrict to that
+     * configuration, or null to include every configuration — used by the
+     * drill "Record" auto-set action, which prefers the current configuration
+     * but falls back to configurations that actually have records.
+     */
+    suspend fun getBestDrillRecordsForTimeBucket(
+        tableType: String,
+        drillParamValue: Int?,
+        timeOfDay: String,
+        limit: Int = 50
+    ): List<ApneaRecordEntity> =
+        withContext(ioDispatcher) {
+            dao.getBestDrillRecordsForBucket(tableType, drillParamValue, normTod(timeOfDay), limit)
         }
 
     /** recordId of the most recent free-hold for the current 5-setting combination. */

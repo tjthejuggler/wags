@@ -391,8 +391,7 @@ fun ProgressiveO2Screen(
 
             // 0e. Record-breaking forecast
             RecordForecastSummary(
-                forecast = state.recordForecast,
-                showAutoSet = false
+                forecast = state.recordForecast
             )
 
             // 1. Explanation card

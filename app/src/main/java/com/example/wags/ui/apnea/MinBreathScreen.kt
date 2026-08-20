@@ -397,8 +397,7 @@ fun MinBreathScreen(
 
             // 0g. Record-breaking forecast
             RecordForecastSummary(
-                forecast = state.recordForecast,
-                showAutoSet = false
+                forecast = state.recordForecast
             )
 
             // 1. Explanation card

@@ -51,9 +51,11 @@ import com.example.wags.domain.usecase.apnea.forecast.ForecastSettings
 import com.example.wags.domain.usecase.apnea.forecast.RecordForecast
 import com.example.wags.domain.usecase.apnea.forecast.RecordForecastCalculator
 import com.example.wags.domain.usecase.apnea.forecast.ForecastStatus
+import com.example.wags.domain.usecase.apnea.forecast.SettingsWithProbability
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -63,10 +65,13 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.Calendar
 import javax.inject.Inject
 import javax.inject.Named
 
@@ -330,14 +335,37 @@ class ApneaViewModel @Inject constructor(
     }
 
     /**
+     * Emits immediately, then again at every local-hour boundary. Combined
+     * into [_effectiveTod] so By-the-Hour consumers refresh when the
+     * wall-clock hour rolls over — otherwise the bucket stays frozen at the
+     * hour it was computed at (e.g. app opened at 12:xx keeps using "H12"
+     * all through hour 13), which made the forecast disagree with the
+     * record card (which re-queries with the fresh hour).
+     */
+    private val hourTick: Flow<Unit> = flow {
+        while (true) {
+            emit(Unit)
+            val now = Calendar.getInstance()
+            val nextTopOfHour = (now.clone() as Calendar).apply {
+                set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+                add(Calendar.HOUR_OF_DAY, 1)
+            }
+            delay((nextTopOfHour.timeInMillis - now.timeInMillis).coerceAtLeast(1_000L))
+        }
+    }
+
+    /**
      * Effective time-bucket string for the current dimension: the TimeOfDay
      * name as before, or the automatic current-hour bucket ("H14") when the
-     * user selected "By the Hour". Drives forecasts and combo badges; the
-     * repository applies the same normalization for its own queries.
+     * user selected "By the Hour". Re-evaluated on time-of-day / dimension
+     * changes AND on every hour rollover (via [hourTick]), so long-lived
+     * collectors never act on a stale hour bucket. Drives forecasts, combo
+     * badges and all settings-filtered queries below; the repository passes
+     * hour buckets through its own normalization untouched.
      */
-    private val _effectiveTod = combine(_timeOfDay, timeDimensionStore.dimension) { tod, dim ->
+    private val _effectiveTod = combine(_timeOfDay, timeDimensionStore.dimension, hourTick) { tod, dim, _ ->
         TimeBuckets.normalizeSessionBucket(tod.name, dim)
-    }
+    }.distinctUntilChanged()
 
     // Drill-specific param flows — drive trophy queries for Progressive O₂ and Min Breath
     private val _progO2BreathPeriodSec = MutableStateFlow(60)
@@ -452,11 +480,11 @@ class ApneaViewModel @Inject constructor(
 
         // Whenever any setting changes, re-subscribe to best-time query
         viewModelScope.launch {
-            combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud -> arrayOf(lv, pt, tod, pos, aud) }
+            combine(_lungVolume, _prepType, _effectiveTod, _posture, _audio) { lv, pt, tod, pos, aud -> arrayOf(lv, pt, tod, pos, aud) }
                 .collectLatest { arr ->
-                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as TimeOfDay
+                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as String
                     val pos = arr[3] as Posture; val aud = arr[4] as AudioSetting
-                    apneaRepository.getBestFreeHold(lv, pt.name, tod.name, pos.name, aud.name).collect { best ->
+                    apneaRepository.getBestFreeHold(lv, pt.name, tod, pos.name, aud.name).collect { best ->
                         val bestMs = best ?: 0L
                         _uiState.update { it.copy(bestTimeForSettingsMs = bestMs) }
                         // Auto-set PB from best free hold when no PB has been set yet
@@ -468,22 +496,22 @@ class ApneaViewModel @Inject constructor(
         }
         // Whenever any setting changes, re-subscribe to last free-hold query
         viewModelScope.launch {
-            combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud -> arrayOf(lv, pt, tod, pos, aud) }
+            combine(_lungVolume, _prepType, _effectiveTod, _posture, _audio) { lv, pt, tod, pos, aud -> arrayOf(lv, pt, tod, pos, aud) }
                 .collectLatest { arr ->
-                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as TimeOfDay
+                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as String
                     val pos = arr[3] as Posture; val aud = arr[4] as AudioSetting
-                    apneaRepository.getLastFreeHold(lv, pt.name, tod.name, pos.name, aud.name).collect { last ->
+                    apneaRepository.getLastFreeHold(lv, pt.name, tod, pos.name, aud.name).collect { last ->
                         _uiState.update { it.copy(lastFreeHoldForSettingsMs = last ?: 0L) }
                     }
                 }
         }
         // Whenever any setting changes, re-subscribe to last free-hold record-id query
         viewModelScope.launch {
-            combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud -> arrayOf(lv, pt, tod, pos, aud) }
+            combine(_lungVolume, _prepType, _effectiveTod, _posture, _audio) { lv, pt, tod, pos, aud -> arrayOf(lv, pt, tod, pos, aud) }
                 .collectLatest { arr ->
-                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as TimeOfDay
+                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as String
                     val pos = arr[3] as Posture; val aud = arr[4] as AudioSetting
-                    apneaRepository.getLastFreeHoldRecordId(lv, pt.name, tod.name, pos.name, aud.name).collect { id ->
+                    apneaRepository.getLastFreeHoldRecordId(lv, pt.name, tod, pos.name, aud.name).collect { id ->
                         _uiState.update { it.copy(lastFreeHoldForSettingsRecordId = id) }
                     }
                 }
@@ -491,15 +519,15 @@ class ApneaViewModel @Inject constructor(
         // Whenever any setting changes, re-subscribe to best-time record-id query
         // and recompute the trophy level for the best record.
         viewModelScope.launch {
-            combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud -> arrayOf(lv, pt, tod, pos, aud) }
+            combine(_lungVolume, _prepType, _effectiveTod, _posture, _audio) { lv, pt, tod, pos, aud -> arrayOf(lv, pt, tod, pos, aud) }
                 .collectLatest { arr ->
-                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as TimeOfDay
+                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as String
                     val pos = arr[3] as Posture; val aud = arr[4] as AudioSetting
-                    apneaRepository.getBestFreeHoldRecordId(lv, pt.name, tod.name, pos.name, aud.name).collect { id ->
+                    apneaRepository.getBestFreeHoldRecordId(lv, pt.name, tod, pos.name, aud.name).collect { id ->
                         _uiState.update { it.copy(bestTimeForSettingsRecordId = id) }
                         // Compute trophy level for the best record
                         val trophyCategory = if (id != null) {
-                            apneaRepository.getBestRecordTrophyLevel(lv, pt.name, tod.name, pos.name, aud.name)
+                            apneaRepository.getBestRecordTrophyLevel(lv, pt.name, tod, pos.name, aud.name)
                         } else null
                         _uiState.update { it.copy(bestTimeTrophyCategory = trophyCategory) }
                     }
@@ -507,22 +535,22 @@ class ApneaViewModel @Inject constructor(
         }
         // Recent records: 10 most recent across ALL event types, filtered by current settings
         viewModelScope.launch {
-            combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud -> arrayOf(lv, pt, tod, pos, aud) }
+            combine(_lungVolume, _prepType, _effectiveTod, _posture, _audio) { lv, pt, tod, pos, aud -> arrayOf(lv, pt, tod, pos, aud) }
                 .collectLatest { arr ->
-                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as TimeOfDay
+                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as String
                     val pos = arr[3] as Posture; val aud = arr[4] as AudioSetting
-                    apneaRepository.getRecentBySettings(lv, pt.name, tod.name, pos.name, aud.name, limit = 10).collect { records ->
+                    apneaRepository.getRecentBySettings(lv, pt.name, tod, pos.name, aud.name, limit = 10).collect { records ->
                         _uiState.update { it.copy(recentRecords = records) }
                     }
                 }
         }
         // Whenever any setting changes, re-subscribe to filtered stats
         viewModelScope.launch {
-            combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud -> arrayOf(lv, pt, tod, pos, aud) }
+            combine(_lungVolume, _prepType, _effectiveTod, _posture, _audio) { lv, pt, tod, pos, aud -> arrayOf(lv, pt, tod, pos, aud) }
                 .collectLatest { arr ->
-                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as TimeOfDay
+                    val lv = arr[0] as String; val pt = arr[1] as PrepType; val tod = arr[2] as String
                     val pos = arr[3] as Posture; val aud = arr[4] as AudioSetting
-                    apneaRepository.getStats(lv, pt.name, tod.name, pos.name, aud.name).collect { stats ->
+                    apneaRepository.getStats(lv, pt.name, tod, pos.name, aud.name).collect { stats ->
                         _uiState.update { it.copy(filteredStats = stats) }
                     }
                 }
@@ -587,11 +615,11 @@ class ApneaViewModel @Inject constructor(
         }
         // ── Progressive O₂ best + trophy (for current breath period + current settings) ──
         viewModelScope.launch {
-            combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio, _progO2BreathPeriodSec) { args ->
+            combine(_lungVolume, _prepType, _effectiveTod, _posture, _audio, _progO2BreathPeriodSec) { args ->
                 args
             }.collectLatest { arr ->
                     val lv = arr[0] as String; val pt = (arr[1] as PrepType).name
-                    val tod = (arr[2] as TimeOfDay).name; val pos = (arr[3] as Posture).name
+                    val tod = arr[2] as String; val pos = (arr[3] as Posture).name
                     val aud = (arr[4] as AudioSetting).name; val bp = arr[5] as Int
                     val drill = DrillContext.progressiveO2(bp)
                     val result = apneaRepository.getDrillBestAndTrophy(drill, lv, pt, tod, pos, aud)
@@ -606,11 +634,11 @@ class ApneaViewModel @Inject constructor(
         }
         // ── Min Breath best + trophy (for current session duration + current settings) ──
         viewModelScope.launch {
-            combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio, _minBreathSessionDurationSec) { args ->
+            combine(_lungVolume, _prepType, _effectiveTod, _posture, _audio, _minBreathSessionDurationSec) { args ->
                 args
             }.collectLatest { arr ->
                     val lv = arr[0] as String; val pt = (arr[1] as PrepType).name
-                    val tod = (arr[2] as TimeOfDay).name; val pos = (arr[3] as Posture).name
+                    val tod = arr[2] as String; val pos = (arr[3] as Posture).name
                     val aud = (arr[4] as AudioSetting).name; val sd = arr[5] as Int
                     val drill = DrillContext.minBreath(sd)
                     val result = apneaRepository.getDrillBestAndTrophy(drill, lv, pt, tod, pos, aud)
@@ -625,11 +653,11 @@ class ApneaViewModel @Inject constructor(
         }
         // ── Contraction Tables best + trophy (Till Contraction, current settings) ──
         viewModelScope.launch {
-            combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud ->
+            combine(_lungVolume, _prepType, _effectiveTod, _posture, _audio) { lv, pt, tod, pos, aud ->
                 arrayOf(lv, pt, tod, pos, aud)
             }.collectLatest { arr ->
                 val lv = arr[0] as String; val pt = (arr[1] as PrepType).name
-                val tod = (arr[2] as TimeOfDay).name; val pos = (arr[3] as Posture).name
+                val tod = arr[2] as String; val pos = (arr[3] as Posture).name
                 val aud = (arr[4] as AudioSetting).name
                 val drill = DrillContext.CONTRACTION_TILL
                 val result = apneaRepository.getDrillBestAndTrophy(drill, lv, pt, tod, pos, aud)
@@ -1509,9 +1537,15 @@ class ApneaViewModel @Inject constructor(
 
     // ── Auto-set best settings ─────────────────────────────────────────────────
     /** Cached list of best settings combos, sorted by probability descending. */
-    private var bestSettingsList: List<com.example.wags.domain.usecase.apnea.forecast.SettingsWithProbability> = emptyList()
+    private var bestSettingsList: List<SettingsWithProbability> = emptyList()
     /** Index into the top-probability group for cycling through ties. */
     private var autoSetCycleIndex: Int = 0
+    /** Same caching for the drill "easiest" auto-set (per section). */
+    private var drillBestSettingsList: List<SettingsWithProbability> = emptyList()
+    private var drillAutoSetCycleIndex: Int = 0
+    private var drillAutoSetSection: ApneaSection? = null
+    /** Cancels the previous "record" auto-set when a new one starts (2s preview). */
+    private var autoSetRecordJob: Job? = null
 
     /**
      * Auto-set the 4 changeable settings (lung volume, prep type, posture, audio)
@@ -1523,6 +1557,7 @@ class ApneaViewModel @Inject constructor(
             val records = apneaRepository.getAllFreeHoldsOnce()
             val tod = TimeBuckets.normalizeSessionBucket(_timeOfDay.value.name, timeDimensionStore.current)
             val best = RecordForecastCalculator.computeBestSettings(records, tod, System.currentTimeMillis())
+                .filter { prepSelectableByName(it.settings.prepType) }
             if (best.isEmpty()) return@launch
 
             val topProb = best.first().probability
@@ -1546,28 +1581,171 @@ class ApneaViewModel @Inject constructor(
         }
     }
 
+    // ── "Record" auto-set (settings of the PB hold for the current bucket) ─────
+
+    /** True when a prep-type name can currently be selected (see [setPrepType]). */
+    private fun prepSelectableByName(prepName: String): Boolean {
+        val prep = runCatching { PrepType.valueOf(prepName) }.getOrNull() ?: return false
+        return (prep != PrepType.HYPER || _uiState.value.hyperRemainingLockDays <= 0) &&
+            (prep != PrepType.RESONANCE || !_uiState.value.resonancePrepLocked)
+    }
+
+    /**
+     * Shared "record" auto-set behaviour: briefly preview the settings of the
+     * true top hold for [bucket] — even when its prep type is currently
+     * locked — then after 2 seconds fall back to the best hold whose prep
+     * type is selectable (setPrepType() silently ignores locked preps, which
+     * would otherwise land on a hybrid combination with no record at all).
+     * [apply] receives each candidate; drill variants also apply the record's
+     * configuration parameter. Flashes an explanation whenever the top hold
+     * was skipped because of a lock.
+     */
+    private suspend fun applyRecordAutoSet(
+        candidates: List<ApneaRecordEntity>,
+        bucket: String,
+        apply: (record: ApneaRecordEntity, force: Boolean) -> Unit
+    ) {
+        if (candidates.isEmpty()) {
+            _flashMessage.value = if (timeDimensionStore.isByHour)
+                "No personal best yet for hour ${TimeBuckets.display(bucket)}"
+            else
+                "No personal best yet for this time of day"
+            return
+        }
+        val top = candidates.first()
+        val best = candidates.firstOrNull { prepSelectableByName(it.prepType) }
+        if (best == null) {
+            _flashMessage.value = "Top holds all use locked prep types"
+            return
+        }
+        if (top !== best) {
+            _flashMessage.value = "Top hold's prep is locked — showing it for 2s, then next-best"
+            apply(top, true)
+            delay(2_000)
+        }
+        apply(best, false)
+    }
+
     /**
      * Auto-set the 4 changeable settings to the combination of the personal-best
      * free hold for the current time bucket (hour bucket in By-the-Hour mode,
-     * Morning/Day/Night otherwise). Flashes a message when no record exists for
-     * the bucket yet.
+     * Morning/Day/Night otherwise) — with a 2-second preview of the true top
+     * record even when its prep is locked; see [applyRecordAutoSet].
      */
     fun autoSetRecordBest() {
-        viewModelScope.launch {
+        autoSetRecordJob?.cancel()
+        autoSetRecordJob = viewModelScope.launch {
             val bucket = TimeBuckets.normalizeSessionBucket(_timeOfDay.value.name, timeDimensionStore.current)
-            val best = apneaRepository.getBestFreeHoldForTimeBucket(bucket)
-            if (best == null) {
-                _flashMessage.value = if (timeDimensionStore.isByHour)
-                    "No personal best yet for hour ${TimeBuckets.display(bucket)}"
-                else
-                    "No personal best yet for this time of day"
-                return@launch
+            val candidates = apneaRepository.getBestFreeHoldsForTimeBucket(bucket)
+            applyRecordAutoSet(candidates, bucket) { record, force ->
+                setLungVolume(record.lungVolume)
+                setPrepType(PrepType.valueOf(record.prepType), force)
+                setPosture(Posture.valueOf(record.posture))
+                setAudio(AudioSetting.valueOf(record.audio))
             }
-            setLungVolume(best.lungVolume)
-            setPrepType(PrepType.valueOf(best.prepType))
-            setPosture(Posture.valueOf(best.posture))
-            setAudio(AudioSetting.valueOf(best.audio))
         }
+    }
+
+    /**
+     * "Record" auto-set for the drill cards (Progressive O₂, Min Breath,
+     * Contraction Tables). Uses records at the drill's CURRENT internal
+     * configuration (breath period / session duration) when any exist; when
+     * none do, the configuration is switched to the one the best record was
+     * set with (e.g. Min Breath → 5min). Same 2-second locked-prep preview
+     * and fallback as the free-hold version.
+     */
+    fun autoSetRecordDrill(section: ApneaSection) {
+        val tableType = when (section) {
+            ApneaSection.PROGRESSIVE_O2 -> "PROGRESSIVE_O2"
+            ApneaSection.MIN_BREATH -> "MIN_BREATH"
+            ApneaSection.CONTRACTION_TABLES -> "WONKA_FIRST_CONTRACTION"
+            else -> return
+        }
+        autoSetRecordJob?.cancel()
+        autoSetRecordJob = viewModelScope.launch {
+            val bucket = TimeBuckets.normalizeSessionBucket(_timeOfDay.value.name, timeDimensionStore.current)
+            val currentParam = when (section) {
+                ApneaSection.PROGRESSIVE_O2 -> _progO2BreathPeriodSec.value
+                ApneaSection.MIN_BREATH -> _minBreathSessionDurationSec.value
+                else -> null
+            }
+            var candidates = apneaRepository.getBestDrillRecordsForTimeBucket(tableType, currentParam, bucket)
+            var allowParamChange = false
+            if (candidates.isEmpty() && currentParam != null) {
+                allowParamChange = true
+                candidates = apneaRepository.getBestDrillRecordsForTimeBucket(tableType, null, bucket)
+            }
+            applyRecordAutoSet(candidates, bucket) { record, force ->
+                setLungVolume(record.lungVolume)
+                setPrepType(PrepType.valueOf(record.prepType), force)
+                setPosture(Posture.valueOf(record.posture))
+                setAudio(AudioSetting.valueOf(record.audio))
+                if (allowParamChange && record.drillParamValue != null) {
+                    when (section) {
+                        ApneaSection.PROGRESSIVE_O2 -> setProgO2BreathPeriodSec(record.drillParamValue)
+                        ApneaSection.MIN_BREATH -> setMinBreathSessionDurationSec(record.drillParamValue)
+                        else -> {}
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * "Easiest" auto-set for the drill cards: the settings combination with
+     * the highest predicted record-breaking probability at the drill's CURRENT
+     * configuration (the configuration itself is only changed by "record").
+     * Repeated calls cycle through tied combinations.
+     */
+    fun autoSetEasiestDrill(section: ApneaSection) {
+        if (section != ApneaSection.PROGRESSIVE_O2 && section != ApneaSection.MIN_BREATH) return
+        viewModelScope.launch {
+            val records = if (section == ApneaSection.PROGRESSIVE_O2) {
+                apneaRepository.getAllProgressiveO2Once()
+            } else {
+                apneaRepository.getAllMinBreathOnce()
+            }
+            val param = if (section == ApneaSection.PROGRESSIVE_O2) {
+                _progO2BreathPeriodSec.value
+            } else {
+                _minBreathSessionDurationSec.value
+            }
+            val tod = TimeBuckets.normalizeSessionBucket(_timeOfDay.value.name, timeDimensionStore.current)
+            val best = RecordForecastCalculator.computeBestSettings(records, tod, System.currentTimeMillis(), drillParam = param)
+                .filter { prepSelectableByName(it.settings.prepType) }
+            if (best.isEmpty()) return@launch
+
+            val topProb = best.first().probability
+            val topGroup = best.filter { it.probability == topProb }
+
+            if (drillAutoSetSection != section || drillBestSettingsList != topGroup) {
+                drillAutoSetSection = section
+                drillBestSettingsList = topGroup
+                drillAutoSetCycleIndex = 0
+            }
+
+            val chosen = drillBestSettingsList[drillAutoSetCycleIndex % drillBestSettingsList.size]
+            drillAutoSetCycleIndex = (drillAutoSetCycleIndex + 1) % drillBestSettingsList.size
+
+            setLungVolume(chosen.settings.lungVolume)
+            setPrepType(PrepType.valueOf(chosen.settings.prepType))
+            setPosture(Posture.valueOf(chosen.settings.posture))
+            setAudio(AudioSetting.valueOf(chosen.settings.audio))
+        }
+    }
+
+    /** Select Progressive O₂ breath period (persisted; used by "record" auto-set). */
+    fun setProgO2BreathPeriodSec(breathPeriodSec: Int) {
+        _progO2BreathPeriodSec.value = breathPeriodSec
+        _uiState.update { it.copy(progO2BreathPeriodSec = breathPeriodSec) }
+        prefs.edit().putInt("prog_o2_breath_period_sec", breathPeriodSec).apply()
+    }
+
+    /** Select Min Breath session duration (persisted; used by "record" auto-set). */
+    fun setMinBreathSessionDurationSec(sessionDurationSec: Int) {
+        _minBreathSessionDurationSec.value = sessionDurationSec
+        _uiState.update { it.copy(minBreathSessionDurationSec = sessionDurationSec) }
+        prefs.edit().putInt("min_breath_session_duration_sec", sessionDurationSec).apply()
     }
 
     // ── Least-recently-used default settings (fresh app open) ─────────────────
@@ -1680,12 +1858,14 @@ class ApneaViewModel @Inject constructor(
         prefs.edit().putString("setting_lung_volume", volume).apply()
     }
 
-    fun setPrepType(type: PrepType) {
+    fun setPrepType(type: PrepType, force: Boolean = false) {
         // HYPER is time-locked: ignore attempts to select it while locked.
-        if (type == PrepType.HYPER && _uiState.value.hyperRemainingLockDays > 0) return
+        // `force` is used by the "record" auto-set to briefly preview the true
+        // top hold's settings even when its prep is locked (2s, then fallback).
+        if (!force && type == PrepType.HYPER && _uiState.value.hyperRemainingLockDays > 0) return
         // RESONANCE prep is staleness-locked: no resonance breathing session ended
         // within the last ~5 minutes.
-        if (type == PrepType.RESONANCE && _uiState.value.resonancePrepLocked) return
+        if (!force && type == PrepType.RESONANCE && _uiState.value.resonancePrepLocked) return
 
         _prepType.value = type
         _uiState.update { it.copy(prepType = type) }

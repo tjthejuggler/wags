@@ -244,21 +244,37 @@ object RecordForecastCalculator {
      * @param records  Records of the desired type (caller should filter by tableType).
      * @param fixedTimeOfDay  Time-of-day to keep fixed (cannot be changed by auto-set).
      * @param nowEpochMs  Current epoch-ms.
+     * @param drillParam  Optional drill parameter (breath-period sec / session-duration
+     *                   sec). When non-null the regression is fit across ALL parameter
+     *                   values (the parameter is a feature, as in [compute]) but the
+     *                   per-combo PB lookups only consider records at this parameter —
+     *                   a record at one parameter is a different record than at another.
      * @return List of [SettingsWithProbability] sorted by probability descending.
      */
     fun computeBestSettings(
         records: List<ApneaRecordEntity>,
         fixedTimeOfDay: String,
-        nowEpochMs: Long
+        nowEpochMs: Long,
+        drillParam: Int? = null
     ): List<SettingsWithProbability> {
         val filtered = records.filter { it.durationMs >= MIN_DURATION_MS }
         if (filtered.size < MIN_TOTAL_RECORDS) return emptyList()
+
+        // PB lookups only compete within the selected drill parameter; the fit
+        // still uses every parameter so the model keeps a single regression.
+        val pbRecords = if (drillParam != null) {
+            filtered.filter { it.drillParamValue == drillParam }
+        } else {
+            filtered
+        }
 
         val firstTs = filtered.minOf { it.timestamp }
         val daysSinceFirst = max(0.0, (nowEpochMs - firstTs) / 86_400_000.0)
 
         val byHour = TimeBuckets.isHourBucket(fixedTimeOfDay)
-        val designResult = FreeHoldFeatureExtractor.buildDesignMatrix(filtered, firstTs, byHour = byHour)
+        val designResult = FreeHoldFeatureExtractor.buildDesignMatrix(
+            filtered, firstTs, includeDrillParam = drillParam != null, byHour = byHour
+        )
             ?: return emptyList()
 
         val (X, y) = designResult
@@ -282,13 +298,13 @@ object RecordForecastCalculator {
                             posture = pos,
                             audio = aud
                         )
-                        val xRow = FreeHoldFeatureExtractor.encodePendingHold(settings, daysSinceFirst, byHour = byHour)
+                        val xRow = FreeHoldFeatureExtractor.encodePendingHold(settings, daysSinceFirst, drillParam, byHour)
                         val (muLogSec, predVariance) = OlsRegression.predict(xRow, fit)
                         val sigmaPred = sqrt(max(1e-6, predVariance))
 
                         // Find the exact-combo PB
                         val bestMs = findBestForSubCombo(
-                            filtered,
+                            pbRecords,
                             setOf(0, 1, 2, 3, 4),
                             listOf(lv, pt, fixedTimeOfDay, pos, aud)
                         )
