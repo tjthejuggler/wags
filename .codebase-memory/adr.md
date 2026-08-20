@@ -1,17 +1,30 @@
-# ADR: Unified eucapnic prep completion flow — pop back to setup screen with START HOLD
-
-**Date:** 2026-08-18
-**Status:** Accepted (implemented)
+# ADR: Settings screen reorganized into collapsible category cards
 
 ## Context
-The eucapnic pacer (EucapnicPacerScreen) dispatched on `sessionType` when the prep completed: FREE_HOLD popped back to the Free Hold setup screen with the `eucapnic_prep_completed` savedStateHandle flag, but MIN_BREATH / PROGRESSIVE_O2 / CONTRACTION_TABLE navigated directly to their active screens, which auto-start the hold via `LaunchedEffect(Unit)`. This caused the hold to begin immediately after prep with no user confirmation — inconsistent with the Free Hold flow and unsafe UX for apnea training.
+The wags SettingsScreen had grown into a 1,588-line monolith: a flat LazyColumn of ~12 unrelated cards (device, Garmin, apnea, scan results, meditation dir, Spotify, Tail habits, backup, crash logs, debug, advice, about) with no grouping, titled "Device Settings" although it contained far more.
 
 ## Decision
-1. **EucapnicPacerScreen** completion is now session-type agnostic: it always sets `eucapnic_prep_completed = true` on `navController.previousBackStackEntry?.savedStateHandle` and calls `popBackStack()`. No direct navigation to active screens.
-2. Every apnea setup screen that supports EUCAPNIC_DIAPHRAGMATIC prep (Min Breath, Progressive O₂, Contraction Tables — Free Hold already had it) consumes the flag in a `LaunchedEffect(Unit)`: reads it from `currentBackStackEntry?.savedStateHandle`, **clears it** (sets to false) to prevent flag resurrection on later back-stack returns, and pushes the value into ViewModel state via `setEucapnicPrepCompleted(true)`.
-3. The START button on each setup screen switches behavior/label based on `eucapnicPrepCompleted`: "START EUCAPNIC" → launches the pacer; "START HOLD" → navigates to the active screen (which then auto-starts the hold deliberately). Starting the hold consumes the flag (`setEucapnicPrepCompleted(false)`), so every new session requires a fresh eucapnic prep.
+Reorganize the settings screen into collapsible category cards, inspired by the tail project's SettingsCategory pattern but styled with the wags design language (SurfaceDark + 1.dp CardBorder outline cards, titleMedium SemiBold headers, KeyboardArrowUp/Down chevron, AnimatedVisibility expand/shrink — same visual grammar as the apnea DrillCard/CollapsibleSectionHeader and the dashboard NavigationCard).
+
+Six categories, collapsed by default (content only composed while expanded, rememberSaveable state):
+- 📡 Sensors & Devices (connected sensor, Garmin watch, nearby-scan; header summary shows live connection state)
+- 🫁 Apnea (hyper cooldown stepper + existing ApneaVibrationSettingsSection)
+- 🔗 Integrations (Spotify, Tail habits, meditation audio folder)
+- 💾 Data & Backup (export/import)
+- 💬 Advice (per-section advice rows)
+- 🐛 Developer (debug bubble, crash logs)
+About stays a footer button. Screen retitled "Settings".
+
+## File layout (split from the monolith, all in ui/settings/)
+- SettingsCategoryCard.kt — SettingsCategoryCard + SettingsSubSectionDivider + SettingsSubSectionLabel
+- SettingsDeviceSections.kt — ConnectedDeviceSection, GarminWatchSection, NearbySensorsSection
+- SettingsIntegrationsSections.kt — MeditationAudioDirectorySection, SpotifySection
+- SettingsTailSection.kt — TailAppIntegrationSection + habit picker dialog
+- SettingsDataSections.kt — DataExportImportSection, CrashLogsSection, DebugModeSection, AdviceSettingsSection
+- SettingsScreen.kt — screen scaffold, launchers, dialogs, category composition
+
+Sub-sections are plain Columns/Rows inside the category card (no nested Cards), separated by thin SurfaceVariant dividers. SettingsViewModel, all routes, and the SettingsScreen public signature are unchanged; behavior is feature-identical to before.
 
 ## Consequences
-- Consistent, deliberate hold-start UX across all apnea drills that use eucapnic prep.
-- The `eucapnic_prep_completed` savedStateHandle key is the single inter-screen contract for this flow; new setup screens integrating the pacer must implement the same consume-and-clear pattern.
-- Files touched: EucapnicPacerScreen.kt, MinBreathScreen.kt, MinBreathViewModel.kt, ProgressiveO2Screen.kt, ProgressiveO2ViewModel.kt, ContractionTableScreen.kt, ContractionTableViewModel.kt, FreeHoldActiveScreen.kt (title fix "Breath Hold" → "Free Hold").
+- New settings get added as a sub-section inside the matching category file instead of growing the screen file.
+- The collapsed-by-default layout keeps the screen scannable; live sensor status is visible in the category summary without expanding.

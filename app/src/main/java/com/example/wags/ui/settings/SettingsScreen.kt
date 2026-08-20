@@ -1,46 +1,39 @@
 package com.example.wags.ui.settings
 
 import android.Manifest
-import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.ui.res.painterResource
-import com.example.wags.R
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
-import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
-import com.example.wags.data.crash.CrashLogWriter
 import com.example.wags.data.garmin.GarminConnectionState
 import com.example.wags.domain.model.BleConnectionState
-import com.example.wags.domain.model.HabitEntry
-import com.example.wags.domain.model.ScannedDevice
 import com.example.wags.ui.common.AdviceDialog
-import com.example.wags.ui.common.AdviceSection
 import com.example.wags.ui.common.AdviceViewModel
 import com.example.wags.ui.common.LiveSensorActionsNav
 import com.example.wags.ui.common.LockPortrait
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 
+/**
+ * Settings screen — organized into collapsible category cards (same pattern
+ * as the apnea drill cards): Sensors & Devices, Apnea, Integrations,
+ * Data & Backup, Advice, and Developer. Each category expands in place to
+ * reveal its sub-sections.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -139,11 +132,24 @@ fun SettingsScreen(
         onDispose { viewModel.stopScan() }
     }
 
+    // Live one-line summary for the Sensors & Devices category header, so the
+    // connection state is visible without expanding the card.
+    val sensorSummary = when (val ds = state.deviceState) {
+        is BleConnectionState.Connected -> "Connected: ${ds.deviceName}"
+        is BleConnectionState.Connecting -> "Connecting…"
+        is BleConnectionState.Scanning -> "Scanning…"
+        is BleConnectionState.Error -> "Sensor error"
+        is BleConnectionState.Disconnected ->
+            if (state.garminState is GarminConnectionState.Connected)
+                "Garmin watch connected · no heart-rate sensor"
+            else "Heart-rate sensor · scan · Garmin watch"
+    }
+
     Scaffold(
         containerColor = BackgroundDark,
         topBar = {
             TopAppBar(
-                title = { Text("Device Settings", style = MaterialTheme.typography.headlineMedium) },
+                title = { Text("Settings", style = MaterialTheme.typography.headlineMedium) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(
@@ -164,7 +170,7 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
 
             // ── Permission denied banner ───────────────────────────────────
@@ -182,128 +188,45 @@ fun SettingsScreen(
                 }
             }
 
-            // ── Connected device status ─────────────────────────────────────
+            // ── Sensors & Devices ──────────────────────────────────────────
             item {
-                ConnectedDeviceCard(
-                    deviceState = state.deviceState,
-                    onDisconnect = { viewModel.disconnectDevice() }
-                )
-            }
-
-            // ── Garmin Watch ─────────────────────────────────────────────────
-            item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = SurfaceDark),
-                    modifier = Modifier.fillMaxWidth()
+                SettingsCategoryCard(
+                    emoji = "📡",
+                    title = "Sensors & Devices",
+                    summary = sensorSummary
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_watch),
-                                    contentDescription = "Watch",
-                                    tint = TextPrimary
-                                )
-                                Text(
-                                    text = "Garmin Watch",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = TextPrimary
-                                )
-                            }
-                            val (garminStatusText, garminStatusColor) = when (val gs = state.garminState) {
-                                is GarminConnectionState.Connected ->
-                                    "Connected: ${gs.deviceName}" to ReadinessGreen
-                                is GarminConnectionState.Initializing,
-                                is GarminConnectionState.SdkReady ->
-                                    "Connecting…" to ReadinessOrange
-                                is GarminConnectionState.DeviceFound ->
-                                    "Found: ${gs.deviceName}…" to ReadinessOrange
-                                is GarminConnectionState.WagsAppNotFound ->
-                                    "WAGS app not found on ${gs.deviceName}" to ButtonDanger
-                                is GarminConnectionState.Error ->
-                                    "Error" to ButtonDanger
-                                is GarminConnectionState.Uninitialized ->
-                                    "Not connected" to TextSecondary
-                            }
-                            Text(
-                                text = garminStatusText,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = garminStatusColor
-                            )
-                        }
-                        Button(
-                            onClick = { navController.navigate(WagsRoutes.GARMIN) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = SurfaceVariant,
-                                contentColor = TextPrimary
-                            )
-                        ) {
-                            Text(
-                                if (state.garminState is GarminConnectionState.Connected) "Manage"
-                                else "Setup"
-                            )
-                        }
-                    }
+                    ConnectedDeviceSection(
+                        deviceState = state.deviceState,
+                        onDisconnect = { viewModel.disconnectDevice() }
+                    )
+                    SettingsSubSectionDivider()
+                    GarminWatchSection(
+                        garminState = state.garminState,
+                        onManage = { navController.navigate(WagsRoutes.GARMIN) }
+                    )
+                    SettingsSubSectionDivider()
+                    NearbySensorsSection(
+                        isScanning = state.isScanning,
+                        scanResults = state.scanResults,
+                        deviceState = state.deviceState,
+                        onScan = { requestScan() },
+                        onStopScan = { viewModel.stopScan() },
+                        onConnect = { viewModel.connectDevice(it) }
+                    )
                 }
             }
 
-            // ── Apnea ─────────────────────────────────────────────────────────
+            // ── Apnea ──────────────────────────────────────────────────────
             item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = SurfaceDark),
-                    modifier = Modifier.fillMaxWidth()
+                SettingsCategoryCard(
+                    emoji = "🫁",
+                    title = "Apnea",
+                    summary = "Hyper cooldown · voice · vibration warnings"
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Apnea",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = TextPrimary
-                            )
-                            Text(
-                                text = "Days required between Hyper uses",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = TextSecondary
-                            )
-                        }
-                        IconButton(
-                            onClick = { viewModel.setHyperLockDays(state.hyperLockDays - 1) },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Text("−", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
-                        }
-                        Text(
-                            text = "${state.hyperLockDays}d",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = TextPrimary
-                        )
-                        IconButton(
-                            onClick = { viewModel.setHyperLockDays(state.hyperLockDays + 1) },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Text("+", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
-                        }
-                    }
-
+                    HyperLockDaysRow(
+                        days = state.hyperLockDays,
+                        onDaysChange = { viewModel.setHyperLockDays(it) }
+                    )
                     ApneaVibrationSettingsSection(
                         settings = state.apneaVibration,
                         onVoiceEnabledChange = viewModel::setApneaVoiceEnabled,
@@ -314,158 +237,119 @@ fun SettingsScreen(
                         onTestHoldWarning = viewModel::testApneaHoldWarning,
                         onTestBreathWarning = viewModel::testApneaBreathWarning
                     )
-                    }
                 }
             }
 
-            // ── Single unified scan button ─────────────────────────────────
+            // ── Integrations ───────────────────────────────────────────────
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                SettingsCategoryCard(
+                    emoji = "🔗",
+                    title = "Integrations",
+                    summary = "Spotify · Tail habits · meditation audio"
                 ) {
-                    Text("Nearby Sensors", style = MaterialTheme.typography.titleLarge)
-                    if (state.isScanning) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                color = EcgCyan,
-                                strokeWidth = 2.dp
-                            )
-                            OutlinedButton(
-                                onClick = { viewModel.stopScan() },
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
-                            ) {
-                                Text("Stop")
-                            }
-                        }
-                    } else {
-                        Button(onClick = { requestScan() }) {
-                            Text("Scan")
-                        }
-                    }
-                }
-            }
-
-            // ── Empty state ────────────────────────────────────────────────
-            if (state.scanResults.isEmpty() && !state.isScanning) {
-                item {
-                    Text(
-                        "No devices found. Make sure your sensors are powered on, then tap Scan.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextSecondary
+                    SpotifySection(
+                        spotifyConnected = state.spotifyConnected,
+                        onConnectSpotify = {
+                            context.startActivity(viewModel.buildSpotifyLoginIntent())
+                        },
+                        onDisconnectSpotify = { viewModel.disconnectSpotify() }
+                    )
+                    SettingsSubSectionDivider()
+                    TailAppIntegrationSection(
+                        habitList               = state.habitList,
+                        isLoading               = state.isLoadingHabits,
+                        habitAppUnavailable     = state.habitAppUnavailable,
+                        freeHoldHabit           = state.freeHoldHabit,
+                        apneaNewRecordHabit     = state.apneaNewRecordHabit,
+                        o2TableHabit            = state.o2TableHabit,
+                        co2TableHabit           = state.co2TableHabit,
+                        morningReadinessHabit   = state.morningReadinessHabit,
+                        hrvReadinessHabit       = state.hrvReadinessHabit,
+                        resonanceBreathingHabit = state.resonanceBreathingHabit,
+                        meditationHabit         = state.meditationHabit,
+                        rapidHrChangeHabit      = state.rapidHrChangeHabit,
+                        progressiveO2Habit      = state.progressiveO2Habit,
+                        minBreathHabit          = state.minBreathHabit,
+                        tillContractionHabit    = state.tillContractionHabit,
+                        contractionCountHabit   = state.contractionCountHabit,
+                        musicHabit              = state.musicHabit,
+                        onSelectHabit           = { slot, entry -> viewModel.selectHabit(slot, entry) },
+                        onClearHabit            = { slot -> viewModel.clearHabit(slot) },
+                        onRefresh               = { viewModel.loadHabits() },
+                        isBackfilling           = state.isBackfilling,
+                        backfillMessage         = state.backfillMessage,
+                        backfillError           = state.backfillError,
+                        onBackfill              = { viewModel.backfillHabitMinutes() },
+                        onDismissBackfillMsg    = { viewModel.clearBackfillMessage() }
+                    )
+                    SettingsSubSectionDivider()
+                    MeditationAudioDirectorySection(
+                        dirUri = state.meditationAudioDirUri,
+                        onChooseDirectory = { meditationDirLauncher.launch(null) },
+                        onClearDirectory = { viewModel.clearMeditationAudioDir() }
                     )
                 }
             }
 
-            // ── Unified scan results ────────────────────────────────────────
-            items(state.scanResults, key = { it.identifier }) { device ->
-                DeviceResultCard(
-                    device = device,
-                    deviceState = state.deviceState,
-                    onConnect = { viewModel.connectDevice(device) }
-                )
-            }
-
-            // ── Meditation audio directory ─────────────────────────────────
+            // ── Data & Backup ──────────────────────────────────────────────
             item {
-                MeditationAudioDirectoryCard(
-                    dirUri = state.meditationAudioDirUri,
-                    onChooseDirectory = { meditationDirLauncher.launch(null) },
-                    onClearDirectory = { viewModel.clearMeditationAudioDir() }
-                )
+                SettingsCategoryCard(
+                    emoji = "💾",
+                    title = "Data & Backup",
+                    summary = "Export everything to a ZIP · restore from backup"
+                ) {
+                    DataExportImportSection(
+                        isExporting = state.isExporting,
+                        isImporting = state.isImporting,
+                        message = state.exportImportMessage,
+                        error = state.exportImportError,
+                        onExport = {
+                            exportLauncher.launch(viewModel.getExportFileName())
+                        },
+                        onImport = {
+                            importLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
+                        },
+                        onDismissMessage = { viewModel.clearExportImportMessage() }
+                    )
+                }
             }
 
-            // ── Spotify song detection ─────────────────────────────────────
+            // ── Advice ─────────────────────────────────────────────────────
             item {
-                SpotifyIntegrationCard(
-                    spotifyConnected = state.spotifyConnected,
-                    onConnectSpotify = {
-                        context.startActivity(viewModel.buildSpotifyLoginIntent())
-                    },
-                    onDisconnectSpotify = { viewModel.disconnectSpotify() }
-                )
+                SettingsCategoryCard(
+                    emoji = "💬",
+                    title = "Advice",
+                    summary = "Personal reminders shown at the top of each screen"
+                ) {
+                    AdviceSettingsSection(
+                        adviceBySection = adviceState.adviceBySection,
+                        onOpenSection = { openAdviceSection = it }
+                    )
+                }
             }
 
-            // ── Tail App integration ───────────────────────────────────────
+            // ── Developer ──────────────────────────────────────────────────
             item {
-                TailAppIntegrationCard(
-                    habitList               = state.habitList,
-                    isLoading               = state.isLoadingHabits,
-                    habitAppUnavailable     = state.habitAppUnavailable,
-                    freeHoldHabit           = state.freeHoldHabit,
-                    apneaNewRecordHabit     = state.apneaNewRecordHabit,
-                    o2TableHabit            = state.o2TableHabit,
-                    co2TableHabit           = state.co2TableHabit,
-                    morningReadinessHabit   = state.morningReadinessHabit,
-                    hrvReadinessHabit       = state.hrvReadinessHabit,
-                    resonanceBreathingHabit = state.resonanceBreathingHabit,
-                    meditationHabit         = state.meditationHabit,
-                    rapidHrChangeHabit      = state.rapidHrChangeHabit,
-                    progressiveO2Habit      = state.progressiveO2Habit,
-                    minBreathHabit          = state.minBreathHabit,
-                    tillContractionHabit    = state.tillContractionHabit,
-                    contractionCountHabit   = state.contractionCountHabit,
-                    musicHabit              = state.musicHabit,
-                    onSelectHabit           = { slot, entry -> viewModel.selectHabit(slot, entry) },
-                    onClearHabit            = { slot -> viewModel.clearHabit(slot) },
-                    onRefresh               = { viewModel.loadHabits() },
-                    isBackfilling           = state.isBackfilling,
-                    backfillMessage         = state.backfillMessage,
-                    backfillError           = state.backfillError,
-                    onBackfill              = { viewModel.backfillHabitMinutes() },
-                    onDismissBackfillMsg    = { viewModel.clearBackfillMessage() }
-                )
+                SettingsCategoryCard(
+                    emoji = "🐛",
+                    title = "Developer",
+                    summary = "Debug bubble · crash logs"
+                ) {
+                    DebugModeSection(
+                        debugModeEnabled = state.debugModeEnabled,
+                        debugFileDirUri = state.debugFileDirUri,
+                        onToggleDebugMode = { viewModel.setDebugModeEnabled(it) },
+                        onChooseDirectory = { debugDirLauncher.launch(null) },
+                        onClearDirectory = { viewModel.clearDebugFileDir() }
+                    )
+                    SettingsSubSectionDivider()
+                    CrashLogsSection(
+                        onViewLogs = { navController.navigate(WagsRoutes.CRASH_LOGS) }
+                    )
+                }
             }
 
-            // ── Data Export / Import ──────────────────────────────────────
-            item {
-                DataExportImportCard(
-                    isExporting = state.isExporting,
-                    isImporting = state.isImporting,
-                    message = state.exportImportMessage,
-                    error = state.exportImportError,
-                    onExport = {
-                        exportLauncher.launch(viewModel.getExportFileName())
-                    },
-                    onImport = {
-                        importLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
-                    },
-                    onDismissMessage = { viewModel.clearExportImportMessage() }
-                )
-            }
-
-            // ── Crash Logs ───────────────────────────────────────────────
-            item {
-                CrashLogsCard(
-                    onViewLogs = { navController.navigate(WagsRoutes.CRASH_LOGS) }
-                )
-            }
-
-            // ── Debug Mode ───────────────────────────────────────────────
-            item {
-                DebugModeCard(
-                    debugModeEnabled = state.debugModeEnabled,
-                    debugFileDirUri = state.debugFileDirUri,
-                    onToggleDebugMode = { viewModel.setDebugModeEnabled(it) },
-                    onChooseDirectory = { debugDirLauncher.launch(null) },
-                    onClearDirectory = { viewModel.clearDebugFileDir() }
-                )
-            }
-
-            // ── Advice ──────────────────────────────────────────────────────
-            item {
-                AdviceSettingsCard(
-                    adviceBySection = adviceState.adviceBySection,
-                    onOpenSection = { openAdviceSection = it }
-                )
-            }
-
-            // ── About ────────────────────────────────────────────────────────
+            // ── About ──────────────────────────────────────────────────────
             item {
                 OutlinedButton(
                     onClick = { navController.navigate(WagsRoutes.ABOUT) },
@@ -545,1043 +429,46 @@ fun SettingsScreen(
     }
 }
 
-// ── Connected device summary card ─────────────────────────────────────────────
+// ── Hyper cooldown stepper row (inside the Apnea category) ───────────────────
 
 @Composable
-private fun ConnectedDeviceCard(
-    deviceState: BleConnectionState,
-    onDisconnect: () -> Unit
-) {
-    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text("Connected Device", style = MaterialTheme.typography.titleMedium)
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    val (statusText, statusColor) = when (deviceState) {
-                        is BleConnectionState.Connected -> {
-                            val typeName = when (deviceState.deviceType) {
-                                com.example.wags.domain.model.DeviceType.POLAR_H10 -> "Polar H10"
-                                com.example.wags.domain.model.DeviceType.POLAR_VERITY -> "Polar Verity Sense"
-                                com.example.wags.domain.model.DeviceType.OXIMETER -> "Pulse Oximeter"
-                                com.example.wags.domain.model.DeviceType.GENERIC_BLE -> "BLE Sensor"
-                            }
-                            "$typeName: ${deviceState.deviceName}" to ReadinessGreen
-                        }
-                        is BleConnectionState.Connecting ->
-                            "Connecting…" to ReadinessOrange
-                        is BleConnectionState.Scanning ->
-                            "Scanning…" to EcgCyan
-                        is BleConnectionState.Error ->
-                            "Error: ${deviceState.message}" to ReadinessRed
-                        is BleConnectionState.Disconnected ->
-                            "Not connected" to TextSecondary
-                    }
-                    Text(statusText, style = MaterialTheme.typography.bodyMedium, color = statusColor)
-
-                    // Show capabilities when connected
-                    if (deviceState is BleConnectionState.Connected) {
-                        val caps = deviceState.deviceType.capabilities.joinToString(", ") { it.name }
-                        Text(
-                            "Capabilities: $caps",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
-                        )
-                    }
-                }
-                if (deviceState is BleConnectionState.Connected) {
-                    OutlinedButton(
-                        onClick = onDisconnect,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
-                    ) { Text("Disconnect") }
-                }
-            }
-        }
-    }
-}
-
-// ── Unified device result card ────────────────────────────────────────────────
-
-@Composable
-private fun DeviceResultCard(
-    device: ScannedDevice,
-    deviceState: BleConnectionState,
-    onConnect: () -> Unit
-) {
-    val isConnected = deviceState is BleConnectionState.Connected &&
-        deviceState.deviceId == device.identifier
-    val isConnecting = deviceState is BleConnectionState.Connecting &&
-        deviceState.deviceId == device.identifier
-
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = if (isConnected) SurfaceVariant else SurfaceDark
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = device.name.ifBlank { device.identifier },
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Text(
-                    text = device.identifier,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
-                )
-                when {
-                    isConnected -> Text(
-                        "Connected",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = ReadinessGreen
-                    )
-                    isConnecting -> Text(
-                        "Connecting…",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = ReadinessOrange
-                    )
-                }
-            }
-            when {
-                isConnected -> { /* no button — disconnect from the top card */ }
-                isConnecting -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = EcgCyan,
-                        strokeWidth = 2.dp
-                    )
-                }
-                else -> {
-                    Button(
-                        onClick = onConnect,
-                        modifier = Modifier.height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                    ) { Text("Connect", style = MaterialTheme.typography.bodySmall) }
-                }
-            }
-        }
-    }
-}
-
-// ── Meditation audio directory card ──────────────────────────────────────────
-
-@Composable
-private fun MeditationAudioDirectoryCard(
-    dirUri: String,
-    onChooseDirectory: () -> Unit,
-    onClearDirectory: () -> Unit
-) {
-    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text("Meditation Audio Directory", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Choose the folder that contains your meditation / NSDR audio files. " +
-                    "The app will scan this folder and list all audio files in the Meditation screen.",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary
-            )
-
-            HorizontalDivider(color = SurfaceVariant)
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    if (dirUri.isNotBlank()) {
-                        val displayPath = try {
-                            Uri.parse(dirUri).lastPathSegment ?: dirUri
-                        } catch (_: Exception) { dirUri }
-                        Text(
-                            displayPath,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = ReadinessGreen
-                        )
-                    } else {
-                        Text(
-                            "No folder selected",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
-                        )
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (dirUri.isNotBlank()) {
-                        IconButton(onClick = onClearDirectory, modifier = Modifier.size(32.dp)) {
-                            Icon(
-                                Icons.Default.Clear,
-                                contentDescription = "Clear directory",
-                                tint = TextSecondary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
-                    OutlinedButton(
-                        onClick = onChooseDirectory,
-                        modifier = Modifier.height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
-                    ) {
-                        Text(
-                            if (dirUri.isNotBlank()) "Change" else "Choose Folder",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ── Tail App integration card ─────────────────────────────────────────────────
-
-@Composable
-private fun TailAppIntegrationCard(
-    habitList: List<HabitEntry>,
-    isLoading: Boolean,
-    habitAppUnavailable: Boolean,
-    freeHoldHabit: HabitSlotSelection,
-    apneaNewRecordHabit: HabitSlotSelection,
-    o2TableHabit: HabitSlotSelection,
-    co2TableHabit: HabitSlotSelection,
-    morningReadinessHabit: HabitSlotSelection,
-    hrvReadinessHabit: HabitSlotSelection,
-    resonanceBreathingHabit: HabitSlotSelection,
-    meditationHabit: HabitSlotSelection,
-    rapidHrChangeHabit: HabitSlotSelection,
-    progressiveO2Habit: HabitSlotSelection,
-    minBreathHabit: HabitSlotSelection,
-    tillContractionHabit: HabitSlotSelection,
-    contractionCountHabit: HabitSlotSelection,
-    musicHabit: HabitSlotSelection,
-    onSelectHabit: (Slot, HabitEntry) -> Unit,
-    onClearHabit: (Slot) -> Unit,
-    onRefresh: () -> Unit,
-    isBackfilling: Boolean = false,
-    backfillMessage: String? = null,
-    backfillError: String? = null,
-    onBackfill: () -> Unit = {},
-    onDismissBackfillMsg: () -> Unit = {}
-) {
-    var pickerSlot by remember { mutableStateOf<Slot?>(null) }
-
-    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Tail App Integration", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Choose which habit to increment for each activity.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
-                    )
-                }
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        color = EcgCyan,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    TextButton(onClick = onRefresh) {
-                        Text("Refresh", style = MaterialTheme.typography.bodySmall, color = EcgCyan)
-                    }
-                }
-            }
-
-            when {
-                habitAppUnavailable ->
-                    Text(
-                        "Tail app not found. Make sure it is installed and tap Refresh.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = ReadinessOrange
-                    )
-                !isLoading && habitList.isEmpty() ->
-                    Text(
-                        "No habits found. Tap Refresh to load from the Tail app.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
-                    )
-            }
-
-            HorizontalDivider(color = SurfaceVariant)
-
-            val slots = listOf(
-                Slot.FREE_HOLD           to freeHoldHabit,
-                Slot.APNEA_NEW_RECORD    to apneaNewRecordHabit,
-                Slot.O2_TABLE            to o2TableHabit,
-                Slot.CO2_TABLE           to co2TableHabit,
-                Slot.PROGRESSIVE_O2      to progressiveO2Habit,
-                Slot.MIN_BREATH          to minBreathHabit,
-                Slot.TILL_CONTRACTION    to tillContractionHabit,
-                Slot.CONTRACTION_COUNT   to contractionCountHabit,
-                Slot.MORNING_READINESS   to morningReadinessHabit,
-                Slot.HRV_READINESS       to hrvReadinessHabit,
-                Slot.RESONANCE_BREATHING to resonanceBreathingHabit,
-                Slot.MEDITATION          to meditationHabit,
-                Slot.RAPID_HR_CHANGE     to rapidHrChangeHabit,
-                Slot.MUSIC               to musicHabit
-            )
-
-            slots.forEachIndexed { index, (slot, selection) ->
-                HabitSlotRow(
-                    slot      = slot,
-                    selection = selection,
-                    onClick   = { pickerSlot = slot },
-                    onClear   = { onClearHabit(slot) }
-                )
-                if (index < slots.lastIndex) {
-                    HorizontalDivider(color = SurfaceVariant)
-                }
-            }
-
-            // Searchable habit-picker popup for the slot being configured
-            pickerSlot?.let { slot ->
-                HabitPickerDialog(
-                    slot        = slot,
-                    habitList   = habitList,
-                    selectedId  = slots.firstOrNull { it.first == slot }?.second?.habitId ?: "",
-                    onSelect    = { entry ->
-                        onSelectHabit(slot, entry)
-                        pickerSlot = null
-                    },
-                    onDismiss   = { pickerSlot = null }
-                )
-            }
-
-            // ── Retroactive backfill ───────────────────────────────────────────
-            HorizontalDivider(color = SurfaceVariant)
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "Backfill Past Sessions",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        "Send minutes and session counts from all past sessions " +
-                                "to Tail. Connecting a new habit backfills its " +
-                                "history automatically.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
-                    )
-                }
-                if (isBackfilling) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        color = EcgCyan,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    TextButton(onClick = onBackfill) {
-                        Text("Send", style = MaterialTheme.typography.bodySmall, color = EcgCyan)
-                    }
-                }
-            }
-
-            // Show result or error message
-            backfillMessage?.let { msg ->
-                Text(
-                    msg,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = ReadinessGreen,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onDismissBackfillMsg() }
-                )
-            }
-            backfillError?.let { err ->
-                Text(
-                    err,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = ReadinessOrange,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onDismissBackfillMsg() }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun HabitSlotRow(
-    slot: Slot,
-    selection: HabitSlotSelection,
-    onClick: () -> Unit,
-    onClear: () -> Unit
+private fun HyperLockDaysRow(
+    days: Int,
+    onDaysChange: (Int) -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(slot.label, style = MaterialTheme.typography.bodyMedium)
-            if (selection.isSet) {
-                Text(
-                    selection.displayName,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = ReadinessGreen
-                )
-            } else {
-                Text(
-                    "Not set",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
-                )
-            }
-        }
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (selection.isSet) {
-                IconButton(onClick = onClear, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        Icons.Default.Clear,
-                        contentDescription = "Clear",
-                        tint = TextSecondary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-            OutlinedButton(
-                onClick = onClick,
-                modifier = Modifier.height(32.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
-            ) {
-                Text(
-                    if (selection.isSet) "Change" else "Set",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-    }
-}
-
-/**
- * Searchable, alphabetically sorted habit picker popup for a Tail slot.
- * Opens when the slot's "Set"/"Change" button is tapped.
- */
-@Composable
-private fun HabitPickerDialog(
-    slot: Slot,
-    habitList: List<HabitEntry>,
-    selectedId: String,
-    onSelect: (HabitEntry) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var query by remember { mutableStateOf("") }
-
-    val filtered = remember(habitList, query) {
-        val sorted = habitList.sortedBy { it.habitName.lowercase() }
-        if (query.isBlank()) sorted
-        else sorted.filter { it.habitName.contains(query.trim(), ignoreCase = true) }
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = SurfaceDark,
-        title = {
-            Column {
-                Text("Select Habit", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    slot.label,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
-                )
-            }
-        },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Search habits") },
-                    leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = null, tint = TextSecondary)
-                    },
-                    trailingIcon = {
-                        if (query.isNotEmpty()) {
-                            IconButton(onClick = { query = "" }) {
-                                Icon(
-                                    Icons.Default.Clear,
-                                    contentDescription = "Clear search",
-                                    tint = TextSecondary
-                                )
-                            }
-                        }
-                    },
-                    singleLine = true,
-                    shape = MaterialTheme.shapes.small
-                )
-                Spacer(Modifier.height(8.dp))
-                when {
-                    habitList.isEmpty() ->
-                        Text(
-                            "No habits available. Tap Refresh on the Tail card.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
-                        )
-                    filtered.isEmpty() ->
-                        Text(
-                            "No habits match \"${query.trim()}\".",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
-                        )
-                    else ->
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 360.dp),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            // No explicit key: Tail can return duplicate/blank habit
-                            // ids (id == habit name), which would crash LazyColumn.
-                            items(filtered) { entry ->
-                                HabitPickerRow(
-                                    entry      = entry,
-                                    isSelected = entry.habitId == selectedId,
-                                    onClick    = { onSelect(entry) }
-                                )
-                            }
-                        }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
-    )
-}
-
-@Composable
-private fun HabitPickerRow(
-    entry: HabitEntry,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    Surface(
-        onClick = onClick,
-        color = if (isSelected) SurfaceVariant else Color.Transparent,
-        shape = MaterialTheme.shapes.small,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
             Text(
-                text = entry.habitName,
+                text = "Hyper Cooldown",
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (isSelected) TextPrimary else TextSecondary,
-                modifier = Modifier.weight(1f)
+                color = TextPrimary
             )
-            if (isSelected) {
-                Text("✓", style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
-            }
-        }
-    }
-}
-
-// ── Crash Logs card ────────────────────────────────────────────────────────────
-
-@Composable
-private fun CrashLogsCard(onViewLogs: () -> Unit) {
-    val context = LocalContext.current
-    val logCount = remember { CrashLogWriter.listLogs(context).size }
-
-    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("🪲 Crash Logs", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
-                Text(
-                    if (logCount == 0) "No crashes recorded"
-                    else "$logCount crash log${if (logCount != 1) "s" else ""} saved",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (logCount > 0) ReadinessRed else TextSecondary
-                )
-            }
-            OutlinedButton(
-                onClick = onViewLogs,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
-            ) {
-                Text("View")
-            }
-        }
-    }
-}
-
-// ── Data Export / Import card ──────────────────────────────────────────────────
-
-@Composable
-private fun DataExportImportCard(
-    isExporting: Boolean,
-    isImporting: Boolean,
-    message: String?,
-    error: String?,
-    onExport: () -> Unit,
-    onImport: () -> Unit,
-    onDismissMessage: () -> Unit
-) {
-    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text("Data Backup & Restore", style = MaterialTheme.typography.titleMedium)
             Text(
-                "Export all your data (readings, sessions, records, settings, device history) " +
-                    "to a backup file. Import a backup to restore everything.",
+                text = "Days required between Hyper uses",
                 style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary
             )
-
-            HorizontalDivider(color = SurfaceVariant)
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Export Data", style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        "Save all data to a ZIP file",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
-                    )
-                }
-                if (isExporting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = EcgCyan,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Button(
-                        onClick = onExport,
-                        enabled = !isImporting,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = SurfaceVariant,
-                            contentColor = TextPrimary
-                        )
-                    ) {
-                        Text("Export")
-                    }
-                }
-            }
-
-            HorizontalDivider(color = SurfaceVariant)
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Import Data", style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        "Restore from a backup file",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
-                    )
-                }
-                if (isImporting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = EcgCyan,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    OutlinedButton(
-                        onClick = onImport,
-                        enabled = !isExporting,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
-                    ) {
-                        Text("Import")
-                    }
-                }
-            }
-
-            if (message != null) {
-                HorizontalDivider(color = SurfaceVariant)
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = ReadinessGreen.copy(alpha = 0.15f)
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp)
-                    ) {
-                        Text(
-                            text = message,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = ReadinessGreen
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        TextButton(
-                            onClick = onDismissMessage,
-                            modifier = Modifier.align(Alignment.End)
-                        ) {
-                            Text("Dismiss", color = ReadinessGreen)
-                        }
-                    }
-                }
-            }
-
-            if (error != null) {
-                HorizontalDivider(color = SurfaceVariant)
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = ReadinessRed.copy(alpha = 0.15f)
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp)
-                    ) {
-                        Text(
-                            text = error,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = ReadinessRed
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        TextButton(
-                            onClick = onDismissMessage,
-                            modifier = Modifier.align(Alignment.End)
-                        ) {
-                            Text("Dismiss", color = ReadinessRed)
-                        }
-                    }
-                }
-            }
         }
-    }
-}
-
-// ── Spotify integration card ──────────────────────────────────────────────────
-
-@Composable
-private fun SpotifyIntegrationCard(
-    spotifyConnected: Boolean,
-    onConnectSpotify: () -> Unit,
-    onDisconnectSpotify: () -> Unit
-) {
-    val context = LocalContext.current
-    val isGranted = remember {
-        android.service.notification.NotificationListenerService::class.java.let {
-            androidx.core.app.NotificationManagerCompat
-                .getEnabledListenerPackages(context)
-                .contains(context.packageName)
-        }
-    }
-    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+        IconButton(
+            onClick = { onDaysChange(days - 1) },
+            modifier = Modifier.size(28.dp)
         ) {
-            Text("Spotify Integration", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Connect your Spotify account to load songs directly into playback " +
-                    "before a breath hold. Song detection also records what played during holds.",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary
-            )
-
-            HorizontalDivider(color = SurfaceVariant)
-
-            // ── Spotify Account ──────────────────────────────────────────────
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Spotify Account", style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        if (spotifyConnected) "✓ Connected" else "Not connected",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (spotifyConnected) ReadinessGreen else TextSecondary
-                    )
-                }
-                if (spotifyConnected) {
-                    OutlinedButton(
-                        onClick = onDisconnectSpotify,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
-                    ) {
-                        Text("Disconnect")
-                    }
-                } else {
-                    Button(
-                        onClick = onConnectSpotify,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = SurfaceVariant,
-                            contentColor = TextPrimary
-                        )
-                    ) {
-                        Text("Connect Spotify")
-                    }
-                }
-            }
-
-            HorizontalDivider(color = SurfaceVariant)
-
-            // ── Notification Access (song detection) ─────────────────────────
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Notification Access", style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        if (isGranted) "✓ Granted" else "⚠ Required for song detection",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (isGranted) ReadinessGreen else ReadinessOrange
-                    )
-                }
-                Button(
-                    onClick = {
-                        context.startActivity(
-                            Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        )
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = SurfaceVariant,
-                        contentColor = TextPrimary
-                    )
-                ) {
-                    Text("Open Settings")
-                }
-            }
+            Text("−", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
         }
-    }
-}
-
-// ── Advice settings card ──────────────────────────────────────────────────────
-
-@Composable
-private fun AdviceSettingsCard(
-    adviceBySection: Map<String, List<com.example.wags.data.db.entity.AdviceEntity>>,
-    onOpenSection: (String) -> Unit
-) {
-    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+        Text(
+            text = "${days}d",
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextPrimary
+        )
+        IconButton(
+            onClick = { onDaysChange(days + 1) },
+            modifier = Modifier.size(28.dp)
         ) {
-            Text("Advice", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Add personal reminders or tips that appear at the top of each section's screen.",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary
-            )
-
-            HorizontalDivider(color = SurfaceVariant)
-
-            AdviceSection.all.forEach { section ->
-                val count = adviceBySection[section]?.size ?: 0
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            AdviceSection.label(section),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            if (count == 0) "No advice set"
-                            else "$count piece${if (count != 1) "s" else ""} of advice",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (count > 0) ReadinessGreen else TextSecondary
-                        )
-                    }
-                    OutlinedButton(
-                        onClick = { onOpenSection(section) },
-                        modifier = Modifier.height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
-                    ) {
-                        Text(
-                            if (count > 0) "Manage" else "Add",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ── Debug Mode card ──────────────────────────────────────────────────────────
-
-@Composable
-private fun DebugModeCard(
-    debugModeEnabled: Boolean,
-    debugFileDirUri: String,
-    onToggleDebugMode: (Boolean) -> Unit,
-    onChooseDirectory: () -> Unit,
-    onClearDirectory: () -> Unit
-) {
-    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text("🐛 Debug Mode", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Show a floating bubble on every screen. Tap it to log bugs, features, or notes " +
-                    "that are saved with the current screen's source file info to debug_wags.json.",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary
-            )
-
-            HorizontalDivider(color = SurfaceVariant)
-
-            // Toggle
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Enable Debug Bubble", style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        if (debugModeEnabled) "Bubble is visible" else "Bubble is hidden",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (debugModeEnabled) ReadinessGreen else TextSecondary
-                    )
-                }
-                Switch(
-                    checked = debugModeEnabled,
-                    onCheckedChange = onToggleDebugMode,
-                    colors = SwitchDefaults.colors(
-                        checkedTrackColor = EcgCyan,
-                        checkedThumbColor = TextPrimary
-                    )
-                )
-            }
-
-            // File directory (only shown when debug mode is on)
-            if (debugModeEnabled) {
-                HorizontalDivider(color = SurfaceVariant)
-
-                Text("Output File Location", style = MaterialTheme.typography.bodyMedium)
-                Text(
-                    "Choose the folder where debug_wags.json will be written.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        if (debugFileDirUri.isNotBlank()) {
-                            val displayPath = try {
-                                Uri.parse(debugFileDirUri).lastPathSegment ?: debugFileDirUri
-                            } catch (_: Exception) { debugFileDirUri }
-                            Text(
-                                displayPath,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = ReadinessGreen
-                            )
-                        } else {
-                            Text(
-                                "Using app internal storage",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = TextSecondary
-                            )
-                        }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        if (debugFileDirUri.isNotBlank()) {
-                            IconButton(onClick = onClearDirectory, modifier = Modifier.size(32.dp)) {
-                                Icon(
-                                    Icons.Default.Clear,
-                                    contentDescription = "Clear directory",
-                                    tint = TextSecondary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                        OutlinedButton(
-                            onClick = onChooseDirectory,
-                            modifier = Modifier.height(32.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
-                        ) {
-                            Text(
-                                if (debugFileDirUri.isNotBlank()) "Change" else "Choose Folder",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                    }
-                }
-            }
+            Text("+", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
         }
     }
 }
