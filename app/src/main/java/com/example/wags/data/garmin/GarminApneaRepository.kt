@@ -82,7 +82,9 @@ class GarminApneaRepository @Inject constructor(
             // Save the record
             val recordId = apneaRepository.saveRecord(
                 ApneaRecordEntity(
-                    timestamp = payload.endEpochMs,
+                    // Start of the hold (the watch sends both epochs) —
+                    // history should show when the hold began, not ended.
+                    timestamp = payload.startEpochMs,
                     durationMs = payload.durationMs,
                     lungVolume = payload.lungVolume,
                     prepType = payload.prepType,

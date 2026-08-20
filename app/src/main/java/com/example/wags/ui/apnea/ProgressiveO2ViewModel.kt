@@ -992,6 +992,9 @@ class ProgressiveO2ViewModel @Inject constructor(
     private suspend fun saveSession(finalState: ProgressiveO2State): Long {
         val now = System.currentTimeMillis()
         val totalDurationMs = now - sessionStartMs
+        // Timestamps mark when the session STARTED (the user's Start click),
+        // not when it was saved — history should show the start time.
+        val sessionStartTs = if (sessionStartMs > 0L) sessionStartMs else now
         val breathPeriodSec = _uiState.value.breathPeriodSec
         val deviceLabel = hrDataSource.activeHrDeviceLabel()
         val telemetrySnapshot = telemetrySamples.toList()
@@ -1011,7 +1014,7 @@ class ProgressiveO2ViewModel @Inject constructor(
 
         // 1. Save ApneaSessionEntity
         val sessionEntity = ApneaSessionEntity(
-            timestamp = now,
+            timestamp = sessionStartTs,
             tableType = "PROGRESSIVE_O2",
             tableVariant = "ENDLESS",
             tableParamsJson = paramsJson,
@@ -1057,7 +1060,7 @@ class ProgressiveO2ViewModel @Inject constructor(
 
         val recordId = apneaRepository.saveRecord(
             ApneaRecordEntity(
-                timestamp = now,
+                timestamp = sessionStartTs,
                 durationMs = totalHoldTimeMs,
                 lungVolume = lungVolume,
                 prepType = prepType,

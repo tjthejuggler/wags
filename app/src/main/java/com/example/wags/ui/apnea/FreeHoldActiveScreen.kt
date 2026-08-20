@@ -429,6 +429,7 @@ class FreeHoldActiveViewModel @Inject constructor(
     }
 
     fun showGuidedCountdown() {
+        markHoldFlowStart()  // the hyper countdown is part of the session
         _uiState.update { it.copy(showGuidedCountdown = true) }
         // If "Start MP3 with Hyper" is checked and we're in guided mode, start audio now
         val state = _uiState.value
@@ -457,6 +458,7 @@ class FreeHoldActiveViewModel @Inject constructor(
      * but does NOT auto-start the hold — the user must tap Start manually.
      */
     fun onGuidedCountdownCancelled() {
+        holdFlowStartMs = 0L  // flow aborted — re-arm for the next Start click
         _uiState.update { it.copy(showGuidedCountdown = false, guidedCountdownComplete = true) }
         // Stop guided audio if it was started with hyper
         if (isGuidedMode && _uiState.value.startMp3WithHyper) {
@@ -605,6 +607,13 @@ class FreeHoldActiveViewModel @Inject constructor(
     }
 
     private var freeHoldStartTime = 0L
+    /**
+     * Wall-clock time of the click that started the current hold flow — the
+     * eucapnic pacer navigation, the guided-hyper countdown, or the hold
+     * itself when no prep runs. Used as the record timestamp so history
+     * shows when the user began, not when the hold ended.
+     */
+    private var holdFlowStartMs = 0L
     private val oximeterSamples = mutableListOf<Pair<Long, OximeterReading>>()
     private var oximeterCollectionJob: Job? = null
     /**
@@ -677,6 +686,7 @@ class FreeHoldActiveViewModel @Inject constructor(
      */
     fun resetForNewHold() {
         savedStateHandle["eucapnic_prep_completed"] = false
+        holdFlowStartMs = 0L
         _uiState.update {
             it.copy(
                 eucapnicPrepCompleted = false,
@@ -684,6 +694,15 @@ class FreeHoldActiveViewModel @Inject constructor(
                 freeHoldFirstContractionMs = null
             )
         }
+    }
+
+    /**
+     * Record the click that began this hold flow. Only the FIRST click marks
+     * it — later clicks (e.g. HOLD after eucapnic prep) must not overwrite
+     * the flow start.
+     */
+    fun markHoldFlowStart() {
+        if (holdFlowStartMs == 0L) holdFlowStartMs = System.currentTimeMillis()
     }
 
     fun startFreeHold() {
@@ -695,6 +714,7 @@ class FreeHoldActiveViewModel @Inject constructor(
             deviceManager.startRrStream(polarDeviceId)
         }
         freeHoldStartTime = System.currentTimeMillis()
+        markHoldFlowStart()  // no-op when prep already marked the flow start
         oximeterIsPrimary = hrDataSource.isOximeterPrimaryDevice()
         holdStartDeviceLabel = hrDataSource.activeHrDeviceLabel()
         _uiState.update {
@@ -1178,6 +1198,12 @@ class FreeHoldActiveViewModel @Inject constructor(
             val maxHr = if (maxHrFromRr > 0f) maxHrFromRr else maxHrFromOx
 
             val now = System.currentTimeMillis()
+            // Timestamp = when the user STARTED the flow (prep click or hold
+            // start), not when the hold ended. Consumed once per hold.
+            val recordTs = if (holdFlowStartMs > 0L) holdFlowStartMs
+                           else if (freeHoldStartTime > 0L) freeHoldStartTime
+                           else now
+            holdFlowStartMs = 0L
 
             // Capture guided hyper state at save time
             val guidedState = _uiState.value
@@ -1194,7 +1220,7 @@ class FreeHoldActiveViewModel @Inject constructor(
 
             val recordId = apneaRepository.saveRecord(
                 ApneaRecordEntity(
-                    timestamp              = now,
+                    timestamp              = recordTs,
                     durationMs             = durationMs,
                     lungVolume             = lungVolume,
                     prepType               = prepType,
@@ -1721,6 +1747,7 @@ private fun FreeHoldActiveScreenContent(
                 modifier = Modifier.fillMaxSize(),
                 onShowTimerChange = { viewModel.setShowTimer(it) },
                 onStart = {
+                    viewModel.markHoldFlowStart()
                     if (state.currentPrepType == PrepType.EUCAPNIC_DIAPHRAGMATIC.name && state.eucapnicConfig != null) {
                         if (state.eucapnicPrepCompleted) {
                             // Eucapnic prep already done, start the actual hold

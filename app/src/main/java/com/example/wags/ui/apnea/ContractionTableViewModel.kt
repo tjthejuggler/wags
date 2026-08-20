@@ -1089,6 +1089,9 @@ class ContractionTableViewModel @Inject constructor(
     ): Pair<Long, Long> {
         val now = System.currentTimeMillis()
         val totalDurationMs = now - sessionStartMs
+        // Timestamps mark when the session STARTED (the user's Start click),
+        // not when it was saved — history should show the start time.
+        val sessionStartTs = if (sessionStartMs > 0L) sessionStartMs else now
         val s = _uiState.value
         // Prep type comes from the session-start snapshot so the record reflects
         // what the session actually started with.
@@ -1111,7 +1114,7 @@ class ContractionTableViewModel @Inject constructor(
 
         // 1. Save ApneaSessionEntity
         val sessionEntity = ApneaSessionEntity(
-            timestamp = now,
+            timestamp = sessionStartTs,
             tableType = s.mode.tableType(),
             tableVariant = s.mode.name,
             tableParamsJson = paramsJson,
@@ -1153,7 +1156,7 @@ class ContractionTableViewModel @Inject constructor(
 
         val recordId = apneaRepository.saveRecord(
             ApneaRecordEntity(
-                timestamp = now,
+                timestamp = sessionStartTs,
                 durationMs = headlineDurationMs,
                 lungVolume = s.lungVolume,
                 prepType = sessionPrep ?: s.prepType,

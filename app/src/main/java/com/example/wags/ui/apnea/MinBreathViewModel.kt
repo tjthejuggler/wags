@@ -1016,6 +1016,9 @@ class MinBreathViewModel @Inject constructor(
     private suspend fun saveSession(finalState: MinBreathState): Long {
         val now = System.currentTimeMillis()
         val totalDurationMs = now - sessionStartMs
+        // Timestamps mark when the session STARTED (the user's Start click),
+        // not when it was saved — history should show the start time.
+        val sessionStartTs = if (sessionStartMs > 0L) sessionStartMs else now
         val sessionDurationSec = _uiState.value.sessionDurationSec
         val deviceLabel = hrDataSource.activeHrDeviceLabel()
         val telemetrySnapshot = telemetrySamples.toList()
@@ -1033,7 +1036,7 @@ class MinBreathViewModel @Inject constructor(
 
         // 1. Save ApneaSessionEntity
         val sessionEntity = ApneaSessionEntity(
-            timestamp = now,
+            timestamp = sessionStartTs,
             tableType = "MIN_BREATH",
             tableVariant = "TIMED",
             tableParamsJson = paramsJson,
@@ -1076,7 +1079,7 @@ class MinBreathViewModel @Inject constructor(
 
         val recordId = apneaRepository.saveRecord(
             ApneaRecordEntity(
-                timestamp = now,
+                timestamp = sessionStartTs,
                 durationMs = totalHoldTimeMs,
                 lungVolume = currentState.lungVolume,
                 prepType = sessionPrep ?: currentState.prepType,

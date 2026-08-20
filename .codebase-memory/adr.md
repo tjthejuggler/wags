@@ -1,30 +1,20 @@
-# ADR: Settings screen reorganized into collapsible category cards
+# ADR: Apnea session timestamps mark session START, not save/end time
+
+## Status
+Accepted (2026-08-20)
 
 ## Context
-The wags SettingsScreen had grown into a 1,588-line monolith: a flat LazyColumn of ~12 unrelated cards (device, Garmin, apnea, scan results, meditation dir, Spotify, Tail habits, backup, crash logs, debug, advice, about) with no grouping, titled "Device Settings" although it contained far more.
+All apnea save paths (free hold, O2/CO2 tables, Contraction Tables, Progressive O2, Min Breath, Garmin watch holds) wrote `timestamp = System.currentTimeMillis()` at SAVE time — i.e. the session END. Users expect the date/time shown in history to be when they clicked START (hold start, or eucapnic/hyperventilation prep start when prep runs).
 
 ## Decision
-Reorganize the settings screen into collapsible category cards, inspired by the tail project's SettingsCategory pattern but styled with the wags design language (SurfaceDark + 1.dp CardBorder outline cards, titleMedium SemiBold headers, KeyboardArrowUp/Down chevron, AnimatedVisibility expand/shrink — same visual grammar as the apnea DrillCard/CollapsibleSectionHeader and the dashboard NavigationCard).
-
-Six categories, collapsed by default (content only composed while expanded, rememberSaveable state):
-- 📡 Sensors & Devices (connected sensor, Garmin watch, nearby-scan; header summary shows live connection state)
-- 🫁 Apnea (hyper cooldown stepper + existing ApneaVibrationSettingsSection)
-- 🔗 Integrations (Spotify, Tail habits, meditation audio folder)
-- 💾 Data & Backup (export/import)
-- 💬 Advice (per-section advice rows)
-- 🐛 Developer (debug bubble, crash logs)
-About stays a footer button. Screen retitled "Settings".
-
-## File layout (split from the monolith, all in ui/settings/)
-- SettingsCategoryCard.kt — SettingsCategoryCard + SettingsSubSectionDivider + SettingsSubSectionLabel
-- SettingsDeviceSections.kt — ConnectedDeviceSection, GarminWatchSection, NearbySensorsSection
-- SettingsIntegrationsSections.kt — MeditationAudioDirectorySection, SpotifySection
-- SettingsTailSection.kt — TailAppIntegrationSection + habit picker dialog
-- SettingsDataSections.kt — DataExportImportSection, CrashLogsSection, DebugModeSection, AdviceSettingsSection
-- SettingsScreen.kt — screen scaffold, launchers, dialogs, category composition
-
-Sub-sections are plain Columns/Rows inside the category card (no nested Cards), separated by thin SurfaceVariant dividers. SettingsViewModel, all routes, and the SettingsScreen public signature are unchanged; behavior is feature-identical to before.
+1. **Future sessions** record the flow-start wall-clock time:
+   - Table VMs (`ContractionTableViewModel`, `MinBreathViewModel`, `ProgressiveO2ViewModel`) use their existing `sessionStartMs` (set in `startSession()`).
+   - `ApneaViewModel` uses `tableSessionStartTime` for tables and `freeHoldStartTime` for the legacy free-hold path.
+   - `FreeHoldActiveScreenViewModel` gained `holdFlowStartMs` + `markHoldFlowStart()` — captured at the FIRST Start click (eucapnic pacer navigation, guided-hyper countdown, or direct hold start), consumed once in `saveFreeHoldRecord`, cleared on cancel/reset.
+   - `GarminApneaRepository` uses `payload.startEpochMs` instead of `endEpochMs`.
+2. **Retroactive fix** via `MIGRATION_42_43` (DB v42→43): `apnea_records` rows paired with an `apnea_sessions` row (exact timestamp+tableType match — the pairing convention also used by MIGRATION_41_42 and `ApneaRecordDetailViewModel`) shift by the session's `totalSessionDurationMs`; unpaired rows (free holds, Garmin) shift by their own `durationMs` (prep time not recoverable). Sessions shift by `totalSessionDurationMs`. Records update FIRST so the pairing subquery sees unshifted session timestamps; both clamp at 1.
 
 ## Consequences
-- New settings get added as a sub-section inside the matching category file instead of growing the screen file.
-- The collapsed-by-default layout keeps the screen scannable; live sensor status is visible in the category summary without expanding.
+- Record↔session exact-timestamp pairing survives the migration (both sides of a pair shift by the same amount).
+- Old free-hold timestamps land on hold start (prep excluded) — accepted imprecision.
+- Rows with zero duration keep their timestamp (no data to shift by); nothing is deleted.

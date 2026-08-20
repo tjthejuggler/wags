@@ -864,6 +864,9 @@ class ApneaViewModel @Inject constructor(
             val tableType = state.currentTable?.type?.name ?: "UNKNOWN"
             val variantStr = "${state.selectedLength.name}_${state.selectedDifficulty.name}"
             val now = System.currentTimeMillis()
+            // Timestamps mark when the table session STARTED, not when it
+            // was saved — history should show the start time.
+            val sessionStartTs = if (tableSessionStartTime > 0L) tableSessionStartTime else now
             val table = state.currentTable ?: return@launch
 
             // ── HR / SpO₂ aggregates (same logic as free hold) ──────────────
@@ -890,7 +893,7 @@ class ApneaViewModel @Inject constructor(
 
             // 1. Save the session entity with per-round contraction data
             val sessionEntity = ApneaSessionEntity(
-                timestamp = now,
+                timestamp = sessionStartTs,
                 tableType = tableType,
                 tableVariant = variantStr,
                 tableParamsJson = roundFcJson,
@@ -914,7 +917,7 @@ class ApneaViewModel @Inject constructor(
             val tableEffectiveAudio = state.audio.name
             val recordId = apneaRepository.saveRecord(
                 ApneaRecordEntity(
-                    timestamp = now,
+                    timestamp = sessionStartTs,
                     durationMs = totalHoldMs,
                     lungVolume = state.selectedLungVolume,
                     prepType = state.prepType.name,
@@ -1385,6 +1388,8 @@ class ApneaViewModel @Inject constructor(
 
             val state = _uiState.value
             val now = System.currentTimeMillis()
+            // Timestamp = hold START, not save time — history shows the start.
+            val recordTs = if (freeHoldStartTime > 0L) freeHoldStartTime else now
 
             // Honor the user's explicit audio choice; never downgrade MUSIC to
             // SILENCE based on unreliable Spotify track tracking.
@@ -1393,7 +1398,7 @@ class ApneaViewModel @Inject constructor(
             // ── Save summary record ───────────────────────────────────────────
             val recordId = apneaRepository.saveRecord(
                 ApneaRecordEntity(
-                    timestamp = now,
+                    timestamp = recordTs,
                     durationMs = durationMs,
                     lungVolume = state.selectedLungVolume,
                     prepType = state.prepType.name,

@@ -32,7 +32,7 @@ import com.example.wags.data.db.entity.*
         ForecastCalibrationEntity::class,
         EucapnicPastConfigurationEntity::class
     ],
-    version = 42,
+    version = 43,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -1189,6 +1189,63 @@ abstract class WagsDatabase : RoomDatabase() {
                     if (holds.isEmpty()) null else holds.sum() / holds.size
                 } catch (_: Exception) {
                     null
+                }
+            }
+
+            /**
+             * v42 → v43: Apnea history timestamps now mark the START of a
+             * session instead of its end.
+             *
+             * Previously apnea_records.timestamp and apnea_sessions.timestamp
+             * were written with System.currentTimeMillis() at SAVE time
+             * (i.e. the session END). Shift every existing row back by its
+             * duration so history shows when the session began:
+             *
+             *  1. apnea_records: rows paired with an apnea_sessions row
+             *     (exact timestamp + tableType match — the same convention
+             *     used by MIGRATION_41_42 and the detail-screen lookup)
+             *     shift by the session's totalSessionDurationMs so the
+             *     pairing survives. Unpaired rows (free holds, Garmin watch
+             *     holds) shift by their own durationMs; prep time before a
+             *     free hold is not recoverable retroactively.
+             *
+             *  2. apnea_sessions: shift by totalSessionDurationMs.
+             *
+             * Rows with zero duration keep their timestamp (nothing to
+             * shift by). Results are clamped at 1 to guard against absurd
+             * data producing negative epochs.
+             */
+            val MIGRATION_42_43 = object : Migration(42, 43) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // 1. Records FIRST — the pairing subquery must see the
+                    //    sessions' original (unshifted) timestamps.
+                    db.execSQL(
+                        """
+                        UPDATE apnea_records
+                        SET timestamp = MAX(
+                            timestamp - COALESCE(
+                                (SELECT s.totalSessionDurationMs
+                                 FROM apnea_sessions s
+                                 WHERE s.timestamp = apnea_records.timestamp
+                                   AND s.tableType = apnea_records.tableType),
+                                durationMs
+                            ),
+                            1
+                        )
+                        WHERE durationMs > 0
+                           OR EXISTS (SELECT 1 FROM apnea_sessions s
+                                      WHERE s.timestamp = apnea_records.timestamp
+                                        AND s.tableType = apnea_records.tableType
+                                        AND s.totalSessionDurationMs > 0)
+                        """.trimIndent()
+                    )
+
+                    // 2. Sessions — the same shift as their paired records.
+                    db.execSQL(
+                        "UPDATE apnea_sessions " +
+                            "SET timestamp = MAX(timestamp - totalSessionDurationMs, 1) " +
+                            "WHERE totalSessionDurationMs > 0"
+                    )
                 }
             }
         }
