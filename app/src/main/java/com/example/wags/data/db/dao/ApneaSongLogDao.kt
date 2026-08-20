@@ -105,7 +105,7 @@ interface ApneaSongLogDao {
               )
               AND r.lungVolume = :lungVolume
               AND r.prepType   = :prepType
-              AND r.timeOfDay  = :timeOfDay
+              AND $TOD_MATCH_R
               AND r.posture    = :posture
               AND r.audio      = :audio
         ) THEN 1 ELSE 0 END

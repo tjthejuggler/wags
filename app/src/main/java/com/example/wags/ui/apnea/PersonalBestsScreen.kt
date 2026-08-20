@@ -17,6 +17,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.domain.model.PersonalBestEntry
+import com.example.wags.domain.model.TimeBuckets
+import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.ui.common.grayscale
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.common.StatsAndSensorActionsNav
@@ -69,6 +71,20 @@ fun PersonalBestsScreen(
                 contentAlignment = Alignment.Center
             ) { CircularProgressIndicator(color = TextSecondary) }
         } else {
+            // Display-only time filter (All / Time of Day ▾ / Hour ▾ + Show Empty).
+            // Defaults to the current hour so the hour-heavy list starts trimmed.
+            var filterMode by remember { mutableStateOf(TrophyTimeFilterMode.HOUR) }
+            var filterTod by remember { mutableStateOf<TimeOfDay?>(TimeOfDay.fromCurrentTime()) }
+            var filterHour by remember { mutableStateOf<Int?>(TimeBuckets.hourOfTimestamp(System.currentTimeMillis())) }
+            var showEmpty by remember { mutableStateOf(false) }
+
+            val visibleEntries = state.entries.filter {
+                it.matchesTrophyTimeFilter(filterMode, filterTod, filterHour, showEmpty)
+            }
+            val visibleCurrentEntry = state.currentSettingsEntry?.takeIf {
+                it.matchesTrophyTimeFilter(filterMode, filterTod, filterHour, showEmpty)
+            }
+
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -76,8 +92,22 @@ fun PersonalBestsScreen(
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
+                item {
+                    TrophyTimeFilterBar(
+                        mode = filterMode,
+                        timeOfDay = filterTod,
+                        hour = filterHour,
+                        showEmpty = showEmpty,
+                        onModeChange = { filterMode = it },
+                        onTimeOfDayChange = { filterTod = it },
+                        onHourChange = { filterHour = it },
+                        onShowEmptyChange = { showEmpty = it },
+                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                    )
+                }
+
                 // Group entries by trophy count for section headers
-                val grouped = state.entries.groupBy { it.trophyCount }
+                val grouped = visibleEntries.groupBy { it.trophyCount }
 
                 fun navigateToChart(entry: PersonalBestEntry) {
                     navController.navigate(
@@ -117,7 +147,7 @@ fun PersonalBestsScreen(
                 }
 
                 // ── Current Settings (quick access) ──────────────────────
-                state.currentSettingsEntry?.let { entry ->
+                visibleCurrentEntry?.let { entry ->
                     item {
                         SectionHeader(
                             trophies = "⚙️",
@@ -257,7 +287,7 @@ fun PersonalBestsScreen(
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun SectionHeader(trophies: String, title: String, subtitle: String) {
+internal fun SectionHeader(trophies: String, title: String, subtitle: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -286,7 +316,7 @@ private fun SectionHeader(trophies: String, title: String, subtitle: String) {
 // Text style tiers — increasingly smaller text for narrower categories
 // ─────────────────────────────────────────────────────────────────────────────
 
-private enum class TrophyTextStyle {
+internal enum class TrophyTextStyle {
     GLOBAL,           // largest
     ONE_SETTING,
     TWO_SETTINGS,
@@ -300,7 +330,7 @@ private enum class TrophyTextStyle {
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun PersonalBestRow(
+internal fun PersonalBestRow(
     entry: PersonalBestEntry,
     textStyle: TrophyTextStyle,
     onRecordClick: (Long) -> Unit,

@@ -18,6 +18,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.wags.domain.model.TimeBuckets
 import com.example.wags.ui.theme.TextPrimary
 import com.example.wags.ui.theme.TextSecondary
 
@@ -53,11 +54,11 @@ fun ApneaSettingsSummaryBanner(
         append(" · ")
         append(prepType.displayPrepTypeBanner())
         append(" · ")
-        append(timeOfDay.displayTimeOfDayBanner())
-        append(" · ")
         append(posture.displayPostureBanner())
         append(" · ")
         append(audio.displayAudioBanner())
+        append(" · ")
+        append(timeOfDay.displayTimeOfDayBanner())
     }
 
     Row(
@@ -103,11 +104,15 @@ internal fun String.displayPrepTypeBanner(): String = when (uppercase()) {
     else        -> lowercase().replaceFirstChar { it.uppercase() }
 }
 
-internal fun String.displayTimeOfDayBanner(): String = when (uppercase()) {
-    "MORNING" -> "Morning"
-    "DAY"     -> "Day"
-    "NIGHT"   -> "Night"
-    else      -> lowercase().replaceFirstChar { it.uppercase() }
+internal fun String.displayTimeOfDayBanner(): String {
+    // Hour buckets ("H08") display as the plain hour number; legacy names as before.
+    TimeBuckets.hourOf(this)?.let { return "%02d".format(it) }
+    return when (uppercase()) {
+        "MORNING" -> "Morning"
+        "DAY"     -> "Day"
+        "NIGHT"   -> "Night"
+        else      -> lowercase().replaceFirstChar { it.uppercase() }
+    }
 }
 
 internal fun String.displayPostureBanner(): String = when (uppercase()) {

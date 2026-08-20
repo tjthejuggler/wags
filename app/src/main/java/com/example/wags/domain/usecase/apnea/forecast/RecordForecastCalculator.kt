@@ -3,6 +3,7 @@ package com.example.wags.domain.usecase.apnea.forecast
 import android.util.Log
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.domain.model.PersonalBestCategory
+import com.example.wags.domain.model.TimeBuckets
 import com.example.wags.domain.model.trophyCount
 import kotlin.math.ln
 import kotlin.math.max
@@ -37,6 +38,14 @@ object RecordForecastCalculator {
 
     private val SETTING_KEYS = listOf("lungVolume", "prepType", "timeOfDay", "posture", "audio")
     private val SETTING_DISPLAYS = listOf(LUNG_DISPLAY, PREP_DISPLAY, TOD_DISPLAY, POS_DISPLAY, AUD_DISPLAY)
+
+    /**
+     * Label for a setting value. Index 2 (timeOfDay) goes through [TimeBuckets.display]
+     * so hour buckets ("H08" → "08:00") are labelled properly in By-the-Hour mode;
+     * legacy names behave exactly as before.
+     */
+    private fun displaySetting(i: Int, value: String): String =
+        if (i == 2) TimeBuckets.display(value) else SETTING_DISPLAYS[i][value] ?: value
 
     /**
      * Compute the record-breaking forecast for the current settings.
@@ -113,8 +122,11 @@ object RecordForecastCalculator {
         Log.d(TAG, "firstTs=$firstTs, daysSinceFirst=$daysSinceFirst")
 
         // ── Fit OLS model ─────────────────────────────────────────────────────
+        // In By-the-Hour mode the settings carry an "Hxx" bucket: encode the time
+        // features from each record's timestamp hour instead of the tod column.
+        val byHour = TimeBuckets.isHourBucket(settings.timeOfDay)
         val designResult = FreeHoldFeatureExtractor.buildDesignMatrix(
-            regressionRecords, firstTs, includeDrillParam = drillParam != null
+            regressionRecords, firstTs, includeDrillParam = drillParam != null, byHour = byHour
         ) ?: return insufficientDataForecast(pbRecords, settings, recordLabel)
 
         val (X, y) = designResult
@@ -123,7 +135,7 @@ object RecordForecastCalculator {
         Log.d(TAG, "OLS fit successful: X.size=${X.size}, y.size=${y.size}")
 
         // ── Predict for the pending hold ──────────────────────────────────────
-        val xPending = FreeHoldFeatureExtractor.encodePendingHold(settings, daysSinceFirst, drillParam)
+        val xPending = FreeHoldFeatureExtractor.encodePendingHold(settings, daysSinceFirst, drillParam, byHour)
         val (muLogSec, predVariance) = OlsRegression.predict(xPending, fit)
         val sigmaPred = sqrt(max(1e-6, predVariance))
         Log.d(TAG, "Prediction: muLogSec=$muLogSec, predVariance=$predVariance, sigmaPred=$sigmaPred")
@@ -163,7 +175,7 @@ object RecordForecastCalculator {
             // Build label
             val label = if (fixedCount == 0) "All settings"
             else fixedIndices.sorted().map { i ->
-                SETTING_DISPLAYS[i][settingValues[i]] ?: settingValues[i]
+                displaySetting(i, settingValues[i])
             }.joinToString(" · ")
 
             // Find best record matching this sub-combination (within the selected
@@ -245,7 +257,8 @@ object RecordForecastCalculator {
         val firstTs = filtered.minOf { it.timestamp }
         val daysSinceFirst = max(0.0, (nowEpochMs - firstTs) / 86_400_000.0)
 
-        val designResult = FreeHoldFeatureExtractor.buildDesignMatrix(filtered, firstTs)
+        val byHour = TimeBuckets.isHourBucket(fixedTimeOfDay)
+        val designResult = FreeHoldFeatureExtractor.buildDesignMatrix(filtered, firstTs, byHour = byHour)
             ?: return emptyList()
 
         val (X, y) = designResult
@@ -269,7 +282,7 @@ object RecordForecastCalculator {
                             posture = pos,
                             audio = aud
                         )
-                        val xRow = FreeHoldFeatureExtractor.encodePendingHold(settings, daysSinceFirst)
+                        val xRow = FreeHoldFeatureExtractor.encodePendingHold(settings, daysSinceFirst, byHour = byHour)
                         val (muLogSec, predVariance) = OlsRegression.predict(xRow, fit)
                         val sigmaPred = sqrt(max(1e-6, predVariance))
 
@@ -345,7 +358,7 @@ object RecordForecastCalculator {
 
             val label = if (fixedCount == 0) "All settings"
             else fixedIndices.sorted().map { i ->
-                SETTING_DISPLAYS[i][settingValues[i]] ?: settingValues[i]
+                displaySetting(i, settingValues[i])
             }.joinToString(" · ")
 
             val bestMs = findBestForSubCombo(records, fixedIndices, settingValues)
@@ -418,7 +431,7 @@ object RecordForecastCalculator {
 
             val label = if (fixedCount == 0) "All settings"
             else fixedIndices.sorted().map { i ->
-                SETTING_DISPLAYS[i][settingValues[i]] ?: settingValues[i]
+                displaySetting(i, settingValues[i])
             }.joinToString(" · ")
 
             val bestMs = findBestForSubCombo(records, fixedIndices, settingValues)
@@ -463,10 +476,17 @@ object RecordForecastCalculator {
         fixedIndices: Set<Int>,
         settingValues: List<String>
     ): Long? {
+        // In By-the-Hour mode the expected timeOfDay value is an "Hxx" bucket;
+        // match records by the hour derived from their timestamp (retroactive).
+        val todIsHour = TimeBuckets.isHourBucket(settingValues[2])
         val settingFields = listOf(
             { r: ApneaRecordEntity -> r.lungVolume },
             { r: ApneaRecordEntity -> r.prepType },
-            { r: ApneaRecordEntity -> r.timeOfDay },
+            if (todIsHour) {
+                { r: ApneaRecordEntity -> TimeBuckets.fromTimestamp(r.timestamp) }
+            } else {
+                { r: ApneaRecordEntity -> r.timeOfDay }
+            },
             { r: ApneaRecordEntity -> r.posture },
             { r: ApneaRecordEntity -> r.audio }
         )

@@ -4,6 +4,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -35,8 +37,11 @@ import androidx.navigation.NavController
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.domain.model.ApneaStats
 import com.example.wags.domain.model.AudioSetting
+import com.example.wags.domain.model.PersonalBestEntry
 import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
+import com.example.wags.domain.model.TimeBuckets
+import com.example.wags.domain.model.TimeDimension
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.ui.common.LiveSensorActionsNav
 import com.example.wags.ui.navigation.WagsRoutes
@@ -55,7 +60,8 @@ private enum class ApneaHistoryTab(val label: String) {
     GRAPHS("Graphs"),
     ALL_RECORDS("All Records"),
     STATS("Stats"),
-    CALENDAR("Calendar")
+    CALENDAR("Calendar"),
+    TROPHIES("Trophies")
 }
 
 // ── Screen ─────────────────────────────────────────────────────────────────────
@@ -67,6 +73,8 @@ fun ApneaHistoryScreen(
     viewModel: ApneaHistoryViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val timeDimension by viewModel.timeDimension.collectAsStateWithLifecycle()
+    val trophyEntries by viewModel.trophyEntries.collectAsStateWithLifecycle()
     var selectedTabOrdinal by rememberSaveable { mutableIntStateOf(ApneaHistoryTab.GRAPHS.ordinal) }
     val selectedTab = ApneaHistoryTab.entries[selectedTabOrdinal]
     var displayedMonth by remember { mutableStateOf(YearMonth.now()) }
@@ -78,6 +86,11 @@ fun ApneaHistoryScreen(
             navController.navigate(WagsRoutes.apneaRecordDetail(selectedDayRecords.first().recordId))
             viewModel.clearSelection()
         }
+    }
+
+    // Load the trophy shelf when the Trophies tab is selected
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == ApneaHistoryTab.TROPHIES) viewModel.loadTrophies()
     }
 
     Scaffold(
@@ -127,11 +140,19 @@ fun ApneaHistoryScreen(
                             else Color.Transparent
                         ),
                         text = {
-                            Text(
-                                tab.label,
-                                color = if (isSelected) TextPrimary else TextDisabled,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                            )
+                            if (tab == ApneaHistoryTab.TROPHIES) {
+                                Text(
+                                    "🏆",
+                                    fontSize = 18.sp,
+                                    color = if (isSelected) TextPrimary else TextDisabled
+                                )
+                            } else {
+                                Text(
+                                    tab.label,
+                                    color = if (isSelected) TextPrimary else TextDisabled,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
                         }
                     )
                 }
@@ -151,6 +172,7 @@ fun ApneaHistoryScreen(
                 ApneaHistoryTab.ALL_RECORDS -> AllApneaRecordsScreen(navController = navController)
                 ApneaHistoryTab.STATS -> StatsTabContent(
                     state = state,
+                    byHour = timeDimension == TimeDimension.BY_HOUR,
                     onToggleShowAll = { viewModel.toggleShowAllStats() },
                     onRecordClick = { recordId ->
                         navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
@@ -192,6 +214,24 @@ fun ApneaHistoryScreen(
                     onNavigateToDetail = { recordId ->
                         viewModel.clearSelection()
                         navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
+                    }
+                )
+                ApneaHistoryTab.TROPHIES -> TrophiesTabContent(
+                    entries = trophyEntries,
+                    onRecordClick = { recordId ->
+                        navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
+                    },
+                    onChartClick = { entry ->
+                        navController.navigate(
+                            WagsRoutes.pbChart(
+                                lungVolume = entry.lungVolume,
+                                prepType = entry.prepType,
+                                timeOfDay = entry.timeOfDay,
+                                posture = entry.posture,
+                                audio = entry.audio,
+                                label = entry.label
+                            )
+                        )
                     }
                 )
             }
@@ -638,6 +678,7 @@ private fun ApneaLineChartCanvas(
 @Composable
 private fun StatsTabContent(
     state: ApneaHistoryUiState,
+    byHour: Boolean = false,
     onToggleShowAll: () -> Unit,
     onRecordClick: (Long) -> Unit,
     onTimeChartClick: (metricType: String, drillType: String, title: String) -> Unit,
@@ -656,6 +697,7 @@ private fun StatsTabContent(
             lungVolume = state.lungVolume,
             prepType   = state.prepType,
             timeOfDay  = state.timeOfDay,
+            byHour     = byHour,
             posture    = state.posture,
             audio      = state.audio,
             onSetLungVolume = onSetLungVolume,
@@ -731,6 +773,7 @@ private fun StatsSettingsDialog(
     lungVolume: String,
     prepType: String,
     timeOfDay: String,
+    byHour: Boolean = false,
     posture: String,
     audio: String,
     onSetLungVolume: (String) -> Unit,
@@ -767,13 +810,6 @@ private fun StatsSettingsDialog(
                         SettingChip(pt.name, pt.shortDisplayName(), prepType == pt.name, { onSetPrepType(pt.name) }, chipColors)
                     }
                 }
-                // Time of Day
-                SettingRow(label = "Time of Day") {
-                    SettingChip(FILTER_ALL, "All", timeOfDay == FILTER_ALL, { onSetTimeOfDay(FILTER_ALL) }, chipColors)
-                    TimeOfDay.entries.forEach { tod ->
-                        SettingChip(tod.name, tod.displayName(), timeOfDay == tod.name, { onSetTimeOfDay(tod.name) }, chipColors)
-                    }
-                }
                 // Posture
                 SettingRow(label = "Posture") {
                     SettingChip(FILTER_ALL, "All", posture == FILTER_ALL, { onSetPosture(FILTER_ALL) }, chipColors)
@@ -786,6 +822,19 @@ private fun StatsSettingsDialog(
                     SettingChip(FILTER_ALL, "All", audio == FILTER_ALL, { onSetAudio(FILTER_ALL) }, chipColors)
                     AudioSetting.entries.forEach { aud ->
                         SettingChip(aud.name, aud.displayName(), audio == aud.name, { onSetAudio(aud.name) }, chipColors)
+                    }
+                }
+                // Time of Day
+                SettingRow(label = if (byHour) "Hour" else "Time of Day") {
+                    SettingChip(FILTER_ALL, "All", timeOfDay == FILTER_ALL, { onSetTimeOfDay(FILTER_ALL) }, chipColors)
+                    if (byHour) {
+                        TimeBuckets.HOUR_BUCKETS.forEach { bucket ->
+                            SettingChip(bucket, TimeBuckets.display(bucket), timeOfDay == bucket, { onSetTimeOfDay(bucket) }, chipColors)
+                        }
+                    } else {
+                        TimeOfDay.entries.forEach { tod ->
+                            SettingChip(tod.name, tod.displayName(), timeOfDay == tod.name, { onSetTimeOfDay(tod.name) }, chipColors)
+                        }
                     }
                 }
             }
@@ -823,6 +872,126 @@ private fun SettingRow(label: String, chips: @Composable FlowRowScope.() -> Unit
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) { chips() }
+    }
+}
+
+// ── Trophies tab ───────────────────────────────────────────────────────────────
+
+@Composable
+private fun TrophiesTabContent(
+    entries: List<PersonalBestEntry>,
+    onRecordClick: (Long) -> Unit,
+    onChartClick: (PersonalBestEntry) -> Unit
+) {
+    // Display-only time filter (All / Time of Day ▾ / Hour ▾ + Show Empty).
+    // Defaults to the current hour so the hour-heavy list starts trimmed.
+    var filterMode by remember { mutableStateOf(TrophyTimeFilterMode.HOUR) }
+    var filterTod by remember { mutableStateOf<TimeOfDay?>(TimeOfDay.fromCurrentTime()) }
+    var filterHour by remember { mutableStateOf<Int?>(TimeBuckets.hourOfTimestamp(System.currentTimeMillis())) }
+    var showEmpty by remember { mutableStateOf(false) }
+
+    if (entries.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("No free hold trophies yet", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+        }
+        return
+    }
+
+    val visible = entries.filter {
+        it.matchesTrophyTimeFilter(filterMode, filterTod, filterHour, showEmpty)
+    }
+    val grouped = visible.groupBy { it.trophyCount }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp)
+    ) {
+        item {
+            Text(
+                "Free Hold Personal Bests",
+                style = MaterialTheme.typography.titleMedium,
+                color = TextPrimary,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 16.dp)
+            )
+            Text(
+                "Trophies for free holds only",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
+        }
+        item {
+            TrophyTimeFilterBar(
+                mode = filterMode,
+                timeOfDay = filterTod,
+                hour = filterHour,
+                showEmpty = showEmpty,
+                onModeChange = { filterMode = it },
+                onTimeOfDayChange = { filterTod = it },
+                onHourChange = { filterHour = it },
+                onShowEmptyChange = { showEmpty = it },
+                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+            )
+        }
+        grouped[6]?.let { section ->
+            item {
+                SectionHeader(trophies = "🏆🏆🏆🏆🏆🏆", title = "Global Personal Best", subtitle = "Best across all settings")
+            }
+            items(section) { entry ->
+                PersonalBestRow(entry = entry, textStyle = TrophyTextStyle.GLOBAL, onRecordClick = onRecordClick, onChartClick = { onChartClick(entry) })
+            }
+            item { Spacer(modifier = Modifier.height(8.dp)) }
+        }
+        grouped[5]?.let { section ->
+            item {
+                SectionHeader(trophies = "🏆🏆🏆🏆🏆", title = "Single Setting Bests", subtitle = "Best for one setting (any other settings)")
+            }
+            items(section) { entry ->
+                PersonalBestRow(entry = entry, textStyle = TrophyTextStyle.ONE_SETTING, onRecordClick = onRecordClick, onChartClick = { onChartClick(entry) })
+            }
+            item { Spacer(modifier = Modifier.height(8.dp)) }
+        }
+        grouped[4]?.let { section ->
+            item {
+                SectionHeader(trophies = "🏆🏆🏆🏆", title = "Two Setting Bests", subtitle = "Best for a pair of settings")
+            }
+            items(section) { entry ->
+                PersonalBestRow(entry = entry, textStyle = TrophyTextStyle.TWO_SETTINGS, onRecordClick = onRecordClick, onChartClick = { onChartClick(entry) })
+            }
+            item { Spacer(modifier = Modifier.height(8.dp)) }
+        }
+        grouped[3]?.let { section ->
+            item {
+                SectionHeader(trophies = "🏆🏆🏆", title = "Three Setting Bests", subtitle = "Best for a trio of settings")
+            }
+            items(section) { entry ->
+                PersonalBestRow(entry = entry, textStyle = TrophyTextStyle.THREE_SETTINGS, onRecordClick = onRecordClick, onChartClick = { onChartClick(entry) })
+            }
+            item { Spacer(modifier = Modifier.height(8.dp)) }
+        }
+        grouped[2]?.let { section ->
+            item {
+                SectionHeader(trophies = "🏆🏆", title = "Four Setting Bests", subtitle = "Best for four specific settings")
+            }
+            items(section) { entry ->
+                PersonalBestRow(entry = entry, textStyle = TrophyTextStyle.FOUR_SETTINGS, onRecordClick = onRecordClick, onChartClick = { onChartClick(entry) })
+            }
+            item { Spacer(modifier = Modifier.height(8.dp)) }
+        }
+        grouped[1]?.let { section ->
+            item {
+                SectionHeader(trophies = "🏆", title = "Exact Setting Bests", subtitle = "Best for each specific combination of all 5 settings")
+            }
+            items(section) { entry ->
+                PersonalBestRow(entry = entry, textStyle = TrophyTextStyle.EXACT, onRecordClick = onRecordClick, onChartClick = { onChartClick(entry) })
+            }
+            item { Spacer(modifier = Modifier.height(24.dp)) }
+        }
     }
 }
 
@@ -1466,29 +1635,32 @@ private fun HistoryStatsRow(label: String, value: String, bold: Boolean = false,
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 /** Converts a setting string (enum name or "ALL") to a display label. */
-private fun String.displaySettingLabel(): String = when (this) {
-    FILTER_ALL -> "All"
-    // Lung volume
-    "FULL"     -> "Full"
-    "PARTIAL"  -> "Half"
-    "EMPTY"    -> "Empty"
-    // PrepType
-    "NO_PREP"  -> "No Prep"
-    "RESONANCE"-> "Resonance"
-    "HYPER"    -> "Hyper"
-    // TimeOfDay
-    "MORNING"  -> "Morning"
-    "DAY"      -> "Day"
-    "NIGHT"    -> "Night"
-    // Posture
-    "SITTING"  -> "Sitting"
-    "LAYING"   -> "Laying"
-    // AudioSetting
-    "SILENCE"  -> "Silence"
-    "MUSIC"    -> "Music"
-    "MOVIE"    -> "Movie"
-    "GUIDED"   -> "Guided"
-    else       -> lowercase().replaceFirstChar { it.uppercase() }
+private fun String.displaySettingLabel(): String {
+    TimeBuckets.hourOf(this)?.let { return "%02d".format(it) }
+    return when (this) {
+        FILTER_ALL -> "All"
+        // Lung volume
+        "FULL"     -> "Full"
+        "PARTIAL"  -> "Half"
+        "EMPTY"    -> "Empty"
+        // PrepType
+        "NO_PREP"  -> "No Prep"
+        "RESONANCE"-> "Resonance"
+        "HYPER"    -> "Hyper"
+        // TimeOfDay
+        "MORNING"  -> "Morning"
+        "DAY"      -> "Day"
+        "NIGHT"    -> "Night"
+        // Posture
+        "SITTING"  -> "Sitting"
+        "LAYING"   -> "Laying"
+        // AudioSetting
+        "SILENCE"  -> "Silence"
+        "MUSIC"    -> "Music"
+        "MOVIE"    -> "Movie"
+        "GUIDED"   -> "Guided"
+        else       -> lowercase().replaceFirstChar { it.uppercase() }
+    }
 }
 
 private fun formatHistoryDuration(ms: Long): String {

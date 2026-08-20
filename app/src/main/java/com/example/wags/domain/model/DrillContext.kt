@@ -45,7 +45,7 @@ data class DrillContext(
         fun minBreath(sessionDurationSec: Int) = DrillContext(
             drillType = "MIN_BREATH",
             drillParamValue = sessionDurationSec,
-            displayName = "Min Breath (${sessionDurationSec / 60}min)"
+            displayName = "Min Breath (%d:%02d)".format(sessionDurationSec / 60, sessionDurationSec % 60)
         )
 
         /** Till-Contraction mode — one PB pool (best time-to-first-contraction). */

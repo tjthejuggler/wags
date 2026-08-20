@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
+import com.example.wags.domain.model.TimeBuckets
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.ui.theme.SurfaceVariant
 import com.example.wags.ui.theme.TextPrimary
@@ -39,6 +40,8 @@ fun FreeHoldSettingsDialog(
     timeOfDay: String,
     posture: String,
     audio: String,
+    /** True in By-the-Hour mode — the hour bucket is automatic, so the tod selector is hidden. */
+    byHour: Boolean = false,
     /** True when no resonance breathing session ended within the last ~5 minutes (RESONANCE prep locked). */
     resonancePrepLocked: Boolean = false,
     onLungVolumeChange: (String) -> Unit,
@@ -101,23 +104,6 @@ fun FreeHoldSettingsDialog(
                     }
                 }
 
-                // ── Time of Day ──────────────────────────────────────────────
-                Text("Time of Day", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    TimeOfDay.entries.forEach { tod ->
-                        FilterChip(
-                            selected = timeOfDay == tod.name,
-                            onClick = { onTimeOfDayChange(tod.name) },
-                            label = { Text(tod.displayName(), style = MaterialTheme.typography.bodySmall) },
-                            modifier = Modifier.height(30.dp),
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = SurfaceVariant,
-                                selectedLabelColor = TextPrimary
-                            )
-                        )
-                    }
-                }
-
                 // ── Posture ──────────────────────────────────────────────────
                 Text("Posture", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -149,6 +135,31 @@ fun FreeHoldSettingsDialog(
                                 selectedLabelColor = TextPrimary
                             )
                         )
+                    }
+                }
+
+                // ── Time of Day / Hour Bucket ────────────────────────────────
+                if (byHour) {
+                    Text(
+                        "Hour Bucket: ${TimeBuckets.display(TimeBuckets.current())} (automatic)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                } else {
+                    Text("Time of Day", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        TimeOfDay.entries.forEach { tod ->
+                            FilterChip(
+                                selected = timeOfDay == tod.name,
+                                onClick = { onTimeOfDayChange(tod.name) },
+                                label = { Text(tod.displayName(), style = MaterialTheme.typography.bodySmall) },
+                                modifier = Modifier.height(30.dp),
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = SurfaceVariant,
+                                    selectedLabelColor = TextPrimary
+                                )
+                            )
+                        }
                     }
                 }
             }

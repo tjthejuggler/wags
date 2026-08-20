@@ -5,11 +5,13 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wags.data.repository.ApneaRepository
+import com.example.wags.data.repository.ApneaTimeDimensionStore
 import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.DrillContext
 import com.example.wags.domain.model.PersonalBestEntry
 import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
+import com.example.wags.domain.model.TimeBuckets
 import com.example.wags.domain.model.TimeOfDay
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +38,7 @@ data class PersonalBestsUiState(
 class PersonalBestsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val apneaRepository: ApneaRepository,
+    private val timeDimensionStore: ApneaTimeDimensionStore,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
@@ -64,7 +67,9 @@ class PersonalBestsViewModel @Inject constructor(
             val pt = runCatching {
                 PrepType.valueOf(prefs.getString("setting_prep_type", "NO_PREP") ?: "NO_PREP")
             }.getOrDefault(PrepType.NO_PREP).name
-            val tod = TimeOfDay.fromCurrentTime().name
+            // In BY_HOUR mode the PB entries carry hour buckets — resolve the
+            // automatic current-hour bucket so the exact-settings entry matches.
+            val tod = TimeBuckets.normalizeSessionBucket(TimeOfDay.fromCurrentTime().name, timeDimensionStore.current)
             val pos = runCatching {
                 Posture.valueOf(prefs.getString("setting_posture", "LAYING") ?: "LAYING")
             }.getOrDefault(Posture.LAYING).name

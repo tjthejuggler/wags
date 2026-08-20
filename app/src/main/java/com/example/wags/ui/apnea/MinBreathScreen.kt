@@ -45,6 +45,7 @@ fun MinBreathScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val pastConfigurations by eucapnicConfigViewModel.pastConfigurations.collectAsStateWithLifecycle()
+    val timeDimension by viewModel.timeDimension.collectAsStateWithLifecycle()
     val eucapnicConfig by eucapnicConfigViewModel.config.collectAsStateWithLifecycle()
 
     // Seed-or-mirror the eucapnic config (EucapnicConfigViewModel is the
@@ -138,6 +139,7 @@ fun MinBreathScreen(
 
         if (showSettingsDialog) {
             FreeHoldSettingsDialog(
+                byHour = timeDimension == com.example.wags.domain.model.TimeDimension.BY_HOUR,
                 lungVolume = state.lungVolume,
                 prepType = state.prepType,
                 timeOfDay = state.timeOfDay,
@@ -167,6 +169,7 @@ fun MinBreathScreen(
 
         if (showFilterDialog) {
             MinBreathFilterDialog(
+                byHour = timeDimension == com.example.wags.domain.model.TimeDimension.BY_HOUR,
                 filterLungVolume = state.filterLungVolume,
                 filterPrepType = state.filterPrepType,
                 filterTimeOfDay = state.filterTimeOfDay,

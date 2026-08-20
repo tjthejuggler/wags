@@ -5,6 +5,7 @@ import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteQuery
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.domain.model.DrillContext
+import com.example.wags.domain.model.TimeBuckets
 import kotlinx.coroutines.flow.Flow
 
 /** Lightweight projection returned by [ApneaRecordDao.getBestFreeHoldRecord]. */
@@ -37,6 +38,27 @@ data class SettingLastUsedTuple(
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Drill-type filter helper ─────────────────────────────────────────────────
+
+/**
+ * Appends a time-bucket condition for a dynamic (RawQuery) builder: hour
+ * buckets ("H00".."H23", used when the apnea time dimension is By-the-Hour)
+ * match the local hour derived from the record's timestamp; legacy TimeOfDay
+ * names match the stored column. See [TimeBucketSql] for the equivalent
+ * @Query-annotation fragments.
+ */
+private fun addBucketCondition(
+    conditions: MutableList<String>,
+    args: MutableList<Any>,
+    bucket: String
+) {
+    val hour = TimeBuckets.hourOf(bucket)
+    if (hour != null) {
+        conditions += "$SQL_HOUR_OF_TS = $hour"
+    } else {
+        conditions += "timeOfDay = ?"
+        args += bucket
+    }
+}
 
 /** Appends drill-type + drillParamValue conditions to the given lists. */
 private fun addDrillFilter(
@@ -79,7 +101,7 @@ internal fun buildBestDrillQuery(
     val args = mutableListOf<Any>()
     val conditions = mutableListOf<String>()
     addDrillFilter(drill, conditions, args)
-    if (timeOfDay  != null) { conditions += "timeOfDay = ?";  args += timeOfDay  }
+    if (timeOfDay  != null) addBucketCondition(conditions, args, timeOfDay)
     if (lungVolume != null) { conditions += "lungVolume = ?"; args += lungVolume }
     if (prepType   != null) { conditions += "prepType = ?";   args += prepType   }
     if (posture    != null) { conditions += "posture = ?";    args += posture    }
@@ -108,7 +130,10 @@ internal fun buildIsBestDrillQuery(
     addDrillFilter(drill, innerConditions, args, "o")
     innerConditions += "o.recordId != ?"
     args += recordId
-    if (timeOfDay  != null) { innerConditions += "o.timeOfDay = r.timeOfDay";   }
+    if (timeOfDay  != null) {
+        innerConditions += if (TimeBuckets.isHourBucket(timeOfDay)) "$SQL_HOUR_OF_TS_O = $SQL_HOUR_OF_TS_R"
+                           else "o.timeOfDay = r.timeOfDay"
+    }
     if (lungVolume != null) { innerConditions += "o.lungVolume = r.lungVolume"; }
     if (prepType   != null) { innerConditions += "o.prepType = r.prepType";     }
     if (posture    != null) { innerConditions += "o.posture = r.posture";       }
@@ -144,7 +169,10 @@ internal fun buildWasBestAtTimeDrillQuery(
     addDrillFilter(drill, innerConditions, args, "o")
     innerConditions += "o.timestamp < r.timestamp"
     innerConditions += "o.durationMs >= r.durationMs"
-    if (timeOfDay  != null) { innerConditions += "o.timeOfDay = r.timeOfDay";   }
+    if (timeOfDay  != null) {
+        innerConditions += if (TimeBuckets.isHourBucket(timeOfDay)) "$SQL_HOUR_OF_TS_O = $SQL_HOUR_OF_TS_R"
+                           else "o.timeOfDay = r.timeOfDay"
+    }
     if (lungVolume != null) { innerConditions += "o.lungVolume = r.lungVolume"; }
     if (prepType   != null) { innerConditions += "o.prepType = r.prepType";     }
     if (posture    != null) { innerConditions += "o.posture = r.posture";       }
@@ -206,7 +234,7 @@ internal fun buildBestDrillRecordQuery(
     addDrillFilter(drill, conditions, args)
     if (lungVolume.isNotEmpty()) { conditions += "lungVolume = ?"; args += lungVolume }
     if (prepType.isNotEmpty())   { conditions += "prepType = ?";   args += prepType   }
-    if (timeOfDay.isNotEmpty())  { conditions += "timeOfDay = ?";  args += timeOfDay  }
+    if (timeOfDay.isNotEmpty())  addBucketCondition(conditions, args, timeOfDay)
     if (posture.isNotEmpty())    { conditions += "posture = ?";    args += posture    }
     if (audio.isNotEmpty())      { conditions += "audio = ?";      args += audio      }
     val sql = """
@@ -235,7 +263,7 @@ internal fun buildAllDrillRecordsQuery(
     addDrillFilter(drill, conditions, args)
     if (lungVolume.isNotEmpty()) { conditions += "lungVolume = ?"; args += lungVolume }
     if (prepType.isNotEmpty())   { conditions += "prepType = ?";   args += prepType   }
-    if (timeOfDay.isNotEmpty())  { conditions += "timeOfDay = ?";  args += timeOfDay  }
+    if (timeOfDay.isNotEmpty())  addBucketCondition(conditions, args, timeOfDay)
     if (posture.isNotEmpty())    { conditions += "posture = ?";    args += posture    }
     if (audio.isNotEmpty())      { conditions += "audio = ?";      args += audio      }
     val sql = """
@@ -276,7 +304,7 @@ interface ApneaRecordDao {
         SELECT * FROM apnea_records
         WHERE lungVolume = :lungVolume
           AND prepType   = :prepType
-          AND timeOfDay  = :timeOfDay
+          AND $TOD_MATCH
           AND posture    = :posture
           AND audio      = :audio
         ORDER BY timestamp DESC
@@ -294,7 +322,7 @@ interface ApneaRecordDao {
         SELECT MAX(durationMs) FROM apnea_records
         WHERE lungVolume = :lungVolume
           AND prepType   = :prepType
-          AND timeOfDay  = :timeOfDay
+          AND $TOD_MATCH
           AND posture    = :posture
           AND audio      = :audio
           AND tableType IS NULL
@@ -312,7 +340,7 @@ interface ApneaRecordDao {
         SELECT recordId FROM apnea_records
         WHERE lungVolume = :lungVolume
           AND prepType   = :prepType
-          AND timeOfDay  = :timeOfDay
+          AND $TOD_MATCH
           AND posture    = :posture
           AND audio      = :audio
           AND tableType IS NULL
@@ -331,7 +359,7 @@ interface ApneaRecordDao {
         SELECT durationMs FROM apnea_records
         WHERE lungVolume = :lungVolume
           AND prepType   = :prepType
-          AND timeOfDay  = :timeOfDay
+          AND $TOD_MATCH
           AND posture    = :posture
           AND audio      = :audio
           AND tableType IS NULL
@@ -350,7 +378,7 @@ interface ApneaRecordDao {
         SELECT recordId FROM apnea_records
         WHERE lungVolume = :lungVolume
           AND prepType   = :prepType
-          AND timeOfDay  = :timeOfDay
+          AND $TOD_MATCH
           AND posture    = :posture
           AND audio      = :audio
           AND tableType IS NULL
@@ -369,7 +397,7 @@ interface ApneaRecordDao {
         SELECT MAX(durationMs) FROM apnea_records
         WHERE lungVolume = :lungVolume
           AND prepType   = :prepType
-          AND timeOfDay  = :timeOfDay
+          AND $TOD_MATCH
           AND posture    = :posture
           AND audio      = :audio
           AND tableType IS NULL
@@ -387,7 +415,7 @@ interface ApneaRecordDao {
         SELECT recordId FROM apnea_records
         WHERE lungVolume = :lungVolume
           AND prepType   = :prepType
-          AND timeOfDay  = :timeOfDay
+          AND $TOD_MATCH
           AND posture    = :posture
           AND audio      = :audio
           AND tableType IS NULL
@@ -417,7 +445,7 @@ interface ApneaRecordDao {
 
     @Query("""
         SELECT COUNT(*) FROM apnea_records
-        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND (:timeOfDay = 'ALL' OR timeOfDay = :timeOfDay)
+        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND $TOD_MATCH_OR_ALL
           AND (:posture = 'ALL' OR posture = :posture) AND (:audio = 'ALL' OR audio = :audio) AND tableType IS NULL
     """)
     fun countFreeHolds(
@@ -430,7 +458,7 @@ interface ApneaRecordDao {
 
     @Query("""
         SELECT COUNT(*) FROM apnea_records
-        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND (:timeOfDay = 'ALL' OR timeOfDay = :timeOfDay)
+        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND $TOD_MATCH_OR_ALL
           AND (:posture = 'ALL' OR posture = :posture) AND (:audio = 'ALL' OR audio = :audio) AND tableType = :tableType
     """)
     fun countByTableType(
@@ -444,7 +472,7 @@ interface ApneaRecordDao {
 
     @Query("""
         SELECT MAX(maxHrBpm) FROM apnea_records
-        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND (:timeOfDay = 'ALL' OR timeOfDay = :timeOfDay)
+        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND $TOD_MATCH_OR_ALL
           AND (:posture = 'ALL' OR posture = :posture) AND (:audio = 'ALL' OR audio = :audio) AND maxHrBpm BETWEEN 20 AND 250
     """)
     fun getMaxHrEver(
@@ -457,7 +485,7 @@ interface ApneaRecordDao {
 
     @Query("""
         SELECT recordId FROM apnea_records
-        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND (:timeOfDay = 'ALL' OR timeOfDay = :timeOfDay)
+        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND $TOD_MATCH_OR_ALL
           AND (:posture = 'ALL' OR posture = :posture) AND (:audio = 'ALL' OR audio = :audio) AND maxHrBpm BETWEEN 20 AND 250
         ORDER BY maxHrBpm DESC LIMIT 1
     """)
@@ -471,7 +499,7 @@ interface ApneaRecordDao {
 
     @Query("""
         SELECT MIN(minHrBpm) FROM apnea_records
-        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND (:timeOfDay = 'ALL' OR timeOfDay = :timeOfDay)
+        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND $TOD_MATCH_OR_ALL
           AND (:posture = 'ALL' OR posture = :posture) AND (:audio = 'ALL' OR audio = :audio) AND minHrBpm BETWEEN 20 AND 250
     """)
     fun getMinHrEver(
@@ -484,7 +512,7 @@ interface ApneaRecordDao {
 
     @Query("""
         SELECT recordId FROM apnea_records
-        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND (:timeOfDay = 'ALL' OR timeOfDay = :timeOfDay)
+        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND $TOD_MATCH_OR_ALL
           AND (:posture = 'ALL' OR posture = :posture) AND (:audio = 'ALL' OR audio = :audio) AND minHrBpm BETWEEN 20 AND 250
         ORDER BY minHrBpm ASC LIMIT 1
     """)
@@ -498,7 +526,7 @@ interface ApneaRecordDao {
 
     @Query("""
         SELECT MIN(lowestSpO2) FROM apnea_records
-        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND (:timeOfDay = 'ALL' OR timeOfDay = :timeOfDay)
+        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND $TOD_MATCH_OR_ALL
           AND (:posture = 'ALL' OR posture = :posture) AND (:audio = 'ALL' OR audio = :audio)
           AND lowestSpO2 IS NOT NULL AND lowestSpO2 BETWEEN 1 AND 100
     """)
@@ -512,7 +540,7 @@ interface ApneaRecordDao {
 
     @Query("""
         SELECT recordId FROM apnea_records
-        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND (:timeOfDay = 'ALL' OR timeOfDay = :timeOfDay)
+        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND $TOD_MATCH_OR_ALL
           AND (:posture = 'ALL' OR posture = :posture) AND (:audio = 'ALL' OR audio = :audio)
           AND lowestSpO2 IS NOT NULL AND lowestSpO2 BETWEEN 1 AND 100
         ORDER BY lowestSpO2 ASC LIMIT 1
@@ -531,7 +559,7 @@ interface ApneaRecordDao {
         SELECT * FROM apnea_records
         WHERE lungVolume = :lungVolume
           AND prepType   = :prepType
-          AND timeOfDay  = :timeOfDay
+          AND $TOD_MATCH
           AND posture    = :posture
           AND audio      = :audio
         ORDER BY timestamp DESC
@@ -552,7 +580,7 @@ interface ApneaRecordDao {
         SELECT * FROM apnea_records
         WHERE (:lungVolume = '' OR lungVolume = :lungVolume)
           AND (:prepType   = '' OR prepType   = :prepType)
-          AND (:timeOfDay  = '' OR timeOfDay  = :timeOfDay)
+          AND $TOD_MATCH_OR_EMPTY
           AND (:posture    = '' OR posture    = :posture)
           AND (:audio      = '' OR audio      = :audio)
         ORDER BY timestamp DESC
@@ -572,7 +600,7 @@ interface ApneaRecordDao {
         SELECT * FROM apnea_records
         WHERE (:lungVolume = '' OR lungVolume = :lungVolume)
           AND (:prepType   = '' OR prepType   = :prepType)
-          AND (:timeOfDay  = '' OR timeOfDay  = :timeOfDay)
+          AND $TOD_MATCH_OR_EMPTY
           AND (:posture    = '' OR posture    = :posture)
           AND (:audio      = '' OR audio      = :audio)
           AND tableType = :tableType
@@ -594,7 +622,7 @@ interface ApneaRecordDao {
         SELECT * FROM apnea_records
         WHERE (:lungVolume = '' OR lungVolume = :lungVolume)
           AND (:prepType   = '' OR prepType   = :prepType)
-          AND (:timeOfDay  = '' OR timeOfDay  = :timeOfDay)
+          AND $TOD_MATCH_OR_EMPTY
           AND (:posture    = '' OR posture    = :posture)
           AND (:audio      = '' OR audio      = :audio)
           AND tableType IS NULL
@@ -616,7 +644,7 @@ interface ApneaRecordDao {
         WHERE r.tableType IS NULL
           AND (:lungVolume = '' OR r.lungVolume = :lungVolume)
           AND (:prepType   = '' OR r.prepType   = :prepType)
-          AND (:timeOfDay  = '' OR r.timeOfDay  = :timeOfDay)
+          AND $TOD_MATCH_R_OR_EMPTY
           AND (:posture    = '' OR r.posture    = :posture)
           AND (:audio      = '' OR r.audio      = :audio)
           AND NOT EXISTS (
@@ -624,7 +652,7 @@ interface ApneaRecordDao {
               WHERE older.tableType IS NULL
                 AND (:lungVolume = '' OR older.lungVolume = :lungVolume)
                 AND (:prepType   = '' OR older.prepType   = :prepType)
-                AND (:timeOfDay  = '' OR older.timeOfDay  = :timeOfDay)
+                AND $TOD_MATCH_OLDER_OR_EMPTY
                 AND (:posture    = '' OR older.posture    = :posture)
                 AND (:audio      = '' OR older.audio      = :audio)
                 AND older.timestamp < r.timestamp
@@ -671,7 +699,7 @@ interface ApneaRecordDao {
         WHERE tableType IS NULL
           AND (:lungVolume = '' OR lungVolume = :lungVolume)
           AND (:prepType   = '' OR prepType   = :prepType)
-          AND (:timeOfDay  = '' OR timeOfDay  = :timeOfDay)
+          AND $TOD_MATCH_OR_EMPTY
           AND (:posture    = '' OR posture    = :posture)
           AND (:audio      = '' OR audio      = :audio)
         ORDER BY durationMs DESC
@@ -685,6 +713,16 @@ interface ApneaRecordDao {
         audio: String
     ): BestRecordTuple?
 
+    /** Best free-hold record (full entity) for a single time bucket — all other settings relaxed. */
+    @Query("""
+        SELECT * FROM apnea_records
+        WHERE tableType IS NULL
+          AND $TOD_MATCH
+        ORDER BY durationMs DESC
+        LIMIT 1
+    """)
+    suspend fun getBestFreeHoldForBucket(timeOfDay: String): ApneaRecordEntity?
+
     // ── All free holds matching dynamic filters (for chart) ──────────────────
 
     @Query("""
@@ -692,7 +730,7 @@ interface ApneaRecordDao {
         WHERE tableType IS NULL
           AND (:lungVolume = '' OR lungVolume = :lungVolume)
           AND (:prepType   = '' OR prepType   = :prepType)
-          AND (:timeOfDay  = '' OR timeOfDay  = :timeOfDay)
+          AND $TOD_MATCH_OR_EMPTY
           AND (:posture    = '' OR posture    = :posture)
           AND (:audio      = '' OR audio      = :audio)
         ORDER BY timestamp ASC
@@ -719,7 +757,7 @@ interface ApneaRecordDao {
 
     @Query("""
         SELECT COALESCE(SUM(durationMs), 0) FROM apnea_records
-        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND (:timeOfDay = 'ALL' OR timeOfDay = :timeOfDay)
+        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND $TOD_MATCH_OR_ALL
           AND (:posture = 'ALL' OR posture = :posture) AND (:audio = 'ALL' OR audio = :audio) AND tableType IS NULL
     """)
     fun sumFreeHoldDuration(
@@ -729,7 +767,7 @@ interface ApneaRecordDao {
 
     @Query("""
         SELECT COALESCE(SUM(durationMs), 0) FROM apnea_records
-        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND (:timeOfDay = 'ALL' OR timeOfDay = :timeOfDay)
+        WHERE (:lungVolume = 'ALL' OR lungVolume = :lungVolume) AND (:prepType = 'ALL' OR prepType = :prepType) AND $TOD_MATCH_OR_ALL
           AND (:posture = 'ALL' OR posture = :posture) AND (:audio = 'ALL' OR audio = :audio) AND tableType = :tableType
     """)
     fun sumHoldDurationByTableType(
@@ -786,7 +824,7 @@ interface ApneaRecordDao {
             WHERE guidedAudioName = :guidedAudioName
               AND lungVolume = :lungVolume
               AND prepType   = :prepType
-              AND timeOfDay  = :timeOfDay
+              AND $TOD_MATCH
               AND posture    = :posture
               AND audio      = :audio
         ) THEN 1 ELSE 0 END

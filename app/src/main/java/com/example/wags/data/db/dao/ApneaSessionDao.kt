@@ -50,7 +50,7 @@ interface ApneaSessionDao {
         INNER JOIN apnea_records r ON r.timestamp = s.timestamp AND r.tableType = s.tableType
         WHERE s.tableType = :tableType
           AND (:lungVolume = 'ALL' OR r.lungVolume = :lungVolume) AND (:prepType = 'ALL' OR r.prepType = :prepType)
-          AND (:timeOfDay = 'ALL' OR r.timeOfDay = :timeOfDay) AND (:posture = 'ALL' OR r.posture = :posture) AND (:audio = 'ALL' OR r.audio = :audio)
+          AND $TOD_MATCH_R_OR_ALL AND (:posture = 'ALL' OR r.posture = :posture) AND (:audio = 'ALL' OR r.audio = :audio)
     """)
     fun sumSessionDuration(
         lungVolume: String, prepType: String, timeOfDay: String,

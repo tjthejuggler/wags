@@ -14,11 +14,13 @@ import com.example.wags.data.garmin.GarminManager
 import com.example.wags.data.ipc.HabitBackfillManager
 import com.example.wags.data.ipc.HabitIntegrationRepository
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
+import com.example.wags.data.repository.ApneaTimeDimensionStore
 import com.example.wags.data.repository.DataExportImportRepository
 import com.example.wags.data.spotify.SpotifyAuthManager
 import com.example.wags.domain.model.BleConnectionState
 import com.example.wags.domain.model.HabitEntry
 import com.example.wags.domain.model.ScannedDevice
+import com.example.wags.domain.model.TimeDimension
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
 import com.example.wags.domain.usecase.apnea.ApneaVibrationWarningConfig
 import com.example.wags.domain.usecase.apnea.HyperLockManager
@@ -103,7 +105,9 @@ data class SettingsUiState(
     /** Days required between HYPER prep sessions (0 disables the lock). */
     val hyperLockDays: Int = HyperLockManager.DEFAULT_LOCK_DAYS,
     /** Apnea voice/vibration indication + customizable warning vibrations. */
-    val apneaVibration: ApneaVibrationSettings = ApneaVibrationSettings()
+    val apneaVibration: ApneaVibrationSettings = ApneaVibrationSettings(),
+    /** How apnea records are bucketed by time: Morning/Day/Night or by the hour. */
+    val apneaTimeDimension: TimeDimension = TimeDimension.TIME_OF_DAY
 )
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
@@ -121,7 +125,8 @@ class SettingsViewModel @Inject constructor(
     private val spotifyAuthManager: SpotifyAuthManager,
     private val debugPrefs: DebugPreferences,
     private val hyperLockManager: HyperLockManager,
-    private val apneaAudioHapticEngine: ApneaAudioHapticEngine
+    private val apneaAudioHapticEngine: ApneaAudioHapticEngine,
+    private val timeDimensionStore: ApneaTimeDimensionStore
 ) : ViewModel() {
 
     private val _habitState = MutableStateFlow(buildInitialHabitState())
@@ -196,6 +201,8 @@ class SettingsViewModel @Inject constructor(
         state.copy(hyperLockDays = days)
     }.combine(_apneaVibrationState) { state, apneaVibration ->
         state.copy(apneaVibration = apneaVibration)
+    }.combine(timeDimensionStore.dimension) { state, dimension ->
+        state.copy(apneaTimeDimension = dimension)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -225,6 +232,15 @@ class SettingsViewModel @Inject constructor(
     fun setHyperLockDays(days: Int) {
         hyperLockManager.setLockDays(days)
         _hyperLockDays.value = hyperLockManager.lockDays
+    }
+
+    /**
+     * Switch the apnea time dimension (Time of Day vs By the Hour). Applies
+     * instantly and retroactively — records/PBs/trophies/stats/forecasts are
+     * recalculated against the chosen bucketing on the next query.
+     */
+    fun setApneaTimeDimension(dimension: TimeDimension) {
+        timeDimensionStore.set(dimension)
     }
 
     private fun loadApneaVibrationSettings() = ApneaVibrationSettings(

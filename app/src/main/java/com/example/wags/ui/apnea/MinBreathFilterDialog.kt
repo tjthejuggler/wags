@@ -30,6 +30,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
+import com.example.wags.domain.model.TimeBuckets
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.ui.theme.ButtonPrimary
 import com.example.wags.ui.theme.SurfaceDark
@@ -49,6 +50,8 @@ fun MinBreathFilterDialog(
     filterTimeOfDay: String,
     filterPosture: String,
     filterAudio: String,
+    /** True in By-the-Hour mode — filters offer the 24 hour buckets instead of Morning/Day/Night. */
+    byHour: Boolean = false,
     onLungVolumeChange: (String) -> Unit,
     onPrepTypeChange: (String) -> Unit,
     onTimeOfDayChange: (String) -> Unit,
@@ -103,17 +106,6 @@ fun MinBreathFilterDialog(
                 }
             }
 
-            // Time of Day
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Time of Day", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    FilterChip(selected = filterTimeOfDay.isEmpty(), onClick = { onTimeOfDayChange("") }, label = { Text("All", style = MaterialTheme.typography.labelSmall) }, modifier = Modifier.height(30.dp), colors = chipColors)
-                    TimeOfDay.entries.forEach { tod ->
-                        FilterChip(selected = filterTimeOfDay == tod.name, onClick = { onTimeOfDayChange(tod.name) }, label = { Text(tod.displayName(), style = MaterialTheme.typography.labelSmall) }, modifier = Modifier.height(30.dp), colors = chipColors)
-                    }
-                }
-            }
-
             // Posture
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Posture", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
@@ -132,6 +124,26 @@ fun MinBreathFilterDialog(
                     FilterChip(selected = filterAudio.isEmpty(), onClick = { onAudioChange("") }, label = { Text("All", style = MaterialTheme.typography.labelSmall) }, modifier = Modifier.height(30.dp), colors = chipColors)
                     AudioSetting.entries.forEach { aud ->
                         FilterChip(selected = filterAudio == aud.name, onClick = { onAudioChange(aud.name) }, label = { Text(aud.displayName(), style = MaterialTheme.typography.labelSmall) }, modifier = Modifier.height(30.dp), colors = chipColors)
+                    }
+                }
+            }
+
+            // Time of Day / Hour Bucket
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    if (byHour) "Hour" else "Time of Day",
+                    style = MaterialTheme.typography.labelMedium, color = TextSecondary
+                )
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    FilterChip(selected = filterTimeOfDay.isEmpty(), onClick = { onTimeOfDayChange("") }, label = { Text("All", style = MaterialTheme.typography.labelSmall) }, modifier = Modifier.height(30.dp), colors = chipColors)
+                    if (byHour) {
+                        TimeBuckets.HOUR_BUCKETS.forEach { bucket ->
+                            FilterChip(selected = filterTimeOfDay == bucket, onClick = { onTimeOfDayChange(bucket) }, label = { Text(TimeBuckets.display(bucket), style = MaterialTheme.typography.labelSmall) }, modifier = Modifier.height(30.dp), colors = chipColors)
+                        }
+                    } else {
+                        TimeOfDay.entries.forEach { tod ->
+                            FilterChip(selected = filterTimeOfDay == tod.name, onClick = { onTimeOfDayChange(tod.name) }, label = { Text(tod.displayName(), style = MaterialTheme.typography.labelSmall) }, modifier = Modifier.height(30.dp), colors = chipColors)
+                        }
                     }
                 }
             }
@@ -175,10 +187,7 @@ fun buildMinBreathFilterSummary(state: MinBreathUiState): String {
         runCatching { PrepType.valueOf(state.filterPrepType).displayName() }
             .getOrDefault(state.filterPrepType)
     )
-    if (state.filterTimeOfDay.isNotEmpty()) parts.add(
-        runCatching { TimeOfDay.valueOf(state.filterTimeOfDay).displayName() }
-            .getOrDefault(state.filterTimeOfDay)
-    )
+    if (state.filterTimeOfDay.isNotEmpty()) parts.add(TimeBuckets.display(state.filterTimeOfDay))
     if (state.filterPosture.isNotEmpty()) parts.add(
         runCatching { Posture.valueOf(state.filterPosture).displayName() }
             .getOrDefault(state.filterPosture)

@@ -221,6 +221,7 @@ class FreeHoldActiveViewModel @Inject constructor(
     private val deviceManager: UnifiedDeviceManager,
     private val hrDataSource: HrDataSource,
     private val apneaRepository: ApneaRepository,
+    private val timeDimensionStore: com.example.wags.data.repository.ApneaTimeDimensionStore,
     private val audioHapticEngine: ApneaAudioHapticEngine,
     private val habitRepo: HabitIntegrationRepository,
     private val spotifyManager: SpotifyManager,
@@ -244,6 +245,9 @@ class FreeHoldActiveViewModel @Inject constructor(
         private set
     var audio: String      = savedStateHandle.get<String>("audio")      ?: AudioSetting.SILENCE.name
         private set
+
+    /** Selected time-bucket dimension (Time of Day vs By the Hour) — hides the tod selector when BY_HOUR. */
+    val timeDimension: StateFlow<com.example.wags.domain.model.TimeDimension> = timeDimensionStore.dimension
 
     private var isMusicMode = audio == AudioSetting.MUSIC.name
     private var isGuidedMode = audio == AudioSetting.GUIDED.name
@@ -499,6 +503,9 @@ class FreeHoldActiveViewModel @Inject constructor(
     }
 
     fun updateTimeOfDay(tod: String) {
+        // BY_HOUR mode: the bucket is automatic (derived from the session start
+        // time) — manual time-of-day selection is disabled.
+        if (timeDimensionStore.isByHour) return
         timeOfDay = tod
         prefs.edit().putString("setting_time_of_day", tod).apply()
         _uiState.update { it.copy(currentTimeOfDay = tod) }
@@ -1337,6 +1344,7 @@ fun FreeHoldActiveScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val pastConfigurations by eucapnicConfigViewModel.pastConfigurations.collectAsStateWithLifecycle()
+    val timeDimension by viewModel.timeDimension.collectAsStateWithLifecycle()
     val eucapnicConfig by eucapnicConfigViewModel.config.collectAsStateWithLifecycle()
 
     // Seed-or-mirror the eucapnic config. The EucapnicConfigViewModel is the
@@ -1394,6 +1402,8 @@ private fun FreeHoldActiveScreenContent(
     }
     // Keep screen on while hold is active OR while reviewing PB results / waiting to navigate
     KeepScreenOn(enabled = state.freeHoldActive || state.pbCheckPending || state.newPersonalBest != null)
+
+    val timeDimension by viewModel.timeDimension.collectAsStateWithLifecycle()
 
     // True once the user taps Stop — we wait for the async PB check before navigating.
     var stopRequested by remember { mutableStateOf(false) }
@@ -1489,6 +1499,7 @@ private fun FreeHoldActiveScreenContent(
         // Settings edit popup
         if (showSettingsDialog) {
             FreeHoldSettingsDialog(
+                byHour = timeDimension == com.example.wags.domain.model.TimeDimension.BY_HOUR,
                 lungVolume = state.currentLungVolume,
                 prepType = state.currentPrepType,
                 timeOfDay = state.currentTimeOfDay,

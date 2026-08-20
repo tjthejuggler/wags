@@ -1,5 +1,6 @@
 package com.example.wags.ui.apnea
 
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -43,6 +44,8 @@ import com.example.wags.domain.usecase.apnea.forecast.RecordForecast
 import com.example.wags.ui.apnea.forecast.RecordForecastSummary
 import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
+import com.example.wags.domain.model.TimeBuckets
+import com.example.wags.domain.model.TimeDimension
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.usecase.apnea.HyperLockManager
 import com.example.wags.ui.common.AdviceBanner
@@ -62,6 +65,7 @@ fun ApneaScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val pastConfigurations by eucapnicConfigViewModel.pastConfigurations.collectAsStateWithLifecycle()
+    val timeDimension by viewModel.timeDimension.collectAsStateWithLifecycle()
 
     LockPortrait()
 
@@ -251,6 +255,7 @@ fun ApneaScreen(
                         exit = shrinkVertically()
                     ) {
                         ApneaSettingsContent(
+                            byHour = timeDimension == TimeDimension.BY_HOUR,
                             selectedLungVolume = state.selectedLungVolume,
                             prepType = state.prepType,
                             timeOfDay = state.timeOfDay,
@@ -312,6 +317,15 @@ fun ApneaScreen(
                     },
                     headerBadges = sectionBadges(ApneaSection.BEST_TIME)
                 ) {
+                    val flash by viewModel.flashMessage.collectAsStateWithLifecycle()
+                    val context = LocalContext.current
+                    LaunchedEffect(flash) {
+                        flash?.let {
+                            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+                            viewModel.consumeFlashMessage()
+                        }
+                    }
+
                     FreeHoldContent(
                         freeHoldDurationMs    = state.freeHoldDurationMs,
                         bestTimeMs            = state.bestTimeForSettingsMs,
@@ -321,6 +335,7 @@ fun ApneaScreen(
                         bestTimeTrophyCategory = state.bestTimeTrophyCategory,
                         recordForecast         = state.recordForecast,
                         onAutoSet              = { viewModel.autoSetBestSettings() },
+                        onAutoSetRecord        = { viewModel.autoSetRecordBest() },
                         onBestTimeClick = { recordId ->
                             navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
                         },
@@ -683,6 +698,8 @@ private fun DrillCard(
 @Composable
 private fun ApneaSettingsContent(
     selectedLungVolume: String,
+    /** True in By-the-Hour mode — the hour bucket is automatic, so the tod selector is hidden. */
+    byHour: Boolean = false,
     prepType: PrepType,
     timeOfDay: TimeOfDay,
     posture: Posture,
@@ -743,19 +760,8 @@ private fun ApneaSettingsContent(
             }
         }
 
-        Text("Time of Day", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TimeOfDay.entries.forEach { tod ->
-                SettingChip(
-                    selected = timeOfDay == tod,
-                    onClick = { onTimeOfDayChange(tod) },
-                    label = tod.displayName(),
-                    daysSinceUsed = daysSince("timeOfDay", tod.name),
-                    daysSinceCombo = comboDaysSince("timeOfDay", tod.name)
-                )
-            }
-        }
-
+        // In By-the-Hour mode the bucket is automatic (derived from the session
+        // start time) — the manual selector is hidden entirely.
         Text("Posture", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Posture.entries.forEach { pos ->
@@ -782,6 +788,28 @@ private fun ApneaSettingsContent(
             }
         }
 
+        // ── Time of Day / Hour Bucket (kept last) ────────────────────────────
+        if (!byHour) {
+            Text("Time of Day", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                TimeOfDay.entries.forEach { tod ->
+                    SettingChip(
+                        selected = timeOfDay == tod,
+                        onClick = { onTimeOfDayChange(tod) },
+                        label = tod.displayName(),
+                        daysSinceUsed = daysSince("timeOfDay", tod.name),
+                        daysSinceCombo = comboDaysSince("timeOfDay", tod.name)
+                    )
+                }
+            }
+        } else {
+            Text("Hour Bucket", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+            Text(
+                "This session will use ${TimeBuckets.display(TimeBuckets.current())}h",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextPrimary
+            )
+        }
     }
 }
 
@@ -923,6 +951,7 @@ private fun FreeHoldContent(
     bestTimeTrophyCategory: PersonalBestCategory?,
     recordForecast: RecordForecast? = null,
     onAutoSet: () -> Unit = {},
+    onAutoSetRecord: () -> Unit = {},
     onBestTimeClick: (Long) -> Unit = {},
     onLastTimeClick: (Long) -> Unit = {},
     onTrophyClick: () -> Unit = {}
@@ -993,7 +1022,11 @@ private fun FreeHoldContent(
         }
 
         // ── Record-breaking forecast (with auto set) ─────────────────────────
-        RecordForecastSummary(forecast = recordForecast, onAutoSet = onAutoSet)
+        RecordForecastSummary(
+            forecast = recordForecast,
+            onAutoSet = onAutoSet,
+            onAutoSetRecord = onAutoSetRecord
+        )
     }
 }
 

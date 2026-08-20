@@ -16,6 +16,7 @@ import com.example.wags.data.ipc.HabitIntegrationRepository
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.data.repository.ApneaSessionRepository
+import com.example.wags.data.repository.ApneaTimeDimensionStore
 import com.example.wags.data.spotify.SpotifyApiClient
 import com.example.wags.data.spotify.SpotifyAuthManager
 import com.example.wags.data.spotify.SpotifyManager
@@ -32,6 +33,8 @@ import com.example.wags.domain.model.PersonalBestResult
 import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.SpotifySong
+import com.example.wags.domain.model.TimeBuckets
+import com.example.wags.domain.model.TimeDimension
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.model.TableDifficulty
 import com.example.wags.domain.model.TableLength
@@ -262,6 +265,7 @@ class ApneaViewModel @Inject constructor(
     private val forecastCalibrationDao: ForecastCalibrationDao,
     private val hyperLockManager: HyperLockManager,
     private val resonancePrepGate: ResonancePrepGate,
+    private val timeDimensionStore: ApneaTimeDimensionStore,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
@@ -312,6 +316,28 @@ class ApneaViewModel @Inject constructor(
     private val _timeOfDay   = MutableStateFlow(TimeOfDay.fromCurrentTime())
     private val _posture     = MutableStateFlow(Posture.LAYING)
     private val _audio       = MutableStateFlow(AudioSetting.SILENCE)
+
+    /** Time-dimension choice (Time of Day vs By the Hour) — see [TimeDimension]. */
+    val timeDimension: StateFlow<TimeDimension> = timeDimensionStore.dimension
+
+    /** One-shot flash message for UI toasts; null when nothing to show. */
+    private val _flashMessage = MutableStateFlow<String?>(null)
+    val flashMessage: StateFlow<String?> = _flashMessage
+
+    /** Clears the current flash message (call after showing it). */
+    fun consumeFlashMessage() {
+        _flashMessage.value = null
+    }
+
+    /**
+     * Effective time-bucket string for the current dimension: the TimeOfDay
+     * name as before, or the automatic current-hour bucket ("H14") when the
+     * user selected "By the Hour". Drives forecasts and combo badges; the
+     * repository applies the same normalization for its own queries.
+     */
+    private val _effectiveTod = combine(_timeOfDay, timeDimensionStore.dimension) { tod, dim ->
+        TimeBuckets.normalizeSessionBucket(tod.name, dim)
+    }
 
     // Drill-specific param flows — drive trophy queries for Progressive O₂ and Min Breath
     private val _progO2BreathPeriodSec = MutableStateFlow(60)
@@ -620,8 +646,8 @@ class ApneaViewModel @Inject constructor(
         // Also recomputes when _forecastRefreshTrigger is bumped (e.g. after a new record is saved).
         viewModelScope.launch {
             combine(
-                combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud ->
-                    ForecastSettings(lv, pt.name, tod.name, pos.name, aud.name)
+                combine(_lungVolume, _prepType, _effectiveTod, _posture, _audio) { lv, pt, tod, pos, aud ->
+                    ForecastSettings(lv, pt.name, tod, pos.name, aud.name)
                 },
                 _forecastRefreshTrigger
             ) { settings, _ -> settings }
@@ -644,14 +670,14 @@ class ApneaViewModel @Inject constructor(
         // ── Progressive O₂ forecast: recompute when settings change ──────────
         viewModelScope.launch {
             combine(
-                combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio, _progO2BreathPeriodSec) { args -> args },
+                combine(_lungVolume, _prepType, _effectiveTod, _posture, _audio, _progO2BreathPeriodSec) { args -> args },
                 _forecastRefreshTrigger
             ) { arr, _ -> arr }
             .collectLatest { arr ->
                 delay(150) // debounce
                 try {
                     val lv = arr[0] as String; val pt = (arr[1] as PrepType).name
-                    val tod = (arr[2] as TimeOfDay).name; val pos = (arr[3] as Posture).name
+                    val tod = arr[2] as String; val pos = (arr[3] as Posture).name
                     val aud = (arr[4] as AudioSetting).name; val bp = arr[5] as Int
                     val settings = ForecastSettings(lv, pt, tod, pos, aud)
                     // Pass ALL Progressive O₂ records; breath period is a regression
@@ -674,14 +700,14 @@ class ApneaViewModel @Inject constructor(
         // ── Min Breath forecast: recompute when settings change ──────────────
         viewModelScope.launch {
             combine(
-                combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio, _minBreathSessionDurationSec) { args -> args },
+                combine(_lungVolume, _prepType, _effectiveTod, _posture, _audio, _minBreathSessionDurationSec) { args -> args },
                 _forecastRefreshTrigger
             ) { arr, _ -> arr }
             .collectLatest { arr ->
                 delay(150) // debounce
                 try {
                     val lv = arr[0] as String; val pt = (arr[1] as PrepType).name
-                    val tod = (arr[2] as TimeOfDay).name; val pos = (arr[3] as Posture).name
+                    val tod = arr[2] as String; val pos = (arr[3] as Posture).name
                     val aud = (arr[4] as AudioSetting).name; val sd = arr[5] as Int
                     val settings = ForecastSettings(lv, pt, tod, pos, aud)
                     // Pass ALL Min Breath records; session duration is a regression
@@ -708,8 +734,8 @@ class ApneaViewModel @Inject constructor(
         // (_forecastRefreshTrigger is bumped on resume and after a record is saved).
         viewModelScope.launch {
             combine(
-                combine(_lungVolume, _prepType, _timeOfDay, _posture, _audio) { lv, pt, tod, pos, aud ->
-                    listOf(lv, pt.name, tod.name, pos.name, aud.name)
+                combine(_lungVolume, _prepType, _effectiveTod, _posture, _audio) { lv, pt, tod, pos, aud ->
+                    listOf(lv, pt.name, tod, pos.name, aud.name)
                 },
                 _forecastRefreshTrigger
             ) { selected, _ -> selected }
@@ -740,7 +766,7 @@ class ApneaViewModel @Inject constructor(
                             val rec = mapOf(
                                 "lungVolume" to r.lungVolume,
                                 "prepType"   to r.prepType,
-                                "timeOfDay"  to r.timeOfDay,
+                                "timeOfDay"  to (if (TimeBuckets.isHourBucket(sel[2])) TimeBuckets.fromTimestamp(r.timestamp) else r.timeOfDay),
                                 "posture"    to r.posture,
                                 "audio"      to r.audio
                             )
@@ -1495,7 +1521,7 @@ class ApneaViewModel @Inject constructor(
     fun autoSetBestSettings() {
         viewModelScope.launch {
             val records = apneaRepository.getAllFreeHoldsOnce()
-            val tod = _timeOfDay.value.name
+            val tod = TimeBuckets.normalizeSessionBucket(_timeOfDay.value.name, timeDimensionStore.current)
             val best = RecordForecastCalculator.computeBestSettings(records, tod, System.currentTimeMillis())
             if (best.isEmpty()) return@launch
 
@@ -1517,6 +1543,30 @@ class ApneaViewModel @Inject constructor(
             setPrepType(PrepType.valueOf(chosen.settings.prepType))
             setPosture(Posture.valueOf(chosen.settings.posture))
             setAudio(AudioSetting.valueOf(chosen.settings.audio))
+        }
+    }
+
+    /**
+     * Auto-set the 4 changeable settings to the combination of the personal-best
+     * free hold for the current time bucket (hour bucket in By-the-Hour mode,
+     * Morning/Day/Night otherwise). Flashes a message when no record exists for
+     * the bucket yet.
+     */
+    fun autoSetRecordBest() {
+        viewModelScope.launch {
+            val bucket = TimeBuckets.normalizeSessionBucket(_timeOfDay.value.name, timeDimensionStore.current)
+            val best = apneaRepository.getBestFreeHoldForTimeBucket(bucket)
+            if (best == null) {
+                _flashMessage.value = if (timeDimensionStore.isByHour)
+                    "No personal best yet for hour ${TimeBuckets.display(bucket)}"
+                else
+                    "No personal best yet for this time of day"
+                return@launch
+            }
+            setLungVolume(best.lungVolume)
+            setPrepType(PrepType.valueOf(best.prepType))
+            setPosture(Posture.valueOf(best.posture))
+            setAudio(AudioSetting.valueOf(best.audio))
         }
     }
 
@@ -1575,13 +1625,14 @@ class ApneaViewModel @Inject constructor(
                 if (prepCandidates.isEmpty()) return@launch
 
                 val tod = TimeOfDay.fromCurrentTime()
+                val todBucket = TimeBuckets.normalizeSessionBucket(tod.name, timeDimensionStore.current)
 
                 // Last time the EXACT combo (incl. current time of day) was used.
                 fun comboLastUsedMs(lv: String, pt: PrepType, pos: Posture, aud: AudioSetting): Long? =
                     records.asSequence()
                         .filter {
                             it.lungVolume == lv && it.prepType == pt.name &&
-                                it.timeOfDay == tod.name && it.posture == pos.name && it.audio == aud.name
+                                (if (TimeBuckets.isHourBucket(todBucket)) TimeBuckets.fromTimestamp(it.timestamp) else it.timeOfDay) == todBucket && it.posture == pos.name && it.audio == aud.name
                         }
                         .maxOfOrNull { it.timestamp }
 
@@ -1647,6 +1698,9 @@ class ApneaViewModel @Inject constructor(
     }
 
     fun setTimeOfDay(tod: TimeOfDay) {
+        // In By-the-Hour mode the bucket is automatic (derived from the clock at
+        // query time) and the selector is hidden — ignore any stale calls.
+        if (timeDimensionStore.isByHour) return
         _timeOfDay.value = tod
         _uiState.update { it.copy(timeOfDay = tod) }
         // Time of Day is intentionally NOT persisted — always smart-set from current time on launch.

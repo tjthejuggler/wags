@@ -21,6 +21,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.data.garmin.GarminConnectionState
 import com.example.wags.domain.model.BleConnectionState
+import com.example.wags.domain.model.TimeDimension
 import com.example.wags.ui.common.AdviceDialog
 import com.example.wags.ui.common.AdviceViewModel
 import com.example.wags.ui.common.LiveSensorActionsNav
@@ -221,8 +222,13 @@ fun SettingsScreen(
                 SettingsCategoryCard(
                     emoji = "🫁",
                     title = "Apnea",
-                    summary = "Hyper cooldown · voice · vibration warnings"
+                    summary = "Time buckets · Hyper cooldown · voice · vibration warnings"
                 ) {
+                    TimeDimensionRow(
+                        dimension = state.apneaTimeDimension,
+                        onDimensionChange = { viewModel.setApneaTimeDimension(it) }
+                    )
+                    SettingsSubSectionDivider()
                     HyperLockDaysRow(
                         days = state.hyperLockDays,
                         onDaysChange = { viewModel.setHyperLockDays(it) }
@@ -426,6 +432,51 @@ fun SettingsScreen(
                 }
             }
         )
+    }
+}
+
+// ── Time-dimension chooser (inside the Apnea category) ───────────────────────
+
+/**
+ * Chooses how apnea records are bucketed by time:
+ *  * "Time of Day" — the classic Morning / Day / Night buckets (default).
+ *  * "By the Hour" — 24 automatic buckets derived from each session's start
+ *    time. Records, PBs, trophies, stats, recommended settings and forecasts
+ *    are all recalculated against the hour buckets, retroactively.
+ */
+@Composable
+private fun TimeDimensionRow(
+    dimension: TimeDimension,
+    onDimensionChange: (TimeDimension) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Time Buckets",
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextPrimary
+        )
+        Text(
+            text = if (dimension == TimeDimension.BY_HOUR)
+                "By the Hour — 24 automatic buckets from session start time"
+            else
+                "Time of Day — Morning / Day / Night",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            TimeDimension.entries.forEach { option ->
+                FilterChip(
+                    selected = dimension == option,
+                    onClick = { onDimensionChange(option) },
+                    label = { Text(option.displayName()) }
+                )
+            }
+        }
     }
 }
 

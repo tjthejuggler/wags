@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.db.entity.FreeHoldTelemetryEntity
 import com.example.wags.data.repository.ApneaRepository
+import com.example.wags.data.repository.ApneaTimeDimensionStore
+import com.example.wags.domain.model.TimeBuckets
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -74,7 +76,8 @@ data class HoldsRankedListUiState(
 @HiltViewModel
 class HoldsRankedListViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val apneaRepository: ApneaRepository
+    private val apneaRepository: ApneaRepository,
+    private val timeDimensionStore: ApneaTimeDimensionStore
 ) : ViewModel() {
 
     private val metric = RankedHoldMetric.fromKey(savedStateHandle.get<String>("metricKey"))
@@ -101,7 +104,9 @@ class HoldsRankedListViewModel @Inject constructor(
         val filtered = if (showAll) records else records.filter { r ->
             (lungVolume == FILTER_ALL || r.lungVolume == lungVolume) &&
             (prepType == FILTER_ALL || r.prepType == prepType) &&
-            (timeOfDay == FILTER_ALL || r.timeOfDay == timeOfDay) &&
+            // Hour buckets are derived from the record's start timestamp.
+            (timeOfDay == FILTER_ALL ||
+                (if (TimeBuckets.isHourBucket(timeOfDay)) TimeBuckets.fromTimestamp(r.timestamp) else r.timeOfDay) == timeOfDay) &&
             (posture == FILTER_ALL || r.posture == posture) &&
             (audio == FILTER_ALL || r.audio == audio)
         }

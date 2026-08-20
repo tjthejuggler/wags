@@ -14,6 +14,7 @@ import com.example.wags.data.ipc.HabitIntegrationRepository
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
 import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.data.repository.ApneaSessionRepository
+import com.example.wags.data.repository.ApneaTimeDimensionStore
 import com.example.wags.data.spotify.SpotifyApiClient
 import com.example.wags.data.spotify.SpotifyAuthManager
 import com.example.wags.data.spotify.SpotifyManager
@@ -25,6 +26,8 @@ import com.example.wags.domain.model.PersonalBestCategory
 import com.example.wags.domain.model.PersonalBestResult
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.SpotifySong
+import com.example.wags.domain.model.TimeBuckets
+import com.example.wags.domain.model.TimeDimension
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
 import com.example.wags.domain.usecase.apnea.ContractionTableMode
@@ -185,6 +188,7 @@ class ContractionTableViewModel @Inject constructor(
     private val guidedAudioManager: GuidedAudioManager,
     private val hyperLockManager: HyperLockManager,
     private val resonancePrepGate: ResonancePrepGate,
+    private val timeDimensionStore: ApneaTimeDimensionStore,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
@@ -229,6 +233,9 @@ class ContractionTableViewModel @Inject constructor(
 
     // Spotify tracks played during the session (captured at stop time)
     private var trackedSongs: List<SpotifySong> = emptyList()
+
+    /** Selected time-bucket dimension (Time of Day vs By the Hour) — drives selector/filter UI. */
+    val timeDimension: StateFlow<TimeDimension> = timeDimensionStore.dimension
 
     /** Bumped when settings change — triggers forecast recompute. */
     private val _forecastRefreshTrigger = MutableStateFlow(0)
@@ -300,7 +307,9 @@ class ContractionTableViewModel @Inject constructor(
                     val settings = ForecastSettings(
                         lungVolume = s.lungVolume,
                         prepType = s.prepType,
-                        timeOfDay = s.timeOfDay,
+                        // BY_HOUR mode: resolve the automatic hour bucket so the
+                        // calculator matches records by start-time hour.
+                        timeOfDay = TimeBuckets.normalizeSessionBucket(s.timeOfDay, timeDimensionStore.current),
                         posture = s.posture,
                         audio = s.audio
                     )
@@ -487,6 +496,9 @@ class ContractionTableViewModel @Inject constructor(
     }
 
     fun setTimeOfDay(v: String) {
+        // BY_HOUR mode: the bucket is automatic (derived from the session start
+        // time) — manual time-of-day selection is disabled.
+        if (timeDimensionStore.isByHour) return
         prefs.edit().putString("setting_time_of_day", v).apply()
         _uiState.update { it.copy(timeOfDay = v) }
         refreshForecast()
@@ -760,7 +772,7 @@ class ContractionTableViewModel @Inject constructor(
             it.copy(
                 filterLungVolume = s.lungVolume,
                 filterPrepType   = s.prepType,
-                filterTimeOfDay  = s.timeOfDay,
+                filterTimeOfDay  = TimeBuckets.normalizeSessionBucket(s.timeOfDay, timeDimensionStore.current),
                 filterPosture    = s.posture,
                 filterAudio      = s.audio
             )
@@ -837,7 +849,9 @@ class ContractionTableViewModel @Inject constructor(
                 var filtered = allTableRecords
                 if (s.filterLungVolume.isNotEmpty()) filtered = filtered.filter { it.lungVolume == s.filterLungVolume }
                 if (s.filterPrepType.isNotEmpty()) filtered = filtered.filter { it.prepType == s.filterPrepType }
-                if (s.filterTimeOfDay.isNotEmpty()) filtered = filtered.filter { it.timeOfDay == s.filterTimeOfDay }
+                if (s.filterTimeOfDay.isNotEmpty()) filtered = filtered.filter {
+                    (if (TimeBuckets.isHourBucket(s.filterTimeOfDay)) TimeBuckets.fromTimestamp(it.timestamp) else it.timeOfDay) == s.filterTimeOfDay
+                }
                 if (s.filterPosture.isNotEmpty()) filtered = filtered.filter { it.posture == s.filterPosture }
                 if (s.filterAudio.isNotEmpty()) filtered = filtered.filter { it.audio == s.filterAudio }
 

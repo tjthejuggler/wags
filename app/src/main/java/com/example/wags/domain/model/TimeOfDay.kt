@@ -28,5 +28,17 @@ enum class TimeOfDay {
                 else      -> NIGHT   // 18-23 and 0-2
             }
         }
+
+        /**
+         * Maps an hour-of-day (0–23) to its TimeOfDay bucket using the same
+         * boundaries as [fromCurrentTime]. Used to keep showing the classic
+         * Morning/Day/Night line on summary/detail screens when the app is in
+         * the "By the Hour" dimension (hour buckets "H00".."H23").
+         */
+        fun fromHour(hour: Int): TimeOfDay = when (hour) {
+            in 3..10  -> MORNING
+            in 11..17 -> DAY
+            else      -> NIGHT   // 18-23 and 0-2
+        }
     }
 }

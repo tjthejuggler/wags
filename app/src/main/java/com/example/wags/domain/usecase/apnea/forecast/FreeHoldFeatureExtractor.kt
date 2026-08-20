@@ -1,8 +1,12 @@
 package com.example.wags.domain.usecase.apnea.forecast
 
 import com.example.wags.data.db.entity.ApneaRecordEntity
+import com.example.wags.domain.model.TimeBuckets
+import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.ln
 import kotlin.math.max
+import kotlin.math.sin
 
 /**
  * Converts apnea records and pending-hold settings into the feature vectors
@@ -14,8 +18,8 @@ import kotlin.math.max
  *   2  lungVolume == PARTIAL
  *   3  prepType   == RESONANCE
  *   4  prepType   == HYPER
- *   5  timeOfDay  == DAY
- *   6  timeOfDay  == NIGHT
+ *   5  timeOfDay == DAY dummy — or sin(2π·hour/24) in By-the-Hour mode
+ *   6  timeOfDay == NIGHT dummy — or cos(2π·hour/24) in By-the-Hour mode
  *   7  posture    == SITTING
  *   8  audio      == MUSIC
  *   9  audio      == MOVIE
@@ -55,13 +59,17 @@ object FreeHoldFeatureExtractor {
      * @param firstHoldTimestamp  Epoch-ms of the earliest record (used for the trend term).
      * @param includeDrillParam  When true, [ApneaRecordEntity.drillParamValue] is added as
      *                  a regression feature so all parameter buckets share one fit.
+     * @param byHour  When true (By-the-Hour dimension), columns 5–6 encode the local
+     *                  hour of each record's timestamp as sin/cos instead of the
+     *                  Morning/Day/Night dummies. Must match [encodePendingHold].
      * @return Pair(X, y) where X is n×p and y is n-vector of log-seconds,
      *         or null if no records pass the duration filter.
      */
     fun buildDesignMatrix(
         records: List<ApneaRecordEntity>,
         firstHoldTimestamp: Long,
-        includeDrillParam: Boolean = false
+        includeDrillParam: Boolean = false,
+        byHour: Boolean = false
     ): Pair<Array<DoubleArray>, DoubleArray>? {
         val filtered = records.filter { it.durationMs >= MIN_DURATION_MS }
         if (filtered.isEmpty()) return null
@@ -80,7 +88,8 @@ object FreeHoldFeatureExtractor {
                 posture = r.posture,
                 audio = r.audio,
                 daysSinceFirst = max(0.0, (r.timestamp - firstHoldTimestamp) / 86_400_000.0),
-                drillParam = if (includeDrillParam) r.drillParamValue else null
+                drillParam = if (includeDrillParam) r.drillParamValue else null,
+                hourOfDay = if (byHour) TimeBuckets.hourOfTimestamp(r.timestamp) else null
             )
             y[i] = ln(r.durationMs / 1000.0)
         }
@@ -94,11 +103,16 @@ object FreeHoldFeatureExtractor {
      * @param drillParam  When non-null, the drill-param column is appended. This MUST be
      *                    consistent with how [buildDesignMatrix] was called (i.e. supply a
      *                    value here exactly when includeDrillParam was true there).
+     * @param byHour  When true (By-the-Hour dimension), columns 5–6 encode the hour of
+     *                    [ForecastSettings.timeOfDay] (an "Hxx" bucket; falls back to the
+     *                    current hour for legacy values) as sin/cos. Must match
+     *                    [buildDesignMatrix].
      */
     fun encodePendingHold(
         settings: ForecastSettings,
         daysSinceFirstHold: Double,
-        drillParam: Int? = null
+        drillParam: Int? = null,
+        byHour: Boolean = false
     ): DoubleArray = encodeRow(
         lungVolume = settings.lungVolume,
         prepType = settings.prepType,
@@ -106,7 +120,10 @@ object FreeHoldFeatureExtractor {
         posture = settings.posture,
         audio = settings.audio,
         daysSinceFirst = daysSinceFirstHold,
-        drillParam = drillParam
+        drillParam = drillParam,
+        hourOfDay = if (byHour)
+            (TimeBuckets.hourOf(settings.timeOfDay) ?: TimeBuckets.hourOfTimestamp(System.currentTimeMillis()))
+        else null
     )
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -120,7 +137,8 @@ object FreeHoldFeatureExtractor {
         posture: String,
         audio: String,
         daysSinceFirst: Double,
-        drillParam: Int?
+        drillParam: Int?,
+        hourOfDay: Int? = null
     ): DoubleArray {
         val featureCount = if (drillParam != null) FEATURE_COUNT_WITH_PARAM else FEATURE_COUNT
         return DoubleArray(featureCount) { 0.0 }.also { x ->
@@ -129,8 +147,14 @@ object FreeHoldFeatureExtractor {
             if (lungVolume == "PARTIAL") x[2] = 1.0
             if (prepType == "RESONANCE") x[3] = 1.0
             if (prepType == "HYPER")     x[4] = 1.0
-            if (timeOfDay == "DAY")      x[5] = 1.0
-            if (timeOfDay == "NIGHT")    x[6] = 1.0
+            if (hourOfDay != null) {
+                // By-the-Hour: cyclical encoding so 23:00 is close to 00:00
+                x[5] = sin(2.0 * PI * hourOfDay / 24.0)
+                x[6] = cos(2.0 * PI * hourOfDay / 24.0)
+            } else {
+                if (timeOfDay == "DAY")   x[5] = 1.0
+                if (timeOfDay == "NIGHT") x[6] = 1.0
+            }
             if (posture == "SITTING")    x[7] = 1.0
             if (audio == "MUSIC")        x[8] = 1.0
             if (audio == "MOVIE")        x[9] = 1.0

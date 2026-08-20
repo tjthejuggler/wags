@@ -34,6 +34,8 @@ import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
+import com.example.wags.domain.model.TimeBuckets
+import com.example.wags.domain.model.TimeDimension
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.ui.common.LiveSensorActionsNav
 import com.example.wags.ui.navigation.WagsRoutes
@@ -48,6 +50,8 @@ fun AllApneaRecordsScreen(
     viewModel: AllApneaRecordsViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val timeDimension by viewModel.timeDimension.collectAsStateWithLifecycle()
+    val byHour = timeDimension == TimeDimension.BY_HOUR
     val listState = rememberLazyListState()
 
     // Reload list when we return to this screen (e.g. after deleting a record in the detail screen)
@@ -215,24 +219,33 @@ fun AllApneaRecordsScreen(
                                             label = { Text(pt.shortDisplayName(), style = MaterialTheme.typography.labelSmall) }
                                         )
                                     }
-                                }
-
-                                // Time of Day
-                                FilterRow(label = "Time of Day") {
-                                    FilterChip(
-                                        selected = state.filterTimeOfDay == "",
-                                        onClick = { viewModel.setTimeOfDayFilter("") },
-                                        label = { Text("All", style = MaterialTheme.typography.labelSmall) }
-                                    )
-                                    TimeOfDay.entries.forEach { tod ->
+    
+                                    // Time of Day
+                                    FilterRow(label = if (byHour) "Hour" else "Time of Day") {
                                         FilterChip(
-                                            selected = state.filterTimeOfDay == tod.name,
-                                            onClick = { viewModel.setTimeOfDayFilter(tod.name) },
-                                            label = { Text(tod.displayName(), style = MaterialTheme.typography.labelSmall) }
+                                            selected = state.filterTimeOfDay == "",
+                                            onClick = { viewModel.setTimeOfDayFilter("") },
+                                            label = { Text("All", style = MaterialTheme.typography.labelSmall) }
                                         )
+                                        if (byHour) {
+                                            TimeBuckets.HOUR_BUCKETS.forEach { bucket ->
+                                                FilterChip(
+                                                    selected = state.filterTimeOfDay == bucket,
+                                                    onClick = { viewModel.setTimeOfDayFilter(bucket) },
+                                                    label = { Text(TimeBuckets.display(bucket), style = MaterialTheme.typography.labelSmall) }
+                                                )
+                                            }
+                                        } else {
+                                            TimeOfDay.entries.forEach { tod ->
+                                                FilterChip(
+                                                    selected = state.filterTimeOfDay == tod.name,
+                                                    onClick = { viewModel.setTimeOfDayFilter(tod.name) },
+                                                    label = { Text(tod.displayName(), style = MaterialTheme.typography.labelSmall) }
+                                                )
+                                            }
+                                        }
                                     }
                                 }
-
                                 // Posture
                                 FilterRow(label = "Posture") {
                                     FilterChip(
@@ -421,10 +434,7 @@ private fun buildFilterSummary(state: AllApneaRecordsUiState): String {
         runCatching { PrepType.valueOf(state.filterPrepType).displayName() }
             .getOrDefault(state.filterPrepType)
     )
-    if (state.filterTimeOfDay.isNotEmpty()) parts.add(
-        runCatching { TimeOfDay.valueOf(state.filterTimeOfDay).displayName() }
-            .getOrDefault(state.filterTimeOfDay)
-    )
+    if (state.filterTimeOfDay.isNotEmpty()) parts.add(TimeBuckets.display(state.filterTimeOfDay))
     if (state.filterPosture.isNotEmpty()) parts.add(
         runCatching { Posture.valueOf(state.filterPosture).displayName() }
             .getOrDefault(state.filterPosture)

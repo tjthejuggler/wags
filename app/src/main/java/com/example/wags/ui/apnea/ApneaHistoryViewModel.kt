@@ -6,12 +6,15 @@ import androidx.lifecycle.viewModelScope
 import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.data.repository.ApneaSessionRepository
+import com.example.wags.data.repository.ApneaTimeDimensionStore
 import com.example.wags.domain.model.ApneaStats
 import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.DrillContext
 import com.example.wags.domain.model.PersonalBestEntry
 import com.example.wags.domain.model.Posture
 import com.example.wags.domain.model.PrepType
+import com.example.wags.domain.model.TimeBuckets
+import com.example.wags.domain.model.TimeDimension
 import com.example.wags.domain.model.TimeOfDay
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -142,8 +145,12 @@ data class ApneaHistoryUiState(
 class ApneaHistoryViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val apneaRepository: ApneaRepository,
-    private val sessionRepository: ApneaSessionRepository
+    private val sessionRepository: ApneaSessionRepository,
+    private val timeDimensionStore: ApneaTimeDimensionStore
 ) : ViewModel() {
+
+    /** Selected time-bucket dimension (Time of Day vs By the Hour) — drives filter chips. */
+    val timeDimension: StateFlow<TimeDimension> = timeDimensionStore.dimension
 
     // ── Mutable settings (start from nav args, can be changed in Stats tab) ──────
     private val _lungVolume = MutableStateFlow(
@@ -152,8 +159,13 @@ class ApneaHistoryViewModel @Inject constructor(
     private val _prepType = MutableStateFlow(
         savedStateHandle.get<String>("prepType") ?: PrepType.NO_PREP.name
     )
+    // In BY_HOUR mode a legacy nav-arg name resolves to the current hour bucket
+    // so stats/trophies filter by "records like now".
     private val _timeOfDay = MutableStateFlow(
-        savedStateHandle.get<String>("timeOfDay") ?: TimeOfDay.DAY.name
+        TimeBuckets.normalizeSessionBucket(
+            savedStateHandle.get<String>("timeOfDay") ?: TimeOfDay.DAY.name,
+            timeDimensionStore.current
+        )
     )
     private val _posture = MutableStateFlow(
         savedStateHandle.get<String>("posture") ?: Posture.LAYING.name
@@ -180,6 +192,31 @@ class ApneaHistoryViewModel @Inject constructor(
     }
 
     private val _trophyStats = MutableStateFlow(TrophyStats())
+
+    // ── Trophies tab state ──────────────────────────────────────────────────────
+
+    /** Personal-best entries that currently hold a record — the "trophy shelf". */
+    private val _trophyEntries = MutableStateFlow<List<PersonalBestEntry>>(emptyList())
+    val trophyEntries: StateFlow<List<PersonalBestEntry>> = _trophyEntries
+
+    /** Dimension the shelf was last loaded for — reload when the user switches mode. */
+    private var trophiesLoadedFor: TimeDimension? = null
+
+    /** Loads the trophy shelf once per dimension; cheap no-op on repeated tab visits. */
+    fun loadTrophies() {
+        val dim = timeDimensionStore.current
+        if (trophiesLoadedFor == dim) return
+        trophiesLoadedFor = dim
+        viewModelScope.launch {
+            // Empty combos are kept so the tab's "Show Empty" filter can reveal
+            // them; they are gated out at display level by default.
+            _trophyEntries.value = apneaRepository.getAllPersonalBests()
+                .sortedWith(
+                    compareByDescending<PersonalBestEntry> { it.trophyCount }
+                        .thenByDescending { it.durationMs ?: 0L }
+                )
+        }
+    }
 
     val uiState: StateFlow<ApneaHistoryUiState> = combine(
         combine(

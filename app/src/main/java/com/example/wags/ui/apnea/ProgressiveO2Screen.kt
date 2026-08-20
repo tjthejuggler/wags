@@ -44,6 +44,7 @@ fun ProgressiveO2Screen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val pastConfigurations by eucapnicConfigViewModel.pastConfigurations.collectAsStateWithLifecycle()
+    val timeDimension by viewModel.timeDimension.collectAsStateWithLifecycle()
     val eucapnicConfig by eucapnicConfigViewModel.config.collectAsStateWithLifecycle()
 
     // Seed-or-mirror the eucapnic config (EucapnicConfigViewModel is the
@@ -141,6 +142,7 @@ fun ProgressiveO2Screen(
 
         if (showFilterDialog) {
             ProgressiveO2FilterDialog(
+                byHour = timeDimension == com.example.wags.domain.model.TimeDimension.BY_HOUR,
                 filterLungVolume = state.filterLungVolume,
                 filterPrepType = state.filterPrepType,
                 filterTimeOfDay = state.filterTimeOfDay,
@@ -158,6 +160,7 @@ fun ProgressiveO2Screen(
 
         if (showSettingsDialog) {
             FreeHoldSettingsDialog(
+                byHour = timeDimension == com.example.wags.domain.model.TimeDimension.BY_HOUR,
                 lungVolume = state.lungVolume,
                 prepType = state.prepType,
                 timeOfDay = state.timeOfDay,
