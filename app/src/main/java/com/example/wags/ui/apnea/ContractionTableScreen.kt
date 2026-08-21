@@ -297,11 +297,10 @@ fun ContractionTableScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 0. Settings summary banner — clickable to open settings popup
+            // 0. Settings summary banner — pinned below the top bar so it stays
+            // visible while scrolling. Clickable to open the settings popup, but
+            // only while no session is running (plain label during a session).
             ApneaSettingsSummaryBanner(
                 lungVolume = state.lungVolume,
                 prepType   = state.prepType,
@@ -309,21 +308,38 @@ fun ContractionTableScreen(
                 timeOfDay  = effectiveTod,
                 posture    = state.posture,
                 audio      = state.audio,
-                onClick    = { showSettingsDialog = true }
+                onClick    = if (!state.isSessionActive) {{ showSettingsDialog = true }} else null
             )
 
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+
             // 0b. Song picker / connect prompt — shown when MUSIC mode
+            // Selected-song banner doubles as the picker trigger, so banner and
+            // choose-button are never visible at the same time.
             if (state.isMusicMode) {
                 if (state.spotifyConnected) {
                     if (state.selectedSongs.isNotEmpty()) {
-                        SelectedSongBanner(tracks = state.selectedSongs) {
-                            viewModel.clearSelectedSong()
-                        }
+                        SelectedSongBanner(
+                            tracks = state.selectedSongs,
+                            onClear = { viewModel.clearSelectedSong() },
+                            onClick = {
+                                viewModel.loadPreviousSongs()
+                                showSongPicker = true
+                            }
+                        )
+                    } else {
+                        SongPickerButton(onClick = {
+                            viewModel.loadPreviousSongs()
+                            showSongPicker = true
+                        })
                     }
-                    SongPickerButton(onClick = {
-                        viewModel.loadPreviousSongs()
-                        showSongPicker = true
-                    })
                 } else {
                     SpotifyConnectPrompt(
                         onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) }
@@ -332,12 +348,17 @@ fun ContractionTableScreen(
             }
 
             // 0c. Guided audio picker — shown when GUIDED mode
+            // Selected-audio banner doubles as the picker trigger.
             var showGuidedPicker by remember { mutableStateOf(false) }
             if (state.isGuidedMode) {
                 if (state.guidedSelectedName.isNotBlank()) {
-                    SelectedGuidedAudioBanner(name = state.guidedSelectedName)
+                    SelectedGuidedAudioBanner(
+                        name = state.guidedSelectedName,
+                        onClick = { showGuidedPicker = true }
+                    )
+                } else {
+                    GuidedAudioPickerButton(onClick = { showGuidedPicker = true })
                 }
-                GuidedAudioPickerButton(onClick = { showGuidedPicker = true })
             }
             if (showGuidedPicker) {
                 LaunchedEffect(Unit) { viewModel.loadGuidedCompletionStatuses() }
@@ -490,6 +511,7 @@ fun ContractionTableScreen(
             )
 
             Spacer(modifier = Modifier.height(24.dp))
+            }
         }
     }
 }

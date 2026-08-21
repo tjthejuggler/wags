@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -80,12 +81,15 @@ fun GuidedAudioPickerButton(onClick: () -> Unit) {
 
 /**
  * Banner showing the currently selected guided audio name.
- * Displayed above the picker button when a guided audio is selected.
+ * Tapping it re-opens the guided audio picker, so it replaces
+ * [GuidedAudioPickerButton] while an audio is selected.
  */
 @Composable
-fun SelectedGuidedAudioBanner(name: String) {
+fun SelectedGuidedAudioBanner(name: String, onClick: () -> Unit) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         color = SurfaceVariant,
         tonalElevation = 4.dp
     ) {

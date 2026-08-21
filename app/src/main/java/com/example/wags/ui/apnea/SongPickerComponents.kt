@@ -116,13 +116,21 @@ fun SpotifyConnectPrompt(onNavigateToSettings: () -> Unit) {
 /**
  * Banner shown before the hold starts when the user has selected a song
  * from the picker. Shows the song name/artist and a clear button.
+ * Tapping the banner re-opens the song picker, so it replaces
+ * [SongPickerButton] while a selection exists.
  */
 @Composable
-fun SelectedSongBanner(tracks: List<SpotifyTrackDetail>, onClear: () -> Unit) {
+fun SelectedSongBanner(
+    tracks: List<SpotifyTrackDetail>,
+    onClear: () -> Unit,
+    onClick: () -> Unit
+) {
     if (tracks.isEmpty()) return
     
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         color = SurfaceDark,
         tonalElevation = 4.dp
     ) {

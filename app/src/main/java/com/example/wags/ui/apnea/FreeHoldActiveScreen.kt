@@ -1664,22 +1664,28 @@ private fun FreeHoldActiveScreenContent(
                 NowPlayingBanner(track = state.nowPlayingSong!!)
             }
 
-            // Selected song banner — shown before hold starts when a song was picked
-            if (!state.freeHoldActive && state.selectedSongs.isNotEmpty()) {
-                SelectedSongBanner(tracks = state.selectedSongs) {
-                    viewModel.clearSelectedSong()
-                }
-            }
-
-            // Song picker / connect prompt — shown when MUSIC mode + hold not active
+            // Song picker / selected song banner — shown when MUSIC mode + hold not active.
+            // The selected-song banner doubles as the picker trigger, so banner and
+            // choose-button are never visible at the same time.
             if (!state.freeHoldActive && state.isMusicMode) {
                 if (state.spotifyConnected) {
-                    SongPickerButton(
-                        onClick = {
-                            viewModel.loadPreviousSongs()
-                            showSongPicker = true
-                        }
-                    )
+                    if (state.selectedSongs.isNotEmpty()) {
+                        SelectedSongBanner(
+                            tracks = state.selectedSongs,
+                            onClear = { viewModel.clearSelectedSong() },
+                            onClick = {
+                                viewModel.loadPreviousSongs()
+                                showSongPicker = true
+                            }
+                        )
+                    } else {
+                        SongPickerButton(
+                            onClick = {
+                                viewModel.loadPreviousSongs()
+                                showSongPicker = true
+                            }
+                        )
+                    }
                 } else {
                     SpotifyConnectPrompt(
                         onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) }
@@ -1688,14 +1694,19 @@ private fun FreeHoldActiveScreenContent(
             }
 
             // Guided audio picker — shown when GUIDED mode + hold not active
+            // Selected-audio banner doubles as the picker trigger.
             var showGuidedPicker by remember { mutableStateOf(false) }
             if (!state.freeHoldActive && state.isGuidedMode) {
                 if (state.guidedSelectedName.isNotBlank()) {
-                    SelectedGuidedAudioBanner(name = state.guidedSelectedName)
+                    SelectedGuidedAudioBanner(
+                        name = state.guidedSelectedName,
+                        onClick = { showGuidedPicker = true }
+                    )
+                } else {
+                    GuidedAudioPickerButton(onClick = {
+                        showGuidedPicker = true
+                    })
                 }
-                GuidedAudioPickerButton(onClick = {
-                    showGuidedPicker = true
-                })
             }
             if (showGuidedPicker) {
                 LaunchedEffect(Unit) { viewModel.loadGuidedCompletionStatuses() }

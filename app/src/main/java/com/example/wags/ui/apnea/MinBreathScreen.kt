@@ -192,11 +192,10 @@ fun MinBreathScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 0. Settings summary banner — clickable to open settings popup
+            // 0. Settings summary banner — pinned below the top bar so it stays
+            // visible while scrolling. Clickable to open the settings popup, but
+            // only while no session is running (plain label during a session).
             ApneaSettingsSummaryBanner(
                 lungVolume = state.lungVolume,
                 prepType   = state.prepType,
@@ -204,21 +203,38 @@ fun MinBreathScreen(
                 timeOfDay  = effectiveTod,
                 posture    = state.posture,
                 audio      = state.audio,
-                onClick    = { showSettingsDialog = true }
+                onClick    = if (!state.isSessionActive) {{ showSettingsDialog = true }} else null
             )
 
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+
             // 0b. Song picker / connect prompt — shown when MUSIC mode
+            // Selected-song banner doubles as the picker trigger, so banner and
+            // choose-button are never visible at the same time.
             if (state.isMusicMode) {
                 if (state.spotifyConnected) {
                     if (state.selectedSongs.isNotEmpty()) {
-                        SelectedSongBanner(tracks = state.selectedSongs) {
-                            viewModel.clearSelectedSong()
-                        }
+                        SelectedSongBanner(
+                            tracks = state.selectedSongs,
+                            onClear = { viewModel.clearSelectedSong() },
+                            onClick = {
+                                viewModel.loadPreviousSongs()
+                                showSongPicker = true
+                            }
+                        )
+                    } else {
+                        SongPickerButton(onClick = {
+                            viewModel.loadPreviousSongs()
+                            showSongPicker = true
+                        })
                     }
-                    SongPickerButton(onClick = {
-                        viewModel.loadPreviousSongs()
-                        showSongPicker = true
-                    })
                 } else {
                     SpotifyConnectPrompt(
                         onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) }
@@ -227,14 +243,19 @@ fun MinBreathScreen(
             }
 
             // 0c. Guided audio picker — shown when GUIDED mode
+            // Selected-audio banner doubles as the picker trigger.
             var showGuidedPicker by remember { mutableStateOf(false) }
             if (state.isGuidedMode) {
                 if (state.guidedSelectedName.isNotBlank()) {
-                    SelectedGuidedAudioBanner(name = state.guidedSelectedName)
+                    SelectedGuidedAudioBanner(
+                        name = state.guidedSelectedName,
+                        onClick = { showGuidedPicker = true }
+                    )
+                } else {
+                    GuidedAudioPickerButton(onClick = {
+                        showGuidedPicker = true
+                    })
                 }
-                GuidedAudioPickerButton(onClick = {
-                    showGuidedPicker = true
-                })
             }
             if (showGuidedPicker) {
                 LaunchedEffect(Unit) { viewModel.loadGuidedCompletionStatuses() }
@@ -524,6 +545,7 @@ fun MinBreathScreen(
             )
 
             Spacer(modifier = Modifier.height(24.dp))
+            }
         }
     }
 }
@@ -697,19 +719,25 @@ private fun SessionHistorySection(
     onFilterClick: () -> Unit = {},
     onClearAllFilters: () -> Unit = {}
 ) {
-    // Header row with title + filter buttons
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "Session History",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = TextPrimary
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    // Header: title on its own line, filter buttons on the line below —
+    // gives the filter summary the full row width to display completely.
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Session History",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             // Quick "All" chip — single tap to clear all filters
             if (isFiltered) {
                 OutlinedButton(
@@ -728,6 +756,7 @@ private fun SessionHistorySection(
             }
             OutlinedButton(
                 onClick = onFilterClick,
+                modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                 shape = RoundedCornerShape(8.dp),
                 border = BorderStroke(1.dp, TextSecondary),

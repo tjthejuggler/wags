@@ -194,6 +194,17 @@ fun ApneaTableScreen(
                     .fillMaxSize()
                     .padding(padding)
             ) {
+                // Settings summary — pinned below the top bar so it stays visible
+                // while scrolling (label only; settings are chosen on the main apnea screen)
+                ApneaSettingsSummaryBanner(
+                    lungVolume = state.selectedLungVolume,
+                    prepType   = state.prepType.name,
+                    // Dimension-aware bucket: hour number in BY_HOUR mode, Morning/Day/Night otherwise.
+                    timeOfDay  = effectiveTod,
+                    posture    = state.posture.name,
+                    audio      = state.audio.name
+                )
+
                 // Upper content section - scrolls separately
                 LazyColumn(
                     modifier = Modifier
@@ -202,17 +213,6 @@ fun ApneaTableScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Settings summary
-                    item {
-                        ApneaSettingsSummaryBanner(
-                            lungVolume = state.selectedLungVolume,
-                            prepType   = state.prepType.name,
-                            // Dimension-aware bucket: hour number in BY_HOUR mode, Morning/Day/Night otherwise.
-                            timeOfDay  = effectiveTod,
-                            posture    = state.posture.name,
-                            audio      = state.audio.name
-                        )
-                    }
                     // Hyperventilating advice
                     if (state.prepType == PrepType.HYPER) {
                         item {
@@ -247,18 +247,26 @@ fun ApneaTableScreen(
                         TableContractionSummaryCard(uiState = state)
                     }
                     // Song picker / connect prompt — shown when MUSIC is selected, session not active
+                    // Selected-song banner doubles as the picker trigger, so banner and
+                    // choose-button are never visible at the same time.
                     if (state.audio == AudioSetting.MUSIC && state.apneaState == ApneaState.IDLE) {
                         item {
                             if (state.spotifyConnected) {
                                 if (state.selectedSongs.isNotEmpty()) {
-                                    SelectedSongBanner(tracks = state.selectedSongs) {
-                                        viewModel.clearSelectedSong()
-                                    }
+                                    SelectedSongBanner(
+                                        tracks = state.selectedSongs,
+                                        onClear = { viewModel.clearSelectedSong() },
+                                        onClick = {
+                                            viewModel.loadPreviousSongs()
+                                            showSongPicker = true
+                                        }
+                                    )
+                                } else {
+                                    SongPickerButton(onClick = {
+                                        viewModel.loadPreviousSongs()
+                                        showSongPicker = true
+                                    })
                                 }
-                                SongPickerButton(onClick = {
-                                    viewModel.loadPreviousSongs()
-                                    showSongPicker = true
-                                })
                             } else {
                                 SpotifyConnectPrompt(
                                     onNavigateToSettings = { navController.navigate(WagsRoutes.SETTINGS) }
@@ -267,14 +275,19 @@ fun ApneaTableScreen(
                         }
                     }
                     // Guided audio picker — shown when GUIDED is selected, session not active
+                    // Selected-audio banner doubles as the picker trigger.
                     if (state.audio == AudioSetting.GUIDED && state.apneaState == ApneaState.IDLE) {
                         item {
                             if (state.guidedSelectedName.isNotBlank()) {
-                                SelectedGuidedAudioBanner(name = state.guidedSelectedName)
+                                SelectedGuidedAudioBanner(
+                                    name = state.guidedSelectedName,
+                                    onClick = { showGuidedPicker = true }
+                                )
+                            } else {
+                                GuidedAudioPickerButton(onClick = {
+                                    showGuidedPicker = true
+                                })
                             }
-                            GuidedAudioPickerButton(onClick = {
-                                showGuidedPicker = true
-                            })
                         }
                     }
                     // Voice / vibration toggles — shown when session is not active

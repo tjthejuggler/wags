@@ -56,11 +56,9 @@ fun TableTrainingScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Settings summary — reflects the settings chosen on the main apnea screen
+            // Settings summary — pinned below the top bar so it stays visible
+            // while scrolling; reflects the settings chosen on the main apnea screen
             ApneaSettingsSummaryBanner(
                 lungVolume = state.selectedLungVolume,
                 prepType   = state.prepType.name,
@@ -70,17 +68,27 @@ fun TableTrainingScreen(
                 audio      = state.audio.name
             )
 
-            TableTrainingConfigContent(
-                personalBestMs = state.personalBestMs,
-                bestTimeForSettingsMs = state.bestTimeForSettingsMs,
-                selectedLength = state.selectedLength,
-                selectedDifficulty = state.selectedDifficulty,
-                onSetPersonalBest = { viewModel.setPersonalBest(it) },
-                onLengthSelected = { viewModel.setLength(it) },
-                onDifficultySelected = { viewModel.setDifficulty(it) },
-                onNavigateO2 = { navController.navigate(WagsRoutes.apneaTable("O2")) },
-                onNavigateCo2 = { navController.navigate(WagsRoutes.apneaTable("CO2")) }
-            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+
+                TableTrainingConfigContent(
+                    personalBestMs = state.personalBestMs,
+                    bestTimeForSettingsMs = state.bestTimeForSettingsMs,
+                    selectedLength = state.selectedLength,
+                    selectedDifficulty = state.selectedDifficulty,
+                    onSetPersonalBest = { viewModel.setPersonalBest(it) },
+                    onLengthSelected = { viewModel.setLength(it) },
+                    onDifficultySelected = { viewModel.setDifficulty(it) },
+                    onNavigateO2 = { navController.navigate(WagsRoutes.apneaTable("O2")) },
+                    onNavigateCo2 = { navController.navigate(WagsRoutes.apneaTable("CO2")) }
+                )
+            }
         }
     }
 }
