@@ -1,11 +1,74 @@
-### ADR: Auto-set menu on all apnea drill cards + 2s locked-prep preview (2026-08-20)
+# ADR: Dimension-aware effective time bucket for the collapsed settings banner
 
-**Context.** The "record" auto-set previously jumped straight to the highest unlocked-prep record, hiding the true top hold when its prep (e.g. HYPER) was locked. Auto-set also existed only on the Free Hold card, inside `RecordForecastSummary`.
+## Context
+With the "By the Hour" apnea time dimension enabled, the collapsed one-line settings
+summary (`ApneaSettingsSummaryBanner`) still showed the legacy time-of-day word
+("Morning"/"Day"/"Night") on all session-type screens (main apnea, free hold, O₂/CO₂
+tables, table training, contraction tables, min breath, progressive O₂), because every
+call site passed the raw stored `timeOfDay` value. The banner already knew how to
+render hour buckets ("H14" → "14") but never received one.
 
-**Decision.**
-1. **Shared preview-then-fallback** (`ApneaViewModel.applyRecordAutoSet`): when the true top record's prep is locked, apply it anyway via `setPrepType(type, force = true)` for 2 seconds (toast explains), then fall back to the best record whose prep is selectable. A single `autoSetRecordJob` is cancelled/restarted so rapid taps don't stack previews.
-2. **Drill record auto-set** (`autoSetRecordDrill(section)`): queries `getBestDrillRecordsForTimeBucket(tableType, drillParamValue, bucket)` (new DAO query, `drillParamValue IS NULL` = any config). Prefers records at the CURRENT internal config (Prog O₂ breath period / Min Breath session duration); if none exist, re-queries with param = null and switches the config via `setProgO2BreathPeriodSec`/`setMinBreathSessionDurationSec` (persisted to prefs, mirroring `refreshDrillParams` keys).
-3. **Drill "easiest"** (`autoSetEasiestDrill(section)`): `RecordForecastCalculator.computeBestSettings` gained a `drillParam` argument — pbRecords filtered to that config, design matrix/encoding include the param — so probability ranking is config-aware; results filtered by `prepSelectableByName`.
-4. **UI**: `RecordForecastSummary` reduced to the probability row (auto-set params removed; drill screens' `showAutoSet = false` args dropped). New `AutoSetMenuButton` composable (menu: "easiest" when applicable + "record") rendered through a new `DrillCard(headerAction)` slot, immediately left of the "→" arrow on ALL four cards (Free Hold, Progressive O₂, Min Breath, Contraction Tables — the latter record-only since it has no forecast).
+## Decision
+- `ApneaTimeDimensionStore` (singleton, already the owner of the dimension choice) now
+  hosts the shared hour-rollover tick and exposes
+  `effectiveTod(selectedTod: Flow<String>): Flow<String>` — legacy names pass through in
+  TIME_OF_DAY mode; in BY_HOUR mode any legacy name is replaced with the automatic
+  current-hour bucket via `TimeBuckets.normalizeSessionBucket`, re-emitted at every
+  local-hour boundary so long-lived collectors never display a stale hour.
+- `ApneaViewModel`'s private `hourTick`/`_effectiveTod` was refactored onto the store
+  helper (identical semantics for forecasts/combo badges/filtered queries) and is now
+  also exposed publicly as `effectiveTod: StateFlow<String>` for the UI.
+- `FreeHoldActiveViewModel`, `ContractionTableViewModel`, `MinBreathViewModel` and
+  `ProgressiveO2ViewModel` each expose the same `effectiveTod: StateFlow<String>`
+  derived from their `_uiState` time-of-day field.
+- All 7 `ApneaSettingsSummaryBanner` call sites pass `effectiveTod` instead of the raw
+  stored value. In BY_HOUR mode the banner line now ends with the current hour ("14");
+  in TIME_OF_DAY mode it is unchanged ("Morning"/"Day"/"Night").
 
-**Consequences.** Inner `clickable` on the header button consumes taps before the card's navigation (same pattern as trophy texts inside cards). `setPrepType(force = true)` bypasses HYPER/RESONANCE locks ONLY for the 2s preview; the persisted end state is always an unlocked-prep combo.
+## Consequences
+- Display-only change: record saving, queries, PBs, trophies and forecasts are untouched
+  (the repository already normalizes hour buckets independently).
+- The banner hour stays correct across hour boundaries on screens left open, matching
+  the pre-existing hourTick behavior documented for forecasts.
+- Future session-type screens should reuse `timeDimensionStore.effectiveTod(...)` rather
+  than re-implementing the tick locally.
+
+---
+
+# ADR: Conditional history-filter re-sync on resume (Min Breath & Progressive O₂)
+
+## Context
+Both drill screens reset their history filter to the current "settings to be used" on
+every `ON_RESUME`. Returning from a record's detail screen therefore wiped the user's
+filter edits made in the filter dialog. The reset is only wanted when the settings
+themselves changed while the user was away (e.g. changed on the main apnea screen, or
+applied from a record via ApneaRecordDetailViewModel's "use these settings", which
+writes the shared `setting_*` SharedPreferences keys).
+
+## Decision
+- `MinBreathViewModel` / `ProgressiveO2ViewModel`:
+  - `resetFilters()` now records `filtersSyncedTo`, a signature of the five settings
+    (lung volume, prep type, tod normalized to the active time dimension, posture,
+    audio) it synced the filters to.
+  - New `syncFiltersOnResume()` is the ON_RESUME entry point: it re-reads the persisted
+    `setting_*` prefs (they may have changed while the destination sat in the back
+    stack). Signature unchanged → keep the user's filter edits and only reload the
+    history list (so deletions/edits made in the detail screen still show up).
+    Signature changed → adopt the new settings through the existing setters (so the
+    banner/settings state stays truthful) and re-sync the filters to them.
+  - First sync after ViewModel creation (filtersSyncedTo == null) keeps the old
+    behavior: mirror the freshly loaded settings — time-of-day stays smart-set from the
+    clock at init rather than adopting a stale persisted value.
+- Screens call `viewModel.syncFiltersOnResume()` instead of `viewModel.resetFilters()`
+  in their ON_RESUME observers. The filter dialog's Reset button still calls
+  `resetFilters()` directly (explicit user action), and `clearAllFilters()` deliberately
+  does NOT touch the sync signature (an "All" filter survives resumes).
+
+## Consequences
+- Drill → detail → back: filter preserved (the reported bug).
+- Main apnea settings changed → re-enter drill: fresh ViewModel loads new prefs and the
+  first sync maps the filter to them (unchanged from before).
+- Settings applied from a record detail while the drill screen is in the back stack are
+  now adopted on return (previously the drill screen kept stale settings in its banner).
+- ContractionTableScreen still resets unconditionally on resume (same old pattern);
+  change it to `syncFiltersOnResume()` too if the same behavior is wanted there.

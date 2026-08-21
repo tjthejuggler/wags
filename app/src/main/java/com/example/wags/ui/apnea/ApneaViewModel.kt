@@ -68,10 +68,10 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.Calendar
 import javax.inject.Inject
 import javax.inject.Named
 
@@ -335,37 +335,28 @@ class ApneaViewModel @Inject constructor(
     }
 
     /**
-     * Emits immediately, then again at every local-hour boundary. Combined
-     * into [_effectiveTod] so By-the-Hour consumers refresh when the
-     * wall-clock hour rolls over — otherwise the bucket stays frozen at the
-     * hour it was computed at (e.g. app opened at 12:xx keeps using "H12"
-     * all through hour 13), which made the forecast disagree with the
-     * record card (which re-queries with the fresh hour).
-     */
-    private val hourTick: Flow<Unit> = flow {
-        while (true) {
-            emit(Unit)
-            val now = Calendar.getInstance()
-            val nextTopOfHour = (now.clone() as Calendar).apply {
-                set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-                add(Calendar.HOUR_OF_DAY, 1)
-            }
-            delay((nextTopOfHour.timeInMillis - now.timeInMillis).coerceAtLeast(1_000L))
-        }
-    }
-
-    /**
      * Effective time-bucket string for the current dimension: the TimeOfDay
      * name as before, or the automatic current-hour bucket ("H14") when the
      * user selected "By the Hour". Re-evaluated on time-of-day / dimension
-     * changes AND on every hour rollover (via [hourTick]), so long-lived
-     * collectors never act on a stale hour bucket. Drives forecasts, combo
-     * badges and all settings-filtered queries below; the repository passes
-     * hour buckets through its own normalization untouched.
+     * changes AND on every hour rollover (via the store's internal hour
+     * tick), so long-lived collectors never act on a stale hour bucket.
+     * Drives forecasts, combo badges and all settings-filtered queries
+     * below; the repository passes hour buckets through its own
+     * normalization untouched.
      */
-    private val _effectiveTod = combine(_timeOfDay, timeDimensionStore.dimension, hourTick) { tod, dim, _ ->
-        TimeBuckets.normalizeSessionBucket(tod.name, dim)
-    }.distinctUntilChanged()
+    private val _effectiveTod = timeDimensionStore.effectiveTod(_timeOfDay.map { it.name })
+
+    /**
+     * [_effectiveTod] as hot state for the UI. The collapsed settings
+     * summary banner shows this bucket — the plain hour number in BY_HOUR
+     * mode, Morning/Day/Night otherwise — and it refreshes automatically
+     * when the wall-clock hour rolls over.
+     */
+    val effectiveTod: StateFlow<String> = _effectiveTod.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        TimeBuckets.normalizeSessionBucket(_timeOfDay.value.name, timeDimensionStore.current)
+    )
 
     // Drill-specific param flows — drive trophy queries for Progressive O₂ and Min Breath
     private val _progO2BreathPeriodSec = MutableStateFlow(60)

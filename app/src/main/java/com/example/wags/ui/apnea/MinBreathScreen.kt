@@ -46,6 +46,7 @@ fun MinBreathScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val pastConfigurations by eucapnicConfigViewModel.pastConfigurations.collectAsStateWithLifecycle()
     val timeDimension by viewModel.timeDimension.collectAsStateWithLifecycle()
+    val effectiveTod by viewModel.effectiveTod.collectAsStateWithLifecycle()
     val eucapnicConfig by eucapnicConfigViewModel.config.collectAsStateWithLifecycle()
 
     // Seed-or-mirror the eucapnic config (EucapnicConfigViewModel is the
@@ -77,12 +78,14 @@ fun MinBreathScreen(
         }
     }
 
-    // Reset filters to current settings every time this screen is entered
+    // Sync the history filters to the current settings on entry, but keep the
+    // user's filter edits when returning from a record detail screen unchanged
+    // (re-sync only happens when the "settings to be used" actually changed).
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.resetFilters()
+                viewModel.syncFiltersOnResume()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -197,7 +200,8 @@ fun MinBreathScreen(
             ApneaSettingsSummaryBanner(
                 lungVolume = state.lungVolume,
                 prepType   = state.prepType,
-                timeOfDay  = state.timeOfDay,
+                // Dimension-aware bucket: hour number in BY_HOUR mode, Morning/Day/Night otherwise.
+                timeOfDay  = effectiveTod,
                 posture    = state.posture,
                 audio      = state.audio,
                 onClick    = { showSettingsDialog = true }

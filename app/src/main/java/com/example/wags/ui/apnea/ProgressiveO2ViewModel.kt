@@ -48,6 +48,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.collectLatest
@@ -210,6 +212,20 @@ class ProgressiveO2ViewModel @Inject constructor(
 
     /** Selected time-bucket dimension (Time of Day vs By the Hour) — drives selector/filter UI. */
     val timeDimension: StateFlow<TimeDimension> = timeDimensionStore.dimension
+
+    /**
+     * Effective time-bucket for the collapsed settings banner: the selected
+     * Morning/Day/Night name, or the automatic current-hour bucket ("H14")
+     * when By-the-Hour is active. Refreshes automatically when the
+     * wall-clock hour rolls over.
+     */
+    val effectiveTod: StateFlow<String> = timeDimensionStore.effectiveTod(
+        _uiState.map { it.timeOfDay }.distinctUntilChanged()
+    ).stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = TimeBuckets.normalizeSessionBucket(_uiState.value.timeOfDay, timeDimensionStore.current)
+    )
 
     /** Bumped when settings change — triggers forecast recompute. */
     private val _forecastRefreshTrigger = MutableStateFlow(0)
@@ -738,6 +754,13 @@ class ProgressiveO2ViewModel @Inject constructor(
     fun setFilterPosture(v: String)   { _uiState.update { it.copy(filterPosture = v) }; loadBreathPeriodHistory() }
     fun setFilterAudio(v: String)     { _uiState.update { it.copy(filterAudio = v) }; loadBreathPeriodHistory() }
 
+    /** Signature of the "settings to be used" (tod normalized to the active dimension). */
+    private fun settingsSignature(lv: String, pt: String, tod: String, pos: String, aud: String): String =
+        listOf(lv, pt, TimeBuckets.normalizeSessionBucket(tod, timeDimensionStore.current), pos, aud).joinToString("|")
+
+    /** Settings signature the history filters were last synced to (null = never synced). */
+    private var filtersSyncedTo: String? = null
+
     fun resetFilters() {
         val s = _uiState.value
         _uiState.update {
@@ -750,7 +773,41 @@ class ProgressiveO2ViewModel @Inject constructor(
                 guidedCountdownComplete = false
             )
         }
+        filtersSyncedTo = settingsSignature(s.lungVolume, s.prepType, s.timeOfDay, s.posture, s.audio)
         loadBreathPeriodHistory()
+    }
+
+    /**
+     * ON_RESUME entry point. Re-reads the persisted "settings to be used" —
+     * they may have changed on the main apnea screen or via a record's
+     * "use these settings" while this screen was in the back stack:
+     *  * changed   → adopt the new settings and re-sync the filters to them;
+     *  * unchanged → keep the user's filter edits (e.g. tweaks made in the
+     *    filter dialog before visiting a record's detail screen) and only
+     *    refresh the history list so edits/deletes made away still show up.
+     */
+    fun syncFiltersOnResume() {
+        // First sync after ViewModel creation: mirror the current settings
+        // (timeOfDay is smart-set from the clock at init, not read from prefs).
+        if (filtersSyncedTo == null) { resetFilters(); return }
+
+        val s = _uiState.value
+        val savedLungVolume = prefs.getString("setting_lung_volume", s.lungVolume) ?: s.lungVolume
+        val savedPrepType   = prefs.getString("setting_prep_type",   s.prepType)   ?: s.prepType
+        val savedTimeOfDay  = prefs.getString("setting_time_of_day", s.timeOfDay)  ?: s.timeOfDay
+        val savedPosture    = prefs.getString("setting_posture",    s.posture)    ?: s.posture
+        val savedAudio      = prefs.getString("setting_audio",      s.audio)      ?: s.audio
+
+        if (settingsSignature(savedLungVolume, savedPrepType, savedTimeOfDay, savedPosture, savedAudio) == filtersSyncedTo) {
+            loadBreathPeriodHistory()
+            return
+        }
+        if (savedLungVolume != s.lungVolume) setLungVolume(savedLungVolume)
+        if (savedPrepType != s.prepType)     setPrepType(savedPrepType)
+        if (savedTimeOfDay != s.timeOfDay)   setTimeOfDay(savedTimeOfDay)
+        if (savedPosture != s.posture)       setPosture(savedPosture)
+        if (savedAudio != s.audio)           setAudio(savedAudio)
+        resetFilters()
     }
 
     /** Clear all filters to show sessions across every setting combination. */

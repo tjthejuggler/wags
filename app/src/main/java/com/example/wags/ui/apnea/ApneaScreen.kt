@@ -66,6 +66,7 @@ fun ApneaScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val pastConfigurations by eucapnicConfigViewModel.pastConfigurations.collectAsStateWithLifecycle()
     val timeDimension by viewModel.timeDimension.collectAsStateWithLifecycle()
+    val effectiveTod by viewModel.effectiveTod.collectAsStateWithLifecycle()
 
     LockPortrait()
 
@@ -243,7 +244,8 @@ fun ApneaScreen(
                         ApneaSettingsSummaryBanner(
                             lungVolume = state.selectedLungVolume,
                             prepType   = state.prepType.name,
-                            timeOfDay  = state.timeOfDay.name,
+                            // Dimension-aware bucket: hour number in BY_HOUR mode, Morning/Day/Night otherwise.
+                            timeOfDay  = effectiveTod,
                             posture    = state.posture.name,
                             audio      = state.audio.name,
                             comboDaysSince = comboDaysSince?.toString() ?: "∞"

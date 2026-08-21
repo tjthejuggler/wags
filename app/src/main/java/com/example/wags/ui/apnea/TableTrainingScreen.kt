@@ -33,6 +33,7 @@ fun TableTrainingScreen(
     viewModel: ApneaViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val effectiveTod by viewModel.effectiveTod.collectAsStateWithLifecycle()
 
     Scaffold(
         containerColor = BackgroundDark,
@@ -63,7 +64,8 @@ fun TableTrainingScreen(
             ApneaSettingsSummaryBanner(
                 lungVolume = state.selectedLungVolume,
                 prepType   = state.prepType.name,
-                timeOfDay  = state.timeOfDay.name,
+                // Dimension-aware bucket: hour number in BY_HOUR mode, Morning/Day/Night otherwise.
+                timeOfDay  = effectiveTod,
                 posture    = state.posture.name,
                 audio      = state.audio.name
             )

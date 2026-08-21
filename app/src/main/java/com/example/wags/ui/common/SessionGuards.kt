@@ -95,8 +95,14 @@ fun LockPortrait() {
         val original = activity?.requestedOrientation
         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         onDispose {
-            activity?.requestedOrientation =
-                original ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            // Only restore if our portrait lock is still the active request.
+            // This avoids overriding a screen that took control of the
+            // orientation after us (e.g. a chart screen that released or
+            // forced landscape while we were still disposing).
+            if (activity?.requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT) {
+                activity?.requestedOrientation =
+                    original ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            }
         }
     }
 }

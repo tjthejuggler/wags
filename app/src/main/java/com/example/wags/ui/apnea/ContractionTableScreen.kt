@@ -56,6 +56,7 @@ fun ContractionTableScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val pastConfigurations by eucapnicConfigViewModel.pastConfigurations.collectAsStateWithLifecycle()
     val timeDimension by viewModel.timeDimension.collectAsStateWithLifecycle()
+    val effectiveTod by viewModel.effectiveTod.collectAsStateWithLifecycle()
     val eucapnicConfig by eucapnicConfigViewModel.config.collectAsStateWithLifecycle()
 
     // Seed-or-mirror the eucapnic config (EucapnicConfigViewModel is the
@@ -304,7 +305,8 @@ fun ContractionTableScreen(
             ApneaSettingsSummaryBanner(
                 lungVolume = state.lungVolume,
                 prepType   = state.prepType,
-                timeOfDay  = state.timeOfDay,
+                // Dimension-aware bucket: hour number in BY_HOUR mode, Morning/Day/Night otherwise.
+                timeOfDay  = effectiveTod,
                 posture    = state.posture,
                 audio      = state.audio,
                 onClick    = { showSettingsDialog = true }

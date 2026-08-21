@@ -56,6 +56,7 @@ import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.trophyCount
 import com.example.wags.domain.model.trophyEmojis
 import com.example.wags.domain.model.SpotifySong
+import com.example.wags.domain.model.TimeBuckets
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
 import com.example.wags.domain.usecase.apnea.GuidedAudioManager
@@ -78,6 +79,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -314,6 +317,20 @@ class FreeHoldActiveViewModel @Inject constructor(
             isGuidedMode = isGuidedMode,
             isHyperPrep = isHyperPrep
         )
+    )
+
+    /**
+     * Effective time-bucket for the collapsed settings banner: the selected
+     * Morning/Day/Night name, or the automatic current-hour bucket ("H14")
+     * when By-the-Hour is active. Refreshes automatically when the
+     * wall-clock hour rolls over.
+     */
+    val effectiveTod: StateFlow<String> = timeDimensionStore.effectiveTod(
+        _uiState.map { it.currentTimeOfDay }.distinctUntilChanged()
+    ).stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = TimeBuckets.normalizeSessionBucket(timeOfDay, timeDimensionStore.current)
     )
 
     init {
@@ -1404,6 +1421,7 @@ private fun FreeHoldActiveScreenContent(
     KeepScreenOn(enabled = state.freeHoldActive || state.pbCheckPending || state.newPersonalBest != null)
 
     val timeDimension by viewModel.timeDimension.collectAsStateWithLifecycle()
+    val effectiveTod by viewModel.effectiveTod.collectAsStateWithLifecycle()
 
     // True once the user taps Stop — we wait for the async PB check before navigating.
     var stopRequested by remember { mutableStateOf(false) }
@@ -1629,7 +1647,8 @@ private fun FreeHoldActiveScreenContent(
             ApneaSettingsSummaryBanner(
                 lungVolume = state.currentLungVolume,
                 prepType   = state.currentPrepType,
-                timeOfDay  = state.currentTimeOfDay,
+                // Dimension-aware bucket: hour number in BY_HOUR mode, Morning/Day/Night otherwise.
+                timeOfDay  = effectiveTod,
                 posture    = state.currentPosture,
                 audio      = state.currentAudio,
                 onClick    = if (!state.freeHoldActive) {{ showSettingsDialog = true }} else null

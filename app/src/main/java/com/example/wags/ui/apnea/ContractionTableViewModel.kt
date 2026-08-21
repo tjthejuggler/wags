@@ -50,6 +50,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -236,6 +238,20 @@ class ContractionTableViewModel @Inject constructor(
 
     /** Selected time-bucket dimension (Time of Day vs By the Hour) — drives selector/filter UI. */
     val timeDimension: StateFlow<TimeDimension> = timeDimensionStore.dimension
+
+    /**
+     * Effective time-bucket for the collapsed settings banner: the selected
+     * Morning/Day/Night name, or the automatic current-hour bucket ("H14")
+     * when By-the-Hour is active. Refreshes automatically when the
+     * wall-clock hour rolls over.
+     */
+    val effectiveTod: StateFlow<String> = timeDimensionStore.effectiveTod(
+        _uiState.map { it.timeOfDay }.distinctUntilChanged()
+    ).stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = TimeBuckets.normalizeSessionBucket(_uiState.value.timeOfDay, timeDimensionStore.current)
+    )
 
     /** Bumped when settings change — triggers forecast recompute. */
     private val _forecastRefreshTrigger = MutableStateFlow(0)

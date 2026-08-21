@@ -84,11 +84,11 @@ fun RateBarChart(
     val scrollState = rememberScrollState()
     val minChartWidthDp = if (needsScroll) (entries.size * 32).dp + 48.dp else 0.dp
 
-    // Layout constants — padBottom increased from 24f to 40f for x-axis labels
-    val padLeft = 36f
+    // Layout constants — generous pads so axis labels never clip on dense screens
+    val padLeft = 44f
     val padRight = 8f
     val padTop = 8f
-    val padBottom = 40f
+    val padBottom = 56f
 
     // Pre-compute bar hit-test rects whenever canvas size or entries change
     val barLayout = remember(canvasSize, entries) {

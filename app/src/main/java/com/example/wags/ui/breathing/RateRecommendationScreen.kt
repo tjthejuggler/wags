@@ -1,5 +1,8 @@
 package com.example.wags.ui.breathing
 
+import android.app.Activity
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -13,6 +16,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -22,6 +27,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wags.domain.usecase.breathing.DataPointSource
 import com.example.wags.domain.usecase.breathing.RateBucket
+import com.example.wags.domain.usecase.breathing.RateHistoryResult
 import com.example.wags.domain.usecase.breathing.RateRecommendation
 import com.example.wags.ui.common.BarEntry
 import com.example.wags.ui.common.LiveSensorActionsCallback
@@ -50,7 +56,24 @@ fun RateRecommendationScreen(
     viewModel: RateRecommendationViewModel = hiltViewModel()
 ) {
     val recommendation by viewModel.recommendation.collectAsStateWithLifecycle()
+    val history by viewModel.history.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+
+    // Release the orientation lock inherited from the parent screen so the
+    // user can rotate into landscape manually — the charts get much more
+    // detail at full landscape width. No automatic rotation is forced.
+    val activity = LocalContext.current as? Activity
+    DisposableEffect(Unit) {
+        val original = activity?.requestedOrientation
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        onDispose {
+            // Only restore if no other screen has taken over since.
+            if (activity?.requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) {
+                activity?.requestedOrientation =
+                    original ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            }
+        }
+    }
 
     Scaffold(
         containerColor = BackgroundDark,
@@ -86,14 +109,20 @@ fun RateRecommendationScreen(
                     Text("Unable to load recommendation.", color = TextSecondary)
                 }
             } else {
-                RecommendationContent(rec = rec, modifier = Modifier.padding(padding))
+                RecommendationContent(rec = rec, history = history, modifier = Modifier.padding(padding))
             }
         }
     }
 }
 
 @Composable
-private fun RecommendationContent(rec: RateRecommendation, modifier: Modifier = Modifier) {
+private fun RecommendationContent(
+    rec: RateRecommendation,
+    history: RateHistoryResult?,
+    modifier: Modifier = Modifier
+) {
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -101,75 +130,15 @@ private fun RecommendationContent(rec: RateRecommendation, modifier: Modifier = 
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // ── Hero card ────────────────────────────────────────────────────────
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = SurfaceDark),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp).fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "RECOMMENDED RATE",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = RecGold,
-                    letterSpacing = 3.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                if (rec.recommendedBpm != null) {
-                    Text(
-                        text = "%.2f".format(rec.recommendedBpm),
-                        style = MaterialTheme.typography.displayLarge.copy(
-                            fontSize = 56.sp,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = TextPrimary
-                    )
-                    Text(
-                        text = "breaths per minute",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = RecSilver
-                    )
-                } else {
-                    Text(
-                        text = "No Data",
-                        style = MaterialTheme.typography.displayMedium.copy(fontWeight = FontWeight.Bold),
-                        color = TextSecondary
-                    )
-                    Text(
-                        text = "Run an RF Assessment to get started",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = RecAsh
-                    )
-                }
+        // ── Hero + data summary (side by side in landscape) ──────────────────
+        if (isLandscape) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                HeroCard(rec = rec, modifier = Modifier.weight(1f))
+                DataSummaryCard(rec = rec, modifier = Modifier.weight(1f))
             }
-        }
-
-        // ── Data summary ─────────────────────────────────────────────────────
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = SurfaceDark),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    "DATA SUMMARY",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = RecSilver,
-                    letterSpacing = 2.sp
-                )
-                RecMetricRow("Lookback window", "${rec.lookbackDays} days")
-                RecMetricRow("Assessments used", "${rec.assessmentCount}")
-                RecMetricRow("Sessions used", "${rec.sessionCount}")
-                RecMetricRow("Total data points", "${rec.assessmentCount + rec.sessionCount}")
-                RecMetricRow("Rate buckets", "${rec.buckets.size}")
-            }
+        } else {
+            HeroCard(rec = rec)
+            DataSummaryCard(rec = rec)
         }
 
         // ── Algorithm explanation ────────────────────────────────────────────
@@ -194,6 +163,13 @@ private fun RecommendationContent(rec: RateRecommendation, modifier: Modifier = 
                     color = RecBone,
                     lineHeight = 18.sp
                 )
+            }
+        }
+
+        // ── Best rate over time (full-history replay) ─────────────────────────
+        history?.let { h ->
+            if (h.hasData && h.snapshots.size >= 2) {
+                RateHistorySection(history = h)
             }
         }
 
@@ -281,6 +257,81 @@ private fun RecommendationContent(rec: RateRecommendation, modifier: Modifier = 
         }
 
         Spacer(Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun HeroCard(rec: RateRecommendation, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp).fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "RECOMMENDED RATE",
+                style = MaterialTheme.typography.labelMedium,
+                color = RecGold,
+                letterSpacing = 3.sp,
+                fontWeight = FontWeight.Bold
+            )
+            if (rec.recommendedBpm != null) {
+                Text(
+                    text = "%.2f".format(rec.recommendedBpm),
+                    style = MaterialTheme.typography.displayLarge.copy(
+                        fontSize = 56.sp,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = TextPrimary
+                )
+                Text(
+                    text = "breaths per minute",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = RecSilver
+                )
+            } else {
+                Text(
+                    text = "No Data",
+                    style = MaterialTheme.typography.displayMedium.copy(fontWeight = FontWeight.Bold),
+                    color = TextSecondary
+                )
+                Text(
+                    text = "Run an RF Assessment to get started",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = RecAsh
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DataSummaryCard(rec: RateRecommendation, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                "DATA SUMMARY",
+                style = MaterialTheme.typography.labelMedium,
+                color = RecSilver,
+                letterSpacing = 2.sp
+            )
+            RecMetricRow("Lookback window", "${rec.lookbackDays} days")
+            RecMetricRow("Assessments used", "${rec.assessmentCount}")
+            RecMetricRow("Sessions used", "${rec.sessionCount}")
+            RecMetricRow("Total data points", "${rec.assessmentCount + rec.sessionCount}")
+            RecMetricRow("Rate buckets", "${rec.buckets.size}")
+        }
     }
 }
 
