@@ -116,7 +116,10 @@ fun MeditationScreen(
                         navController.navigate(WagsRoutes.MEDITATION_HISTORY)
                     },
                     onAdjustDuration = { viewModel.adjustSessionDuration(it) },
-                    onDone = { viewModel.reset() },
+                    onDone = {
+                        viewModel.reset()
+                        navController.popBackStack(WagsRoutes.DASHBOARD, inclusive = false)
+                    },
                     modifier = Modifier
                 )
             }
@@ -691,7 +694,7 @@ private fun CompleteContent(
         }
 
         Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) {
-            Text("New Session")
+            Text("Done")
         }
     }
 }
