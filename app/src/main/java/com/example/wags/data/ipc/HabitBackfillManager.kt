@@ -101,12 +101,23 @@ class HabitBackfillManager @Inject constructor(
         val skipped = habitRepo.getHabitId(slot).isBlank()
         if (!skipped && minutesByDate.isNotEmpty()) {
             Log.i(TAG, "Backfill ${slot.name}: ${minutesByDate.size} dates, " +
-                    "${minutesByDate.values.sum()} min, ${sessionsByDate.values.sum()} sessions")
-            habitRepo.sendHabitValuesForDates(slot, minutesByDate)
-            // Small delay to let Tail's mutex-serialised receiver finish the primary write
-            // before we send the secondary broadcast.
-            delay(500)
-            habitRepo.sendSecondaryValuesForDates(slot, sessionsByDate)
+                "${minutesByDate.values.sum()} min, ${sessionsByDate.values.sum()} sessions")
+            if (slot in SESSIONS_PRIMARY_SLOTS) {
+                // Sessions-primary habits (Aug-21-2026 migration): the session
+                // count is the PRIMARY value and the minutes live in Tail's
+                // first-class minutes:<habit> slot.
+                habitRepo.sendHabitValuesForDates(slot, sessionsByDate)
+                // Small delay to let Tail's mutex-serialised receiver finish
+                // the primary write before we send the minutes-slot broadcast.
+                delay(500)
+                habitRepo.sendMinutesSlotValuesForDates(slot, minutesByDate)
+            } else {
+                habitRepo.sendHabitValuesForDates(slot, minutesByDate)
+                // Small delay to let Tail's mutex-serialised receiver finish the primary write
+                // before we send the secondary broadcast.
+                delay(500)
+                habitRepo.sendSecondaryValuesForDates(slot, sessionsByDate)
+            }
         }
         return SlotBackfillResult(
             slot = slot,
@@ -225,5 +236,19 @@ class HabitBackfillManager @Inject constructor(
 
     companion object {
         private const val TAG = "HabitBackfillManager"
+
+        /**
+         * Slots whose Tail habits are SESSIONS-PRIMARY (Aug-21-2026 migration):
+         * sessions are the primary value and points source; minutes live in
+         * the first-class `minutes:<habit>` slot. All other slots keep the
+         * legacy layout (minutes = primary, sessions = secondary value).
+         */
+        val SESSIONS_PRIMARY_SLOTS = setOf(
+            Slot.FREE_HOLD,
+            Slot.O2_TABLE,
+            Slot.CO2_TABLE,
+            Slot.PROGRESSIVE_O2,
+            Slot.MIN_BREATH
+        )
     }
 }

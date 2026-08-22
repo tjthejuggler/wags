@@ -303,6 +303,53 @@ class HabitIntegrationRepository @Inject constructor(
     }
 
     /**
+     * **Protocol v3** — Sends ONE atomic increment broadcast for a
+     * SESSIONS-PRIMARY habit: +[sessions] on the habit's own key (the primary
+     * value / session count) and +[minutes] on its first-class
+     * `minutes:<habitName>` slot.
+     *
+     * Used by the apnea slots whose Tail habits are sessions-primary with the
+     * built-in minutes value (free hold, O₂/CO₂ tables, progressive O₂,
+     * min breath). Tail performs both increments in a single read-modify-write
+     * ([HabitIncrementReceiver] reads [EXTRA_SESSIONS] together with
+     * [EXTRA_MINUTES]), so no increment can be lost to a concurrent writer.
+     *
+     * Does nothing if no habit has been selected for [slot], or if both
+     * [minutes] and [sessions] are < 1.
+     */
+    fun sendSessionWithMinutes(slot: Slot, minutes: Int, sessions: Int = 1) {
+        if (minutes < 1 && sessions < 1) {
+            Log.d(TAG, "sendSessionWithMinutes(${slot.name}): minutes=$minutes, sessions=$sessions — nothing to send, skipping")
+            return
+        }
+        val habitName = getHabitId(slot)
+        if (habitName.isBlank()) {
+            Log.d(TAG, "sendSessionWithMinutes(${slot.name}): no habit selected, skipping")
+            return
+        }
+        try {
+            val intent = Intent(ACTION_INCREMENT).apply {
+                `package` = HABIT_APP_PACKAGE
+                putExtra(EXTRA_HABIT_ID, habitName)
+                putExtra(EXTRA_SLOT, slot.name)
+                putExtra(EXTRA_MINUTES, minutes.coerceAtLeast(0))
+                putExtra(EXTRA_SESSIONS, sessions.coerceAtLeast(1))
+            }
+            context.sendBroadcast(intent, PERMISSION_TAIL)
+            Log.d(
+                TAG,
+                "sendSessionWithMinutes(${slot.name}): fired for habitId=$habitName, " +
+                    "sessions=$sessions, minutes=$minutes"
+            )
+        } catch (e: SecurityException) {
+            Log.w(TAG, "sendSessionWithMinutes(${slot.name}): SecurityException — " +
+                "Tail app likely not installed. ${e.message}")
+        } catch (e: Exception) {
+            Log.w(TAG, "sendSessionWithMinutes(${slot.name}): unexpected error — ${e.message}")
+        }
+    }
+
+    /**
      * Internal helper that fires the increment broadcast with an optional
      * [EXTRA_MINUTES] extra.
      *
@@ -383,7 +430,22 @@ class HabitIntegrationRepository @Inject constructor(
      * Does nothing if no habit has been selected for [slot] or if the map is empty.
      */
     fun sendSecondaryValuesForDates(slot: Slot, dateValues: Map<String, Int>) {
-        sendValuesForDatesBroadcast(slot, dateValues, isSecondary = true)
+        sendValuesForDatesBroadcast(slot, dateValues, keyPrefix = SECONDARY_VALUE_PREFIX)
+    }
+
+    /**
+     * Sends a SET broadcast for the **first-class minutes slot** of the habit
+     * mapped to [slot], with per-date values.
+     *
+     * Tail stores the built-in minutes value under the key
+     * `minutes:<habitName>`. Used by the backfill for SESSIONS-PRIMARY habits
+     * (apnea free hold, O₂/CO₂ tables, progressive O₂, min breath), whose
+     * minutes live in that slot instead of the primary key.
+     *
+     * Does nothing if no habit has been selected for [slot] or if the map is empty.
+     */
+    fun sendMinutesSlotValuesForDates(slot: Slot, dateValues: Map<String, Int>) {
+        sendValuesForDatesBroadcast(slot, dateValues, keyPrefix = MINUTES_SLOT_PREFIX)
     }
 
     // ── Retroactive backfill ──────────────────────────────────────────────────
@@ -402,20 +464,21 @@ class HabitIntegrationRepository @Inject constructor(
      * Does nothing if no habit has been selected for [slot] or if the map is empty.
      */
     fun sendHabitValuesForDates(slot: Slot, dateMinutes: Map<String, Int>) {
-        sendValuesForDatesBroadcast(slot, dateMinutes, isSecondary = false)
+        sendValuesForDatesBroadcast(slot, dateMinutes, keyPrefix = "")
     }
 
     /**
      * Internal helper that serialises a date→value map as JSON and fires the
      * [ACTION_SET_HABIT_VALUES] broadcast.
      *
-     * When [isSecondary] is true, the habit ID is prefixed with
-     * [SECONDARY_VALUE_PREFIX] so Tail writes to the secondary value slot.
+     * When [keyPrefix] is non-blank (e.g. [SECONDARY_VALUE_PREFIX] or
+     * [MINUTES_SLOT_PREFIX]), the habit ID is prefixed with it so Tail writes
+     * to that storage slot instead of the habit's primary key.
      */
     private fun sendValuesForDatesBroadcast(
         slot: Slot,
         dateValues: Map<String, Int>,
-        isSecondary: Boolean
+        keyPrefix: String
     ) {
         val habitName = getHabitId(slot)
         if (habitName.isBlank()) {
@@ -427,7 +490,7 @@ class HabitIntegrationRepository @Inject constructor(
             return
         }
 
-        val effectiveHabitId = if (isSecondary) SECONDARY_VALUE_PREFIX + habitName else habitName
+        val effectiveHabitId = if (keyPrefix.isNotEmpty()) keyPrefix + habitName else habitName
 
         // Serialise the date→minutes map as a compact JSON object.
         val json = buildString {
@@ -472,6 +535,13 @@ class HabitIntegrationRepository @Inject constructor(
          * `"secondary_value:Meditations"`.
          */
         const val SECONDARY_VALUE_PREFIX = "secondary_value:"
+
+        /**
+         * Prefix used by Tail for the first-class minutes slot keys in
+         * habitsdb.txt. The built-in minutes value of "Apnea apb" is stored
+         * under `"minutes:Apnea apb"`.
+         */
+        const val MINUTES_SLOT_PREFIX = "minutes:"
 
         /**
          * Converts a duration in seconds to whole minutes, rounded to the nearest
@@ -535,6 +605,25 @@ class HabitIntegrationRepository @Inject constructor(
          * never sent by WAGS.
          */
         const val EXTRA_MINUTES = "EXTRA_MINUTES"
+
+        // ── Protocol v3: sessions-primary increments ────────────────────────────
+
+        /**
+         * **Protocol v3** — Optional Int extra for [ACTION_INCREMENT].
+         *
+         * When present (together with [EXTRA_MINUTES]), the Tail app adds this
+         * many SESSIONS to the habit's primary key and [EXTRA_MINUTES] minutes
+         * to its first-class `minutes:<habitName>` slot, in one atomic
+         * read-modify-write. Used by the apnea slots whose Tail habits are
+         * sessions-primary with the built-in minutes value.
+         *
+         * If the Tail app has not yet been updated to read this extra, it
+         * falls back to the v2 behaviour (increment the primary key by
+         * [EXTRA_MINUTES]).
+         *
+         * Value: a positive Int (number of sessions).
+         */
+        const val EXTRA_SESSIONS = "EXTRA_SESSIONS"
 
         // ── Protocol v2: retroactive backfill ──────────────────────────────────
 

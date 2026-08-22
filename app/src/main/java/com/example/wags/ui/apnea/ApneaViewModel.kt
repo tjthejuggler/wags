@@ -881,8 +881,9 @@ class ApneaViewModel @Inject constructor(
                         ApneaTableType.CO2 -> Slot.CO2_TABLE
                         else -> Slot.O2_TABLE
                     }
-                    habitRepo.sendHabitIncrementWithMinutes(tableSlot, tableHoldMinutes)
-                    habitRepo.sendSecondaryValueIncrement(tableSlot, 1)
+                    // Sessions-primary habit: +1 session (primary) + hold minutes
+                    // (minutes slot) in ONE atomic Tail write.
+                    habitRepo.sendSessionWithMinutes(tableSlot, tableHoldMinutes)
                     val uiSnap = _uiState.value
                     // Honor the user's explicit audio choice; never downgrade MUSIC
                     // to SILENCE based on unreliable Spotify track tracking.
@@ -1360,8 +1361,9 @@ class ApneaViewModel @Inject constructor(
         val fhEffectiveAudio = state.audio.name
         // Signal the Habit app that a free breath hold was successfully completed
         val freeHoldMinutes = HabitIntegrationRepository.millisToMinutes(duration)
-        habitRepo.sendHabitIncrementWithMinutes(Slot.FREE_HOLD, freeHoldMinutes)
-        habitRepo.sendSecondaryValueIncrement(Slot.FREE_HOLD, 1)
+        // Sessions-primary habit: +1 session (primary) + hold minutes
+        // (minutes slot) in ONE atomic Tail write.
+        habitRepo.sendSessionWithMinutes(Slot.FREE_HOLD, freeHoldMinutes)
         habitRepo.sendMusicHabitIncrementIfNeeded(fhEffectiveAudio, state.timeOfDay.name)
         viewModelScope.launch {
             // Check broader PB categories BEFORE saving so queries compare against prior records only.

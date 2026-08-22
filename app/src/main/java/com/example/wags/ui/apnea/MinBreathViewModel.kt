@@ -1180,8 +1180,9 @@ class MinBreathViewModel @Inject constructor(
         // Fire Tail habit for every completed Min Breath session
         try {
             val holdMinutes = HabitIntegrationRepository.millisToMinutes(totalHoldTimeMs)
-            habitRepo.sendHabitIncrementWithMinutes(Slot.MIN_BREATH, holdMinutes)
-            habitRepo.sendSecondaryValueIncrement(Slot.MIN_BREATH, 1)
+            // Sessions-primary habit: +1 session (primary) + hold minutes
+            // (minutes slot) in ONE atomic Tail write.
+            habitRepo.sendSessionWithMinutes(Slot.MIN_BREATH, holdMinutes)
         } catch (_: Exception) {}
 
         // Fire music habit if applicable (once per TimeOfDay per day)
