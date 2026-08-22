@@ -264,23 +264,21 @@ class AssessmentRunViewModel @Inject constructor(
                     is RfOrchestratorState.Complete -> {
                         pacerActive = false
                         saveSteppedSession(orchState.epochs)
-                        // Signal the Habit app that a Resonance Breathing assessment completed
-                        // Minutes → primary slot (Value 1), session count = 1 → secondary_value slot (Value 2)
+                        // Signal the Habit app that a Resonance Breathing assessment completed:
+                        // +1 session (primary) + minutes (minutes slot), one atomic v3 broadcast.
                         val durationSec = ((System.currentTimeMillis() - sessionStartTimeMs) / 1000).toInt()
                         val minutes = HabitIntegrationRepository.secondsToMinutes(durationSec)
-                        habitRepo.sendHabitIncrementWithMinutes(Slot.RESONANCE_BREATHING, minutes)
-                        habitRepo.sendSecondaryValueIncrement(Slot.RESONANCE_BREATHING, 1)
+                        habitRepo.sendSessionWithMinutes(Slot.RESONANCE_BREATHING, minutes)
                     }
 
                     is RfOrchestratorState.SlidingDone -> {
                         val result = orchState.result
                         val enrichedEntity = buildEnrichedSlidingEntity(result)
                         val id = saveEntity(enrichedEntity)
-                        // Signal the Habit app that a Resonance Breathing assessment completed
-                        // Minutes → primary slot (Value 1), session count = 1 → secondary_value slot (Value 2)
+                        // Signal the Habit app that a Resonance Breathing assessment completed:
+                        // +1 session (primary) + minutes (minutes slot), one atomic v3 broadcast.
                         val minutes = HabitIntegrationRepository.secondsToMinutes(enrichedEntity.durationSeconds)
-                        habitRepo.sendHabitIncrementWithMinutes(Slot.RESONANCE_BREATHING, minutes)
-                        habitRepo.sendSecondaryValueIncrement(Slot.RESONANCE_BREATHING, 1)
+                        habitRepo.sendSessionWithMinutes(Slot.RESONANCE_BREATHING, minutes)
                         _uiState.value = _uiState.value.copy(
                             phase      = "COMPLETE",
                             isComplete = true,
@@ -622,8 +620,7 @@ class AssessmentRunViewModel @Inject constructor(
             saveSteppedSession(epochs)
             val durationSec = ((System.currentTimeMillis() - sessionStartTimeMs) / 1000).toInt()
             val minutes = HabitIntegrationRepository.secondsToMinutes(durationSec)
-            habitRepo.sendHabitIncrementWithMinutes(Slot.RESONANCE_BREATHING, minutes)
-            habitRepo.sendSecondaryValueIncrement(Slot.RESONANCE_BREATHING, 1)
+            habitRepo.sendSessionWithMinutes(Slot.RESONANCE_BREATHING, minutes)
         }
     }
 

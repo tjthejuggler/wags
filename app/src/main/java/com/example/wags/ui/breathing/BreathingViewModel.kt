@@ -360,11 +360,11 @@ class BreathingViewModel @Inject constructor(
                 )
             }
 
-            // Signal the Habit app that a Resonance Breathing session was completed
-            // Minutes → primary slot (Value 1), session count = 1 → secondary_value slot (Value 2)
+            // Signal the Habit app that a Resonance Breathing session was completed:
+            // +1 session (primary value) + minutes (first-class minutes slot) in
+            // ONE atomic Protocol v3 broadcast.
             val minutes = HabitIntegrationRepository.secondsToMinutes(summary.durationSeconds)
-            habitRepo.sendHabitIncrementWithMinutes(Slot.RESONANCE_BREATHING, minutes)
-            habitRepo.sendSecondaryValueIncrement(Slot.RESONANCE_BREATHING, 1)
+            habitRepo.sendSessionWithMinutes(Slot.RESONANCE_BREATHING, minutes)
         } else {
             _uiState.update {
                 it.copy(

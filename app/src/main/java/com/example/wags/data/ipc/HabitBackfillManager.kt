@@ -238,17 +238,21 @@ class HabitBackfillManager @Inject constructor(
         private const val TAG = "HabitBackfillManager"
 
         /**
-         * Slots whose Tail habits are SESSIONS-PRIMARY (Aug-21-2026 migration):
-         * sessions are the primary value and points source; minutes live in
-         * the first-class `minutes:<habit>` slot. All other slots keep the
-         * legacy layout (minutes = primary, sessions = secondary value).
+         * Slots whose Tail habits are SESSIONS-PRIMARY (Aug-21-2026 apnea
+         * migration; Aug-22-2026 breathing migration): sessions are the
+         * primary value and points source; minutes live in the first-class
+         * `minutes:<habit>` slot. All other slots keep the legacy layout
+         * (minutes = primary, sessions = secondary value).
          */
         val SESSIONS_PRIMARY_SLOTS = setOf(
             Slot.FREE_HOLD,
             Slot.O2_TABLE,
             Slot.CO2_TABLE,
             Slot.PROGRESSIVE_O2,
-            Slot.MIN_BREATH
+            Slot.MIN_BREATH,
+            Slot.MEDITATION,
+            Slot.RESONANCE_BREATHING,
+            Slot.TILL_CONTRACTION
         )
     }
 }

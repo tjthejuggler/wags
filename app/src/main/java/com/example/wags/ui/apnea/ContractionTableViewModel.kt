@@ -1215,13 +1215,23 @@ class ContractionTableViewModel @Inject constructor(
         // (mode-specific slot: Till Contraction vs Contraction Count).
         // Hold minutes always count; the "tables done" counter only ticks for
         // tables that were not ended early.
+        //
+        // Till Contraction is SESSIONS-PRIMARY (Aug-22-2026 migration): one
+        // atomic Protocol v3 broadcast — +1 session (primary) + hold minutes
+        // (minutes slot); an ended-early table sends sessions = 0 so its
+        // minutes still count without ticking the session counter.
+        // Contraction Count keeps the legacy v2 layout.
         try {
             val holdMinutes = HabitIntegrationRepository.millisToMinutes(totalHoldTimeMs)
             val slot = if (s.mode == ContractionTableMode.TILL_CONTRACTION) Slot.TILL_CONTRACTION
                        else Slot.CONTRACTION_COUNT
-            habitRepo.sendHabitIncrementWithMinutes(slot, holdMinutes)
-            if (countsAsRecord) {
-                habitRepo.sendSecondaryValueIncrement(slot, 1)
+            if (slot == Slot.TILL_CONTRACTION) {
+                habitRepo.sendSessionWithMinutes(slot, holdMinutes, if (countsAsRecord) 1 else 0)
+            } else {
+                habitRepo.sendHabitIncrementWithMinutes(slot, holdMinutes)
+                if (countsAsRecord) {
+                    habitRepo.sendSecondaryValueIncrement(slot, 1)
+                }
             }
         } catch (_: Exception) {}
 

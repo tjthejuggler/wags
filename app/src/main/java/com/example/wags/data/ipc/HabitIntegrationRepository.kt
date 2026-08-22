@@ -308,11 +308,17 @@ class HabitIntegrationRepository @Inject constructor(
      * value / session count) and +[minutes] on its first-class
      * `minutes:<habitName>` slot.
      *
-     * Used by the apnea slots whose Tail habits are sessions-primary with the
-     * built-in minutes value (free hold, O₂/CO₂ tables, progressive O₂,
-     * min breath). Tail performs both increments in a single read-modify-write
-     * ([HabitIncrementReceiver] reads [EXTRA_SESSIONS] together with
-     * [EXTRA_MINUTES]), so no increment can be lost to a concurrent writer.
+     * Used by the apnea and breathing slots whose Tail habits are
+     * sessions-primary with the built-in minutes value (free hold, O₂/CO₂
+     * tables, progressive O₂, min breath, meditation, resonance breathing,
+     * till-contraction). Tail performs both increments in a single
+     * read-modify-write ([HabitIncrementReceiver] reads [EXTRA_SESSIONS]
+     * together with [EXTRA_MINUTES]), so no increment can be lost to a
+     * concurrent writer.
+     *
+     * [sessions] = 0 sends the MINUTES-ONLY variant: the minutes are recorded
+     * but the session counter is not ticked (an ended-early session whose
+     * hold time still counts).
      *
      * Does nothing if no habit has been selected for [slot], or if both
      * [minutes] and [sessions] are < 1.
@@ -333,7 +339,7 @@ class HabitIntegrationRepository @Inject constructor(
                 putExtra(EXTRA_HABIT_ID, habitName)
                 putExtra(EXTRA_SLOT, slot.name)
                 putExtra(EXTRA_MINUTES, minutes.coerceAtLeast(0))
-                putExtra(EXTRA_SESSIONS, sessions.coerceAtLeast(1))
+                putExtra(EXTRA_SESSIONS, sessions.coerceAtLeast(0))
             }
             context.sendBroadcast(intent, PERMISSION_TAIL)
             Log.d(
@@ -346,6 +352,50 @@ class HabitIntegrationRepository @Inject constructor(
                 "Tail app likely not installed. ${e.message}")
         } catch (e: Exception) {
             Log.w(TAG, "sendSessionWithMinutes(${slot.name}): unexpected error — ${e.message}")
+        }
+    }
+
+    /**
+     * **Protocol v3, minutes-only SIGNED delta** — adjusts ONLY the habit's
+     * first-class `minutes:<habitName>` slot by [deltaMinutes] (positive or
+     * negative), leaving the primary session count untouched.
+     *
+     * Used when the user edits a just-completed session's duration (e.g. they
+     * fell asleep and the recorded meditation time is too long): the session
+     * still happened, only its minutes change. Tail clamps the day total at
+     * zero so an over-correction can never go negative.
+     *
+     * Does nothing if no habit has been selected for [slot] or if
+     * [deltaMinutes] is 0.
+     */
+    fun sendSessionMinutesDelta(slot: Slot, deltaMinutes: Int) {
+        if (deltaMinutes == 0) {
+            Log.d(TAG, "sendSessionMinutesDelta(${slot.name}): deltaMinutes=0, skipping")
+            return
+        }
+        val habitName = getHabitId(slot)
+        if (habitName.isBlank()) {
+            Log.d(TAG, "sendSessionMinutesDelta(${slot.name}): no habit selected, skipping")
+            return
+        }
+        try {
+            val intent = Intent(ACTION_INCREMENT).apply {
+                `package` = HABIT_APP_PACKAGE
+                putExtra(EXTRA_HABIT_ID, habitName)
+                putExtra(EXTRA_SLOT, slot.name)
+                putExtra(EXTRA_MINUTES, deltaMinutes)
+                putExtra(EXTRA_SESSIONS, 0)
+            }
+            context.sendBroadcast(intent, PERMISSION_TAIL)
+            Log.d(
+                TAG,
+                "sendSessionMinutesDelta(${slot.name}): fired for habitId=$habitName, deltaMinutes=$deltaMinutes"
+            )
+        } catch (e: SecurityException) {
+            Log.w(TAG, "sendSessionMinutesDelta(${slot.name}): SecurityException — " +
+                "Tail app likely not installed. ${e.message}")
+        } catch (e: Exception) {
+            Log.w(TAG, "sendSessionMinutesDelta(${slot.name}): unexpected error — ${e.message}")
         }
     }
 
