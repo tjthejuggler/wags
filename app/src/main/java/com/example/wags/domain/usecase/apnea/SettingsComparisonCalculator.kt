@@ -48,6 +48,8 @@ enum class ComparisonSessionType(val key: String, val label: String) {
 /** One individual hold, flattened out of any session type. */
 data class HoldSample(
     val holdMs: Long,
+    /** Apnea record that contained this hold (for drill-down navigation). */
+    val recordId: Long,
     val sessionTypeKey: String,
     val lungVolume: String,
     val prepType: String,
@@ -57,6 +59,9 @@ data class HoldSample(
     /** Local hour of day (0–23) the hold started at. */
     val hourOfDay: Int,
 )
+
+/** A single extracted hold length plus the record it came from. */
+private data class ExtractedHold(val recordId: Long, val holdMs: Long)
 
 /** A single setting option's hold-time performance inside its category. */
 data class SettingsOptionResult(
@@ -79,6 +84,8 @@ data class SettingsOptionResult(
     val deltaPctVsPrev: Double?,
     /** True when fewer than [SettingsComparisonCalculator.MIN_RELIABLE_HOLDS] holds back this option. */
     val lowData: Boolean,
+    /** Record containing the single best hold of this option in the window. */
+    val bestRecordId: Long? = null,
 )
 
 /** One settings category (Lung Volume, Prep Type, …) with its ranked options. */
@@ -183,10 +190,11 @@ class SettingsComparisonCalculator @Inject constructor(
             val holds = extractHolds(record, sessionByTsType)
             if (holds.isEmpty()) continue
             val bucket = if (target == CURRENT) currentSamples else prevSamples
-            for (holdMs in holds) {
+            for (hold in holds) {
                 bucket.add(
                     HoldSample(
-                        holdMs = holdMs,
+                        holdMs = hold.holdMs,
+                        recordId = hold.recordId,
                         sessionTypeKey = typeKey,
                         lungVolume = record.lungVolume,
                         prepType = record.prepType,
@@ -287,7 +295,8 @@ class SettingsComparisonCalculator @Inject constructor(
     ): SettingsOptionResult {
         val n = current.size
         val avg = current.map { it.holdMs.toDouble() }.average()
-        val best = current.maxOf { it.holdMs }
+        val bestSample = current.maxByOrNull { it.holdMs }
+        val best = bestSample?.holdMs ?: 0L
 
         // Primary: regression-adjusted, all-else-equal score.
         // Fallback (too little data to fit): session-type-normalized ratio
@@ -310,7 +319,8 @@ class SettingsComparisonCalculator @Inject constructor(
             rankInCategory = 0,
             prevAvgMs = prevAvg?.toLong(),
             deltaPctVsPrev = deltaPct,
-            lowData = n < MIN_RELIABLE_HOLDS
+            lowData = n < MIN_RELIABLE_HOLDS,
+            bestRecordId = bestSample?.recordId
         )
     }
 
@@ -429,25 +439,26 @@ class SettingsComparisonCalculator @Inject constructor(
     private fun extractHolds(
         record: ApneaRecordEntity,
         sessionByTsType: Map<Pair<Long, String>, ApneaSessionEntity>
-    ): List<Long> = when (record.tableType) {
-        null -> listOfNotNull(record.durationMs.takeIf { it > 0L })
-        "O2", "CO2" -> extractTableHolds(record, sessionByTsType)
-        "PROGRESSIVE_O2" -> {
-            val json = sessionParams(record, sessionByTsType)
-            val holds = jsonLongs(json, "rounds", "actualMs")
-            holds.ifEmpty { fallbackPerRound(record, sessionByTsType) }
+    ): List<ExtractedHold> {
+        fun tagged(holds: List<Long>): List<ExtractedHold> =
+            holds.map { ExtractedHold(record.recordId, it) }
+        return when (record.tableType) {
+            null -> tagged(listOfNotNull(record.durationMs.takeIf { it > 0L }))
+            "O2", "CO2" -> tagged(extractTableHolds(record, sessionByTsType))
+            "PROGRESSIVE_O2" -> tagged(
+                jsonLongs(sessionParams(record, sessionByTsType), "rounds", "actualMs")
+                    .ifEmpty { fallbackPerRound(record, sessionByTsType) }
+            )
+            "MIN_BREATH" -> tagged(
+                jsonLongs(sessionParams(record, sessionByTsType), "holds", "durationMs")
+                    .ifEmpty { fallbackPerRound(record, sessionByTsType) }
+            )
+            "WONKA_FIRST_CONTRACTION", "WONKA_ENDURANCE" -> tagged(
+                jsonLongs(sessionParams(record, sessionByTsType), "rounds", "totalHoldMs")
+                    .ifEmpty { fallbackPerRound(record, sessionByTsType) }
+            )
+            else -> emptyList()
         }
-        "MIN_BREATH" -> {
-            val json = sessionParams(record, sessionByTsType)
-            val holds = jsonLongs(json, "holds", "durationMs")
-            holds.ifEmpty { fallbackPerRound(record, sessionByTsType) }
-        }
-        "WONKA_FIRST_CONTRACTION", "WONKA_ENDURANCE" -> {
-            val json = sessionParams(record, sessionByTsType)
-            val holds = jsonLongs(json, "rounds", "totalHoldMs")
-            holds.ifEmpty { fallbackPerRound(record, sessionByTsType) }
-        }
-        else -> emptyList()
     }
 
     private fun sessionParams(

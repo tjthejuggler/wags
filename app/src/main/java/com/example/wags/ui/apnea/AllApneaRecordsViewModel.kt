@@ -210,6 +210,34 @@ class AllApneaRecordsViewModel @Inject constructor(
         loadAllRecords()
     }
 
+    /**
+     * Replaces every filter at once (used when drilling into this screen from
+     * elsewhere, e.g. tapping an average in the Settings comparison tab).
+     *
+     * @param eventTypes tableType values to select (null = free hold); the
+     * "Free Hold Best" sentinel is never set by this path.
+     */
+    fun applyPresetFilters(
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        posture: String,
+        audio: String,
+        eventTypes: Set<String?>
+    ) {
+        _uiState.update {
+            it.copy(
+                filterLungVolume = lungVolume,
+                filterPrepType = prepType,
+                filterTimeOfDay = timeOfDay,
+                filterPosture = posture,
+                filterAudio = audio,
+                selectedEventTypes = eventTypes
+            )
+        }
+        loadAllRecords()
+    }
+
     fun setSortOrder(order: RecordSortOrder) {
         _uiState.update { it.copy(sortOrder = order) }
         loadAllRecords()

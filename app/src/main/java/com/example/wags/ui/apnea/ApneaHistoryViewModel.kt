@@ -29,9 +29,12 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
+import java.time.temporal.TemporalAdjusters
 import javax.inject.Inject
 
 /** Sentinel value meaning "don't filter on this setting". */
@@ -63,6 +66,16 @@ data class ApneaChartData(
     val lowestSpO2: List<ApneaChartPoint> = emptyList(),
     /** Time to first contraction (seconds) over time — only records where it was tapped. */
     val firstContractionSec: List<ApneaChartPoint> = emptyList(),
+    /** Running personal best (seconds) — steps up every time a new best hold is set. */
+    val pbProgression: List<ApneaChartPoint> = emptyList(),
+    /** Holds per time bucket (value = count) for the training-volume bar chart. */
+    val volumePerBucket: List<ApneaChartPoint> = emptyList(),
+    /** Unit label for [volumePerBucket] buckets: "day", "week" or "month". */
+    val volumeBucketLabel: String = "day",
+    /** Fraction of each hold (0–100%) completed before the first contraction was tapped. */
+    val contractionEasePct: List<ApneaChartPoint> = emptyList(),
+    /** Peak-to-lowest heart-rate drop (bpm) per hold — only records with HR data. */
+    val hrDrop: List<ApneaChartPoint> = emptyList(),
 )
 
 /**
@@ -489,25 +502,40 @@ class ApneaHistoryViewModel @Inject constructor(
     ): ApneaChartData {
         if (chronological.isEmpty()) return ApneaChartData()
 
-        val holdDuration       = mutableListOf<ApneaChartPoint>()
-        val minHr              = mutableListOf<ApneaChartPoint>()
-        val maxHr              = mutableListOf<ApneaChartPoint>()
-        val lowestSpO2         = mutableListOf<ApneaChartPoint>()
+        val holdDuration        = mutableListOf<ApneaChartPoint>()
+        val minHr               = mutableListOf<ApneaChartPoint>()
+        val maxHr               = mutableListOf<ApneaChartPoint>()
+        val lowestSpO2          = mutableListOf<ApneaChartPoint>()
         val firstContractionSec = mutableListOf<ApneaChartPoint>()
+        val pbProgression       = mutableListOf<ApneaChartPoint>()
+        val contractionEasePct  = mutableListOf<ApneaChartPoint>()
+        val hrDrop              = mutableListOf<ApneaChartPoint>()
 
+        var runningBestSec = 0f
         chronological.forEachIndexed { idx, e ->
             val x = idx.toFloat()
             val label = Instant.ofEpochMilli(e.timestamp)
                 .atZone(zone).toLocalDate().toString()
 
-            holdDuration.add(ApneaChartPoint(x, (e.durationMs / 1000f), label))
+            val durationSec = e.durationMs / 1000f
+            holdDuration.add(ApneaChartPoint(x, durationSec, label))
             minHr.add(ApneaChartPoint(x, e.minHrBpm, label))
             maxHr.add(ApneaChartPoint(x, e.maxHrBpm, label))
             e.lowestSpO2?.let { lowestSpO2.add(ApneaChartPoint(x, it.toFloat(), label)) }
-            e.firstContractionMs?.let {
-                firstContractionSec.add(ApneaChartPoint(x, it / 1000f, label))
+            e.firstContractionMs?.let { fc ->
+                firstContractionSec.add(ApneaChartPoint(x, fc / 1000f, label))
+                if (e.durationMs > 0L) {
+                    contractionEasePct.add(ApneaChartPoint(x, fc * 100f / e.durationMs, label))
+                }
+            }
+            if (durationSec > runningBestSec) runningBestSec = durationSec
+            pbProgression.add(ApneaChartPoint(x, runningBestSec, label))
+            if (e.maxHrBpm > 0f && e.minHrBpm > 0f) {
+                hrDrop.add(ApneaChartPoint(x, e.maxHrBpm - e.minHrBpm, label))
             }
         }
+
+        val (volumePoints, volumeUnit) = buildVolumeBuckets(chronological, zone)
 
         return ApneaChartData(
             holdDuration        = holdDuration,
@@ -515,7 +543,62 @@ class ApneaHistoryViewModel @Inject constructor(
             maxHr               = maxHr,
             lowestSpO2          = lowestSpO2,
             firstContractionSec = firstContractionSec,
+            pbProgression       = pbProgression,
+            volumePerBucket     = volumePoints,
+            volumeBucketLabel   = volumeUnit,
+            contractionEasePct  = contractionEasePct,
+            hrDrop              = hrDrop,
         )
+    }
+
+    /**
+     * Counts holds per calendar day / ISO week / month (adaptive to the span so
+     * the bar chart stays readable). Zero buckets inside the active range are
+     * kept so training gaps remain visible.
+     */
+    private fun buildVolumeBuckets(
+        chronological: List<ApneaRecordEntity>,
+        zone: ZoneId
+    ): Pair<List<ApneaChartPoint>, String> {
+        if (chronological.isEmpty()) return emptyList<ApneaChartPoint>() to "day"
+
+        val countsByDay = chronological.groupingBy {
+            Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate()
+        }.eachCount()
+        val first = countsByDay.keys.min()
+        val last = countsByDay.keys.max()
+        val spanDays = ChronoUnit.DAYS.between(first, last).toInt() + 1
+
+        val unitLabel = when {
+            spanDays <= 62 -> "day"
+            spanDays <= 730 -> "week"
+            else -> "month"
+        }
+        val bucketOf: (LocalDate) -> LocalDate = when (unitLabel) {
+            "day" -> { d -> d }
+            "week" -> { d -> d.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)) }
+            else -> { d -> d.withDayOfMonth(1) }
+        }
+
+        val counts = countsByDay.entries
+            .groupBy({ bucketOf(it.key) }, { it.value })
+            .mapValues { (_, v) -> v.sum() }
+
+        val firstBucket = bucketOf(first)
+        val lastBucket = bucketOf(last)
+        val bucketStarts = generateSequence(firstBucket) { prev ->
+            val next = when (unitLabel) {
+                "day" -> prev.plusDays(1)
+                "week" -> prev.plusWeeks(1)
+                else -> prev.plusMonths(1)
+            }
+            if (next.isAfter(lastBucket)) null else next
+        }.toList()
+
+        val points = bucketStarts.mapIndexed { i, start ->
+            ApneaChartPoint(i.toFloat(), (counts[start] ?: 0).toFloat(), start.toString())
+        }
+        return points to unitLabel
     }
 
     // ── Trophy stats computation ──────────────────────────────────────────────

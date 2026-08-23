@@ -23,7 +23,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.wags.domain.model.TimeBuckets
 import com.example.wags.domain.usecase.apnea.ComparisonSessionType
 import com.example.wags.domain.usecase.apnea.SettingsCategoryResult
 import com.example.wags.domain.usecase.apnea.SettingsMasterRankEntry
@@ -43,7 +45,13 @@ import java.time.format.DateTimeFormatter
  * (e.g. this month vs last month, last 3 months vs the 3 before those).
  */
 @Composable
-fun SettingsComparisonTabContent(viewModel: ApneaHistoryViewModel) {
+fun SettingsComparisonTabContent(
+    viewModel: ApneaHistoryViewModel,
+    onOpenRecordDetail: (Long) -> Unit,
+    onSwitchToAllRecords: () -> Unit,
+    /** Shared with the embedded All Records tab (same nav destination scope). */
+    allRecordsViewModel: AllApneaRecordsViewModel = hiltViewModel()
+) {
     val state by viewModel.settingsComparison.collectAsStateWithLifecycle()
     var showTypeDialog by remember { mutableStateOf(false) }
     /** Bulk default for the lists below: raw averages or adjusted scores. */
@@ -55,6 +63,37 @@ fun SettingsComparisonTabContent(viewModel: ApneaHistoryViewModel) {
 
     fun parseMetric(name: String?): OptionMetric? =
         name?.let { v -> OptionMetric.entries.firstOrNull { it.name == v } }
+
+    /**
+     * Drill-down for a tapped average: opens the All Records tab pre-filtered
+     * to the tapped setting option and the session types the average was
+     * computed over.
+     */
+    fun openAverageInAllRecords(categoryTitle: String, optionKey: String) {
+        val eventTypes = state.sessionTypes.map { key ->
+            if (key == ComparisonSessionType.FREE_HOLD.key) null else key
+        }.toSet()
+        allRecordsViewModel.applyPresetFilters(
+            lungVolume = optionKey.takeIf { categoryTitle == "Lung Volume" } ?: "",
+            prepType = optionKey.takeIf { categoryTitle == "Prep Type" } ?: "",
+            timeOfDay = when (categoryTitle) {
+                "Time of Day" -> optionKey
+                "Hour of Day" -> optionKey.toIntOrNull()?.let(TimeBuckets::fromHour) ?: ""
+                else -> ""
+            },
+            posture = optionKey.takeIf { categoryTitle == "Posture" } ?: "",
+            audio = optionKey.takeIf { categoryTitle == "Audio" } ?: "",
+            eventTypes = eventTypes
+        )
+        onSwitchToAllRecords()
+    }
+
+    val onBestClick: (SettingsOptionResult) -> Unit = { opt ->
+        opt.bestRecordId?.let(onOpenRecordDetail)
+    }
+    val onAvgClick: (String, SettingsOptionResult) -> Unit = { categoryTitle, opt ->
+        openAverageInAllRecords(categoryTitle, opt.key)
+    }
 
     if (showTypeDialog) {
         SessionTypeFilterDialog(
@@ -218,7 +257,9 @@ fun SettingsComparisonTabContent(viewModel: ApneaHistoryViewModel) {
                     includeHours = state.includeHours,
                     onToggleHours = viewModel::setComparisonIncludeHours,
                     metric = masterMetric,
-                    onMetricChange = { masterMetricOverride = it.name }
+                    onMetricChange = { masterMetricOverride = it.name },
+                    onBestClick = onBestClick,
+                    onAvgClick = onAvgClick
                 )
 
                 // ── Metric mode toggle: default metric for sections below ──
@@ -243,14 +284,26 @@ fun SettingsComparisonTabContent(viewModel: ApneaHistoryViewModel) {
                 // ── Per-category ranked lists ─────────────────────────────
                 result.categories.forEach { category ->
                     val metric = parseMetric(categoryMetricOverrides[category.title]) ?: defaultMetric
-                    CategoryCard(category, metric) { m ->
-                        categoryMetricOverrides = categoryMetricOverrides + (category.title to m.name)
-                    }
+                    CategoryCard(
+                        category = category,
+                        metric = metric,
+                        onMetricChange = { m ->
+                            categoryMetricOverrides = categoryMetricOverrides + (category.title to m.name)
+                        },
+                        onBestClick = onBestClick,
+                        onAvgClick = onAvgClick
+                    )
                 }
 
                 // ── Hour of day section (chart + ranked list) ─────────────
                 result.hourCategory?.let { hourCat ->
-                    HourOfDayCard(hourCat, hourMetric) { hourMetricOverride = it.name }
+                    HourOfDayCard(
+                        category = hourCat,
+                        metric = hourMetric,
+                        onMetricChange = { hourMetricOverride = it.name },
+                        onBestClick = onBestClick,
+                        onAvgClick = onAvgClick
+                    )
                 }
 
                 Text(
@@ -277,7 +330,9 @@ private fun MasterRankingCard(
     includeHours: Boolean,
     onToggleHours: (Boolean) -> Unit,
     metric: OptionMetric,
-    onMetricChange: (OptionMetric) -> Unit
+    onMetricChange: (OptionMetric) -> Unit,
+    onBestClick: (SettingsOptionResult) -> Unit,
+    onAvgClick: (String, SettingsOptionResult) -> Unit
 ) {
     // Re-rank by the selected metric; the first entry of each category in the
     // current order keeps the white-bordered chip.
@@ -334,7 +389,9 @@ private fun MasterRankingCard(
                     rank = ranks.getValue(entry.categoryTitle to entry.option.key),
                     isTopOfCategory = (entry.categoryTitle to entry.option.key) in topOfCategory,
                     metric = metric,
-                    onMetricChange = onMetricChange
+                    onMetricChange = onMetricChange,
+                    onBestClick = onBestClick,
+                    onAvgClick = onAvgClick
                 )
             }
         }
@@ -347,9 +404,12 @@ private fun MasterRankRow(
     rank: Int,
     isTopOfCategory: Boolean,
     metric: OptionMetric,
-    onMetricChange: (OptionMetric) -> Unit
+    onMetricChange: (OptionMetric) -> Unit,
+    onBestClick: (SettingsOptionResult) -> Unit,
+    onAvgClick: (String, SettingsOptionResult) -> Unit
 ) {
     val opt = entry.option
+    val categoryTitle = entry.categoryTitle
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -386,15 +446,62 @@ private fun MasterRankRow(
             }
             MetricTokensRow(opt, metric, onMetricChange)
         }
-        Column(horizontalAlignment = Alignment.End) {
-            Text(
-                headlineText(metric, opt),
-                style = MaterialTheme.typography.titleMedium,
-                color = headlineColor(metric, opt),
-                fontWeight = FontWeight.Bold
+        HeadlineValue(
+            metric = metric,
+            opt = opt,
+            categoryTitle = categoryTitle,
+            onBestClick = onBestClick,
+            onAvgClick = onAvgClick
+        )
+    }
+}
+
+/**
+ * The far-right headline value of a ranked row. When the active metric is
+ * "best" it drills into the hold's detail screen; when it is "avg" it opens
+ * the All Records tab pre-filtered to that option and the comparison's
+ * session types.
+ */
+@Composable
+private fun HeadlineValue(
+    metric: OptionMetric,
+    opt: SettingsOptionResult,
+    categoryTitle: String,
+    onBestClick: (SettingsOptionResult) -> Unit,
+    onAvgClick: (String, SettingsOptionResult) -> Unit
+) {
+    val bestClickable = metric == OptionMetric.BEST && opt.bestRecordId != null
+    val avgClickable = metric == OptionMetric.AVG
+    val clickable = bestClickable || avgClickable
+    Column(
+        horizontalAlignment = Alignment.End,
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .then(
+                if (clickable) Modifier.clickable {
+                    when {
+                        bestClickable -> onBestClick(opt)
+                        avgClickable -> onAvgClick(categoryTitle, opt)
+                    }
+                } else Modifier
             )
-            Text(metric.label, style = MaterialTheme.typography.labelSmall, color = TextDisabled)
-        }
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+    ) {
+        Text(
+            headlineText(metric, opt),
+            style = MaterialTheme.typography.titleMedium,
+            color = headlineColor(metric, opt),
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = when {
+                bestClickable -> "view hold ›"
+                avgClickable -> "view holds ›"
+                else -> metric.label
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = if (clickable) EcgCyan else TextDisabled
+        )
     }
 }
 
@@ -404,7 +511,9 @@ private fun MasterRankRow(
 private fun CategoryCard(
     category: SettingsCategoryResult,
     metric: OptionMetric,
-    onMetricChange: (OptionMetric) -> Unit
+    onMetricChange: (OptionMetric) -> Unit,
+    onBestClick: (SettingsOptionResult) -> Unit,
+    onAvgClick: (String, SettingsOptionResult) -> Unit
 ) {
     val maxima = metricMaxima(category.options)
     val ranks = displayRanks(category.options, metric)
@@ -427,7 +536,16 @@ private fun CategoryCard(
             HorizontalDivider(color = SurfaceDark)
             val ordered = category.options.sortedByDescending { metric.value(it) }
             ordered.forEach { opt ->
-                CategoryOptionRow(opt, maxima, metric, ranks.getValue(opt.key), onMetricChange)
+                CategoryOptionRow(
+                    opt = opt,
+                    categoryTitle = category.title,
+                    maxima = maxima,
+                    metric = metric,
+                    displayRank = ranks.getValue(opt.key),
+                    onMetricChange = onMetricChange,
+                    onBestClick = onBestClick,
+                    onAvgClick = onAvgClick
+                )
             }
         }
     }
@@ -436,10 +554,13 @@ private fun CategoryCard(
 @Composable
 private fun CategoryOptionRow(
     opt: SettingsOptionResult,
+    categoryTitle: String,
     maxima: Map<OptionMetric, Double>,
     metric: OptionMetric,
     displayRank: Int,
-    onMetricChange: (OptionMetric) -> Unit
+    onMetricChange: (OptionMetric) -> Unit,
+    onBestClick: (SettingsOptionResult) -> Unit,
+    onAvgClick: (String, SettingsOptionResult) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
@@ -464,11 +585,12 @@ private fun CategoryOptionRow(
                 MetricTokensRow(opt, metric, onMetricChange)
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    headlineText(metric, opt),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = headlineColor(metric, opt),
-                    fontWeight = FontWeight.Bold
+                HeadlineValue(
+                    metric = metric,
+                    opt = opt,
+                    categoryTitle = categoryTitle,
+                    onBestClick = onBestClick,
+                    onAvgClick = onAvgClick
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     when (metric) {
@@ -517,7 +639,9 @@ private fun CategoryOptionRow(
 private fun HourOfDayCard(
     category: SettingsCategoryResult,
     metric: OptionMetric,
-    onMetricChange: (OptionMetric) -> Unit
+    onMetricChange: (OptionMetric) -> Unit,
+    onBestClick: (SettingsOptionResult) -> Unit,
+    onAvgClick: (String, SettingsOptionResult) -> Unit
 ) {
     val maxima = metricMaxima(category.options)
     val ranks = displayRanks(category.options, metric)
@@ -541,7 +665,16 @@ private fun HourOfDayCard(
             HourAvgBarChart(category.options, metric)
             val ordered = category.options.sortedByDescending { metric.value(it) }
             ordered.forEach { opt ->
-                CategoryOptionRow(opt, maxima, metric, ranks.getValue(opt.key), onMetricChange)
+                CategoryOptionRow(
+                    opt = opt,
+                    categoryTitle = category.title,
+                    maxima = maxima,
+                    metric = metric,
+                    displayRank = ranks.getValue(opt.key),
+                    onMetricChange = onMetricChange,
+                    onBestClick = onBestClick,
+                    onAvgClick = onAvgClick
+                )
             }
         }
     }
