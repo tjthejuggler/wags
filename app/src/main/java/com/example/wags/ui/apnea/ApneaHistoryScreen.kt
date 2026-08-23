@@ -61,6 +61,7 @@ private enum class ApneaHistoryTab(val label: String) {
     ALL_RECORDS("All Records"),
     STATS("Stats"),
     CALENDAR("Calendar"),
+    SETTINGS("Settings"),
     TROPHIES("Trophies")
 }
 
@@ -199,6 +200,7 @@ fun ApneaHistoryScreen(
                     onSetPosture    = { viewModel.setPosture(it) },
                     onSetAudio      = { viewModel.setAudio(it) }
                 )
+                ApneaHistoryTab.SETTINGS -> SettingsComparisonTabContent(viewModel = viewModel)
                 ApneaHistoryTab.CALENDAR -> CalendarTabContent(
                     state = state,
                     displayedMonth = displayedMonth,

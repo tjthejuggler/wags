@@ -16,6 +16,9 @@ import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.TimeBuckets
 import com.example.wags.domain.model.TimeDimension
 import com.example.wags.domain.model.TimeOfDay
+import com.example.wags.domain.usecase.apnea.ComparisonSessionType
+import com.example.wags.domain.usecase.apnea.SettingsComparisonCalculator
+import com.example.wags.domain.usecase.apnea.SettingsComparisonResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +26,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -140,13 +144,29 @@ data class ApneaHistoryUiState(
     val canStepForward: Boolean = false,
 )
 
+/** UI state for the Settings comparison tab (hold-time stats per setting option). */
+data class SettingsComparisonUiState(
+    val isLoading: Boolean = true,
+    /** Currently selected session-type filter keys (ComparisonSessionType keys). */
+    val sessionTypes: Set<String> = ComparisonSessionType.ALL_KEYS,
+    /** Currently selected comparison window. */
+    val period: ApneaChartTimePeriod = ApneaChartTimePeriod.ALL,
+    /** Step offset from the present (0 = current window, -1 = one window back). */
+    val offset: Int = 0,
+    /** Whether hour-of-day options compete in the master ranking. */
+    val includeHours: Boolean = false,
+    /** Computed comparison; null while loading. */
+    val result: SettingsComparisonResult? = null,
+)
+
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class ApneaHistoryViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val apneaRepository: ApneaRepository,
     private val sessionRepository: ApneaSessionRepository,
-    private val timeDimensionStore: ApneaTimeDimensionStore
+    private val timeDimensionStore: ApneaTimeDimensionStore,
+    private val comparisonCalculator: SettingsComparisonCalculator
 ) : ViewModel() {
 
     /** Selected time-bucket dimension (Time of Day vs By the Hour) — drives filter chips. */
@@ -330,6 +350,94 @@ class ApneaHistoryViewModel @Inject constructor(
         if (_periodOffset.value < 0) {
             _periodOffset.value = _periodOffset.value + 1
         }
+    }
+
+    // ── Settings comparison tab state ─────────────────────────────────────────
+
+    private val _cmpSessionTypes = MutableStateFlow(ComparisonSessionType.ALL_KEYS)
+    private val _cmpPeriod = MutableStateFlow(ApneaChartTimePeriod.ALL)
+    private val _cmpOffset = MutableStateFlow(0)
+    private val _cmpIncludeHours = MutableStateFlow(false)
+
+    private data class ComparisonFilter(
+        val types: Set<String>,
+        val period: ApneaChartTimePeriod,
+        val offset: Int,
+        val includeHours: Boolean
+    )
+
+    /**
+     * Settings-comparison tab: per-category hold-time averages + rankings and
+     * the cross-category master ranking, scoped to the selected session types
+     * and time window. Recomputed whenever any filter changes.
+     */
+    val settingsComparison: StateFlow<SettingsComparisonUiState> =
+        combine(_cmpSessionTypes, _cmpPeriod, _cmpOffset, _cmpIncludeHours) { types, period, offset, hours ->
+            ComparisonFilter(types, period, offset, hours)
+        }.flatMapLatest { f ->
+            flow {
+                emit(
+                    SettingsComparisonUiState(
+                        isLoading = true,
+                        sessionTypes = f.types,
+                        period = f.period,
+                        offset = f.offset,
+                        includeHours = f.includeHours
+                    )
+                )
+                val records = apneaRepository.getAllRecordsOnce()
+                val sessions = sessionRepository.getAllSessionsOnce()
+                val result = comparisonCalculator.compute(
+                    records = records,
+                    sessions = sessions,
+                    sessionTypeKeys = f.types,
+                    windowDays = f.period.days,
+                    offset = f.offset,
+                    includeHoursInMaster = f.includeHours
+                )
+                emit(
+                    SettingsComparisonUiState(
+                        isLoading = false,
+                        sessionTypes = f.types,
+                        period = f.period,
+                        offset = f.offset,
+                        includeHours = f.includeHours,
+                        result = result
+                    )
+                )
+            }
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = SettingsComparisonUiState()
+        )
+
+    /** Replaces the whole session-type selection for the Settings comparison tab. */
+    fun setComparisonSessionTypes(types: Set<String>) {
+        if (types.isNotEmpty()) _cmpSessionTypes.value = types
+    }
+
+    /** Selects the comparison window length; resets the step offset. */
+    fun setComparisonPeriod(period: ApneaChartTimePeriod) {
+        _cmpPeriod.value = period
+        _cmpOffset.value = 0
+    }
+
+    /** Shift the comparison window one period into the past. */
+    fun stepComparisonBack() {
+        _cmpOffset.value = _cmpOffset.value - 1
+    }
+
+    /** Shift the comparison window one period toward the present. */
+    fun stepComparisonForward() {
+        if (_cmpOffset.value < 0) {
+            _cmpOffset.value = _cmpOffset.value + 1
+        }
+    }
+
+    /** Include/exclude hour-of-day options from the master ranking. */
+    fun setComparisonIncludeHours(include: Boolean) {
+        _cmpIncludeHours.value = include
     }
 
     // ── Period filtering ──────────────────────────────────────────────────────

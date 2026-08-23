@@ -1,20 +1,22 @@
-## ADR: Pinned settings banner + two-line history filter header
+# ADR: Apnea History "Settings" comparison tab
 
-**Date:** 2026-08-21
-**Status:** Accepted
+## Status
+Accepted (rev 4 — 2026-08-23)
 
-### Context
-1. On Min Breath and Progressive O2, the past-session section header crammed the title and the "All" + filter-summary buttons into one Row, so long filter summaries ellipsized.
-2. On most apnea session screens the one-line settings summary banner scrolled away with the content; users lost sight of the active settings while scrolling and during sessions.
+## Context
+The apnea History screen needs a tab that compares hold-time performance across every settings category (lung volume, prep type, time of day, posture, audio, plus hour-of-day and session type), scoped by an arbitrary combination of session types and a steppable time window. Raw averages alone are confounded: options are not used equally often together (e.g. music holds are rarely paired with hyper prep), so naive per-option averages misattribute the effect of co-occurring settings. Users also want to re-sort any list by any displayed stat on tap.
 
-### Decision
-- **Two-line history header** (MinBreathScreen `SessionHistorySection`, ProgressiveO2Screen `BreathPeriodHistorySection`): title on its own Row, filter buttons on a full-width Row below it; the filter OutlinedButton takes `Modifier.weight(1f)` so the complete summary is readable.
-- **Pinned settings banner**: banner moved OUT of the scroll container onto a fixed outer Column directly under the top bar.
-  - MinBreath / ProgressiveO2 / ContractionTable / TableTraining: outer `Column(fillMaxSize().padding(padding))` holds the banner, then the former scrollable Column becomes `weight(1f)` inside it.
-  - ApneaTableScreen: banner hoisted out of the LazyColumn into the fixed parent Column.
-  - FreeHoldActiveScreen and ApneaScreen already had fixed-position banners — unchanged.
-- **Session gating**: on screens with an editable-settings dialog (MinBreath, ProgressiveO2, ContractionTable) the banner's `onClick` is `if (!state.isSessionActive) {{ showSettingsDialog = true }} else null` — matching the pre-existing FreeHoldActiveScreen pattern. While a session runs the banner is a plain non-clickable label (no underline); it stays visible throughout the session. ApneaTable/TableTraining banners remain label-only (settings are chosen on the main apnea screen).
+## Decision
+1. **Data extraction** (`SettingsComparisonCalculator`): every individual hold is recovered from all 7 session types — free holds (`durationMs`), O2/CO2 tables (deterministically regenerated from `pbAtSessionMs` + `tableVariant` via `ApneaTableGenerator`), Progressive O2 (`rounds[].actualMs`), Min Breath (`holds[].durationMs`), Contraction tables (`rounds[].totalHoldMs`) — joined to `ApneaSessionEntity.tableParamsJson` by `(timestamp, tableType)`.
+2. **Adjusted scoring (rev 3)**: `computeAdjustedScores()` fits a **ridge regression on ln(holdMs)** with one-hot dummies for every option of every category (5 settings + session type + hour of day), solved via normal equations `(XᵀX + λI)β = Xᵀy` with Gaussian elimination + partial pivoting (`solveLinearSystem`). Score = `100·exp(β)` clamped to ±1.5 log-effect → each option's all-else-equal hold-time effect (100 = average, 120 ≈ 20% longer holding everything else constant). λ = 5.0 absorbs the collinearity of full dummy encoding and shrinks sparse options. Guards: ≥ 40 holds and ≥ 3 samples per feature, else fall back to `legacyScore()` (session-type-normalized ratio with K=5 Bayesian shrinkage).
+3. **One score everywhere**: the same adjusted scores drive the master ranking AND all per-category lists AND the hour-of-day section (regression already controls for every other factor, so an hour's score is already its fair within-hours comparison).
+4. **Per-list metric selection (rev 4)**: a UI-side `OptionMetric` enum (AVG / BEST / HOLDS / SCORE) drives every list. Each row renders the non-active metrics as **clickable subtext stat tokens** (`MetricTokensRow`); tapping one swaps it into the headline slot, re-sorts that list, re-scales its bars, and (for the hour section) re-keys the 24-slot chart including peak-hour highlight — so score is chartable alongside avg/best/holds. Rank badges and the white-bordered top-of-category chip are recomputed client-side for the active metric (master ranking keyed by `(categoryTitle, optionKey)` since option keys like "NONE" can repeat across categories). State model: `scoreMode` toggle sets the bulk default (avg|score) for all sections below and clears per-list overrides; `masterMetricOverride` / `hourMetricOverride` / `categoryMetricOverrides[title]` (all `rememberSaveable`) hold per-list taps. Master ranking's default metric stays SCORE regardless of toggle.
+5. **Filters**: session-type popup (any subset of the 7 types) + window length chips (week/month/3M/6M/year/all) with ‹ › stepping to compare against the previous equal-length window (mirrors Graphs-tab `filterByPeriod` semantics).
+6. **Master ranking extras (rev 2)**: "Hours" switch includes hour-of-day options in the master ranking; the top entry of each category gets a white-bordered category chip (recomputed per active metric as of rev 4); hour-of-day has its own section with the 24-slot canvas bar chart plus the ranked list.
 
-### Consequences
-- Settings line is always visible on every apnea screen, idle or mid-session.
-- No ViewModel/domain changes; purely layout restructuring. Banner component itself unchanged (its nullable `onClick` already supported the label mode).
+## Consequences
+- Confounding between settings is removed: an option's score reflects its own effect, not the company it keeps.
+- Any list can be re-ranked by any stat with one tap; the hour chart follows the selected metric, making score vs avg vs best vs hold-count views available at a glance.
+- Sparse options shrink toward neutral instead of producing extreme ratios; "low data" badges still flag n < 3.
+- Sorting/ranking for non-default metrics is computed in the UI layer from calculator-provided per-option stats; the calculator's `rankInCategory`/`overallRank` remain the avg/score defaults.
+- Regression runs inside the existing `flatMapLatest` compute (dataset is small: hundreds–thousands of holds, p ≈ 30–40 dummies → normal-equations solve is O(p³) ≈ trivial). If hold history grows by orders of magnitude, move the compute off the main thread or subsample.
