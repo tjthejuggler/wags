@@ -524,15 +524,16 @@ fun MinBreathScreen(
             }
 
             // 4. Session history
-            val isFiltered = state.filterLungVolume.isNotEmpty()
-                    || state.filterPrepType.isNotEmpty()
-                    || state.filterTimeOfDay.isNotEmpty()
-                    || state.filterPosture.isNotEmpty()
-                    || state.filterAudio.isNotEmpty()
+            val byHour = timeDimension == com.example.wags.domain.model.TimeDimension.BY_HOUR
+            val isFiltered = !state.filterLungVolume.coversAll(SettingFilterOptions.LUNG_VOLUMES)
+                    || !state.filterPrepType.coversAll(SettingFilterOptions.PREP_TYPES)
+                    || !state.filterTimeOfDay.coversAll(SettingFilterOptions.timeOfDayOptions(byHour))
+                    || !state.filterPosture.coversAll(SettingFilterOptions.POSTURES)
+                    || !state.filterAudio.coversAll(SettingFilterOptions.AUDIOS)
             SessionHistorySection(
                 history = state.pastDurations,
                 currentDurationSec = state.sessionDurationSec,
-                filterSummary = buildMinBreathFilterSummary(state),
+                filterSummary = buildMinBreathFilterSummary(state, byHour),
                 isFiltered = isFiltered,
                 onSelectDuration = { viewModel.setSessionDurationSec(it) },
                 onLongClickDuration = { recordId ->

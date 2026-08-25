@@ -494,14 +494,15 @@ fun ContractionTableScreen(
             }
 
             // 5. Past sessions
-            val isFiltered = state.filterLungVolume.isNotEmpty()
-                    || state.filterPrepType.isNotEmpty()
-                    || state.filterTimeOfDay.isNotEmpty()
-                    || state.filterPosture.isNotEmpty()
-                    || state.filterAudio.isNotEmpty()
+            val byHour = timeDimension == com.example.wags.domain.model.TimeDimension.BY_HOUR
+            val isFiltered = !state.filterLungVolume.coversAll(SettingFilterOptions.LUNG_VOLUMES)
+                    || !state.filterPrepType.coversAll(SettingFilterOptions.PREP_TYPES)
+                    || !state.filterTimeOfDay.coversAll(SettingFilterOptions.timeOfDayOptions(byHour))
+                    || !state.filterPosture.coversAll(SettingFilterOptions.POSTURES)
+                    || !state.filterAudio.coversAll(SettingFilterOptions.AUDIOS)
             PastSessionsSection(
                 history = state.pastSessions,
-                filterSummary = buildContractionTableFilterSummary(state),
+                filterSummary = buildContractionTableFilterSummary(state, byHour),
                 isFiltered = isFiltered,
                 onViewSessionDetail = { recordId ->
                     navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
@@ -948,29 +949,13 @@ private fun PastSessionsSection(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Build a short label describing the current filter combination. */
-fun buildContractionTableFilterSummary(state: ContractionTableUiState): String {
-    val parts = mutableListOf<String>()
-    if (state.filterLungVolume.isNotEmpty()) parts.add(
-        when (state.filterLungVolume) {
-            "PARTIAL" -> "Half"
-            else -> state.filterLungVolume.lowercase().replaceFirstChar { it.uppercase() }
-        }
-    )
-    if (state.filterPrepType.isNotEmpty()) parts.add(
-        runCatching { PrepType.valueOf(state.filterPrepType).displayName() }
-            .getOrDefault(state.filterPrepType)
-    )
-    if (state.filterTimeOfDay.isNotEmpty()) parts.add(
-        runCatching { TimeOfDay.valueOf(state.filterTimeOfDay).displayName() }
-            .getOrDefault(state.filterTimeOfDay)
-    )
-    if (state.filterPosture.isNotEmpty()) parts.add(
-        runCatching { Posture.valueOf(state.filterPosture).displayName() }
-            .getOrDefault(state.filterPosture)
-    )
-    if (state.filterAudio.isNotEmpty()) parts.add(
-        runCatching { AudioSetting.valueOf(state.filterAudio).displayName() }
-            .getOrDefault(state.filterAudio)
+fun buildContractionTableFilterSummary(state: ContractionTableUiState, byHour: Boolean = false): String {
+    val parts = listOfNotNull(
+        settingFilterSummaryPart(state.filterLungVolume, SettingFilterOptions.LUNG_VOLUMES, SettingFilterOptions::lungVolumeLabel),
+        settingFilterSummaryPart(state.filterPrepType, SettingFilterOptions.PREP_TYPES, SettingFilterOptions::prepTypeLabel),
+        settingFilterSummaryPart(state.filterTimeOfDay, SettingFilterOptions.timeOfDayOptions(byHour), SettingFilterOptions::timeBucketLabel),
+        settingFilterSummaryPart(state.filterPosture, SettingFilterOptions.POSTURES, SettingFilterOptions::postureLabel),
+        settingFilterSummaryPart(state.filterAudio, SettingFilterOptions.AUDIOS, SettingFilterOptions::audioLabel)
     )
     return if (parts.isEmpty()) "All Sessions" else parts.joinToString(" · ")
 }

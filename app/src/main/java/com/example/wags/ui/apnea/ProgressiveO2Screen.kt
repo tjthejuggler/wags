@@ -518,15 +518,16 @@ fun ProgressiveO2Screen(
             }
 
             // 4. Breath period history
-            val isFiltered = state.filterLungVolume.isNotEmpty()
-                    || state.filterPrepType.isNotEmpty()
-                    || state.filterTimeOfDay.isNotEmpty()
-                    || state.filterPosture.isNotEmpty()
-                    || state.filterAudio.isNotEmpty()
+            val byHour = timeDimension == com.example.wags.domain.model.TimeDimension.BY_HOUR
+            val isFiltered = !state.filterLungVolume.coversAll(SettingFilterOptions.LUNG_VOLUMES)
+                    || !state.filterPrepType.coversAll(SettingFilterOptions.PREP_TYPES)
+                    || !state.filterTimeOfDay.coversAll(SettingFilterOptions.timeOfDayOptions(byHour))
+                    || !state.filterPosture.coversAll(SettingFilterOptions.POSTURES)
+                    || !state.filterAudio.coversAll(SettingFilterOptions.AUDIOS)
             BreathPeriodHistorySection(
                 history = state.pastBreathPeriods,
                 currentBreathPeriodSec = state.breathPeriodSec,
-                filterSummary = buildProgressiveO2FilterSummary(state),
+                filterSummary = buildProgressiveO2FilterSummary(state, byHour),
                 isFiltered = isFiltered,
                 onViewSessionDetail = { recordId ->
                     navController.navigate(WagsRoutes.apneaRecordDetail(recordId))

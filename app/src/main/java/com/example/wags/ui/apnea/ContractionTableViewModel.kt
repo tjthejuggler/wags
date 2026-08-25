@@ -93,12 +93,13 @@ data class ContractionTableUiState(
     val timeOfDay: String = "DAY",
     val posture: String = "LAYING",
     val audio: String = "SILENCE",
-    // Filter state ("" = all, specific value = filter to that value)
-    val filterLungVolume: String = "",
-    val filterPrepType: String = "",
-    val filterTimeOfDay: String = "",
-    val filterPosture: String = "",
-    val filterAudio: String = "",
+    // Filter state — selected option values per dimension (multi-select).
+    // All options selected = unfiltered; empty set = nothing matches.
+    val filterLungVolume: Set<String> = SettingFilterOptions.LUNG_VOLUMES.toSet(),
+    val filterPrepType: Set<String> = SettingFilterOptions.PREP_TYPES.toSet(),
+    val filterTimeOfDay: Set<String> = SettingFilterOptions.timeOfDayOptions(byHour = false).toSet(),
+    val filterPosture: Set<String> = SettingFilterOptions.POSTURES.toSet(),
+    val filterAudio: Set<String> = SettingFilterOptions.AUDIOS.toSet(),
     // ── Voice / vibration toggles ─────────────────────────────────────────────
     val voiceEnabled: Boolean = true,
     val vibrationEnabled: Boolean = true,
@@ -776,34 +777,35 @@ class ContractionTableViewModel @Inject constructor(
 
     // ── Filters ────────────────────────────────────────────────────────────────
 
-    fun setFilterLungVolume(v: String) { _uiState.update { it.copy(filterLungVolume = v) }; loadSessionHistory() }
-    fun setFilterPrepType(v: String)   { _uiState.update { it.copy(filterPrepType = v) }; loadSessionHistory() }
-    fun setFilterTimeOfDay(v: String)  { _uiState.update { it.copy(filterTimeOfDay = v) }; loadSessionHistory() }
-    fun setFilterPosture(v: String)    { _uiState.update { it.copy(filterPosture = v) }; loadSessionHistory() }
-    fun setFilterAudio(v: String)      { _uiState.update { it.copy(filterAudio = v) }; loadSessionHistory() }
+    fun setFilterLungVolume(v: Set<String>) { _uiState.update { it.copy(filterLungVolume = v) }; loadSessionHistory() }
+    fun setFilterPrepType(v: Set<String>)   { _uiState.update { it.copy(filterPrepType = v) }; loadSessionHistory() }
+    fun setFilterTimeOfDay(v: Set<String>)  { _uiState.update { it.copy(filterTimeOfDay = v) }; loadSessionHistory() }
+    fun setFilterPosture(v: Set<String>)    { _uiState.update { it.copy(filterPosture = v) }; loadSessionHistory() }
+    fun setFilterAudio(v: Set<String>)      { _uiState.update { it.copy(filterAudio = v) }; loadSessionHistory() }
 
     fun resetFilters() {
         val s = _uiState.value
         _uiState.update {
             it.copy(
-                filterLungVolume = s.lungVolume,
-                filterPrepType   = s.prepType,
-                filterTimeOfDay  = TimeBuckets.normalizeSessionBucket(s.timeOfDay, timeDimensionStore.current),
-                filterPosture    = s.posture,
-                filterAudio      = s.audio
+                filterLungVolume = setOf(s.lungVolume),
+                filterPrepType   = setOf(s.prepType),
+                filterTimeOfDay  = setOf(TimeBuckets.normalizeSessionBucket(s.timeOfDay, timeDimensionStore.current)),
+                filterPosture    = setOf(s.posture),
+                filterAudio      = setOf(s.audio)
             )
         }
         loadSessionHistory()
     }
 
     fun clearAllFilters() {
+        val byHour = timeDimensionStore.current == TimeDimension.BY_HOUR
         _uiState.update {
             it.copy(
-                filterLungVolume = "",
-                filterPrepType   = "",
-                filterTimeOfDay  = "",
-                filterPosture    = "",
-                filterAudio      = ""
+                filterLungVolume = SettingFilterOptions.LUNG_VOLUMES.toSet(),
+                filterPrepType   = SettingFilterOptions.PREP_TYPES.toSet(),
+                filterTimeOfDay  = SettingFilterOptions.timeOfDayOptions(byHour).toSet(),
+                filterPosture    = SettingFilterOptions.POSTURES.toSet(),
+                filterAudio      = SettingFilterOptions.AUDIOS.toSet()
             )
         }
         loadSessionHistory()
@@ -862,14 +864,23 @@ class ContractionTableViewModel @Inject constructor(
                         )
                     }.sortedByDescending { it.lastUsedMs }
 
-                var filtered = allTableRecords
-                if (s.filterLungVolume.isNotEmpty()) filtered = filtered.filter { it.lungVolume == s.filterLungVolume }
-                if (s.filterPrepType.isNotEmpty()) filtered = filtered.filter { it.prepType == s.filterPrepType }
-                if (s.filterTimeOfDay.isNotEmpty()) filtered = filtered.filter {
-                    (if (TimeBuckets.isHourBucket(s.filterTimeOfDay)) TimeBuckets.fromTimestamp(it.timestamp) else it.timeOfDay) == s.filterTimeOfDay
+                val filtered = if (
+                    s.filterLungVolume.isEmpty() || s.filterPrepType.isEmpty() || s.filterTimeOfDay.isEmpty() ||
+                    s.filterPosture.isEmpty() || s.filterAudio.isEmpty()
+                ) {
+                    // A category with nothing selected can never match — skip the work.
+                    emptyList()
+                } else {
+                    val byHourTod = s.filterTimeOfDay.any { TimeBuckets.isHourBucket(it) }
+                    allTableRecords
+                        .filter { it.lungVolume in s.filterLungVolume }
+                        .filter { it.prepType in s.filterPrepType }
+                        .filter {
+                            (if (byHourTod) TimeBuckets.fromTimestamp(it.timestamp) else it.timeOfDay) in s.filterTimeOfDay
+                        }
+                        .filter { it.posture in s.filterPosture }
+                        .filter { it.audio in s.filterAudio }
                 }
-                if (s.filterPosture.isNotEmpty()) filtered = filtered.filter { it.posture == s.filterPosture }
-                if (s.filterAudio.isNotEmpty()) filtered = filtered.filter { it.audio == s.filterAudio }
 
                 val entries = filtered.mapNotNull { record ->
                     val session = sessionMap[record.timestamp] ?: return@mapNotNull null

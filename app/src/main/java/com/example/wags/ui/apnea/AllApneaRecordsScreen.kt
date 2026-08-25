@@ -170,7 +170,7 @@ fun AllApneaRecordsScreen(
                                 if (!filtersExpanded) {
                                     // Show current filter summary when collapsed
                                     Text(
-                                        buildFilterSummary(state),
+                                        buildFilterSummary(state, byHour),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = TextSecondary
                                     )
@@ -190,93 +190,49 @@ fun AllApneaRecordsScreen(
                                 verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 // Lung Volume
-                                FilterRow(label = "Lung Volume") {
-                                    FilterChip(
-                                        selected = state.filterLungVolume == "",
-                                        onClick = { viewModel.setLungVolumeFilter("") },
-                                        label = { Text("All", style = MaterialTheme.typography.labelSmall) }
-                                    )
-                                    listOf("FULL", "PARTIAL", "EMPTY").forEach { lv ->
-                                        FilterChip(
-                                            selected = state.filterLungVolume == lv,
-                                            onClick = { viewModel.setLungVolumeFilter(lv) },
-                                            label = { Text(if (lv == "PARTIAL") "Half" else lv.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelSmall) }
-                                        )
-                                    }
-                                }
+                                MultiSelectFilterCategory(
+                                    label = "Lung Volume",
+                                    options = SettingFilterOptions.LUNG_VOLUMES,
+                                    optionLabel = SettingFilterOptions::lungVolumeLabel,
+                                    selected = state.filterLungVolume,
+                                    onSelectionChange = { viewModel.setLungVolumeFilter(it) }
+                                )
 
                                 // Prep Type
-                                FilterRow(label = "Prep") {
-                                    FilterChip(
-                                        selected = state.filterPrepType == "",
-                                        onClick = { viewModel.setPrepTypeFilter("") },
-                                        label = { Text("All", style = MaterialTheme.typography.labelSmall) }
-                                    )
-                                    PrepType.entries.forEach { pt ->
-                                        FilterChip(
-                                            selected = state.filterPrepType == pt.name,
-                                            onClick = { viewModel.setPrepTypeFilter(pt.name) },
-                                            label = { Text(pt.shortDisplayName(), style = MaterialTheme.typography.labelSmall) }
-                                        )
-                                    }
-    
-                                    // Time of Day
-                                    FilterRow(label = if (byHour) "Hour" else "Time of Day") {
-                                        FilterChip(
-                                            selected = state.filterTimeOfDay == "",
-                                            onClick = { viewModel.setTimeOfDayFilter("") },
-                                            label = { Text("All", style = MaterialTheme.typography.labelSmall) }
-                                        )
-                                        if (byHour) {
-                                            TimeBuckets.HOUR_BUCKETS.forEach { bucket ->
-                                                FilterChip(
-                                                    selected = state.filterTimeOfDay == bucket,
-                                                    onClick = { viewModel.setTimeOfDayFilter(bucket) },
-                                                    label = { Text(TimeBuckets.display(bucket), style = MaterialTheme.typography.labelSmall) }
-                                                )
-                                            }
-                                        } else {
-                                            TimeOfDay.entries.forEach { tod ->
-                                                FilterChip(
-                                                    selected = state.filterTimeOfDay == tod.name,
-                                                    onClick = { viewModel.setTimeOfDayFilter(tod.name) },
-                                                    label = { Text(tod.displayName(), style = MaterialTheme.typography.labelSmall) }
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
+                                MultiSelectFilterCategory(
+                                    label = "Prep",
+                                    options = SettingFilterOptions.PREP_TYPES,
+                                    optionLabel = SettingFilterOptions::prepTypeShortLabel,
+                                    selected = state.filterPrepType,
+                                    onSelectionChange = { viewModel.setPrepTypeFilter(it) }
+                                )
+
+                                // Time of Day / Hour Bucket
+                                MultiSelectFilterCategory(
+                                    label = if (byHour) "Hour" else "Time of Day",
+                                    options = SettingFilterOptions.timeOfDayOptions(byHour),
+                                    optionLabel = SettingFilterOptions::timeBucketLabel,
+                                    selected = state.filterTimeOfDay,
+                                    onSelectionChange = { viewModel.setTimeOfDayFilter(it) }
+                                )
+
                                 // Posture
-                                FilterRow(label = "Posture") {
-                                    FilterChip(
-                                        selected = state.filterPosture == "",
-                                        onClick = { viewModel.setPostureFilter("") },
-                                        label = { Text("All", style = MaterialTheme.typography.labelSmall) }
-                                    )
-                                    Posture.entries.forEach { pos ->
-                                        FilterChip(
-                                            selected = state.filterPosture == pos.name,
-                                            onClick = { viewModel.setPostureFilter(pos.name) },
-                                            label = { Text(pos.displayName(), style = MaterialTheme.typography.labelSmall) }
-                                        )
-                                    }
-                                }
+                                MultiSelectFilterCategory(
+                                    label = "Posture",
+                                    options = SettingFilterOptions.POSTURES,
+                                    optionLabel = SettingFilterOptions::postureLabel,
+                                    selected = state.filterPosture,
+                                    onSelectionChange = { viewModel.setPostureFilter(it) }
+                                )
 
                                 // Audio
-                                FilterRow(label = "Audio") {
-                                    FilterChip(
-                                        selected = state.filterAudio == "",
-                                        onClick = { viewModel.setAudioFilter("") },
-                                        label = { Text("All", style = MaterialTheme.typography.labelSmall) }
-                                    )
-                                    AudioSetting.entries.forEach { aud ->
-                                        FilterChip(
-                                            selected = state.filterAudio == aud.name,
-                                            onClick = { viewModel.setAudioFilter(aud.name) },
-                                            label = { Text(aud.displayName(), style = MaterialTheme.typography.labelSmall) }
-                                        )
-                                    }
-                                }
+                                MultiSelectFilterCategory(
+                                    label = "Audio",
+                                    options = SettingFilterOptions.AUDIOS,
+                                    optionLabel = SettingFilterOptions::audioLabel,
+                                    selected = state.filterAudio,
+                                    onSelectionChange = { viewModel.setAudioFilter(it) }
+                                )
                             }
                         }
                     }
@@ -422,26 +378,13 @@ fun AllApneaRecordsScreen(
 // Collapsed-state summary helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-private fun buildFilterSummary(state: AllApneaRecordsUiState): String {
-    val parts = mutableListOf<String>()
-    if (state.filterLungVolume.isNotEmpty()) parts.add(
-        when (state.filterLungVolume) {
-            "PARTIAL" -> "Half"
-            else -> state.filterLungVolume.lowercase().replaceFirstChar { it.uppercase() }
-        }
-    )
-    if (state.filterPrepType.isNotEmpty()) parts.add(
-        runCatching { PrepType.valueOf(state.filterPrepType).displayName() }
-            .getOrDefault(state.filterPrepType)
-    )
-    if (state.filterTimeOfDay.isNotEmpty()) parts.add(TimeBuckets.display(state.filterTimeOfDay))
-    if (state.filterPosture.isNotEmpty()) parts.add(
-        runCatching { Posture.valueOf(state.filterPosture).displayName() }
-            .getOrDefault(state.filterPosture)
-    )
-    if (state.filterAudio.isNotEmpty()) parts.add(
-        runCatching { AudioSetting.valueOf(state.filterAudio).displayName() }
-            .getOrDefault(state.filterAudio)
+private fun buildFilterSummary(state: AllApneaRecordsUiState, byHour: Boolean): String {
+    val parts = listOfNotNull(
+        settingFilterSummaryPart(state.filterLungVolume, SettingFilterOptions.LUNG_VOLUMES, SettingFilterOptions::lungVolumeLabel),
+        settingFilterSummaryPart(state.filterPrepType, SettingFilterOptions.PREP_TYPES, SettingFilterOptions::prepTypeLabel),
+        settingFilterSummaryPart(state.filterTimeOfDay, SettingFilterOptions.timeOfDayOptions(byHour), SettingFilterOptions::timeBucketLabel),
+        settingFilterSummaryPart(state.filterPosture, SettingFilterOptions.POSTURES, SettingFilterOptions::postureLabel),
+        settingFilterSummaryPart(state.filterAudio, SettingFilterOptions.AUDIOS, SettingFilterOptions::audioLabel)
     )
     return if (parts.isEmpty()) "All" else parts.joinToString(" · ")
 }
@@ -464,6 +407,7 @@ private fun buildEventTypeSummary(state: AllApneaRecordsUiState): String {
 
 /**
  * A simple line chart showing hold duration progress over the current filtered list.
+ * A prominent white trend line marks the average of the shown points.
  */
 @Composable
 private fun AllRecordsProgressChart(
@@ -496,21 +440,39 @@ private fun AllRecordsProgressChart(
             else path.lineTo(x, y)
         }
 
+        // Connecting line — kept subtle so the average trend line dominates.
         drawPath(
             path = path,
-            color = EcgCyan,
+            color = EcgCyan.copy(alpha = 0.45f),
             style = Stroke(
                 width = 2.dp.toPx(),
                 cap = StrokeCap.Round,
                 join = StrokeJoin.Round
             )
         )
-        
-        // Draw dots for each point
+
+        // Average trend line — the mean of the shown points, drawn prominent.
+        val avg = durations.average().toFloat()
+        val avgY = height - (((avg - minDuration) / range) * height)
+        drawLine(
+            color = CoherenceWhite,
+            start = Offset(0f, avgY),
+            end = Offset(width, avgY),
+            strokeWidth = 3.5.dp.toPx(),
+            cap = StrokeCap.Round
+        )
+
+        // Draw dots for each point — on top, with a dark halo so they stay
+        // clearly visible even where they sit on the trend line.
         durations.forEachIndexed { index, duration ->
             val x = index * spacing
             val normalized = (duration - minDuration) / range
             val y = height - (normalized * height)
+            drawCircle(
+                color = SurfaceDark,
+                radius = 4.5.dp.toPx(),
+                center = Offset(x, y)
+            )
             drawCircle(
                 color = EcgCyan,
                 radius = 3.dp.toPx(),
@@ -524,17 +486,7 @@ private fun AllRecordsProgressChart(
 // Components
 // ─────────────────────────────────────────────────────────────────────────────
 
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun FilterRow(label: String, chips: @Composable FlowRowScope.() -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = TextSecondary)
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) { chips() }
-    }
-}
+// FilterRow was replaced by the shared MultiSelectFilterCategory (SettingFilterWidgets.kt).
 
 @Composable
 private fun AllRecordsRow(

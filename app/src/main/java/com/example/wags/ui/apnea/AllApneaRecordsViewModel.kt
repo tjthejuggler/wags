@@ -89,12 +89,15 @@ data class ChartPoint(val x: Long, val y: Float, val recordId: Long)
 
 data class AllApneaRecordsUiState(
     // ── Settings filters ──────────────────────────────────────────────────────
-    /** "" means "all values" for that dimension */
-    val filterLungVolume: String = "",
-    val filterPrepType: String = "",
-    val filterTimeOfDay: String = "",
-    val filterPosture: String = "",
-    val filterAudio: String = "",
+    /**
+     * Selected option values per dimension (multi-select).
+     * All options selected = unfiltered; empty set = nothing matches.
+     */
+    val filterLungVolume: Set<String> = SettingFilterOptions.LUNG_VOLUMES.toSet(),
+    val filterPrepType: Set<String> = SettingFilterOptions.PREP_TYPES.toSet(),
+    val filterTimeOfDay: Set<String> = SettingFilterOptions.timeOfDayOptions(byHour = false).toSet(),
+    val filterPosture: Set<String> = SettingFilterOptions.POSTURES.toSet(),
+    val filterAudio: Set<String> = SettingFilterOptions.AUDIOS.toSet(),
 
     // ── Event-type filter ─────────────────────────────────────────────────────
     /**
@@ -169,13 +172,19 @@ class AllApneaRecordsViewModel @Inject constructor(
             }
         }
 
+        val byHour = timeDimensionStore.current == TimeDimension.BY_HOUR
         _uiState.update {
             it.copy(
-                filterLungVolume   = initLungVolume,
-                filterPrepType     = initPrepType,
-                filterTimeOfDay    = initTimeOfDay,
-                filterPosture      = initPosture,
-                filterAudio        = initAudio,
+                filterLungVolume   = initLungVolume.takeIf { v -> v.isNotEmpty() }?.let { setOf(it) }
+                    ?: SettingFilterOptions.LUNG_VOLUMES.toSet(),
+                filterPrepType     = initPrepType.takeIf { v -> v.isNotEmpty() }?.let { setOf(it) }
+                    ?: SettingFilterOptions.PREP_TYPES.toSet(),
+                filterTimeOfDay    = initTimeOfDay.takeIf { v -> v.isNotEmpty() }?.let { setOf(it) }
+                    ?: SettingFilterOptions.timeOfDayOptions(byHour).toSet(),
+                filterPosture      = initPosture.takeIf { v -> v.isNotEmpty() }?.let { setOf(it) }
+                    ?: SettingFilterOptions.POSTURES.toSet(),
+                filterAudio        = initAudio.takeIf { v -> v.isNotEmpty() }?.let { setOf(it) }
+                    ?: SettingFilterOptions.AUDIOS.toSet(),
                 selectedEventTypes = initialSelectedTypes
             )
         }
@@ -185,27 +194,27 @@ class AllApneaRecordsViewModel @Inject constructor(
 
     // ── Public filter actions ─────────────────────────────────────────────────
 
-    fun setLungVolumeFilter(value: String) {
+    fun setLungVolumeFilter(value: Set<String>) {
         _uiState.update { it.copy(filterLungVolume = value) }
         loadAllRecords()
     }
 
-    fun setPrepTypeFilter(value: String) {
+    fun setPrepTypeFilter(value: Set<String>) {
         _uiState.update { it.copy(filterPrepType = value) }
         loadAllRecords()
     }
 
-    fun setTimeOfDayFilter(value: String) {
+    fun setTimeOfDayFilter(value: Set<String>) {
         _uiState.update { it.copy(filterTimeOfDay = value) }
         loadAllRecords()
     }
 
-    fun setPostureFilter(value: String) {
+    fun setPostureFilter(value: Set<String>) {
         _uiState.update { it.copy(filterPosture = value) }
         loadAllRecords()
     }
 
-    fun setAudioFilter(value: String) {
+    fun setAudioFilter(value: Set<String>) {
         _uiState.update { it.copy(filterAudio = value) }
         loadAllRecords()
     }
@@ -225,13 +234,14 @@ class AllApneaRecordsViewModel @Inject constructor(
         audio: String,
         eventTypes: Set<String?>
     ) {
+        val byHour = timeDimensionStore.current == TimeDimension.BY_HOUR
         _uiState.update {
             it.copy(
-                filterLungVolume = lungVolume,
-                filterPrepType = prepType,
-                filterTimeOfDay = timeOfDay,
-                filterPosture = posture,
-                filterAudio = audio,
+                filterLungVolume = presetToSelection(lungVolume, SettingFilterOptions.LUNG_VOLUMES),
+                filterPrepType = presetToSelection(prepType, SettingFilterOptions.PREP_TYPES),
+                filterTimeOfDay = presetToSelection(timeOfDay, SettingFilterOptions.timeOfDayOptions(byHour)),
+                filterPosture = presetToSelection(posture, SettingFilterOptions.POSTURES),
+                filterAudio = presetToSelection(audio, SettingFilterOptions.AUDIOS),
                 selectedEventTypes = eventTypes
             )
         }
@@ -282,22 +292,38 @@ class AllApneaRecordsViewModel @Inject constructor(
             val s = _uiState.value
             val selected = s.selectedEventTypes
 
+            // A settings category with nothing selected can never match — skip the queries.
+            if (s.filterLungVolume.isEmpty() || s.filterPrepType.isEmpty() || s.filterTimeOfDay.isEmpty() ||
+                s.filterPosture.isEmpty() || s.filterAudio.isEmpty()
+            ) {
+                _uiState.update { current ->
+                    current.copy(
+                        records = emptyList(),
+                        isLoading = false,
+                        isInitialLoad = false,
+                        chartPoints = null,
+                        chartYLabel = ""
+                    )
+                }
+                return@launch
+            }
+
             // Separate the PB sentinel from real types
             val pbSelected    = selected.contains(ApneaEventType.FREE_HOLD_PB_SENTINEL)
             val realSelected  = selected.filter { it != ApneaEventType.FREE_HOLD_PB_SENTINEL }.toSet()
 
-            val allRecords: List<ApneaRecordEntity> = when {
+            val fetched: List<ApneaRecordEntity> = when {
                 // Nothing selected → empty
                 selected.isEmpty() -> emptyList()
 
                 // Only PB sentinel selected → fetch PB free holds
                 pbSelected && realSelected.isEmpty() -> {
                     repository.getPagedPersonalBestFreeHolds(
-                        lungVolume = s.filterLungVolume,
-                        prepType   = s.filterPrepType,
-                        timeOfDay  = s.filterTimeOfDay,
-                        posture    = s.filterPosture,
-                        audio      = s.filterAudio,
+                        lungVolume = sqlFilter(s.filterLungVolume),
+                        prepType   = sqlFilter(s.filterPrepType),
+                        timeOfDay  = sqlFilter(s.filterTimeOfDay),
+                        posture    = sqlFilter(s.filterPosture),
+                        audio      = sqlFilter(s.filterAudio),
                         pageSize   = FETCH_ALL,
                         offset     = 0
                     )
@@ -306,11 +332,11 @@ class AllApneaRecordsViewModel @Inject constructor(
                 // PB sentinel + real types → fetch both and merge
                 pbSelected -> {
                     val pbPage = repository.getPagedPersonalBestFreeHolds(
-                        lungVolume = s.filterLungVolume,
-                        prepType   = s.filterPrepType,
-                        timeOfDay  = s.filterTimeOfDay,
-                        posture    = s.filterPosture,
-                        audio      = s.filterAudio,
+                        lungVolume = sqlFilter(s.filterLungVolume),
+                        prepType   = sqlFilter(s.filterPrepType),
+                        timeOfDay  = sqlFilter(s.filterTimeOfDay),
+                        posture    = sqlFilter(s.filterPosture),
+                        audio      = sqlFilter(s.filterAudio),
                         pageSize   = FETCH_ALL,
                         offset     = 0
                     )
@@ -321,11 +347,11 @@ class AllApneaRecordsViewModel @Inject constructor(
                 // Only real types (all selected = no type filter)
                 realSelected.size == ApneaEventType.REAL_TABLE_TYPE_VALUES.size -> {
                     repository.getPagedRecords(
-                        lungVolume = s.filterLungVolume,
-                        prepType   = s.filterPrepType,
-                        timeOfDay  = s.filterTimeOfDay,
-                        posture    = s.filterPosture,
-                        audio      = s.filterAudio,
+                        lungVolume = sqlFilter(s.filterLungVolume),
+                        prepType   = sqlFilter(s.filterPrepType),
+                        timeOfDay  = sqlFilter(s.filterTimeOfDay),
+                        posture    = sqlFilter(s.filterPosture),
+                        audio      = sqlFilter(s.filterAudio),
                         eventTypes = emptyList(),
                         pageSize   = FETCH_ALL,
                         offset     = 0
@@ -333,6 +359,16 @@ class AllApneaRecordsViewModel @Inject constructor(
                 }
 
                 else -> fetchRealTypes(s, realSelected, FETCH_ALL, 0)
+            }
+
+            // Multi-select refinement — the SQL layer only narrows single-value selections.
+            val byHourTod = s.filterTimeOfDay.any { TimeBuckets.isHourBucket(it) }
+            val allRecords = fetched.filter { r ->
+                r.lungVolume in s.filterLungVolume &&
+                r.prepType in s.filterPrepType &&
+                r.posture in s.filterPosture &&
+                r.audio in s.filterAudio &&
+                (if (byHourTod) TimeBuckets.fromTimestamp(r.timestamp) else r.timeOfDay) in s.filterTimeOfDay
             }
 
             // Apply sort order
@@ -367,16 +403,27 @@ class AllApneaRecordsViewModel @Inject constructor(
         offset: Int
     ): List<ApneaRecordEntity> {
         return repository.getPagedRecords(
-            lungVolume = s.filterLungVolume,
-            prepType   = s.filterPrepType,
-            timeOfDay  = s.filterTimeOfDay,
-            posture    = s.filterPosture,
-            audio      = s.filterAudio,
+            lungVolume = sqlFilter(s.filterLungVolume),
+            prepType   = sqlFilter(s.filterPrepType),
+            timeOfDay  = sqlFilter(s.filterTimeOfDay),
+            posture    = sqlFilter(s.filterPosture),
+            audio      = sqlFilter(s.filterAudio),
             eventTypes = realSelected.toList(),
             pageSize   = pageSize,
             offset     = offset
         )
     }
+
+    /**
+     * SQL still speaks single-value equality ("" = relaxed): pass a lone
+     * selection through, and relax everything else — multi selections are
+     * refined in memory by the caller.
+     */
+    private fun sqlFilter(selected: Set<String>): String = selected.singleOrNull() ?: ""
+
+    /** Single preset value ("" = all) → multi-select option set. */
+    private fun presetToSelection(value: String, options: List<String>): Set<String> =
+        value.takeIf { it.isNotEmpty() }?.let { setOf(it) } ?: options.toSet()
 
     /**
      * Builds chart data when exactly one event type is selected.

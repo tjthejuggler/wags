@@ -89,12 +89,13 @@ data class MinBreathUiState(
     val timeOfDay: String = "DAY",
     val posture: String = "LAYING",
     val audio: String = "SILENCE",
-    // Filter state ("" = all, specific value = filter to that value)
-    val filterLungVolume: String = "",
-    val filterPrepType: String = "",
-    val filterTimeOfDay: String = "",
-    val filterPosture: String = "",
-    val filterAudio: String = "",
+    // Filter state — selected option values per dimension (multi-select).
+    // All options selected = unfiltered; empty set = nothing matches.
+    val filterLungVolume: Set<String> = SettingFilterOptions.LUNG_VOLUMES.toSet(),
+    val filterPrepType: Set<String> = SettingFilterOptions.PREP_TYPES.toSet(),
+    val filterTimeOfDay: Set<String> = SettingFilterOptions.timeOfDayOptions(byHour = false).toSet(),
+    val filterPosture: Set<String> = SettingFilterOptions.POSTURES.toSet(),
+    val filterAudio: Set<String> = SettingFilterOptions.AUDIOS.toSet(),
     // ── Voice / vibration toggles ─────────────────────────────────────────────
     val voiceEnabled: Boolean = true,
     val vibrationEnabled: Boolean = true,
@@ -489,11 +490,11 @@ class MinBreathViewModel @Inject constructor(
 
     // ── Filter methods ────────────────────────────────────────────────────────
 
-    fun setFilterLungVolume(v: String) { _uiState.update { it.copy(filterLungVolume = v) }; loadPastSessions() }
-    fun setFilterPrepType(v: String)   { _uiState.update { it.copy(filterPrepType = v) }; loadPastSessions() }
-    fun setFilterTimeOfDay(v: String) { _uiState.update { it.copy(filterTimeOfDay = v) }; loadPastSessions() }
-    fun setFilterPosture(v: String)   { _uiState.update { it.copy(filterPosture = v) }; loadPastSessions() }
-    fun setFilterAudio(v: String)     { _uiState.update { it.copy(filterAudio = v) }; loadPastSessions() }
+    fun setFilterLungVolume(v: Set<String>) { _uiState.update { it.copy(filterLungVolume = v) }; loadPastSessions() }
+    fun setFilterPrepType(v: Set<String>)   { _uiState.update { it.copy(filterPrepType = v) }; loadPastSessions() }
+    fun setFilterTimeOfDay(v: Set<String>) { _uiState.update { it.copy(filterTimeOfDay = v) }; loadPastSessions() }
+    fun setFilterPosture(v: Set<String>)   { _uiState.update { it.copy(filterPosture = v) }; loadPastSessions() }
+    fun setFilterAudio(v: Set<String>)     { _uiState.update { it.copy(filterAudio = v) }; loadPastSessions() }
 
     /** Signature of the "settings to be used" (tod normalized to the active dimension). */
     private fun settingsSignature(lv: String, pt: String, tod: String, pos: String, aud: String): String =
@@ -506,11 +507,11 @@ class MinBreathViewModel @Inject constructor(
         val s = _uiState.value
         _uiState.update {
             it.copy(
-                filterLungVolume = s.lungVolume,
-                filterPrepType   = s.prepType,
-                filterTimeOfDay  = TimeBuckets.normalizeSessionBucket(s.timeOfDay, timeDimensionStore.current),
-                filterPosture    = s.posture,
-                filterAudio      = s.audio,
+                filterLungVolume = setOf(s.lungVolume),
+                filterPrepType   = setOf(s.prepType),
+                filterTimeOfDay  = setOf(TimeBuckets.normalizeSessionBucket(s.timeOfDay, timeDimensionStore.current)),
+                filterPosture    = setOf(s.posture),
+                filterAudio      = setOf(s.audio),
                 guidedCountdownComplete = false
             )
         }
@@ -553,13 +554,14 @@ class MinBreathViewModel @Inject constructor(
 
     /** Clear all filters to show sessions across every setting combination. */
     fun clearAllFilters() {
+        val byHour = timeDimensionStore.current == TimeDimension.BY_HOUR
         _uiState.update {
             it.copy(
-                filterLungVolume = "",
-                filterPrepType   = "",
-                filterTimeOfDay  = "",
-                filterPosture    = "",
-                filterAudio      = ""
+                filterLungVolume = SettingFilterOptions.LUNG_VOLUMES.toSet(),
+                filterPrepType   = SettingFilterOptions.PREP_TYPES.toSet(),
+                filterTimeOfDay  = SettingFilterOptions.timeOfDayOptions(byHour).toSet(),
+                filterPosture    = SettingFilterOptions.POSTURES.toSet(),
+                filterAudio      = SettingFilterOptions.AUDIOS.toSet()
             )
         }
         loadPastSessions()
@@ -862,19 +864,24 @@ class MinBreathViewModel @Inject constructor(
             try {
                 val allRecords = apneaRepository.getAllRecordsOnce()
                 val s = _uiState.value
-                val filtered = allRecords
-                    .filter { it.tableType == "MIN_BREATH" }
-                    .let { records ->
-                        var result = records
-                        if (s.filterLungVolume.isNotEmpty()) result = result.filter { it.lungVolume == s.filterLungVolume }
-                        if (s.filterPrepType.isNotEmpty()) result = result.filter { it.prepType == s.filterPrepType }
-                        if (s.filterTimeOfDay.isNotEmpty()) result = result.filter {
-                            (if (TimeBuckets.isHourBucket(s.filterTimeOfDay)) TimeBuckets.fromTimestamp(it.timestamp) else it.timeOfDay) == s.filterTimeOfDay
+                val filtered = if (
+                    s.filterLungVolume.isEmpty() || s.filterPrepType.isEmpty() || s.filterTimeOfDay.isEmpty() ||
+                    s.filterPosture.isEmpty() || s.filterAudio.isEmpty()
+                ) {
+                    // A category with nothing selected can never match — skip the work.
+                    emptyList()
+                } else {
+                    val byHourTod = s.filterTimeOfDay.any { TimeBuckets.isHourBucket(it) }
+                    allRecords
+                        .filter { it.tableType == "MIN_BREATH" }
+                        .filter { it.lungVolume in s.filterLungVolume }
+                        .filter { it.prepType in s.filterPrepType }
+                        .filter {
+                            (if (byHourTod) TimeBuckets.fromTimestamp(it.timestamp) else it.timeOfDay) in s.filterTimeOfDay
                         }
-                        if (s.filterPosture.isNotEmpty()) result = result.filter { it.posture == s.filterPosture }
-                        if (s.filterAudio.isNotEmpty()) result = result.filter { it.audio == s.filterAudio }
-                        result
-                    }
+                        .filter { it.posture in s.filterPosture }
+                        .filter { it.audio in s.filterAudio }
+                }
                 val history = buildDurationHistory(filtered)
                 _uiState.update { it.copy(pastDurations = history) }
             } catch (e: Exception) {
