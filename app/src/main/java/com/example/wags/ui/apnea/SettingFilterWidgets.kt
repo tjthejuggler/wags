@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.Posture
@@ -37,7 +38,9 @@ import com.example.wags.ui.theme.TextSecondary
  *
  * Filter state is a [Set] of the selected option values:
  *  * every option selected → category is unfiltered;
- *  * empty set → nothing matches (the "None" state of the header toggle).
+ *  * the UI always keeps at least one option selected — the header toggle
+ *    jumps between "All" (every option) and "Current" (the setting value
+ *    currently in use).
  */
 object SettingFilterOptions {
     val LUNG_VOLUMES: List<String> = listOf("FULL", "PARTIAL", "EMPTY")
@@ -68,6 +71,19 @@ object SettingFilterOptions {
     fun timeBucketLabel(value: String): String = TimeBuckets.display(value)
 }
 
+/**
+ * Shared chip colors for every filter UI — a selected look between the old
+ * subtle SurfaceVariant fill and the loud Material default: a translucent
+ * mid-grey fill with a bright label.
+ */
+@Composable
+fun settingFilterChipColors() = FilterChipDefaults.filterChipColors(
+    containerColor = Color.Transparent,
+    labelColor = TextSecondary,
+    selectedContainerColor = TextSecondary.copy(alpha = 0.22f),
+    selectedLabelColor = TextPrimary
+)
+
 /** True when [this] selection includes every value of [options] (category unfiltered). */
 fun Set<String>.coversAll(options: Collection<String>): Boolean = containsAll(options)
 
@@ -90,34 +106,34 @@ fun settingFilterSummaryPart(
 }
 
 /**
- * Small, discrete All/None toggle shown next to a filter category header —
+ * Small, discrete All/Current toggle shown next to a filter category header —
  * deliberately styled unlike the option chips.
  *
- * Shows "None" while more than half of the options are selected (tapping
- * clears the selection) and "All" while half or fewer are selected (tapping
- * selects every option).
+ * Shows "Current" while more than half of the options are selected (tapping
+ * jumps to just the current setting value) and "All" while half or fewer are
+ * selected (tapping selects every option).
  */
 @Composable
-fun AllNoneHeaderToggle(
+fun AllCurrentHeaderToggle(
     selectedCount: Int,
     totalCount: Int,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val noneMode = selectedCount * 2 > totalCount
+    val currentMode = selectedCount * 2 > totalCount
     Surface(
         onClick = onToggle,
         modifier = modifier,
         shape = RoundedCornerShape(50),
         color = SurfaceDark,
-        contentColor = if (noneMode) ButtonPrimary else TextSecondary,
+        contentColor = if (currentMode) ButtonPrimary else TextSecondary,
         border = BorderStroke(
             width = 1.dp,
-            color = if (noneMode) ButtonPrimary else TextSecondary.copy(alpha = 0.4f)
+            color = if (currentMode) ButtonPrimary else TextSecondary.copy(alpha = 0.4f)
         )
     ) {
         Text(
-            text = if (noneMode) "None" else "All",
+            text = if (currentMode) "Current" else "All",
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 1.dp)
         )
@@ -125,8 +141,9 @@ fun AllNoneHeaderToggle(
 }
 
 /**
- * One filter category: a header row (label + All/None toggle) above a flow of
- * multi-select option chips. Tapping a chip toggles that single option.
+ * One filter category: a header row (label + All/Current toggle) above a flow
+ * of multi-select option chips. Tapping a chip toggles that single option,
+ * except the last selected option can never be deselected.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -135,9 +152,12 @@ fun MultiSelectFilterCategory(
     options: List<String>,
     optionLabel: (String) -> String,
     selected: Set<String>,
+    /** Setting value currently in use — the target of the header toggle's "Current" action. */
+    currentValue: String?,
     onSelectionChange: (Set<String>) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val current = currentValue?.takeIf { it in options } ?: options.first()
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -145,11 +165,11 @@ fun MultiSelectFilterCategory(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(label, style = MaterialTheme.typography.labelMedium, color = TextSecondary)
-            AllNoneHeaderToggle(
+            AllCurrentHeaderToggle(
                 selectedCount = selected.size,
                 totalCount = options.size,
                 onToggle = {
-                    if (selected.size * 2 > options.size) onSelectionChange(emptySet())
+                    if (selected.size * 2 > options.size) onSelectionChange(setOf(current))
                     else onSelectionChange(options.toSet())
                 }
             )
@@ -162,17 +182,15 @@ fun MultiSelectFilterCategory(
                 FilterChip(
                     selected = value in selected,
                     onClick = {
+                        // Never allow deselecting the last remaining option.
+                        if (value in selected && selected.size <= 1) return@FilterChip
                         onSelectionChange(
                             if (value in selected) selected - value else selected + value
                         )
                     },
                     label = { Text(optionLabel(value), style = MaterialTheme.typography.labelSmall) },
                     modifier = Modifier.height(30.dp),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = SurfaceVariant,
-                        selectedLabelColor = TextPrimary,
-                        labelColor = TextSecondary
-                    )
+                    colors = settingFilterChipColors()
                 )
             }
         }

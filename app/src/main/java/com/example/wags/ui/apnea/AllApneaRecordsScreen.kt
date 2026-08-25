@@ -1,8 +1,20 @@
 package com.example.wags.ui.apnea
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -22,6 +34,11 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -42,6 +59,12 @@ import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.hypot
+import kotlin.math.ceil
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,6 +76,9 @@ fun AllApneaRecordsScreen(
     val timeDimension by viewModel.timeDimension.collectAsStateWithLifecycle()
     val byHour = timeDimension == TimeDimension.BY_HOUR
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    // Most recent record — the "Current" target for the filter header toggles.
+    val newestRecord = remember(state.records) { state.records.maxByOrNull { it.timestamp } }
 
     // Reload list when we return to this screen (e.g. after deleting a record in the detail screen)
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -68,6 +94,15 @@ fun AllApneaRecordsScreen(
     // Section collapse states — both collapsed by default
     var filtersExpanded by remember { mutableStateOf(false) }
     var eventTypesExpanded by remember { mutableStateOf(false) }
+
+    // Record row targeted by a chart-node jump — pulses for a few seconds.
+    var highlightRecordId by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(highlightRecordId) {
+        if (highlightRecordId != null) {
+            kotlinx.coroutines.delay(4000)
+            highlightRecordId = null
+        }
+    }
 
     // Sort popup state
     var showSortMenu by remember { mutableStateOf(false) }
@@ -88,22 +123,26 @@ fun AllApneaRecordsScreen(
                 Column {
                     // ── Sort row (same style as Filters / Event Types) ──
                     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        Box {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { showSortMenu = true }
-                                    .padding(vertical = 10.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    "Sort",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = TextPrimary
-                                )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Sort",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextPrimary
+                            )
+                            // Anchor box around the right-side label so the
+                            // dropdown opens right beneath it, not far left.
+                            Box {
                                 Row(
+                                    modifier = Modifier
+                                        .clickable { showSortMenu = true }
+                                        .padding(vertical = 2.dp, horizontal = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
@@ -118,27 +157,27 @@ fun AllApneaRecordsScreen(
                                         tint = TextSecondary
                                     )
                                 }
-                            }
-                            DropdownMenu(
-                                expanded = showSortMenu,
-                                onDismissRequest = { showSortMenu = false },
-                                containerColor = SurfaceDark
-                            ) {
-                                RecordSortOrder.entries.forEach { order ->
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                order.label,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = if (state.sortOrder == order) TextPrimary else TextSecondary,
-                                                fontWeight = if (state.sortOrder == order) FontWeight.SemiBold else FontWeight.Normal
-                                            )
-                                        },
-                                        onClick = {
-                                            viewModel.setSortOrder(order)
-                                            showSortMenu = false
-                                        }
-                                    )
+                                DropdownMenu(
+                                    expanded = showSortMenu,
+                                    onDismissRequest = { showSortMenu = false },
+                                    containerColor = SurfaceDark
+                                ) {
+                                    RecordSortOrder.entries.forEach { order ->
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    order.label,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = if (state.sortOrder == order) TextPrimary else TextSecondary,
+                                                    fontWeight = if (state.sortOrder == order) FontWeight.SemiBold else FontWeight.Normal
+                                                )
+                                            },
+                                            onClick = {
+                                                viewModel.setSortOrder(order)
+                                                showSortMenu = false
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -195,6 +234,7 @@ fun AllApneaRecordsScreen(
                                     options = SettingFilterOptions.LUNG_VOLUMES,
                                     optionLabel = SettingFilterOptions::lungVolumeLabel,
                                     selected = state.filterLungVolume,
+                                    currentValue = newestRecord?.lungVolume,
                                     onSelectionChange = { viewModel.setLungVolumeFilter(it) }
                                 )
 
@@ -204,6 +244,7 @@ fun AllApneaRecordsScreen(
                                     options = SettingFilterOptions.PREP_TYPES,
                                     optionLabel = SettingFilterOptions::prepTypeShortLabel,
                                     selected = state.filterPrepType,
+                                    currentValue = newestRecord?.prepType,
                                     onSelectionChange = { viewModel.setPrepTypeFilter(it) }
                                 )
 
@@ -213,6 +254,9 @@ fun AllApneaRecordsScreen(
                                     options = SettingFilterOptions.timeOfDayOptions(byHour),
                                     optionLabel = SettingFilterOptions::timeBucketLabel,
                                     selected = state.filterTimeOfDay,
+                                    currentValue = newestRecord?.let {
+                                        if (byHour) TimeBuckets.fromTimestamp(it.timestamp) else it.timeOfDay
+                                    },
                                     onSelectionChange = { viewModel.setTimeOfDayFilter(it) }
                                 )
 
@@ -222,6 +266,7 @@ fun AllApneaRecordsScreen(
                                     options = SettingFilterOptions.POSTURES,
                                     optionLabel = SettingFilterOptions::postureLabel,
                                     selected = state.filterPosture,
+                                    currentValue = newestRecord?.posture,
                                     onSelectionChange = { viewModel.setPostureFilter(it) }
                                 )
 
@@ -231,6 +276,7 @@ fun AllApneaRecordsScreen(
                                     options = SettingFilterOptions.AUDIOS,
                                     optionLabel = SettingFilterOptions::audioLabel,
                                     selected = state.filterAudio,
+                                    currentValue = newestRecord?.audio,
                                     onSelectionChange = { viewModel.setAudioFilter(it) }
                                 )
                             }
@@ -287,7 +333,8 @@ fun AllApneaRecordsScreen(
                                     FilterChip(
                                         selected = isSelected,
                                         onClick = { viewModel.toggleEventType(type.tableTypeValue) },
-                                        label = { Text(type.label, style = MaterialTheme.typography.labelSmall) }
+                                        label = { Text(type.label, style = MaterialTheme.typography.labelSmall) },
+                                        colors = settingFilterChipColors()
                                     )
                                 }
                             }
@@ -315,7 +362,16 @@ fun AllApneaRecordsScreen(
                         records = state.records,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(120.dp)
+                            .height(120.dp),
+                        onPointTap = { record ->
+                            highlightRecordId = record.recordId
+                            val listIndex = state.records.indexOfFirst { it.recordId == record.recordId }
+                            if (listIndex >= 0) {
+                                // LazyColumn items before the record rows:
+                                // header surface, chart, record-count label.
+                                scope.launch { listState.animateScrollToItem(3 + listIndex) }
+                            }
+                        }
                     )
                 }
             }
@@ -350,6 +406,7 @@ fun AllApneaRecordsScreen(
             itemsIndexed(state.records) { _, record ->
                 AllRecordsRow(
                     record = record,
+                    highlight = record.recordId == highlightRecordId,
                     onClick = {
                         navController.navigate(WagsRoutes.apneaRecordDetail(record.recordId))
                     }
@@ -406,78 +463,271 @@ private fun buildEventTypeSummary(state: AllApneaRecordsUiState): String {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * A simple line chart showing hold duration progress over the current filtered list.
- * A prominent white trend line marks the average of the shown points.
+ * A pinch-zoomable line chart showing hold duration progress over the current
+ * filtered list. A prominent white trend line — a centered moving average of
+ * the visible points — is drawn LAST so it sits on top of everything else.
+ * Tapping near a point shows an info bubble for it; the bubble's button fires
+ * [onPointTap] with the record it represents.
  */
 @Composable
 private fun AllRecordsProgressChart(
     records: List<ApneaRecordEntity>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onPointTap: (ApneaRecordEntity) -> Unit = {}
 ) {
-    // We want to show progress in chronological order (oldest to newest)
-    // The list is usually newest first, so we reverse it for the chart.
+    // Chronological order (oldest → newest); the list is usually newest first.
     val chartRecords = remember(records) { records.reversed() }
     val durations = chartRecords.map { it.durationMs.toFloat() / 1000f }
-    
-    if (durations.isEmpty()) return
+    if (durations.size < 2) return
 
-    val maxDuration = durations.maxOrNull() ?: 1f
-    val minDuration = durations.minOrNull() ?: 0f
+    val total = durations.size
+
+    // Pinch-zoom window over the chronological index space:
+    // zoom = 1f fits everything; panPos ∈ [0, 1] slides the window.
+    var zoom by remember(records) { mutableStateOf(1f) }
+    var panPos by remember(records) { mutableStateOf(0f) }
+    var chartWidthPx by remember { mutableStateOf(0f) }
+    // Chronological index of the point whose info bubble is showing.
+    var selectedIdx by remember(records) { mutableStateOf<Int?>(null) }
+
+    val maxZoom = (total / 2f).coerceAtLeast(1f)
+    fun visibleCountFor(z: Float): Int = maxOf(2, ceil(total / z).toInt()).coerceAtMost(total)
+
+    val visibleCount = visibleCountFor(zoom)
+    val startIdx = (panPos * (total - visibleCount)).roundToInt().coerceIn(0, total - visibleCount)
+    val visible = durations.subList(startIdx, (startIdx + visibleCount).coerceAtMost(total))
+
+    val maxDuration = visible.maxOrNull() ?: 1f
+    val minDuration = visible.minOrNull() ?: 0f
     val range = (maxDuration - minDuration).coerceAtLeast(1f)
 
-    Canvas(modifier = modifier) {
-        val width = size.width
-        val height = size.height
-        val spacing = width / (durations.size - 1).coerceAtLeast(1)
+    // Smoothed trend — centered moving average of the visible points.
+    val smoothWindow = maxOf(3, (visible.size / 6) or 1)
+    val smoothed = visible.mapIndexed { i, _ ->
+        val from = maxOf(0, i - smoothWindow / 2)
+        val to = minOf(visible.size, i + smoothWindow / 2 + 1)
+        visible.subList(from, to).average().toFloat()
+    }
 
-        val path = Path()
-        durations.forEachIndexed { index, duration ->
-            val x = index * spacing
-            val normalized = (duration - minDuration) / range
-            val y = height - (normalized * height)
-            
-            if (index == 0) path.moveTo(x, y)
-            else path.lineTo(x, y)
+    Box(modifier = modifier) {
+        Canvas(
+            modifier = Modifier
+                .matchParentSize()
+                .onSizeChanged { chartWidthPx = it.width.toFloat() }
+                .pointerInput(chartRecords, zoom, panPos) {
+                    detectTapGestures { offset ->
+                        val vc = visibleCountFor(zoom)
+                        val spacing = (chartWidthPx / (vc - 1).coerceAtLeast(1)).coerceAtLeast(1f)
+                        // Nearest visible point by 2-D distance, generous radius.
+                        var best = -1
+                        var bestDist = Float.MAX_VALUE
+                        for (i in 0 until vc) {
+                            val px = i * spacing
+                            val dur = durations.getOrNull(startIdx + i) ?: continue
+                            val py = size.height - (((dur - minDuration) / range) * size.height)
+                            val d = hypot(offset.x - px, offset.y - py)
+                            if (d < bestDist) { bestDist = d; best = i }
+                        }
+                        val radius = 36.dp.toPx()
+                        selectedIdx = if (best >= 0 && bestDist <= radius) startIdx + best else null
+                    }
+                }
+                .pointerInput(total) {
+                    // Custom transform handler: only pinch zooms and horizontal
+                    // pans are consumed — vertical swipes fall through so the
+                    // surrounding LazyColumn still scrolls.
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            if (!event.changes.any { it.pressed }) break
+                            val zoomChange = event.calculateZoom()
+                            val panChange = event.calculatePan()
+                            val horizontal = abs(panChange.x) > abs(panChange.y)
+                            if (zoomChange != 1f || horizontal) {
+                                zoom = (zoom * zoomChange).coerceIn(1f, maxZoom)
+                                val vc = visibleCountFor(zoom)
+                                if (chartWidthPx > 0f && vc < total && panChange.x != 0f) {
+                                    val shift = -panChange.x / chartWidthPx * (vc.toFloat() / total)
+                                    panPos = (panPos + shift).coerceIn(0f, 1f)
+                                }
+                                event.changes.forEach { if (it.positionChanged()) it.consume() }
+                            }
+                        }
+                    }
+                }
+        ) {
+            val width = size.width
+            val height = size.height
+            val spacing = width / (visible.size - 1).coerceAtLeast(1)
+
+            val path = Path()
+            visible.forEachIndexed { index, duration ->
+                val x = index * spacing
+                val normalized = (duration - minDuration) / range
+                val y = height - (normalized * height)
+
+                if (index == 0) path.moveTo(x, y)
+                else path.lineTo(x, y)
+            }
+
+            // Connecting line — kept subtle so the trend line dominates.
+            drawPath(
+                path = path,
+                color = EcgCyan.copy(alpha = 0.45f),
+                style = Stroke(
+                    width = 2.dp.toPx(),
+                    cap = StrokeCap.Round,
+                    join = StrokeJoin.Round
+                )
+            )
+
+            // Dots for each visible point — with a dark halo so they stay
+            // clearly visible against the background and the trend line.
+            visible.forEachIndexed { index, duration ->
+                val x = index * spacing
+                val normalized = (duration - minDuration) / range
+                val y = height - (normalized * height)
+                drawCircle(
+                    color = SurfaceDark,
+                    radius = 4.5.dp.toPx(),
+                    center = Offset(x, y)
+                )
+                drawCircle(
+                    color = EcgCyan,
+                    radius = 3.dp.toPx(),
+                    center = Offset(x, y)
+                )
+            }
+
+            // Ring around the selected point (anchor of the info bubble).
+            selectedIdx?.let { sel ->
+                val slice = sel - startIdx
+                if (slice in visible.indices) {
+                    val x = slice * spacing
+                    val y = height - (((visible[slice] - minDuration) / range) * height)
+                    drawCircle(
+                        color = CoherenceWhite.copy(alpha = 0.8f),
+                        radius = 6.dp.toPx(),
+                        center = Offset(x, y),
+                        style = Stroke(width = 1.5.dp.toPx())
+                    )
+                }
+            }
+
+            // Smoothed trend line — the moving average of the visible points.
+            // Drawn LAST so it sits on top of everything else; this is the
+            // most important mark.
+            val trendPath = Path()
+            smoothed.forEachIndexed { index, value ->
+                val x = index * spacing
+                val y = height - (((value - minDuration) / range) * height)
+                if (index == 0) trendPath.moveTo(x, y)
+                else trendPath.lineTo(x, y)
+            }
+            drawPath(
+                path = trendPath,
+                color = CoherenceWhite,
+                style = Stroke(
+                    width = 3.5.dp.toPx(),
+                    cap = StrokeCap.Round,
+                    join = StrokeJoin.Round
+                )
+            )
         }
 
-        // Connecting line — kept subtle so the average trend line dominates.
-        drawPath(
-            path = path,
-            color = EcgCyan.copy(alpha = 0.45f),
-            style = Stroke(
-                width = 2.dp.toPx(),
-                cap = StrokeCap.Round,
-                join = StrokeJoin.Round
-            )
-        )
+        // Info bubble for the selected point.
+        val sel = selectedIdx
+        if (sel != null && sel >= startIdx && sel < startIdx + visible.size) {
+            val selRecord = chartRecords.getOrNull(sel)
+            if (selRecord != null && chartWidthPx > 0f) {
+                val spacingPx = chartWidthPx / (visible.size - 1).coerceAtLeast(1)
+                val pointX = (sel - startIdx) * spacingPx
+                ChartPointBubble(
+                    record = selRecord,
+                    pointX = pointX,
+                    chartWidthPx = chartWidthPx,
+                    onGoToRecord = { onPointTap(selRecord) },
+                    onDismiss = { selectedIdx = null },
+                    modifier = Modifier.align(Alignment.TopStart)
+                )
+            }
+        }
+    }
+}
 
-        // Average trend line — the mean of the shown points, drawn prominent.
-        val avg = durations.average().toFloat()
-        val avgY = height - (((avg - minDuration) / range) * height)
-        drawLine(
-            color = CoherenceWhite,
-            start = Offset(0f, avgY),
-            end = Offset(width, avgY),
-            strokeWidth = 3.5.dp.toPx(),
-            cap = StrokeCap.Round
-        )
+/**
+ * Small info bubble shown above the chart at [pointX] for the tapped point.
+ * Its "Go to record" button fires [onGoToRecord]; tapping ✕ dismisses.
+ */
+@Composable
+private fun ChartPointBubble(
+    record: ApneaRecordEntity,
+    pointX: Float,
+    chartWidthPx: Float,
+    onGoToRecord: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val density = LocalDensity.current
+    val bubbleWidth = 200.dp
+    val widthPx = with(density) { bubbleWidth.toPx() }
+    val xPx = (pointX - widthPx / 2f).coerceIn(0f, (chartWidthPx - widthPx).coerceAtLeast(0f))
+    val sdf = remember { SimpleDateFormat("EEE, MMM d · HH:mm", Locale.getDefault()) }
 
-        // Draw dots for each point — on top, with a dark halo so they stay
-        // clearly visible even where they sit on the trend line.
-        durations.forEachIndexed { index, duration ->
-            val x = index * spacing
-            val normalized = (duration - minDuration) / range
-            val y = height - (normalized * height)
-            drawCircle(
-                color = SurfaceDark,
-                radius = 4.5.dp.toPx(),
-                center = Offset(x, y)
+    Surface(
+        modifier = modifier
+            .offset { IntOffset(xPx.roundToInt(), 0) }
+            .width(bubbleWidth),
+        shape = RoundedCornerShape(10.dp),
+        color = SurfaceDark,
+        contentColor = TextPrimary,
+        border = BorderStroke(1.dp, TextSecondary.copy(alpha = 0.5f)),
+        shadowElevation = 8.dp,
+        tonalElevation = 4.dp
+    ) {
+        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    formatAllRecordsMs(record.durationMs),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+                Text(
+                    "✕",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TextSecondary,
+                    modifier = Modifier
+                        .clickable { onDismiss() }
+                        .padding(4.dp)
+                )
+            }
+            Text(
+                sdf.format(Date(record.timestamp)),
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
             )
-            drawCircle(
-                color = EcgCyan,
-                radius = 3.dp.toPx(),
-                center = Offset(x, y)
+            Text(
+                record.tableType?.replace("_", " ") ?: "FREE HOLD",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextSecondary
             )
+            Button(
+                onClick = onGoToRecord,
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(vertical = 4.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = ButtonPrimary,
+                    contentColor = TextPrimary
+                )
+            ) {
+                Text("Go to record", style = MaterialTheme.typography.labelSmall)
+            }
         }
     }
 }
@@ -491,16 +741,37 @@ private fun AllRecordsProgressChart(
 @Composable
 private fun AllRecordsRow(
     record: ApneaRecordEntity,
+    highlight: Boolean = false,
     onClick: () -> Unit
 ) {
     val sdf = remember { SimpleDateFormat("EEE, MMM d · HH:mm", Locale.getDefault()) }
     val dateStr = remember(record.timestamp) { sdf.format(Date(record.timestamp)) }
 
-    Column(
+    // Pulsing glow while this row is the target of a chart-node jump.
+    val glowAlpha by if (highlight) {
+        rememberInfiniteTransition(label = "rowGlow").animateFloat(
+            initialValue = 0.10f,
+            targetValue = 0.35f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(650),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "glowAlpha"
+        )
+    } else {
+        remember { mutableStateOf(0f) }
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .background(if (highlight) CoherenceWhite.copy(alpha = glowAlpha) else Color.Transparent)
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onClick() }
+        ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -570,6 +841,7 @@ private fun AllRecordsRow(
         color = SurfaceVariant.copy(alpha = 0.4f),
         modifier = Modifier.padding(horizontal = 16.dp)
     )
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -1,19 +1,14 @@
-# ADR: Multi-select apnea setting filters with header All/None toggle
+# ADR Addendum: All/Current header toggle + interactive progress chart
 
-Date: 2026-08-25
+Date: 2026-08-25 (afternoon)
 
-## Context
-The apnea setting filters (lung volume, prep, time-of-day, posture, audio) in All Records, Min Breath, Progressive O2, and Contraction Table used single-select String state where "" meant "all", with an 'All' chip mixed in among the option chips.
+## Decision changes
 
-## Decision
-1. Filter state is now `Set<String>` per category in all 4 ViewModels (MinBreathViewModel, ProgressiveO2ViewModel, ContractionTableViewModel, AllApneaRecordsViewModel). Full option set = unfiltered; empty set = nothing matches (early-return empty list).
-2. Shared UI lives in `ui/apnea/SettingFilterWidgets.kt`: `MultiSelectFilterCategory` renders a header + FlowRow of toggleable FilterChips; `AllNoneHeaderToggle` is a small pill-shaped button next to the header label. It shows "None" while selectedCount*2 > totalCount (clicking clears to empty set), otherwise "All" (clicking selects the full option set). It is visually distinct from the option chips (small bordered pill, not a FilterChip).
-3. SQL compatibility: Room DAO queries only support single-value equality (`:param = '' OR field = :param`). AllApneaRecordsViewModel bridges this with `sqlFilter(selected) = selected.singleOrNull() ?: ""` for the paged fetch, then refines multi-selections in memory after the fetch. The other three ViewModels already filter in memory.
-4. Time dimension duality: in BY_HOUR mode the tod option space is the 24 hour buckets (TimeBuckets.HOUR_BUCKETS) instead of Morning/Day/Night. Record matching derives the bucket from the timestamp (`byHourTod = selection.any { TimeBuckets.isHourBucket(it) }`). Summary functions (`buildMinBreathFilterSummary`, `buildProgressiveO2FilterSummary`, `buildContractionTableFilterSummary`, `buildFilterSummary`) take a `byHour` param; screens pass `timeDimension == TimeDimension.BY_HOUR`.
-5. `isFiltered` (drives the quick-clear chip) uses `!selected.coversAll(options)` per category rather than isNotEmpty().
-6. Nav-arg/preset entry points (`SavedStateHandle` args, `applyPresetFilters`) keep String inputs and convert internally via `presetToSelection(value, options)`.
-
-## Consequences
-- Option lists and label functions are centralized in `SettingFilterOptions`; adding a new setting option updates all filter UIs at once.
-- resetFilters() sets single-value sets from current session settings; clearAllFilters() sets full option sets (dimension-aware for tod).
-- The ApneaHistoryScreen StatsSettingsDialog (FILTER_ALL sentinel, single-select) is a settings selector, not a history filter, and was intentionally left unchanged.
+1. **Header toggle is All/Current, not All/None.** The per-category header toggle in `SettingFilterWidgets.kt` now jumps between "All" (every option selected) and "Current" (only the setting value currently in use). It shows "Current" while more than half the options are selected, "All" otherwise (same hysteresis rule as before). Rationale: there is never a reason to have zero options selected in a category.
+2. **Minimum-one-selected invariant.** `MultiSelectFilterCategory` ignores a chip tap that would deselect the last remaining option. Empty filter sets are therefore unreachable via the UI (ViewModel empty-set branches remain as dead-safety code).
+3. **"Current" value sources:** the three drill screens pass their live session settings (`state.lungVolume` etc., with `effectiveTod` for time-of-day so BY_HOUR mode yields the current hour bucket). The All Records screen has no session settings, so "Current" there = the settings of the most recent record (`state.records.maxByOrNull { it.timestamp }`, tod derived from its timestamp in BY_HOUR mode). `MultiSelectFilterCategory.currentValue` is nullable; a value outside the option space falls back to `options.first()`.
+4. **Progress chart (`AllRecordsProgressChart`):**
+   - Draw order: connecting line (dim, 45% alpha) → dots (with dark halo) → white average trend line LAST, on top of everything, per user priority.
+   - Pinch zoom: custom `awaitEachGesture` handler consumes only pinch zooms and horizontal pans; vertical swipes are NOT consumed so the surrounding LazyColumn still scrolls. Zoom window = `visibleCount = ceil(total/zoom)` points over the chronological index space; `panPos ∈ [0,1]` slides it. Zoom/pan reset when the records list changes.
+   - Vertical scale (min/max/range) and the average trend line are computed from the VISIBLE slice only.
+   - Tap near a point (nearest-x within a threshold) fires `onPointTap(record)`; the screen maps it to the list index (`records.size-1` reversed order) and `animateScrollToItem(3 + index)` — items 0-2 are header surface, chart, count label.

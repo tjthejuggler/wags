@@ -39,6 +39,12 @@ fun MinBreathFilterDialog(
     filterAudio: Set<String>,
     /** True in By-the-Hour mode — filters offer the 24 hour buckets instead of Morning/Day/Night. */
     byHour: Boolean = false,
+    /** Current session settings — the "Current" target of each category's header toggle. */
+    currentLungVolume: String,
+    currentPrepType: String,
+    currentTimeOfDay: String,
+    currentPosture: String,
+    currentAudio: String,
     onLungVolumeChange: (Set<String>) -> Unit,
     onPrepTypeChange: (Set<String>) -> Unit,
     onTimeOfDayChange: (Set<String>) -> Unit,
@@ -70,6 +76,7 @@ fun MinBreathFilterDialog(
                 options = SettingFilterOptions.LUNG_VOLUMES,
                 optionLabel = SettingFilterOptions::lungVolumeLabel,
                 selected = filterLungVolume,
+                currentValue = currentLungVolume,
                 onSelectionChange = onLungVolumeChange
             )
 
@@ -78,6 +85,7 @@ fun MinBreathFilterDialog(
                 options = SettingFilterOptions.PREP_TYPES,
                 optionLabel = SettingFilterOptions::prepTypeShortLabel,
                 selected = filterPrepType,
+                currentValue = currentPrepType,
                 onSelectionChange = onPrepTypeChange
             )
 
@@ -86,6 +94,7 @@ fun MinBreathFilterDialog(
                 options = SettingFilterOptions.POSTURES,
                 optionLabel = SettingFilterOptions::postureLabel,
                 selected = filterPosture,
+                currentValue = currentPosture,
                 onSelectionChange = onPostureChange
             )
 
@@ -94,6 +103,7 @@ fun MinBreathFilterDialog(
                 options = SettingFilterOptions.AUDIOS,
                 optionLabel = SettingFilterOptions::audioLabel,
                 selected = filterAudio,
+                currentValue = currentAudio,
                 onSelectionChange = onAudioChange
             )
 
@@ -102,6 +112,7 @@ fun MinBreathFilterDialog(
                 options = SettingFilterOptions.timeOfDayOptions(byHour),
                 optionLabel = SettingFilterOptions::timeBucketLabel,
                 selected = filterTimeOfDay,
+                currentValue = currentTimeOfDay,
                 onSelectionChange = onTimeOfDayChange
             )
 
