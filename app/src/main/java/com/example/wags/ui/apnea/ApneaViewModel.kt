@@ -1119,6 +1119,14 @@ class ApneaViewModel @Inject constructor(
         tableSessionStartTime = System.currentTimeMillis()
         oximeterIsPrimary = hrDataSource.isOximeterPrimaryDevice()
         oximeterSamples.clear()
+        // Reset per-session contraction tracking so the end-of-table summary
+        // only reflects the session that is starting now
+        _uiState.update {
+            it.copy(
+                roundFirstContractions = emptyMap(),
+                lastHoldDurationMs = 0L
+            )
+        }
         oximeterCollectionJob?.cancel()
         if (oximeterIsPrimary) {
             oximeterCollectionJob = viewModelScope.launch {

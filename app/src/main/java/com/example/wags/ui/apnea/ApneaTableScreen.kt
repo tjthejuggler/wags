@@ -205,14 +205,26 @@ fun ApneaTableScreen(
                     audio      = state.audio.name
                 )
 
-                // Upper content section - scrolls separately
+                // Upper content section - scrolls separately. During an active
+                // session it gets the lion's share of the screen (big countdown
+                // + first-contraction button) while the table steps shrink.
                 LazyColumn(
                     modifier = Modifier
-                        .weight(1f)
+                        .weight(if (isActive) 0.7f else 1f)
                         .fillMaxWidth()
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    // Live device reading — shown while configuring so the user
+                    // can verify the sensor is streaming before starting
+                    if (state.apneaState == ApneaState.IDLE) {
+                        item {
+                            TableLiveReadingBanner(
+                                liveHr = state.liveHr,
+                                liveSpO2 = state.liveSpO2
+                            )
+                        }
+                    }
                     // Hyperventilating advice
                     if (state.prepType == PrepType.HYPER) {
                         item {
@@ -226,6 +238,12 @@ fun ApneaTableScreen(
                             totalRounds = state.totalRounds,
                             remainingSeconds = state.remainingSeconds
                         )
+                    }
+                    // End-of-session summary — shown once the table is complete
+                    if (state.apneaState == ApneaState.COMPLETE) {
+                        item {
+                            TableSessionSummaryCard(uiState = state)
+                        }
                     }
                     // First Contraction button — shown during APNEA phase, hidden once tapped
                     if (state.apneaState == ApneaState.APNEA && !state.firstContractionTappedThisRound) {
@@ -290,8 +308,8 @@ fun ApneaTableScreen(
                             }
                         }
                     }
-                    // Voice / vibration toggles — shown when session is not active
-                    if (state.apneaState == ApneaState.IDLE || state.apneaState == ApneaState.COMPLETE) {
+                    // Voice / vibration toggles — shown while configuring (pre-start)
+                    if (state.apneaState == ApneaState.IDLE) {
                         item {
                             VoiceVibrationToggles(
                                 voiceEnabled = state.voiceEnabled,
@@ -302,7 +320,7 @@ fun ApneaTableScreen(
                         }
                     }
                     // Eucapnic Diaphragmatic Breathing settings — shown when prep is EUCAPNIC_DIAPHRAGMATIC and session is not active
-                    if ((state.apneaState == ApneaState.IDLE || state.apneaState == ApneaState.COMPLETE) &&
+                    if (state.apneaState == ApneaState.IDLE &&
                         state.prepType == PrepType.EUCAPNIC_DIAPHRAGMATIC &&
                         state.eucapnicConfig != null) {
                         item {
@@ -340,21 +358,29 @@ fun ApneaTableScreen(
                                     viewModel.startTableSession()
                                 }
                             },
-                            onStop = { viewModel.stopTableSession() }
+                            onStop = { viewModel.stopTableSession() },
+                            onDone = {
+                                // End everything (audio, state machine → IDLE) and leave
+                                viewModel.stopTableSession()
+                                navController.popBackStack("advanced_apnea", inclusive = false)
+                            }
                         )
                     }
                 }
                 
-                // Table steps section - separate scrolling with auto-scroll
+                // Table steps section - separate scrolling with auto-scroll.
+                // Shrinks to a compact "upcoming" strip while the session runs.
                 state.currentTable?.let { table ->
                     Column(
                         modifier = Modifier
-                            .weight(1f)
+                            .weight(if (isActive) 0.3f else 1f)
                             .fillMaxWidth()
                     ) {
                         Text(
-                            "Table Steps (PB: ${table.personalBestMs / 1000L}s)",
-                            style = MaterialTheme.typography.titleLarge,
+                            if (isActive) "Upcoming"
+                            else "Table Steps (PB: ${table.personalBestMs / 1000L}s)",
+                            style = if (isActive) MaterialTheme.typography.titleMedium
+                                    else MaterialTheme.typography.titleLarge,
                             modifier = Modifier.padding(16.dp, 8.dp, 16.dp, 4.dp)
                         )
                         LazyColumn(
@@ -362,7 +388,9 @@ fun ApneaTableScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(
+                                if (isActive) 4.dp else 8.dp
+                            )
                         ) {
                             itemsIndexed(table.steps) { index, step ->
                                 TableStepRow(
@@ -371,6 +399,7 @@ fun ApneaTableScreen(
                                             state.currentRound == step.roundNumber,
                                     isComplete = state.currentRound > step.roundNumber,
                                     isEditable = state.apneaState == ApneaState.IDLE,
+                                    compact = isActive || state.apneaState == ApneaState.COMPLETE,
                                     onHoldChanged = { newSec ->
                                         viewModel.updateTableStep(step.roundNumber, newHoldMs = newSec * 1000L)
                                     },
@@ -462,14 +491,14 @@ private fun FirstContractionButton(onTap: () -> Unit) {
         onClick = onTap,
         modifier = Modifier
             .fillMaxWidth()
-            .height(80.dp),
+            .height(128.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = Color(0xFF555555)
         )
     ) {
         Text(
             "First Contraction",
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.headlineMedium,
             color = Color.White
         )
     }
@@ -536,12 +565,26 @@ private fun TableContractionSummaryCard(uiState: ApneaUiState) {
 private fun SessionControlRow(
     apneaState: ApneaState,
     onStart: () -> Unit,
-    onStop: () -> Unit
+    onStop: () -> Unit,
+    onDone: () -> Unit = {}
 ) {
     when (apneaState) {
-        ApneaState.IDLE, ApneaState.COMPLETE -> {
-            Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
-                Text(if (apneaState == ApneaState.COMPLETE) "Restart" else "Start Session")
+        ApneaState.COMPLETE -> {
+            Button(
+                onClick = onDone,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = ButtonPrimary)
+            ) {
+                Text("Done")
+            }
+        }
+        ApneaState.IDLE -> {
+            Button(
+                onClick = onStart,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = ButtonPrimary)
+            ) {
+                Text("Start Session")
             }
         }
         else -> {
@@ -562,6 +605,7 @@ private fun TableStepRow(
     isActive: Boolean,
     isComplete: Boolean,
     isEditable: Boolean,
+    compact: Boolean = false,
     onHoldChanged: (Long) -> Unit,
     onBreathChanged: (Long) -> Unit
 ) {
@@ -569,6 +613,51 @@ private fun TableStepRow(
         isActive -> SurfaceVariant
         isComplete -> SurfaceDark.copy(alpha = 0.5f)
         else -> SurfaceDark
+    }
+
+    // Compact single-line row used while the session runs / after it completes —
+    // keeps the upcoming holds/breaths list visually secondary to the timer
+    // and the first-contraction button.
+    if (compact) {
+        Card(colors = CardDefaults.cardColors(containerColor = containerColor)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "R${step.roundNumber}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (isComplete) TextDisabled else TextSecondary
+                )
+                Text(
+                    "Hold ${step.apneaDurationMs / 1000L}s",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = when {
+                        isActive -> ApneaHold
+                        isComplete -> TextDisabled
+                        else -> TextPrimary
+                    }
+                )
+                Text(
+                    "Breath ${step.ventilationDurationMs / 1000L}s",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = when {
+                        isActive -> ApneaVentilation
+                        isComplete -> TextDisabled
+                        else -> TextSecondary
+                    }
+                )
+                if (isActive) {
+                    Text("▶", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
+                } else if (isComplete) {
+                    Text("✓", style = MaterialTheme.typography.bodyLarge, color = TextPrimary)
+                }
+            }
+        }
+        return
     }
 
     var editingHold by remember { mutableStateOf(false) }
@@ -692,6 +781,79 @@ private fun TableStepRow(
                 Text("✓", style = MaterialTheme.typography.titleLarge, color = TextPrimary)
             }
         }
+    }
+}
+
+/** End-of-table summary shown in place of the old "Restart" flow. */
+@Composable
+private fun TableSessionSummaryCard(uiState: ApneaUiState) {
+    val table = uiState.currentTable ?: return
+    val steps = table.steps
+    val totalHoldMs = steps.sumOf { it.apneaDurationMs }
+    val longestHoldMs = steps.maxOf { it.apneaDurationMs }
+    val totalSessionMs = steps.sumOf { it.apneaDurationMs + it.ventilationDurationMs }
+    val fcMap = uiState.roundFirstContractions
+    val avgCruisingMs = fcMap.values.takeIf { it.isNotEmpty() }?.average()
+    val avgStruggleMs = fcMap.entries
+        .mapNotNull { (round, fc) ->
+            steps.firstOrNull { it.roundNumber == round }
+                ?.takeIf { it.apneaDurationMs > fc }
+                ?.let { it.apneaDurationMs - fc }
+        }
+        .takeIf { it.isNotEmpty() }?.average()
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = SurfaceVariant)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                "${table.type.name} Table Complete",
+                style = MaterialTheme.typography.titleLarge,
+                color = TextPrimary
+            )
+            HorizontalDivider(color = SurfaceDark)
+            SummaryStatRow("Rounds completed", "${uiState.currentRound} / ${uiState.totalRounds}")
+            SummaryStatRow("Total hold time", formatTableMmSs(totalHoldMs))
+            SummaryStatRow("Longest hold", formatTableMmSs(longestHoldMs))
+            SummaryStatRow("Total session time", formatTableMmSs(totalSessionMs))
+            avgCruisingMs?.let {
+                SummaryStatRow("Avg cruising (→ 1st contraction)", formatTableMmSs(it.toLong()))
+            }
+            avgStruggleMs?.let {
+                SummaryStatRow("Avg struggle (contraction → end)", formatTableMmSs(it.toLong()))
+            }
+            if (fcMap.isNotEmpty()) {
+                Text(
+                    "First contractions",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TextSecondary
+                )
+                Text(
+                    fcMap.toSortedMap().entries.joinToString("   ") { (round, ms) ->
+                        "R$round ${formatTableMmSs(ms)}"
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextPrimary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SummaryStatRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
     }
 }
 

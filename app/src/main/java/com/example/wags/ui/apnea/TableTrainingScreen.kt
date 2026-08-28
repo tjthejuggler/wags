@@ -14,6 +14,7 @@ import androidx.navigation.NavController
 import com.example.wags.domain.model.TableDifficulty
 import com.example.wags.domain.model.TableLength
 import com.example.wags.ui.common.InfoHelpBubble
+import com.example.wags.ui.common.LiveSensorActionsNav
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 
@@ -46,6 +47,7 @@ fun TableTrainingScreen(
                     }
                 },
                 actions = {
+                    LiveSensorActionsNav(navController)
                     TableHelpIcon(title = "Table Training", text = TABLE_TRAINING_HELP_TEXT)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
@@ -76,6 +78,14 @@ fun TableTrainingScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+
+                // Live device reading at the top of the selection screen —
+                // lets the user confirm the sensor is streaming before
+                // committing to an O₂ / CO₂ table.
+                TableLiveReadingBanner(
+                    liveHr = state.liveHr,
+                    liveSpO2 = state.liveSpO2
+                )
 
                 TableTrainingConfigContent(
                     personalBestMs = state.personalBestMs,
@@ -234,6 +244,65 @@ private fun TableTrainingConfigContent(
                 colors = ButtonDefaults.buttonColors(containerColor = ButtonPrimary)
             ) { Text("Start CO2 Table") }
             TableHelpIcon(title = CO2_HELP_TITLE, text = CO2_HELP_TEXT)
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Live device reading banner (shared with ApneaTableScreen)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Prominent live HR / SpO₂ reading strip. Shows whatever the connected
+ * device streams; when nothing is connected it shows a muted hint instead.
+ */
+@Composable
+fun TableLiveReadingBanner(
+    liveHr: Int?,
+    liveSpO2: Int?
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark)
+    ) {
+        if (liveHr == null && liveSpO2 == null) {
+            Text(
+                "No sensor connected — live readings appear here once a device is linked",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            )
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                liveHr?.let { hr ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("HEART RATE", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                        Text(
+                            "$hr bpm",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = TextPrimary
+                        )
+                    }
+                }
+                liveSpO2?.let { spo2 ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("SpO₂", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                        Text(
+                            "$spo2%",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = TextPrimary
+                        )
+                    }
+                }
+            }
         }
     }
 }
