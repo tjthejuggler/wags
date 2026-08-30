@@ -25,6 +25,7 @@ import androidx.navigation.NavController
 import com.example.wags.data.db.entity.MeditationAudioEntity
 import com.example.wags.ui.common.AdviceBanner
 import com.example.wags.ui.common.AdviceSection
+import com.example.wags.ui.common.BlackScreenOverlay
 import com.example.wags.ui.common.KeepScreenOn
 import com.example.wags.ui.common.StatsAndSensorActionsNav
 import com.example.wags.ui.common.LockPortrait
@@ -48,6 +49,12 @@ fun MeditationScreen(
     val keepScreenOn = isActive || state.sessionState == MeditationSessionState.COMPLETE
 
     var showAudioPicker by remember { mutableStateOf(false) }
+    var screenBlanked by remember { mutableStateOf(false) }
+
+    // Auto-unblank when the session is no longer active (stopped / completed)
+    LaunchedEffect(state.sessionState) {
+        if (state.sessionState != MeditationSessionState.ACTIVE) screenBlanked = false
+    }
 
     LockPortrait()
     SessionBackHandler(enabled = isActive) { navController.popBackStack() }
@@ -105,6 +112,7 @@ fun MeditationScreen(
                 MeditationSessionState.ACTIVE -> ActiveContent(
                     state = state,
                     onStop = { viewModel.stopSession() },
+                    onBlankScreen = { screenBlanked = true },
                     modifier = Modifier
                 )
                 MeditationSessionState.PROCESSING -> ProcessingContent(
@@ -142,6 +150,12 @@ fun MeditationScreen(
             onDismiss = { showAudioPicker = false }
         )
     }
+
+    // Black screen overlay — placed last so it covers everything (incl. dialogs)
+    BlackScreenOverlay(
+        visible = screenBlanked,
+        onDismiss = { screenBlanked = false }
+    )
 
     // URL edit dialog
     state.editingAudio?.let { audio ->
@@ -450,6 +464,7 @@ private fun MonitorStatusBanner(hasHrMonitor: Boolean, deviceId: String?) {
 private fun ActiveContent(
     state: MeditationUiState,
     onStop: () -> Unit,
+    onBlankScreen: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -552,6 +567,14 @@ private fun ActiveContent(
                     color = TextSecondary
                 )
             }
+        }
+
+        OutlinedButton(
+            onClick = onBlankScreen,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
+        ) {
+            Text("Blank Screen (tap to restore)")
         }
 
         OutlinedButton(
