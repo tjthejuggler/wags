@@ -99,6 +99,7 @@ fun MeditationScreen(
                     state = state,
                     onAudioPickerClick = { showAudioPicker = true },
                     onSonificationToggle = { viewModel.setSonificationEnabled(!state.sonificationEnabled) },
+                    onPitchFollowsHrToggle = { viewModel.setSonificationPitchFollowsHr(!state.sonificationPitchFollowsHr) },
                     onPostureSelected = { viewModel.setPosture(it) },
                     onTimerEnabledChange = { viewModel.setTimerEnabled(it) },
                     onTimerHoursChange = { viewModel.setTimerHours(it) },
@@ -177,6 +178,7 @@ private fun IdleContent(
     state: MeditationUiState,
     onAudioPickerClick: () -> Unit,
     onSonificationToggle: () -> Unit,
+    onPitchFollowsHrToggle: () -> Unit,
     onPostureSelected: (MeditationPosture) -> Unit,
     onTimerEnabledChange: (Boolean) -> Unit,
     onTimerHoursChange: (Int) -> Unit,
@@ -239,6 +241,28 @@ private fun IdleContent(
                             checked = state.sonificationEnabled,
                             onCheckedChange = { onSonificationToggle() }
                         )
+                    }
+                    if (state.sonificationEnabled) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text("Pitch follows HR", style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    "Lower pitch when heart slows, higher when it rises",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = TextSecondary
+                                )
+                            }
+                            Switch(
+                                checked = state.sonificationPitchFollowsHr,
+                                onCheckedChange = { onPitchFollowsHrToggle() }
+                            )
+                        }
                     }
                 }
             }

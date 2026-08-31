@@ -73,6 +73,7 @@ data class MeditationUiState(
     val currentHrBpm: Float? = null,
     val currentRmssd: Float? = null,
     val sonificationEnabled: Boolean = false,
+    val sonificationPitchFollowsHr: Boolean = true,
     // Countdown timer (optional, indication only — does not stop session)
     val timerEnabled: Boolean = false,
     val timerHours: Int = 0,
@@ -136,6 +137,7 @@ class MeditationViewModel @Inject constructor(
 
     companion object {
         private const val PREF_SONIFICATION   = "sonification_enabled"
+        private const val PREF_SONIF_PITCH    = "sonification_pitch_follows_hr"
         private const val PREF_POSTURE        = "posture"
         private const val PREF_TIMER_ENABLED  = "timer_enabled"
         private const val PREF_TIMER_HOURS    = "timer_hours"
@@ -149,6 +151,7 @@ class MeditationViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(
         MeditationUiState(
             sonificationEnabled   = prefs.getBoolean(PREF_SONIFICATION, false),
+            sonificationPitchFollowsHr = prefs.getBoolean(PREF_SONIF_PITCH, true),
             selectedPosture       = prefs.getString(PREF_POSTURE, null)
                                         ?.let { runCatching { MeditationPosture.valueOf(it) }.getOrNull() }
                                         ?: MeditationPosture.LAYING,
@@ -324,6 +327,12 @@ class MeditationViewModel @Inject constructor(
         prefs.edit().putBoolean(PREF_SONIFICATION, enabled).apply()
     }
 
+    fun setSonificationPitchFollowsHr(enabled: Boolean) {
+        _uiState.update { it.copy(sonificationPitchFollowsHr = enabled) }
+        prefs.edit().putBoolean(PREF_SONIF_PITCH, enabled).apply()
+        sonificationEngine.setAdaptivePitch(enabled)
+    }
+
     fun setPosture(posture: MeditationPosture) {
         if (_uiState.value.sessionState == MeditationSessionState.IDLE) {
             _uiState.update { it.copy(selectedPosture = posture) }
@@ -406,6 +415,7 @@ class MeditationViewModel @Inject constructor(
         }
 
         if (_uiState.value.sonificationEnabled && activeMonitorId != null) {
+            sonificationEngine.setAdaptivePitch(_uiState.value.sonificationPitchFollowsHr)
             sonificationEngine.start(viewModelScope)
         }
 
