@@ -911,7 +911,7 @@ class MinBreathViewModel @Inject constructor(
         // Song was pre-loaded in selectSong() — just resume playback.
         if (_uiState.value.isMusicMode) {
             spotifyManager.startTracking()
-            spotifyManager.sendPlayCommand()
+            spotifyManager.startSessionPlayback(_uiState.value.selectedSongs.firstOrNull()?.spotifyUri)
         }
 
         // Start movie playback if MOVIE mode with auto-control enabled

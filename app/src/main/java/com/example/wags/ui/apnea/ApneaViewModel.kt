@@ -1144,7 +1144,7 @@ class ApneaViewModel @Inject constructor(
         // Song was pre-loaded in selectSong() — just resume playback.
         if (_audio.value == AudioSetting.MUSIC) {
             spotifyManager.startTracking()
-            spotifyManager.sendPlayCommand()
+            spotifyManager.startSessionPlayback(_uiState.value.selectedSongs.firstOrNull()?.spotifyUri)
         }
         // Start guided audio if GUIDED is selected
         if (_audio.value == AudioSetting.GUIDED) {
@@ -1268,7 +1268,7 @@ class ApneaViewModel @Inject constructor(
 
         // If MUSIC is selected, start Spotify and begin song tracking
         if (_audio.value == AudioSetting.MUSIC) {
-            spotifyManager.sendPlayCommand()
+            spotifyManager.startSessionPlayback(_uiState.value.selectedSongs.firstOrNull()?.spotifyUri)
             spotifyManager.startTracking()
         }
         // Start guided audio if GUIDED is selected

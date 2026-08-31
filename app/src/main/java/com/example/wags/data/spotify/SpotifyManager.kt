@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.net.Uri
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
@@ -473,6 +474,58 @@ class SpotifyManager @Inject constructor(
      *    as a belt-and-suspenders fallback for devices where the direct broadcast
      *    is blocked.
      */
+    /**
+     * Start Spotify playback for a session.
+     *
+     * Wraps [sendPlayCommand] with a priming step: if Spotify has no active
+     * media session (e.g. it was killed, freshly launched, or its player was
+     * never initialized — common after the Spotify 9.1.78+ update), a plain
+     * media-key play is silently ignored. In that case we first deep-link the
+     * selected track URI into Spotify via [primeSpotifyPlayer] to force its
+     * player to load, then resume with the media key.
+     *
+     * Fire-and-forget: runs on the internal scope so callers can invoke it
+     * synchronously from session-start code.
+     */
+    fun startSessionPlayback(trackUri: String?) {
+        scope.launch {
+            if (spotifyController == null) {
+                refreshSpotifyController()
+            }
+            if (spotifyController == null && !trackUri.isNullOrBlank()) {
+                Log.d("SpotifyMgr", "startSessionPlayback: Spotify inactive, priming player via deep-link")
+                primeSpotifyPlayer(trackUri, pauseAfter = false)
+            } else {
+                playViaSession()
+            }
+        }
+    }
+
+    /**
+     * Send a PLAY command directly to Spotify's MediaSession via
+     * [MediaController.TransportControls.play].
+     *
+     * Unlike [sendPlayCommand] (AudioManager media-key dispatch), this works
+     * even while our app is in the background (e.g. while Spotify is in the
+     * foreground during priming) because it targets Spotify's session
+     * directly. Requires Notification Access (already needed for metadata).
+     * Falls back to the media-key dispatch if no controller is available.
+     */
+    private fun playViaSession() {
+        refreshSpotifyController()
+        val ctrl = spotifyController
+        if (ctrl != null) {
+            try {
+                ctrl.transportControls.play()
+                Log.d("SpotifyMgr", "playViaSession: play() sent to Spotify session")
+                return
+            } catch (e: Exception) {
+                Log.w("SpotifyMgr", "playViaSession: play() failed", e)
+            }
+        }
+        sendPlayCommand()
+    }
+
     fun sendPlayCommand() {
         // Step 1: direct Spotify play broadcast (no permissions needed)
         try {
@@ -609,7 +662,36 @@ class SpotifyManager @Inject constructor(
      * to seek back to the start of the track. Called when a free hold ends
      * (stop or cancel) so the user can replay the song from the beginning.
      */
-    fun sendPauseAndRewindCommand() {
+    fun sendPauseAndRewindCommand(rewind: Boolean = true) {
+        // `rewind` is kept for call-site compatibility; both staging and
+        // end-of-hold now seek to position 0 instead of skipToPrevious.
+        // Never pause while a hold is actively tracking — every legitimate
+        // pause site (stop/cancel) calls stopTracking() first, so reaching
+        // here with isTracking=true means a stale preload coroutine is trying
+        // to pause music the user just started. Drop it.
+        if (isTracking) {
+            Log.d("SpotifyMgr", "sendPauseAndRewindCommand: skipped — session is tracking")
+            return
+        }
+        // Prefer targeting Spotify's MediaSession directly — AudioManager media
+        // keys are ignored when our app is in the background (e.g. while
+        // Spotify is foreground during priming).
+        refreshSpotifyController()
+        val ctrl = spotifyController
+        if (ctrl != null) {
+            try {
+                ctrl.transportControls.pause()
+                // Seek to position 0 (NOT skipToPrevious — PREVIOUS on a
+                // freshly-loaded context makes Spotify jump OUT of the staged
+                // tracks, leaving nothing queued). seekTo(0) while paused
+                // restarts the track from the beginning on resume.
+                ctrl.transportControls.seekTo(0L)
+                Log.d("SpotifyMgr", "sendPauseAndRewindCommand: paused + seekTo(0) via Spotify session")
+                return
+            } catch (e: Exception) {
+                Log.w("SpotifyMgr", "sendPauseAndRewindCommand: session control failed", e)
+            }
+        }
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
         val eventTime = SystemClock.uptimeMillis()
 
@@ -622,12 +704,14 @@ class SpotifyManager @Inject constructor(
         )
 
         // Rewind to beginning (PREVIOUS while paused seeks to start of current track)
-        audioManager.dispatchMediaKeyEvent(
-            KeyEvent(eventTime, eventTime, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0)
-        )
-        audioManager.dispatchMediaKeyEvent(
-            KeyEvent(eventTime, eventTime, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0)
-        )
+        if (rewind) {
+            audioManager.dispatchMediaKeyEvent(
+                KeyEvent(eventTime, eventTime, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0)
+            )
+            audioManager.dispatchMediaKeyEvent(
+                KeyEvent(eventTime, eventTime, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0)
+            )
+        }
     }
 
     /**
@@ -708,6 +792,58 @@ class SpotifyManager @Inject constructor(
     }
 
     /**
+     * Prime Spotify's player by deep-linking a Spotify URI into the app.
+     *
+     * Spotify 9.1.78+ (update rolled out ~Aug 2026) stopped initializing its
+     * player when woken indirectly: the `com.spotify.music.PLAY` broadcast,
+     * AudioManager media-key dispatch, and even Web API play commands (which
+     * return 204 but are silently dropped while the device is inactive) all
+     * fail to start playback. Opening a track/context URI via ACTION_VIEW
+     * forces Spotify to actually load the player and register as an active
+     * Web API device — after which media keys and the Web API work again.
+     *
+     * After priming, the player is paused/rewound (the caller replaces the
+     * playback context via the Web API) and our app is brought back to the
+     * foreground so the user stays in Wags.
+     */
+    private suspend fun primeSpotifyPlayer(spotifyUri: String, pauseAfter: Boolean = true) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(spotifyUri)).apply {
+                setPackage(SPOTIFY_PACKAGE)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            Log.d("SpotifyMgr", "primeSpotifyPlayer: deep-linked $spotifyUri")
+        } catch (e: Exception) {
+            Log.w("SpotifyMgr", "primeSpotifyPlayer: deep-link failed", e)
+            return
+        }
+
+        // Give Spotify a moment to load the track page
+        delay(1_500L)
+
+        // Start playback of the linked track. This is what actually forces
+        // Spotify to initialize its player engine — a deep-link alone only
+        // opens the track page. Target Spotify's MediaSession directly via
+        // transportControls (works while our app is backgrounded behind
+        // Spotify); AudioManager media keys are ignored from the background.
+        playViaSession()
+
+        // Wait for Spotify to register the device on its servers
+        delay(WAKE_PLAYER_DELAY_MS)
+        bringAppToForeground()
+
+        if (pauseAfter && !isTracking) {
+            // Pause whatever Spotify started playing — the caller will replace
+            // the playback context with the real selection via the Web API.
+            // Skip if a session is already tracking (the user started the hold
+            // while priming was still in flight — don't pause their music).
+            // No rewind: the deep-linked track starts at position 0 already.
+            sendPauseAndRewindCommand(rewind = false)
+        }
+    }
+
+    /**
      * Pre-load a track into Spotify playback, then pause it so it's ready
      * to resume instantly when the user starts a session.
      *
@@ -721,44 +857,21 @@ class SpotifyManager @Inject constructor(
      * @return true if the track was successfully loaded and paused.
      */
     suspend fun preloadTrack(trackUri: String): Boolean {
-        val wasActive = spotifyController != null
-        ensureSpotifyActive()
+        // Stage the track LOCALLY via deep-link + session play + pause.
+        // The Web API's PUT /me/player/play returns 204 even when the command
+        // is silently dropped (Spotify 2026 behavior while the device is
+        // inactive), so it cannot be trusted for staging — the deep-link is
+        // the only reliable way to make the selected track Spotify's "current"
+        // track, paused at position 0, ready to resume on session start.
+        primeSpotifyPlayer(trackUri, pauseAfter = true)
 
-        // If Spotify was just launched, its Web API device won't be registered yet.
-        // Send a media key "play" to wake up Spotify's player — this triggers
-        // Spotify to register itself as an active device on its servers.
-        if (!wasActive) {
-            Log.d("SpotifyMgr", "preloadTrack: Spotify was just launched, waking player via media key")
-            sendPlayCommand()
-            delay(WAKE_PLAYER_DELAY_MS)
-            // Pause whatever Spotify started playing — we'll replace it with the
-            // chosen track via the Web API below.
-            sendPauseAndRewindCommand()
+        // Queue a follow-up song so playback continues when the selected track ends.
+        // Try Spotify Recommendations first; fall back to a random song from the cache.
+        scope.launch(Dispatchers.IO) {
+            queueFollowUpSong(trackUri)
         }
 
-        // Retry startPlayback — Spotify may need a moment to register its
-        // device after being launched, especially on first play.
-        var success = false
-        for (attempt in 1..PRELOAD_MAX_ATTEMPTS) {
-            success = spotifyApiClient.startPlayback(trackUri)
-            if (success) break
-            Log.d("SpotifyMgr", "preloadTrack: startPlayback attempt $attempt failed, retrying in ${PRELOAD_RETRY_DELAY_MS}ms...")
-            delay(PRELOAD_RETRY_DELAY_MS.toLong())
-        }
-
-        if (success) {
-            delay(PRELOAD_PAUSE_DELAY_MS)
-            sendPauseAndRewindCommand()
-            // Queue a follow-up song so playback continues when the selected track ends.
-            // Try Spotify Recommendations first; fall back to a random song from the cache.
-            scope.launch(Dispatchers.IO) {
-                queueFollowUpSong(trackUri)
-            }
-        } else {
-            Log.w("SpotifyMgr", "preloadTrack: failed after $PRELOAD_MAX_ATTEMPTS attempts for $trackUri")
-        }
-
-        return success
+        return true
     }
 
     /**
@@ -783,33 +896,30 @@ class SpotifyManager @Inject constructor(
             return false
         }
 
-        val wasActive = spotifyController != null
-        ensureSpotifyActive()
+        // Stage the FIRST selected track locally: deep-link it into Spotify,
+        // start it via Spotify's MediaSession, then pause. This leaves Spotify
+        // in exactly the "manually chosen + paused" state that resumes
+        // reliably on session start. The Web API play command is NOT used —
+        // it returns 204 even when silently dropped (Spotify 2026 behavior),
+        // which previously left nothing staged and wiped the user's queue.
+        primeSpotifyPlayer(trackUris.first(), pauseAfter = true)
 
-        if (!wasActive) {
-            Log.d("SpotifyMgr", "preloadTrackList: Spotify was just launched, waking player via media key")
-            sendPlayCommand()
-            delay(WAKE_PLAYER_DELAY_MS)
-            sendPauseAndRewindCommand()
+        // Best-effort: queue tracks 2+ via the Web API so multi-song
+        // selections keep their order when playback continues.
+        if (trackUris.size > 1) {
+            scope.launch(Dispatchers.IO) {
+                trackUris.drop(1).forEach { uri ->
+                    try {
+                        spotifyApiClient.addToQueue(uri)
+                    } catch (e: Exception) {
+                        Log.w("SpotifyMgr", "preloadTrackList: addToQueue failed for $uri", e)
+                    }
+                }
+            }
         }
 
-        var success = false
-        for (attempt in 1..PRELOAD_MAX_ATTEMPTS) {
-            success = spotifyApiClient.startPlaybackUris(trackUris)
-            if (success) break
-            Log.d("SpotifyMgr", "preloadTrackList: startPlaybackUris attempt $attempt failed, retrying in ${PRELOAD_RETRY_DELAY_MS}ms...")
-            delay(PRELOAD_RETRY_DELAY_MS.toLong())
-        }
-
-        if (success) {
-            delay(PRELOAD_PAUSE_DELAY_MS)
-            sendPauseAndRewindCommand()
-            Log.d("SpotifyMgr", "preloadTrackList: loaded ${trackUris.size} tracks successfully")
-        } else {
-            Log.w("SpotifyMgr", "preloadTrackList: failed after $PRELOAD_MAX_ATTEMPTS attempts for ${trackUris.size} tracks")
-        }
-
-        return success
+        Log.d("SpotifyMgr", "preloadTrackList: staged ${trackUris.size} tracks (first via deep-link, rest queued best-effort)")
+        return true
     }
 
     /**
@@ -832,10 +942,8 @@ class SpotifyManager @Inject constructor(
         ensureSpotifyActive()
 
         if (!wasActive) {
-            Log.d("SpotifyMgr", "preloadPlaylistContext: Spotify was just launched, waking player via media key")
-            sendPlayCommand()
-            delay(WAKE_PLAYER_DELAY_MS)
-            sendPauseAndRewindCommand()
+            Log.d("SpotifyMgr", "preloadPlaylistContext: Spotify was just launched, priming player via context deep-link")
+            primeSpotifyPlayer(contextUri)
         }
 
         var success = false
@@ -848,7 +956,7 @@ class SpotifyManager @Inject constructor(
 
         if (success) {
             delay(PRELOAD_PAUSE_DELAY_MS)
-            sendPauseAndRewindCommand()
+            if (!isTracking) sendPauseAndRewindCommand(rewind = false)
         } else {
             Log.w("SpotifyMgr", "preloadPlaylistContext: failed after $PRELOAD_MAX_ATTEMPTS attempts for $contextUri")
         }

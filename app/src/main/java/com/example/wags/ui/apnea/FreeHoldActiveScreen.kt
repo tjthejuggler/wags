@@ -769,8 +769,9 @@ class FreeHoldActiveViewModel @Inject constructor(
             Log.d("FreeHold", "startFreeHold: hasValidUri=$hasValidUri, uri=${selectedSongs.firstOrNull()?.spotifyUri}, connected=${spotifyAuthManager.isConnected.value}")
             spotifyManager.startTracking()
             // The song was pre-loaded in selectSong() — just resume playback.
-            // sendPlayCommand() resumes the paused track instantly.
-            spotifyManager.sendPlayCommand()
+            // startSessionPlayback() resumes the paused track instantly, and
+            // primes Spotify via deep-link first if its player is not active.
+            spotifyManager.startSessionPlayback(selectedSongs.firstOrNull()?.spotifyUri)
         }
         // Start guided audio if GUIDED is selected — but skip if it was already
         // started during the hyper countdown (startMp3WithHyper == true)

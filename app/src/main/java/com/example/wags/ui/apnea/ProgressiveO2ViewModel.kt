@@ -879,7 +879,7 @@ class ProgressiveO2ViewModel @Inject constructor(
         // Song was pre-loaded in selectSong() — just resume playback.
         if (_uiState.value.isMusicMode) {
             spotifyManager.startTracking()
-            spotifyManager.sendPlayCommand()
+            spotifyManager.startSessionPlayback(_uiState.value.selectedSongs.firstOrNull()?.spotifyUri)
         }
 
         // Start guided audio if GUIDED is selected — but skip if it was already

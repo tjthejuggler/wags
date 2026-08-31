@@ -905,7 +905,7 @@ class ContractionTableViewModel @Inject constructor(
         // Start Spotify if MUSIC is selected (song pre-loaded in selectSong()).
         if (s.isMusicMode) {
             spotifyManager.startTracking()
-            spotifyManager.sendPlayCommand()
+            spotifyManager.startSessionPlayback(_uiState.value.selectedSongs.firstOrNull()?.spotifyUri)
         }
 
         // Start guided audio if GUIDED is selected.
