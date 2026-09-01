@@ -72,16 +72,32 @@ object SettingFilterOptions {
 }
 
 /**
- * Shared chip colors for every filter UI — a selected look between the old
- * subtle SurfaceVariant fill and the loud Material default: a translucent
- * mid-grey fill with a bright label.
+ * Shared setting-chip style used by every setting selector and filter UI:
+ *  - **unselected** — plain grey fill (SurfaceVariant), muted label, no border
+ *  - **selected** — a slightly brighter grey fill, a brighter label, and a
+ *    light outline that marks the active option.
  */
+val SettingChipSelectedFill   = Color(0xFF2E2E2E)   // SurfaceVariant lifted a touch
+val SettingChipOutline        = Color(0xFFC0C0C0)   // brighter-than-text outline
+val SettingChipSelectedLabel  = Color(0xFFF2F2F2)   // brighter than TextPrimary
+
 @Composable
 fun settingFilterChipColors() = FilterChipDefaults.filterChipColors(
-    containerColor = Color.Transparent,
+    containerColor = SurfaceVariant,
     labelColor = TextSecondary,
-    selectedContainerColor = TextSecondary.copy(alpha = 0.22f),
-    selectedLabelColor = TextPrimary
+    selectedContainerColor = SettingChipSelectedFill,
+    selectedLabelColor = SettingChipSelectedLabel
+)
+
+/** Outline shown only on the selected chip; unselected chips stay borderless. */
+@Composable
+fun settingChipBorder(selected: Boolean) = FilterChipDefaults.filterChipBorder(
+    enabled = true,
+    selected = selected,
+    borderColor = Color.Transparent,
+    selectedBorderColor = SettingChipOutline,
+    borderWidth = 0.dp,
+    selectedBorderWidth = 1.dp
 )
 
 /** True when [this] selection includes every value of [options] (category unfiltered). */
@@ -190,7 +206,8 @@ fun MultiSelectFilterCategory(
                     },
                     label = { Text(optionLabel(value), style = MaterialTheme.typography.labelSmall) },
                     modifier = Modifier.height(30.dp),
-                    colors = settingFilterChipColors()
+                    colors = settingFilterChipColors(),
+                    border = settingChipBorder(value in selected)
                 )
             }
         }

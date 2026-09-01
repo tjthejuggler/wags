@@ -359,17 +359,9 @@ private fun EditRecordSheet(
                         FilterChip(
                             selected = isSelected,
                             onClick  = { onLungVolumeChange(vol) },
-                            label    = {
-                                Text(
-                                    displayLabel,
-                                    color = if (isSelected) TextPrimary else MaterialTheme.colorScheme.onSurface
-                                )
-                            },
-                            colors   = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = SurfaceVariant,
-                                selectedLabelColor     = TextPrimary,
-                                labelColor             = MaterialTheme.colorScheme.onSurface
-                            )
+                            label    = { Text(displayLabel) },
+                            colors   = settingFilterChipColors(),
+                            border   = settingChipBorder(isSelected)
                         )
                     }
                 }
@@ -384,17 +376,9 @@ private fun EditRecordSheet(
                         FilterChip(
                             selected = isSelected,
                             onClick  = { onPrepTypeChange(pt) },
-                            label    = {
-                                Text(
-                                    pt.shortDisplayName(),
-                                    color = if (isSelected) TextPrimary else MaterialTheme.colorScheme.onSurface
-                                )
-                            },
-                            colors   = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = SurfaceVariant,
-                                selectedLabelColor     = TextPrimary,
-                                labelColor             = MaterialTheme.colorScheme.onSurface
-                            )
+                            label    = { Text(pt.shortDisplayName()) },
+                            colors   = settingFilterChipColors(),
+                            border   = settingChipBorder(isSelected)
                         )
                     }
                 }
@@ -410,16 +394,10 @@ private fun EditRecordSheet(
                             selected = isSelected,
                             onClick  = { onTimeOfDayChange(tod) },
                             label    = {
-                                Text(
-                                    tod.name.lowercase().replaceFirstChar { it.uppercase() },
-                                    color = if (isSelected) TextPrimary else MaterialTheme.colorScheme.onSurface
-                                )
+                                Text(tod.name.lowercase().replaceFirstChar { it.uppercase() })
                             },
-                            colors   = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = SurfaceVariant,
-                                selectedLabelColor     = TextPrimary,
-                                labelColor             = MaterialTheme.colorScheme.onSurface
-                            )
+                            colors   = settingFilterChipColors(),
+                            border   = settingChipBorder(isSelected)
                         )
                     }
                 }
@@ -434,17 +412,9 @@ private fun EditRecordSheet(
                         FilterChip(
                             selected = isSelected,
                             onClick  = { onPostureChange(pos) },
-                            label    = {
-                                Text(
-                                    pos.displayName(),
-                                    color = if (isSelected) TextPrimary else MaterialTheme.colorScheme.onSurface
-                                )
-                            },
-                            colors   = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = SurfaceVariant,
-                                selectedLabelColor     = TextPrimary,
-                                labelColor             = MaterialTheme.colorScheme.onSurface
-                            )
+                            label    = { Text(pos.displayName()) },
+                            colors   = settingFilterChipColors(),
+                            border   = settingChipBorder(isSelected)
                         )
                     }
                 }
@@ -454,24 +424,28 @@ private fun EditRecordSheet(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Audio", style = MaterialTheme.typography.labelLarge, color = TextSecondary)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AudioSetting.entries.forEach { aud ->
+                    AudioSetting.entries.filter { it != AudioSetting.BIOFEEDBACK }.forEach { aud ->
                         val isSelected = audio == aud
                         FilterChip(
                             selected = isSelected,
                             onClick  = { onAudioChange(aud) },
-                            label    = {
-                                Text(
-                                    aud.displayName(),
-                                    color = if (isSelected) TextPrimary else MaterialTheme.colorScheme.onSurface
-                                )
-                            },
-                            colors   = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = SurfaceVariant,
-                                selectedLabelColor     = TextPrimary,
-                                labelColor             = MaterialTheme.colorScheme.onSurface
-                            )
+                            label    = { Text(aud.displayName()) },
+                            colors   = settingFilterChipColors(),
+                            border   = settingChipBorder(isSelected)
                         )
                     }
+                }
+                // Biofeedback gets its own line so the full label always fits.
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val aud = AudioSetting.BIOFEEDBACK
+                    val isSelected = audio == aud
+                    FilterChip(
+                        selected = isSelected,
+                        onClick  = { onAudioChange(aud) },
+                        label    = { Text(aud.displayName()) },
+                        colors   = settingFilterChipColors(),
+                        border   = settingChipBorder(isSelected)
+                    )
                 }
             }
 
@@ -704,6 +678,34 @@ private fun RecordDetailContent(
                         Text("Guided Audio", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                         Text(
                             record.guidedAudioName!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 200.dp)
+                        )
+                    }
+                }
+                if (record.audio == "BIOFEEDBACK" &&
+                    (!record.biofeedbackHrSound.isNullOrBlank() || !record.biofeedbackSpo2Texture.isNullOrBlank())
+                ) {
+                    val hrName = record.biofeedbackHrSound?.let { raw ->
+                        runCatching { com.example.wags.domain.usecase.session.BiofeedbackHrSound.valueOf(raw) }
+                            .getOrNull()
+                            ?.let { "${it.emoji} ${it.displayName}" }
+                    }
+                    val texName = record.biofeedbackSpo2Texture?.let { raw ->
+                        runCatching { com.example.wags.domain.usecase.session.BiofeedbackSpo2Texture.valueOf(raw) }
+                            .getOrNull()
+                            ?.let { "${it.emoji} ${it.displayName}" }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Biofeedback Sound", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                        Text(
+                            listOfNotNull(hrName, texName).joinToString(" · "),
                             style = MaterialTheme.typography.bodySmall,
                             color = TextPrimary,
                             maxLines = 1,

@@ -58,6 +58,12 @@ data class ApneaRecordEntity(
     /** Display name of the guided audio file used during this hold (null when audio != GUIDED). */
     @ColumnInfo(defaultValue = "NULL")
     val guidedAudioName: String? = null,
+    /** Biofeedback HR instrument enum name (null when audio != BIOFEEDBACK). */
+    @ColumnInfo(defaultValue = "NULL")
+    val biofeedbackHrSound: String? = null,
+    /** Biofeedback SpO2 texture enum name (null when audio != BIOFEEDBACK). */
+    @ColumnInfo(defaultValue = "NULL")
+    val biofeedbackSpo2Texture: String? = null,
     /** Whether the "New Record Indication" feature was enabled during this hold. */
     @ColumnInfo(defaultValue = "0")
     val newRecordIndication: Boolean = false,

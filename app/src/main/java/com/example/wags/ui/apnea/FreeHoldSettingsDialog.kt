@@ -69,10 +69,8 @@ fun FreeHoldSettingsDialog(
                             onClick = { onLungVolumeChange(volume) },
                             label = { Text(volume.displayLungVolumeBanner(), style = MaterialTheme.typography.bodySmall) },
                             modifier = Modifier.height(30.dp),
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = SurfaceVariant,
-                                selectedLabelColor = TextPrimary
-                            )
+                            colors = settingFilterChipColors(),
+                            border = settingChipBorder(lungVolume == volume)
                         )
                     }
                 }
@@ -96,10 +94,8 @@ fun FreeHoldSettingsDialog(
                                 )
                             },
                             modifier = Modifier.height(30.dp),
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = SurfaceVariant,
-                                selectedLabelColor = TextPrimary
-                            )
+                            colors = settingFilterChipColors(),
+                            border = settingChipBorder(prepType == type.name)
                         )
                     }
                 }
@@ -113,10 +109,8 @@ fun FreeHoldSettingsDialog(
                             onClick = { onPostureChange(pos.name) },
                             label = { Text(pos.displayName(), style = MaterialTheme.typography.bodySmall) },
                             modifier = Modifier.height(30.dp),
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = SurfaceVariant,
-                                selectedLabelColor = TextPrimary
-                            )
+                            colors = settingFilterChipColors(),
+                            border = settingChipBorder(posture == pos.name)
                         )
                     }
                 }
@@ -130,10 +124,8 @@ fun FreeHoldSettingsDialog(
                             onClick = { onAudioChange(aud.name) },
                             label = { Text(aud.displayName(), style = MaterialTheme.typography.bodySmall) },
                             modifier = Modifier.height(30.dp),
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = SurfaceVariant,
-                                selectedLabelColor = TextPrimary
-                            )
+                            colors = settingFilterChipColors(),
+                            border = settingChipBorder(audio == aud.name)
                         )
                     }
                 }
@@ -154,10 +146,8 @@ fun FreeHoldSettingsDialog(
                                 onClick = { onTimeOfDayChange(tod.name) },
                                 label = { Text(tod.displayName(), style = MaterialTheme.typography.bodySmall) },
                                 modifier = Modifier.height(30.dp),
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = SurfaceVariant,
-                                    selectedLabelColor = TextPrimary
-                                )
+                                colors = settingFilterChipColors(),
+                                border = settingChipBorder(timeOfDay == tod.name)
                             )
                         }
                     }

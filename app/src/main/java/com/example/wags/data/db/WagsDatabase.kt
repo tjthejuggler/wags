@@ -32,7 +32,7 @@ import com.example.wags.data.db.entity.*
         ForecastCalibrationEntity::class,
         EucapnicPastConfigurationEntity::class
     ],
-    version = 43,
+    version = 44,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -1248,5 +1248,21 @@ abstract class WagsDatabase : RoomDatabase() {
                     )
                 }
             }
+
+        /**
+         * v43 → v44: Biofeedback sonification promoted to a full audio setting.
+         * Adds the per-record biofeedback configuration columns so history
+         * details can show which instrument/texture was used.
+         */
+        val MIGRATION_43_44 = object : Migration(43, 44) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE apnea_records ADD COLUMN biofeedbackHrSound TEXT DEFAULT NULL"
+                )
+                db.execSQL(
+                    "ALTER TABLE apnea_records ADD COLUMN biofeedbackSpo2Texture TEXT DEFAULT NULL"
+                )
+            }
         }
     }
+}

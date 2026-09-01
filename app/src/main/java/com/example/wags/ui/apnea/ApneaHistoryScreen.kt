@@ -426,7 +426,8 @@ private fun SettingChip(
         selected = selected,
         onClick = onClick,
         label = { Text(label, style = MaterialTheme.typography.labelSmall) },
-        colors = colors
+        colors = colors,
+        border = settingChipBorder(selected)
     )
 }
 

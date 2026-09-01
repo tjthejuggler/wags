@@ -805,7 +805,7 @@ private fun ApneaSettingsContent(
 
         Text("Audio", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            AudioSetting.entries.forEach { aud ->
+            AudioSetting.entries.filter { it != AudioSetting.BIOFEEDBACK }.forEach { aud ->
                 SettingChip(
                     selected = audio == aud,
                     onClick = { onAudioChange(aud) },
@@ -814,6 +814,16 @@ private fun ApneaSettingsContent(
                     daysSinceCombo = comboDaysSince("audio", aud.name)
                 )
             }
+        }
+        // Biofeedback gets its own line so the full label always fits.
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            SettingChip(
+                selected = audio == AudioSetting.BIOFEEDBACK,
+                onClick = { onAudioChange(AudioSetting.BIOFEEDBACK) },
+                label = AudioSetting.BIOFEEDBACK.displayName(),
+                daysSinceUsed = daysSince("audio", AudioSetting.BIOFEEDBACK.name),
+                daysSinceCombo = comboDaysSince("audio", AudioSetting.BIOFEEDBACK.name)
+            )
         }
 
         // ── Time of Day / Hour Bucket (kept last) ────────────────────────────
@@ -866,10 +876,8 @@ private fun SettingChip(
             onClick = onClick,
             label = { Text(label, style = MaterialTheme.typography.bodySmall) },
             modifier = Modifier.height(30.dp),
-            colors = FilterChipDefaults.filterChipColors(
-                selectedContainerColor = SurfaceVariant,
-                selectedLabelColor = TextPrimary
-            )
+            colors = settingFilterChipColors(),
+            border = settingChipBorder(selected)
         )
         // Days-since-used badge — upper-right corner (hidden when never used)
         if (daysSinceUsed != null) {

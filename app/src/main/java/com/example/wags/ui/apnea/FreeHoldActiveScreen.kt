@@ -59,6 +59,9 @@ import com.example.wags.domain.model.SpotifySong
 import com.example.wags.domain.model.TimeBuckets
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
+import com.example.wags.domain.usecase.session.BiofeedbackHrSound
+import com.example.wags.domain.usecase.session.BiofeedbackSonificationEngine
+import com.example.wags.domain.usecase.session.BiofeedbackSpo2Texture
 import com.example.wags.domain.usecase.apnea.GuidedAudioManager
 import com.example.wags.domain.usecase.apnea.HyperLockManager
 import com.example.wags.domain.usecase.apnea.ResonancePrepGate
@@ -154,6 +157,12 @@ data class FreeHoldActiveUiState(
     val isMusicMode: Boolean = false,
     /** True when audio setting is GUIDED — controls whether the guided audio picker is shown. */
     val isGuidedMode: Boolean = false,
+    /** True when audio setting is BIOFEEDBACK — controls whether the biofeedback picker is shown. */
+    val isBiofeedbackMode: Boolean = false,
+    /** Selected biofeedback heartbeat instrument (null = not configured yet). */
+    val biofeedbackHrSound: BiofeedbackHrSound? = null,
+    /** Selected biofeedback SpO2 background texture (null = not configured yet). */
+    val biofeedbackSpo2Texture: BiofeedbackSpo2Texture? = null,
     /** All guided audios in the library (for the picker dialog). */
     val guidedAudios: List<GuidedAudioEntity> = emptyList(),
     /** ID of the currently selected guided audio (-1 if none). */
@@ -231,6 +240,7 @@ class FreeHoldActiveViewModel @Inject constructor(
     private val spotifyApiClient: SpotifyApiClient,
     private val spotifyAuthManager: SpotifyAuthManager,
     private val guidedAudioManager: GuidedAudioManager,
+    private val biofeedbackEngine: BiofeedbackSonificationEngine,
     private val eucapnicConfigRepository: EucapnicConfigRepository,
     private val hyperLockManager: HyperLockManager,
     private val resonancePrepGate: ResonancePrepGate,
@@ -254,6 +264,7 @@ class FreeHoldActiveViewModel @Inject constructor(
 
     private var isMusicMode = audio == AudioSetting.MUSIC.name
     private var isGuidedMode = audio == AudioSetting.GUIDED.name
+    private var isBiofeedbackMode = audio == AudioSetting.BIOFEEDBACK.name
     private var isHyperPrep = prepType == PrepType.HYPER.name
 
     private val _uiState = MutableStateFlow(
@@ -269,6 +280,11 @@ class FreeHoldActiveViewModel @Inject constructor(
                 showTimer = savedStateHandle.get<Boolean>("showTimer") ?: true,
                 isMusicMode = isMusicMode,
                 isGuidedMode = isGuidedMode,
+                isBiofeedbackMode = isBiofeedbackMode,
+                biofeedbackHrSound = prefs.getString("biofeedback_hr_sound", null)
+                    ?.let { runCatching { BiofeedbackHrSound.valueOf(it) }.getOrNull() },
+                biofeedbackSpo2Texture = prefs.getString("biofeedback_spo2_texture", null)
+                    ?.let { runCatching { BiofeedbackSpo2Texture.valueOf(it) }.getOrNull() },
                 guidedSelectedId = selId,
                 isHyperPrep = isHyperPrep,
                 guidedHyperEnabled = if (isHyperPrep) prefs.getBoolean("guided_hyper_enabled", false) else false,
@@ -346,6 +362,16 @@ class FreeHoldActiveViewModel @Inject constructor(
                     applyPrepType(PrepType.NO_PREP.name)
                 }
             }
+        }
+
+        // ── Biofeedback sonification — feed live metrics to the engine ──────
+        // Forwarding unconditionally is cheap (volatile writes); the engine
+        // only consumes the values while a hold is actually running.
+        viewModelScope.launch {
+            hrDataSource.liveHr.collect { hr -> hr?.let { biofeedbackEngine.updateHr(it.toFloat()) } }
+        }
+        viewModelScope.launch {
+            hrDataSource.liveSpO2.collect { spo2 -> spo2?.let { biofeedbackEngine.updateSpO2(it) } }
         }
 
         // Reactively observe eucapnic_prep_completed from savedStateHandle.
@@ -538,12 +564,14 @@ class FreeHoldActiveViewModel @Inject constructor(
         audio = aud
         isMusicMode = aud == AudioSetting.MUSIC.name
         isGuidedMode = aud == AudioSetting.GUIDED.name
+        isBiofeedbackMode = aud == AudioSetting.BIOFEEDBACK.name
         prefs.edit().putString("setting_audio", aud).apply()
         _uiState.update {
             it.copy(
                 currentAudio = aud,
                 isMusicMode = isMusicMode,
-                isGuidedMode = isGuidedMode
+                isGuidedMode = isGuidedMode,
+                isBiofeedbackMode = isBiofeedbackMode
             )
         }
         if (isGuidedMode) {
@@ -557,6 +585,20 @@ class FreeHoldActiveViewModel @Inject constructor(
         } else {
             _uiState.update { it.copy(guidedSelectedName = "") }
         }
+    }
+
+    // ── Biofeedback sonification config (experimental — prefs only, no DB) ────
+
+    fun setBiofeedbackHrSound(sound: BiofeedbackHrSound) {
+        prefs.edit().putString("biofeedback_hr_sound", sound.name).apply()
+        biofeedbackEngine.setHrSound(sound)
+        _uiState.update { it.copy(biofeedbackHrSound = sound) }
+    }
+
+    fun setBiofeedbackSpo2Texture(texture: BiofeedbackSpo2Texture) {
+        prefs.edit().putString("biofeedback_spo2_texture", texture.name).apply()
+        biofeedbackEngine.setSpo2Texture(texture)
+        _uiState.update { it.copy(biofeedbackSpo2Texture = texture) }
     }
 
     // ── Guided audio library methods ─────────────────────────────────────────
@@ -781,6 +823,13 @@ class FreeHoldActiveViewModel @Inject constructor(
                 guidedAudioManager.startPlayback()
             }
         }
+        // Start biofeedback sonification if BIOFEEDBACK is selected — the
+        // live HR/SpO2 collectors in init{} keep the engine fed.
+        if (audio == AudioSetting.BIOFEEDBACK.name) {
+            _uiState.value.biofeedbackHrSound?.let { biofeedbackEngine.setHrSound(it) }
+            _uiState.value.biofeedbackSpo2Texture?.let { biofeedbackEngine.setSpo2Texture(it) }
+            biofeedbackEngine.start(viewModelScope)
+        }
 
         // ── Real-time PB indication ────────────────────────────────────────
         // Load PB thresholds and start monitoring loop if the feature is enabled.
@@ -841,6 +890,10 @@ class FreeHoldActiveViewModel @Inject constructor(
         if (audio == AudioSetting.GUIDED.name) {
             guidedAudioManager.stopPlayback()
         }
+        // Stop biofeedback sonification if BIOFEEDBACK was selected
+        if (audio == AudioSetting.BIOFEEDBACK.name) {
+            biofeedbackEngine.stop()
+        }
         _uiState.update { it.copy(freeHoldActive = false, freeHoldFirstContractionMs = null, currentPbCategory = null, nextPbTarget = null) }
     }
 
@@ -877,6 +930,10 @@ class FreeHoldActiveViewModel @Inject constructor(
         // Stop guided audio if GUIDED was selected
         if (audio == AudioSetting.GUIDED.name) {
             guidedAudioManager.stopPlayback()
+        }
+        // Stop biofeedback sonification if BIOFEEDBACK was selected
+        if (audio == AudioSetting.BIOFEEDBACK.name) {
+            biofeedbackEngine.stop()
         }
         _uiState.update {
             it.copy(
@@ -1260,6 +1317,8 @@ class FreeHoldActiveViewModel @Inject constructor(
                     firstContractionMs     = firstContractionMs,
                     hrDeviceId             = deviceLabel,
                     guidedAudioName        = if (isGuidedMode) _uiState.value.guidedSelectedName else null,
+                    biofeedbackHrSound     = if (isBiofeedbackMode) _uiState.value.biofeedbackHrSound?.name else null,
+                    biofeedbackSpo2Texture = if (isBiofeedbackMode) _uiState.value.biofeedbackSpo2Texture?.name else null,
                     guidedHyper            = wasGuided,
                     guidedRelaxedExhaleSec = if (wasGuided) guidedState.guidedRelaxedExhaleSec else null,
                     guidedPurgeExhaleSec   = if (wasGuided) guidedState.guidedPurgeExhaleSec else null,
@@ -1335,6 +1394,7 @@ class FreeHoldActiveViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
+        biofeedbackEngine.stop()
         audioHapticEngine.shutdown()
     }
 }
@@ -1720,6 +1780,33 @@ private fun FreeHoldActiveScreenContent(
                     onAddNew = { uri, name, url -> viewModel.addGuidedAudio(uri, name, url) },
                     onDelete = { audio -> viewModel.deleteGuidedAudio(audio) },
                     onDismiss = { showGuidedPicker = false }
+                )
+            }
+
+            // Biofeedback sonification picker — shown when BIOFEEDBACK mode +
+            // hold not active. Selected-config banner doubles as the trigger
+            // (same pattern as the guided picker above).
+            var showBiofeedbackPicker by remember { mutableStateOf(false) }
+            if (!state.freeHoldActive && state.isBiofeedbackMode) {
+                val hrSound = state.biofeedbackHrSound
+                val texture = state.biofeedbackSpo2Texture
+                if (hrSound != null && texture != null) {
+                    SelectedBiofeedbackBanner(
+                        hrSound = hrSound,
+                        spo2Texture = texture,
+                        onClick = { showBiofeedbackPicker = true }
+                    )
+                } else {
+                    BiofeedbackPickerButton(onClick = { showBiofeedbackPicker = true })
+                }
+            }
+            if (showBiofeedbackPicker) {
+                BiofeedbackPickerDialog(
+                    selectedHrSound = state.biofeedbackHrSound,
+                    selectedSpo2Texture = state.biofeedbackSpo2Texture,
+                    onSelectHrSound = { viewModel.setBiofeedbackHrSound(it) },
+                    onSelectSpo2Texture = { viewModel.setBiofeedbackSpo2Texture(it) },
+                    onDismiss = { showBiofeedbackPicker = false }
                 )
             }
 
