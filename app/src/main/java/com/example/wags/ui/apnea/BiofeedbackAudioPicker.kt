@@ -44,7 +44,7 @@ fun BiofeedbackPickerButton(onClick: () -> Unit) {
             )
         ) {
             Text(
-                "🎛️  Choose Biofeedback Sound",
+                "Choose Biofeedback Sound",
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.grayscale()
             )
@@ -79,12 +79,7 @@ fun SelectedBiofeedbackBanner(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                "🎛️",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.grayscale()
-            )
-            Text(
-                "Biofeedback: ${hrSound.emoji} ${hrSound.displayName} · ${spo2Texture.emoji} ${spo2Texture.displayName}",
+                "Biofeedback: ${hrSound.displayName} · ${spo2Texture.displayName}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextPrimary,
                 maxLines = 1,
@@ -111,10 +106,13 @@ fun BiofeedbackPickerDialog(
     selectedSpo2Texture: BiofeedbackSpo2Texture?,
     onSelectHrSound: (BiofeedbackHrSound) -> Unit,
     onSelectSpo2Texture: (BiofeedbackSpo2Texture) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onPreviewHrSound: (BiofeedbackHrSound) -> Unit = {},
+    onPreviewSpo2Texture: (BiofeedbackSpo2Texture) -> Unit = {},
+    onStopPreview: () -> Unit = {}
 ) {
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { onStopPreview(); onDismiss() },
         containerColor = BackgroundDark,
         title = {
             Text(
@@ -148,11 +146,13 @@ fun BiofeedbackPickerDialog(
                 Spacer(Modifier.height(6.dp))
                 BiofeedbackHrSound.entries.forEach { sound ->
                     BiofeedbackOptionCard(
-                        emoji = sound.emoji,
                         title = sound.displayName,
                         subtitle = sound.description,
                         isSelected = selectedHrSound == sound,
-                        onClick = { onSelectHrSound(sound) }
+                        onClick = {
+                            onSelectHrSound(sound)
+                            onPreviewHrSound(sound)
+                        }
                     )
                     Spacer(Modifier.height(6.dp))
                 }
@@ -166,18 +166,20 @@ fun BiofeedbackPickerDialog(
                 Spacer(Modifier.height(6.dp))
                 BiofeedbackSpo2Texture.entries.forEach { tex ->
                     BiofeedbackOptionCard(
-                        emoji = tex.emoji,
                         title = tex.displayName,
                         subtitle = tex.description,
                         isSelected = selectedSpo2Texture == tex,
-                        onClick = { onSelectSpo2Texture(tex) }
+                        onClick = {
+                            onSelectSpo2Texture(tex)
+                            onPreviewSpo2Texture(tex)
+                        }
                     )
                     Spacer(Modifier.height(6.dp))
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = { onStopPreview(); onDismiss() }) {
                 Text(
                     if (selectedHrSound != null) "Done" else "Cancel",
                     color = TextSecondary
@@ -191,7 +193,6 @@ fun BiofeedbackPickerDialog(
 
 @Composable
 private fun BiofeedbackOptionCard(
-    emoji: String,
     title: String,
     subtitle: String,
     isSelected: Boolean,
@@ -219,7 +220,6 @@ private fun BiofeedbackOptionCard(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(emoji, style = MaterialTheme.typography.titleMedium)
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     title,

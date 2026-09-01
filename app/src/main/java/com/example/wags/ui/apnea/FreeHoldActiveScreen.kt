@@ -241,6 +241,7 @@ class FreeHoldActiveViewModel @Inject constructor(
     private val spotifyAuthManager: SpotifyAuthManager,
     private val guidedAudioManager: GuidedAudioManager,
     private val biofeedbackEngine: BiofeedbackSonificationEngine,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
     private val eucapnicConfigRepository: EucapnicConfigRepository,
     private val hyperLockManager: HyperLockManager,
     private val resonancePrepGate: ResonancePrepGate,
@@ -363,6 +364,9 @@ class FreeHoldActiveViewModel @Inject constructor(
                 }
             }
         }
+
+        // Load the bundled field recordings for the SpO2 nature textures.
+        biofeedbackEngine.loadSamples(appContext)
 
         // ── Biofeedback sonification — feed live metrics to the engine ──────
         // Forwarding unconditionally is cheap (volatile writes); the engine
@@ -599,6 +603,21 @@ class FreeHoldActiveViewModel @Inject constructor(
         prefs.edit().putString("biofeedback_spo2_texture", texture.name).apply()
         biofeedbackEngine.setSpo2Texture(texture)
         _uiState.update { it.copy(biofeedbackSpo2Texture = texture) }
+    }
+
+    /** Play a short demo of a heartbeat instrument in the picker. */
+    fun previewBiofeedbackHrSound(sound: BiofeedbackHrSound) {
+        biofeedbackEngine.previewHrSound(sound)
+    }
+
+    /** Play a short demo of an SpO2 background texture in the picker. */
+    fun previewBiofeedbackSpo2Texture(texture: BiofeedbackSpo2Texture) {
+        biofeedbackEngine.previewSpo2Texture(texture)
+    }
+
+    /** Stop any in-flight picker preview. */
+    fun stopBiofeedbackPreview() {
+        biofeedbackEngine.stopPreview()
     }
 
     // ── Guided audio library methods ─────────────────────────────────────────
@@ -1806,7 +1825,10 @@ private fun FreeHoldActiveScreenContent(
                     selectedSpo2Texture = state.biofeedbackSpo2Texture,
                     onSelectHrSound = { viewModel.setBiofeedbackHrSound(it) },
                     onSelectSpo2Texture = { viewModel.setBiofeedbackSpo2Texture(it) },
-                    onDismiss = { showBiofeedbackPicker = false }
+                    onDismiss = { showBiofeedbackPicker = false },
+                    onPreviewHrSound = { viewModel.previewBiofeedbackHrSound(it) },
+                    onPreviewSpo2Texture = { viewModel.previewBiofeedbackSpo2Texture(it) },
+                    onStopPreview = { viewModel.stopBiofeedbackPreview() }
                 )
             }
 

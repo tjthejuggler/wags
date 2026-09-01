@@ -1,0 +1,981 @@
+kotlin version: 2.0.21
+error message: org.jetbrains.kotlin.backend.common.BackendException: Backend Internal error: Exception during IR lowering
+File being compiled: /home/twain/AndroidStudioProjects/wags/app/src/main/java/com/example/wags/ui/apnea/ApneaViewModel.kt
+The root cause java.lang.RuntimeException was thrown at: org.jetbrains.kotlin.backend.jvm.codegen.FunctionCodegen.generate(FunctionCodegen.kt:47)
+	at org.jetbrains.kotlin.backend.common.CodegenUtil.reportBackendException(CodegenUtil.kt:253)
+	at org.jetbrains.kotlin.backend.common.CodegenUtil.reportBackendException$default(CodegenUtil.kt:236)
+	at org.jetbrains.kotlin.backend.common.phaser.PerformByIrFilePhase.invokeSequential(performByIrFile.kt:65)
+	at org.jetbrains.kotlin.backend.common.phaser.PerformByIrFilePhase.invoke(performByIrFile.kt:52)
+	at org.jetbrains.kotlin.backend.common.phaser.PerformByIrFilePhase.invoke(performByIrFile.kt:38)
+	at org.jetbrains.kotlin.backend.common.phaser.NamedCompilerPhase.phaseBody(CompilerPhase.kt:166)
+	at org.jetbrains.kotlin.backend.common.phaser.AbstractNamedCompilerPhase.invoke(CompilerPhase.kt:113)
+	at org.jetbrains.kotlin.backend.common.phaser.CompositePhase.invoke(PhaseBuilders.kt:27)
+	at org.jetbrains.kotlin.backend.common.phaser.CompositePhase.invoke(PhaseBuilders.kt:14)
+	at org.jetbrains.kotlin.backend.common.phaser.NamedCompilerPhase.phaseBody(CompilerPhase.kt:166)
+	at org.jetbrains.kotlin.backend.common.phaser.AbstractNamedCompilerPhase.invoke(CompilerPhase.kt:113)
+	at org.jetbrains.kotlin.backend.common.phaser.CompilerPhaseKt.invokeToplevel(CompilerPhase.kt:62)
+	at org.jetbrains.kotlin.backend.jvm.JvmIrCodegenFactory.invokeCodegen(JvmIrCodegenFactory.kt:371)
+	at org.jetbrains.kotlin.codegen.CodegenFactory.generateModule(CodegenFactory.kt:47)
+	at org.jetbrains.kotlin.backend.jvm.JvmIrCodegenFactory.generateModuleInFrontendIRMode(JvmIrCodegenFactory.kt:433)
+	at org.jetbrains.kotlin.cli.jvm.compiler.pipeline.JvmCompilerPipelineKt.generateCodeFromIr(jvmCompilerPipeline.kt:246)
+	at org.jetbrains.kotlin.cli.jvm.compiler.pipeline.JvmCompilerPipelineKt.compileModulesUsingFrontendIrAndLightTree(jvmCompilerPipeline.kt:142)
+	at org.jetbrains.kotlin.cli.jvm.K2JVMCompiler.doExecute(K2JVMCompiler.kt:148)
+	at org.jetbrains.kotlin.cli.jvm.K2JVMCompiler.doExecute(K2JVMCompiler.kt:43)
+	at org.jetbrains.kotlin.cli.common.CLICompiler.execImpl(CLICompiler.kt:103)
+	at org.jetbrains.kotlin.cli.common.CLICompiler.execImpl(CLICompiler.kt:49)
+	at org.jetbrains.kotlin.cli.common.CLITool.exec(CLITool.kt:101)
+	at org.jetbrains.kotlin.incremental.IncrementalJvmCompilerRunner.runCompiler(IncrementalJvmCompilerRunner.kt:464)
+	at org.jetbrains.kotlin.incremental.IncrementalJvmCompilerRunner.runCompiler(IncrementalJvmCompilerRunner.kt:73)
+	at org.jetbrains.kotlin.incremental.IncrementalCompilerRunner.doCompile(IncrementalCompilerRunner.kt:506)
+	at org.jetbrains.kotlin.incremental.IncrementalCompilerRunner.compileImpl(IncrementalCompilerRunner.kt:423)
+	at org.jetbrains.kotlin.incremental.IncrementalCompilerRunner.compileNonIncrementally(IncrementalCompilerRunner.kt:301)
+	at org.jetbrains.kotlin.incremental.IncrementalCompilerRunner.compile(IncrementalCompilerRunner.kt:129)
+	at org.jetbrains.kotlin.daemon.CompileServiceImplBase.execIncrementalCompiler(CompileServiceImpl.kt:675)
+	at org.jetbrains.kotlin.daemon.CompileServiceImplBase.access$execIncrementalCompiler(CompileServiceImpl.kt:92)
+	at org.jetbrains.kotlin.daemon.CompileServiceImpl.compile(CompileServiceImpl.kt:1660)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.rmi/sun.rmi.server.UnicastServerRef.dispatch(UnicastServerRef.java:360)
+	at java.rmi/sun.rmi.transport.Transport$1.run(Transport.java:200)
+	at java.rmi/sun.rmi.transport.Transport$1.run(Transport.java:197)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:712)
+	at java.rmi/sun.rmi.transport.Transport.serviceCall(Transport.java:196)
+	at java.rmi/sun.rmi.transport.tcp.TCPTransport.handleMessages(TCPTransport.java:587)
+	at java.rmi/sun.rmi.transport.tcp.TCPTransport$ConnectionHandler.run0(TCPTransport.java:828)
+	at java.rmi/sun.rmi.transport.tcp.TCPTransport$ConnectionHandler.lambda$run$0(TCPTransport.java:705)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:399)
+	at java.rmi/sun.rmi.transport.tcp.TCPTransport$ConnectionHandler.run(TCPTransport.java:704)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+Caused by: java.lang.RuntimeException: Exception while generating code for:
+FUN name:invokeSuspend visibility:public modality:FINAL <> ($this:com.example.wags.ui.apnea.ApneaViewModel.<no name provided>, $result:kotlin.Result<kotlin.Any?>) returnType:kotlin.Any?
+  overridden:
+    protected abstract fun invokeSuspend ($result: kotlin.Result<kotlin.Any?>): kotlin.Any? declared in kotlin.coroutines.jvm.internal.SuspendLambda
+  $this: VALUE_PARAMETER INSTANCE_RECEIVER name:<this> type:com.example.wags.ui.apnea.ApneaViewModel.<no name provided>
+  VALUE_PARAMETER name:$result index:0 type:kotlin.Result<kotlin.Any?>
+  BLOCK_BODY
+    CALL 'public final fun collectLatest <T> (action: kotlin.coroutines.SuspendFunction1<@[ParameterName(name = "value")] T of kotlinx.coroutines.flow.FlowKt.collectLatest, kotlin.Unit>, $completion: kotlin.coroutines.Continuation<kotlin.Unit>): kotlin.Any? [suspend] declared in kotlinx.coroutines.flow.FlowKt' type=kotlin.Unit origin=null
+      <T>: kotlin.Array<out kotlin.Any>
+      $receiver: CALL 'public final fun combine <T1, T2, R> (flow: kotlinx.coroutines.flow.Flow<T1 of kotlinx.coroutines.flow.FlowKt.combine>, flow2: kotlinx.coroutines.flow.Flow<T2 of kotlinx.coroutines.flow.FlowKt.combine>, transform: kotlin.coroutines.SuspendFunction2<@[ParameterName(name = "a")] T1 of kotlinx.coroutines.flow.FlowKt.combine, @[ParameterName(name = "b")] T2 of kotlinx.coroutines.flow.FlowKt.combine, R of kotlinx.coroutines.flow.FlowKt.combine>): kotlinx.coroutines.flow.Flow<R of kotlinx.coroutines.flow.FlowKt.combine> declared in kotlinx.coroutines.flow.FlowKt' type=kotlinx.coroutines.flow.Flow<kotlin.Array<out kotlin.Any>> origin=null
+        <T1>: kotlin.Array<out kotlin.Any>
+        <T2>: kotlin.Int
+        <R>: kotlin.Array<out kotlin.Any>
+        flow: CALL 'public final fun combine <T, R> (vararg flows: kotlinx.coroutines.flow.Flow<T of kotlinx.coroutines.flow.FlowKt.combine>, transform: kotlin.coroutines.SuspendFunction1<kotlin.Array<T of kotlinx.coroutines.flow.FlowKt.combine>, R of kotlinx.coroutines.flow.FlowKt.combine>): kotlinx.coroutines.flow.Flow<R of kotlinx.coroutines.flow.FlowKt.combine> [inline] declared in kotlinx.coroutines.flow.FlowKt' type=kotlinx.coroutines.flow.Flow<kotlin.Array<out kotlin.Any>> origin=null
+          <T>: kotlin.Any
+          <R>: kotlin.Array<out kotlin.Any>
+          flows: BLOCK type=kotlin.Array<out kotlinx.coroutines.flow.Flow<kotlin.Any>> origin=null
+            VAR IR_TEMPORARY_VARIABLE name:tmp0 type:kotlin.Array<out kotlinx.coroutines.flow.Flow<kotlin.Any>> [val]
+              CALL 'public final fun arrayOfNulls <T> (size: kotlin.Int): kotlin.Array<T of kotlin.arrayOfNulls?> declared in kotlin' type=kotlin.Array<out kotlinx.coroutines.flow.Flow<kotlin.Any>> origin=null
+                <T>: kotlinx.coroutines.flow.Flow<kotlin.Any>
+                size: CONST Int type=kotlin.Int value=6
+            CALL 'public final fun set (index: kotlin.Int, value: T of kotlin.Array): kotlin.Unit [operator] declared in kotlin.Array' type=kotlin.Unit origin=null
+              $this: GET_VAR 'val tmp0: kotlin.Array<out kotlinx.coroutines.flow.Flow<kotlin.Any>> [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend' type=kotlin.Array<out kotlinx.coroutines.flow.Flow<kotlin.Any>> origin=null
+              index: CONST Int type=kotlin.Int value=0
+              value: CALL 'public final fun access$get_lungVolume$p ($this: com.example.wags.ui.apnea.ApneaViewModel): kotlinx.coroutines.flow.MutableStateFlow<kotlin.String> declared in com.example.wags.ui.apnea.ApneaViewModel' type=kotlinx.coroutines.flow.MutableStateFlow<kotlin.String> origin=null
+                $this: GET_FIELD 'FIELD FIELD_FOR_CAPTURED_VALUE name:this$0 type:com.example.wags.ui.apnea.ApneaViewModel visibility:public/*package*/ [final] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>' type=com.example.wags.ui.apnea.ApneaViewModel origin=null
+                  receiver: GET_VAR '<this>: com.example.wags.ui.apnea.ApneaViewModel.<no name provided> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided> origin=null
+            CALL 'public final fun set (index: kotlin.Int, value: T of kotlin.Array): kotlin.Unit [operator] declared in kotlin.Array' type=kotlin.Unit origin=null
+              $this: GET_VAR 'val tmp0: kotlin.Array<out kotlinx.coroutines.flow.Flow<kotlin.Any>> [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend' type=kotlin.Array<out kotlinx.coroutines.flow.Flow<kotlin.Any>> origin=null
+              index: CONST Int type=kotlin.Int value=1
+              value: CALL 'public final fun access$get_prepType$p ($this: com.example.wags.ui.apnea.ApneaViewModel): kotlinx.coroutines.flow.MutableStateFlow<com.example.wags.domain.model.PrepType> declared in com.example.wags.ui.apnea.ApneaViewModel' type=kotlinx.coroutines.flow.MutableStateFlow<com.example.wags.domain.model.PrepType> origin=null
+                $this: GET_FIELD 'FIELD FIELD_FOR_CAPTURED_VALUE name:this$0 type:com.example.wags.ui.apnea.ApneaViewModel visibility:public/*package*/ [final] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>' type=com.example.wags.ui.apnea.ApneaViewModel origin=null
+                  receiver: GET_VAR '<this>: com.example.wags.ui.apnea.ApneaViewModel.<no name provided> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided> origin=null
+            CALL 'public final fun set (index: kotlin.Int, value: T of kotlin.Array): kotlin.Unit [operator] declared in kotlin.Array' type=kotlin.Unit origin=null
+              $this: GET_VAR 'val tmp0: kotlin.Array<out kotlinx.coroutines.flow.Flow<kotlin.Any>> [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend' type=kotlin.Array<out kotlinx.coroutines.flow.Flow<kotlin.Any>> origin=null
+              index: CONST Int type=kotlin.Int value=2
+              value: CALL 'public final fun access$get_effectiveTod$p ($this: com.example.wags.ui.apnea.ApneaViewModel): kotlinx.coroutines.flow.Flow<kotlin.String> declared in com.example.wags.ui.apnea.ApneaViewModel' type=kotlinx.coroutines.flow.Flow<kotlin.String> origin=null
+                $this: GET_FIELD 'FIELD FIELD_FOR_CAPTURED_VALUE name:this$0 type:com.example.wags.ui.apnea.ApneaViewModel visibility:public/*package*/ [final] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>' type=com.example.wags.ui.apnea.ApneaViewModel origin=null
+                  receiver: GET_VAR '<this>: com.example.wags.ui.apnea.ApneaViewModel.<no name provided> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided> origin=null
+            CALL 'public final fun set (index: kotlin.Int, value: T of kotlin.Array): kotlin.Unit [operator] declared in kotlin.Array' type=kotlin.Unit origin=null
+              $this: GET_VAR 'val tmp0: kotlin.Array<out kotlinx.coroutines.flow.Flow<kotlin.Any>> [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend' type=kotlin.Array<out kotlinx.coroutines.flow.Flow<kotlin.Any>> origin=null
+              index: CONST Int type=kotlin.Int value=3
+              value: CALL 'public final fun access$get_posture$p ($this: com.example.wags.ui.apnea.ApneaViewModel): kotlinx.coroutines.flow.MutableStateFlow<com.example.wags.domain.model.Posture> declared in com.example.wags.ui.apnea.ApneaViewModel' type=kotlinx.coroutines.flow.MutableStateFlow<com.example.wags.domain.model.Posture> origin=null
+                $this: GET_FIELD 'FIELD FIELD_FOR_CAPTURED_VALUE name:this$0 type:com.example.wags.ui.apnea.ApneaViewModel visibility:public/*package*/ [final] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>' type=com.example.wags.ui.apnea.ApneaViewModel origin=null
+                  receiver: GET_VAR '<this>: com.example.wags.ui.apnea.ApneaViewModel.<no name provided> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided> origin=null
+            CALL 'public final fun set (index: kotlin.Int, value: T of kotlin.Array): kotlin.Unit [operator] declared in kotlin.Array' type=kotlin.Unit origin=null
+              $this: GET_VAR 'val tmp0: kotlin.Array<out kotlinx.coroutines.flow.Flow<kotlin.Any>> [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend' type=kotlin.Array<out kotlinx.coroutines.flow.Flow<kotlin.Any>> origin=null
+              index: CONST Int type=kotlin.Int value=4
+              value: CALL 'public final fun access$get_audio$p ($this: com.example.wags.ui.apnea.ApneaViewModel): kotlinx.coroutines.flow.MutableStateFlow<com.example.wags.domain.model.AudioSetting> declared in com.example.wags.ui.apnea.ApneaViewModel' type=kotlinx.coroutines.flow.MutableStateFlow<com.example.wags.domain.model.AudioSetting> origin=null
+                $this: GET_FIELD 'FIELD FIELD_FOR_CAPTURED_VALUE name:this$0 type:com.example.wags.ui.apnea.ApneaViewModel visibility:public/*package*/ [final] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>' type=com.example.wags.ui.apnea.ApneaViewModel origin=null
+                  receiver: GET_VAR '<this>: com.example.wags.ui.apnea.ApneaViewModel.<no name provided> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided> origin=null
+            CALL 'public final fun set (index: kotlin.Int, value: T of kotlin.Array): kotlin.Unit [operator] declared in kotlin.Array' type=kotlin.Unit origin=null
+              $this: GET_VAR 'val tmp0: kotlin.Array<out kotlinx.coroutines.flow.Flow<kotlin.Any>> [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend' type=kotlin.Array<out kotlinx.coroutines.flow.Flow<kotlin.Any>> origin=null
+              index: CONST Int type=kotlin.Int value=5
+              value: CALL 'public final fun access$get_progO2BreathPeriodSec$p ($this: com.example.wags.ui.apnea.ApneaViewModel): kotlinx.coroutines.flow.MutableStateFlow<kotlin.Int> declared in com.example.wags.ui.apnea.ApneaViewModel' type=kotlinx.coroutines.flow.MutableStateFlow<kotlin.Int> origin=null
+                $this: GET_FIELD 'FIELD FIELD_FOR_CAPTURED_VALUE name:this$0 type:com.example.wags.ui.apnea.ApneaViewModel visibility:public/*package*/ [final] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>' type=com.example.wags.ui.apnea.ApneaViewModel origin=null
+                  receiver: GET_VAR '<this>: com.example.wags.ui.apnea.ApneaViewModel.<no name provided> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided> origin=null
+            GET_VAR 'val tmp0: kotlin.Array<out kotlinx.coroutines.flow.Flow<kotlin.Any>> [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend' type=kotlin.Array<out kotlinx.coroutines.flow.Flow<kotlin.Any>> origin=null
+          transform: BLOCK type=kotlin.coroutines.SuspendFunction1<kotlin.Nothing, kotlin.Array<out kotlin.Any>> origin=LAMBDA
+            COMPOSITE type=kotlin.Unit origin=null
+            FUNCTION_REFERENCE 'private final fun invokeSuspend$lambda$0 (args: kotlin.Array<out kotlin.Any>, $completion: kotlin.coroutines.Continuation<kotlin.Array<out kotlin.Any>>): kotlin.Any? [suspend] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>' type=kotlin.coroutines.SuspendFunction1<kotlin.Nothing, kotlin.Array<out kotlin.Any>> origin=INLINE_LAMBDA reflectionTarget=null
+        flow2: CALL 'public final fun access$get_forecastRefreshTrigger$p ($this: com.example.wags.ui.apnea.ApneaViewModel): kotlinx.coroutines.flow.MutableStateFlow<kotlin.Int> declared in com.example.wags.ui.apnea.ApneaViewModel' type=kotlinx.coroutines.flow.MutableStateFlow<kotlin.Int> origin=null
+          $this: GET_FIELD 'FIELD FIELD_FOR_CAPTURED_VALUE name:this$0 type:com.example.wags.ui.apnea.ApneaViewModel visibility:public/*package*/ [final] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>' type=com.example.wags.ui.apnea.ApneaViewModel origin=null
+            receiver: GET_VAR '<this>: com.example.wags.ui.apnea.ApneaViewModel.<no name provided> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided> origin=null
+        transform: BLOCK type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> origin=null
+          CLASS SUSPEND_LAMBDA CLASS name:<no name provided> modality:FINAL visibility:public/*package*/ superTypes:[kotlin.coroutines.jvm.internal.SuspendLambda; kotlin.jvm.functions.Function3<kotlin.Array<out kotlin.Any>, kotlin.Int, kotlin.coroutines.Continuation<kotlin.Array<out kotlin.Any>>?, kotlin.Any?>]
+            $this: VALUE_PARAMETER INSTANCE_RECEIVER name:<this> type:com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>
+            FIELD name:label type:kotlin.Int visibility:public/*package*/
+            FIELD FIELD_FOR_CAPTURED_VALUE name:L$0 type:kotlin.Any? visibility:public/*package*/
+            CONSTRUCTOR SUSPEND_LAMBDA visibility:public/*package*/ <> ($completion:kotlin.coroutines.Continuation<com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>>?) returnType:com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> [primary]
+              VALUE_PARAMETER name:$completion index:0 type:kotlin.coroutines.Continuation<com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>>?
+              BLOCK_BODY
+                DELEGATING_CONSTRUCTOR_CALL 'public constructor <init> (arity: kotlin.Int, $completion: kotlin.coroutines.Continuation<kotlin.Any?>?) declared in kotlin.coroutines.jvm.internal.SuspendLambda'
+                  arity: CONST Int type=kotlin.Int value=3
+                  $completion: GET_VAR '$completion: kotlin.coroutines.Continuation<com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>>? declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.<init>' type=kotlin.coroutines.Continuation<com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>>? origin=null
+                BLOCK type=kotlin.Unit origin=null
+            FUN name:invokeSuspend visibility:public modality:FINAL <> ($this:com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>, $result:kotlin.Result<kotlin.Any?>) returnType:kotlin.Any?
+              overridden:
+                protected abstract fun invokeSuspend ($result: kotlin.Result<kotlin.Any?>): kotlin.Any? declared in kotlin.coroutines.jvm.internal.SuspendLambda
+              $this: VALUE_PARAMETER INSTANCE_RECEIVER name:<this> type:com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>
+              VALUE_PARAMETER name:$result index:0 type:kotlin.Result<kotlin.Any?>
+              BLOCK_BODY
+                VAR name:arr type:kotlin.Array<out kotlin.Any> [val]
+                  BLOCK type=kotlin.Array<out kotlin.Any> origin=null
+                    GET_FIELD 'FIELD FIELD_FOR_CAPTURED_VALUE name:L$0 type:kotlin.Any? visibility:public/*package*/ declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>' type=kotlin.Array<out kotlin.Any> origin=null
+                      receiver: GET_VAR '<this>: com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> origin=null
+                RETURN type=kotlin.Nothing from='public final fun invokeSuspend ($result: kotlin.Result<kotlin.Any?>): kotlin.Any? declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>'
+                  GET_VAR 'val arr: kotlin.Array<out kotlin.Any> [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.Array<out kotlin.Any> origin=null
+            FUN name:invoke visibility:public modality:FINAL <> ($this:com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>, p1:kotlin.Array<out kotlin.Any>, p2:kotlin.Int, p3:kotlin.coroutines.Continuation<kotlin.Array<out kotlin.Any>>?) returnType:kotlin.Any?
+              overridden:
+                public abstract fun invoke (p1: P1 of kotlin.jvm.functions.Function3, p2: P2 of kotlin.jvm.functions.Function3, p3: P3 of kotlin.jvm.functions.Function3): R of kotlin.jvm.functions.Function3 declared in kotlin.jvm.functions.Function3
+              $this: VALUE_PARAMETER INSTANCE_RECEIVER name:<this> type:com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>
+              VALUE_PARAMETER name:p1 index:0 type:kotlin.Array<out kotlin.Any>
+              VALUE_PARAMETER name:p2 index:1 type:kotlin.Int
+              VALUE_PARAMETER name:p3 index:2 type:kotlin.coroutines.Continuation<kotlin.Array<out kotlin.Any>>?
+              BLOCK_BODY
+                VAR IR_TEMPORARY_VARIABLE name:tmp0_result type:com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> [val]
+                  CONSTRUCTOR_CALL 'public/*package*/ constructor <init> ($completion: kotlin.coroutines.Continuation<com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>>?) [primary] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> origin=null
+                    $completion: GET_VAR 'p3: kotlin.coroutines.Continuation<kotlin.Array<out kotlin.Any>>? declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invoke' type=kotlin.coroutines.Continuation<kotlin.Array<out kotlin.Any>>? origin=null
+                SET_FIELD 'FIELD FIELD_FOR_CAPTURED_VALUE name:L$0 type:kotlin.Any? visibility:public/*package*/ declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>' type=kotlin.Unit origin=null
+                  receiver: GET_VAR 'val tmp0_result: com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invoke' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> origin=null
+                  value: GET_VAR 'p1: kotlin.Array<out kotlin.Any> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invoke' type=kotlin.Array<out kotlin.Any> origin=null
+                RETURN type=kotlin.Nothing from='public final fun invoke (p1: kotlin.Array<out kotlin.Any>, p2: kotlin.Int, p3: kotlin.coroutines.Continuation<kotlin.Array<out kotlin.Any>>?): kotlin.Any? declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>'
+                  CALL 'public final fun invokeSuspend ($result: kotlin.Result<kotlin.Any?>): kotlin.Any? declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>' type=kotlin.Any? origin=null
+                    $this: GET_VAR 'val tmp0_result: com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invoke' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> origin=null
+                    $result: CALL 'public final fun <unsafe-coerce> <T, R> (v: T of kotlin.jvm.internal.<unsafe-coerce>): R of kotlin.jvm.internal.<unsafe-coerce> declared in kotlin.jvm.internal' type=kotlin.Result<kotlin.Any?> origin=null
+                      <T>: kotlin.Any?
+                      <R>: kotlin.Result<kotlin.Any?>
+                      v: GET_FIELD 'FIELD FIELD_FOR_OBJECT_INSTANCE name:INSTANCE type:kotlin.Unit visibility:public [final,static] declared in kotlin.Unit' type=kotlin.Unit origin=null
+            FUN BRIDGE name:invoke visibility:public modality:OPEN <> ($this:com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>, p1:kotlin.Any?, p2:kotlin.Any?, p3:kotlin.Any?) returnType:kotlin.Any?
+              $this: VALUE_PARAMETER INSTANCE_RECEIVER name:<this> type:com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>
+              VALUE_PARAMETER BRIDGE name:p1 index:0 type:kotlin.Any?
+              VALUE_PARAMETER BRIDGE name:p2 index:1 type:kotlin.Any?
+              VALUE_PARAMETER BRIDGE name:p3 index:2 type:kotlin.Any?
+              EXPRESSION_BODY
+                RETURN type=kotlin.Nothing from='public open fun invoke (p1: kotlin.Any?, p2: kotlin.Any?, p3: kotlin.Any?): kotlin.Any? declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>'
+                  CALL 'public final fun invoke (p1: kotlin.Array<out kotlin.Any>, p2: kotlin.Int, p3: kotlin.coroutines.Continuation<kotlin.Array<out kotlin.Any>>?): kotlin.Any? declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>' type=kotlin.Any? origin=BRIDGE_DELEGATION
+                    $this: GET_VAR '<this>: com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invoke' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> origin=null
+                    p1: TYPE_OP type=kotlin.Array<*> origin=IMPLICIT_CAST typeOperand=kotlin.Array<*>
+                      GET_VAR 'p1: kotlin.Any? declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invoke' type=kotlin.Any? origin=null
+                    p2: TYPE_OP type=kotlin.Int origin=IMPLICIT_CAST typeOperand=kotlin.Int
+                      GET_VAR 'p2: kotlin.Any? declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invoke' type=kotlin.Any? origin=null
+                    p3: TYPE_OP type=kotlin.coroutines.Continuation<*> origin=IMPLICIT_CAST typeOperand=kotlin.coroutines.Continuation<*>
+                      GET_VAR 'p3: kotlin.Any? declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invoke' type=kotlin.Any? origin=null
+          CONSTRUCTOR_CALL 'public/*package*/ constructor <init> ($completion: kotlin.coroutines.Continuation<com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>>?) [primary] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> origin=null
+            $completion: CONST Null type=kotlin.Nothing? value=null
+      action: BLOCK type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> origin=null
+        CLASS SUSPEND_LAMBDA CLASS name:<no name provided> modality:FINAL visibility:public/*package*/ superTypes:[kotlin.coroutines.jvm.internal.SuspendLambda; kotlin.jvm.functions.Function2<kotlin.Array<out kotlin.Any>, kotlin.coroutines.Continuation<kotlin.Unit>?, kotlin.Any?>]
+          $this: VALUE_PARAMETER INSTANCE_RECEIVER name:<this> type:com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>
+          FIELD name:label type:kotlin.Int visibility:public/*package*/
+          FIELD FIELD_FOR_CAPTURED_VALUE name:L$0 type:kotlin.Any? visibility:public/*package*/
+          CONSTRUCTOR SUSPEND_LAMBDA visibility:public/*package*/ <> (this$0:com.example.wags.ui.apnea.ApneaViewModel, $completion:kotlin.coroutines.Continuation<com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>>?) returnType:com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> [primary]
+            VALUE_PARAMETER BOUND_RECEIVER_PARAMETER name:this$0 index:0 type:com.example.wags.ui.apnea.ApneaViewModel
+            VALUE_PARAMETER name:$completion index:1 type:kotlin.coroutines.Continuation<com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>>?
+            BLOCK_BODY
+              SET_FIELD 'FIELD FIELD_FOR_CAPTURED_VALUE name:this$0 type:com.example.wags.ui.apnea.ApneaViewModel visibility:public/*package*/ [final] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>' type=kotlin.Unit origin=INITIALIZER_OF_FIELD_FOR_CAPTURED_VALUE
+                receiver: GET_VAR '<this>: com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> origin=null
+                value: GET_VAR 'this$0: com.example.wags.ui.apnea.ApneaViewModel declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.<init>' type=com.example.wags.ui.apnea.ApneaViewModel origin=null
+              DELEGATING_CONSTRUCTOR_CALL 'public constructor <init> (arity: kotlin.Int, $completion: kotlin.coroutines.Continuation<kotlin.Any?>?) declared in kotlin.coroutines.jvm.internal.SuspendLambda'
+                arity: CONST Int type=kotlin.Int value=2
+                $completion: GET_VAR '$completion: kotlin.coroutines.Continuation<com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>>? declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.<init>' type=kotlin.coroutines.Continuation<com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>>? origin=null
+              BLOCK type=kotlin.Unit origin=null
+          FUN name:invokeSuspend visibility:public modality:FINAL <> ($this:com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>, $result:kotlin.Result<kotlin.Any?>) returnType:kotlin.Any?
+            overridden:
+              protected abstract fun invokeSuspend ($result: kotlin.Result<kotlin.Any?>): kotlin.Any? declared in kotlin.coroutines.jvm.internal.SuspendLambda
+            $this: VALUE_PARAMETER INSTANCE_RECEIVER name:<this> type:com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>
+            VALUE_PARAMETER name:$result index:0 type:kotlin.Result<kotlin.Any?>
+            BLOCK_BODY
+              VAR name:arr type:kotlin.Array<out kotlin.Any> [val]
+                BLOCK type=kotlin.Array<out kotlin.Any> origin=null
+                  GET_FIELD 'FIELD FIELD_FOR_CAPTURED_VALUE name:L$0 type:kotlin.Any? visibility:public/*package*/ declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>' type=kotlin.Array<out kotlin.Any> origin=null
+                    receiver: GET_VAR '<this>: com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> origin=null
+              CALL 'public final fun delay (timeMillis: kotlin.Long, $completion: kotlin.coroutines.Continuation<kotlin.Unit>): kotlin.Any? [suspend] declared in kotlinx.coroutines.DelayKt' type=kotlin.Unit origin=null
+                timeMillis: CONST Long type=kotlin.Long value=150
+                $completion: GET_VAR '<this>: com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> origin=null
+              COMPOSITE type=kotlin.Unit origin=null
+                TRY type=kotlin.Any
+                  try: BLOCK type=kotlin.Unit origin=null
+                    VAR name:lv type:kotlin.String [val]
+                      BLOCK type=kotlin.String origin=null
+                        VAR IR_TEMPORARY_VARIABLE name:tmp0 type:kotlin.Any? [val]
+                          CALL 'public final fun get (index: kotlin.Int): T of kotlin.Array [operator] declared in kotlin.Array' type=kotlin.Any origin=GET_ARRAY_ELEMENT
+                            $this: GET_VAR 'val arr: kotlin.Array<out kotlin.Any> [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.Array<out kotlin.Any> origin=null
+                            index: CONST Int type=kotlin.Int value=0
+                        CALL 'public final fun checkNotNull (object: kotlin.Any?, message: kotlin.String): kotlin.Unit declared in kotlin.jvm.internal.Intrinsics' type=kotlin.Unit origin=null
+                          object: GET_VAR 'val tmp0: kotlin.Any? [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.Any? origin=null
+                          message: CONST String type=kotlin.String value="null cannot be cast to non-null type kotlin.String"
+                        TYPE_OP type=kotlin.String? origin=CAST typeOperand=kotlin.String?
+                          GET_VAR 'val tmp0: kotlin.Any? [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.Any? origin=null
+                    VAR name:pt type:kotlin.String [val]
+                      CALL 'public final fun <get-name> (): kotlin.String [fake_override] declared in com.example.wags.domain.model.PrepType' type=kotlin.String origin=GET_PROPERTY
+                        $this: BLOCK type=com.example.wags.domain.model.PrepType origin=null
+                          VAR IR_TEMPORARY_VARIABLE name:tmp1 type:kotlin.Any? [val]
+                            CALL 'public final fun get (index: kotlin.Int): T of kotlin.Array [operator] declared in kotlin.Array' type=kotlin.Any origin=GET_ARRAY_ELEMENT
+                              $this: GET_VAR 'val arr: kotlin.Array<out kotlin.Any> [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.Array<out kotlin.Any> origin=null
+                              index: CONST Int type=kotlin.Int value=1
+                          CALL 'public final fun checkNotNull (object: kotlin.Any?, message: kotlin.String): kotlin.Unit declared in kotlin.jvm.internal.Intrinsics' type=kotlin.Unit origin=null
+                            object: GET_VAR 'val tmp1: kotlin.Any? [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.Any? origin=null
+                            message: CONST String type=kotlin.String value="null cannot be cast to non-null type com.example.wags.domain.model.PrepType"
+                          TYPE_OP type=com.example.wags.domain.model.PrepType? origin=CAST typeOperand=com.example.wags.domain.model.PrepType?
+                            GET_VAR 'val tmp1: kotlin.Any? [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.Any? origin=null
+                    VAR name:tod type:kotlin.String [val]
+                      BLOCK type=kotlin.String origin=null
+                        VAR IR_TEMPORARY_VARIABLE name:tmp2 type:kotlin.Any? [val]
+                          CALL 'public final fun get (index: kotlin.Int): T of kotlin.Array [operator] declared in kotlin.Array' type=kotlin.Any origin=GET_ARRAY_ELEMENT
+                            $this: GET_VAR 'val arr: kotlin.Array<out kotlin.Any> [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.Array<out kotlin.Any> origin=null
+                            index: CONST Int type=kotlin.Int value=2
+                        CALL 'public final fun checkNotNull (object: kotlin.Any?, message: kotlin.String): kotlin.Unit declared in kotlin.jvm.internal.Intrinsics' type=kotlin.Unit origin=null
+                          object: GET_VAR 'val tmp2: kotlin.Any? [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.Any? origin=null
+                          message: CONST String type=kotlin.String value="null cannot be cast to non-null type kotlin.String"
+                        TYPE_OP type=kotlin.String? origin=CAST typeOperand=kotlin.String?
+                          GET_VAR 'val tmp2: kotlin.Any? [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.Any? origin=null
+                    VAR name:pos type:kotlin.String [val]
+                      CALL 'public final fun <get-name> (): kotlin.String [fake_override] declared in com.example.wags.domain.model.Posture' type=kotlin.String origin=GET_PROPERTY
+                        $this: BLOCK type=com.example.wags.domain.model.Posture origin=null
+                          VAR IR_TEMPORARY_VARIABLE name:tmp3 type:kotlin.Any? [val]
+                            CALL 'public final fun get (index: kotlin.Int): T of kotlin.Array [operator] declared in kotlin.Array' type=kotlin.Any origin=GET_ARRAY_ELEMENT
+                              $this: GET_VAR 'val arr: kotlin.Array<out kotlin.Any> [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.Array<out kotlin.Any> origin=null
+                              index: CONST Int type=kotlin.Int value=3
+                          CALL 'public final fun checkNotNull (object: kotlin.Any?, message: kotlin.String): kotlin.Unit declared in kotlin.jvm.internal.Intrinsics' type=kotlin.Unit origin=null
+                            object: GET_VAR 'val tmp3: kotlin.Any? [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.Any? origin=null
+                            message: CONST String type=kotlin.String value="null cannot be cast to non-null type com.example.wags.domain.model.Posture"
+                          TYPE_OP type=com.example.wags.domain.model.Posture? origin=CAST typeOperand=com.example.wags.domain.model.Posture?
+                            GET_VAR 'val tmp3: kotlin.Any? [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.Any? origin=null
+                    VAR name:aud type:kotlin.String [val]
+                      CALL 'public final fun <get-name> (): kotlin.String [fake_override] declared in com.example.wags.domain.model.AudioSetting' type=kotlin.String origin=GET_PROPERTY
+                        $this: BLOCK type=com.example.wags.domain.model.AudioSetting origin=null
+                          VAR IR_TEMPORARY_VARIABLE name:tmp4 type:kotlin.Any? [val]
+                            CALL 'public final fun get (index: kotlin.Int): T of kotlin.Array [operator] declared in kotlin.Array' type=kotlin.Any origin=GET_ARRAY_ELEMENT
+                              $this: GET_VAR 'val arr: kotlin.Array<out kotlin.Any> [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.Array<out kotlin.Any> origin=null
+                              index: CONST Int type=kotlin.Int value=4
+                          CALL 'public final fun checkNotNull (object: kotlin.Any?, message: kotlin.String): kotlin.Unit declared in kotlin.jvm.internal.Intrinsics' type=kotlin.Unit origin=null
+                            object: GET_VAR 'val tmp4: kotlin.Any? [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.Any? origin=null
+                            message: CONST String type=kotlin.String value="null cannot be cast to non-null type com.example.wags.domain.model.AudioSetting"
+                          TYPE_OP type=com.example.wags.domain.model.AudioSetting? origin=CAST typeOperand=com.example.wags.domain.model.AudioSetting?
+                            GET_VAR 'val tmp4: kotlin.Any? [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.Any? origin=null
+                    VAR name:bp type:kotlin.Int [val]
+                      BLOCK type=kotlin.Int origin=null
+                        VAR IR_TEMPORARY_VARIABLE name:tmp5 type:kotlin.Any? [val]
+                          CALL 'public final fun get (index: kotlin.Int): T of kotlin.Array [operator] declared in kotlin.Array' type=kotlin.Any origin=GET_ARRAY_ELEMENT
+                            $this: GET_VAR 'val arr: kotlin.Array<out kotlin.Any> [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.Array<out kotlin.Any> origin=null
+                            index: CONST Int type=kotlin.Int value=5
+                        CALL 'public final fun checkNotNull (object: kotlin.Any?, message: kotlin.String): kotlin.Unit declared in kotlin.jvm.internal.Intrinsics' type=kotlin.Unit origin=null
+                          object: GET_VAR 'val tmp5: kotlin.Any? [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.Any? origin=null
+                          message: CONST String type=kotlin.String value="null cannot be cast to non-null type kotlin.Int"
+                        TYPE_OP type=kotlin.Int? origin=CAST typeOperand=kotlin.Int?
+                          GET_VAR 'val tmp5: kotlin.Any? [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.Any? origin=null
+                    VAR name:settings type:com.example.wags.domain.usecase.apnea.forecast.ForecastSettings [val]
+                      CONSTRUCTOR_CALL 'public constructor <init> (lungVolume: kotlin.String, prepType: kotlin.String, timeOfDay: kotlin.String, posture: kotlin.String, audio: kotlin.String) [primary] declared in com.example.wags.domain.usecase.apnea.forecast.ForecastSettings' type=com.example.wags.domain.usecase.apnea.forecast.ForecastSettings origin=null
+                        lungVolume: GET_VAR 'val lv: kotlin.String [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.String origin=null
+                        prepType: GET_VAR 'val pt: kotlin.String [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.String origin=null
+                        timeOfDay: GET_VAR 'val tod: kotlin.String [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.String origin=null
+                        posture: GET_VAR 'val pos: kotlin.String [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.String origin=null
+                        audio: GET_VAR 'val aud: kotlin.String [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.String origin=null
+                    VAR name:records type:kotlin.collections.List<com.example.wags.data.db.entity.ApneaRecordEntity> [val]
+                      CALL 'public final fun getAllProgressiveO2Once ($completion: kotlin.coroutines.Continuation<kotlin.collections.List<com.example.wags.data.db.entity.ApneaRecordEntity>>): kotlin.Any? [suspend] declared in com.example.wags.data.repository.ApneaRepository' type=kotlin.collections.List<com.example.wags.data.db.entity.ApneaRecordEntity> origin=null
+                        $this: CALL 'public final fun access$getApneaRepository$p ($this: com.example.wags.ui.apnea.ApneaViewModel): com.example.wags.data.repository.ApneaRepository declared in com.example.wags.ui.apnea.ApneaViewModel' type=com.example.wags.data.repository.ApneaRepository origin=null
+                          $this: GET_FIELD 'FIELD FIELD_FOR_CAPTURED_VALUE name:this$0 type:com.example.wags.ui.apnea.ApneaViewModel visibility:public/*package*/ [final] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>' type=com.example.wags.ui.apnea.ApneaViewModel origin=null
+                            receiver: GET_VAR '<this>: com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> origin=null
+                        $completion: GET_VAR '<this>: com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> origin=null
+                    VAR name:forecast type:com.example.wags.domain.usecase.apnea.forecast.RecordForecast [val]
+                      CALL 'public final fun compute$default ($this: com.example.wags.domain.usecase.apnea.forecast.RecordForecastCalculator, records: kotlin.collections.List<com.example.wags.data.db.entity.ApneaRecordEntity>, settings: com.example.wags.domain.usecase.apnea.forecast.ForecastSettings, nowEpochMs: kotlin.Long, recordLabel: kotlin.String?, ceilingMs: kotlin.Long?, drillParam: kotlin.Int?, $mask0: kotlin.Int, $handler: kotlin.Any?): com.example.wags.domain.usecase.apnea.forecast.RecordForecast declared in com.example.wags.domain.usecase.apnea.forecast.RecordForecastCalculator' type=com.example.wags.domain.usecase.apnea.forecast.RecordForecast origin=DEFAULT_DISPATCH_CALL
+                        $this: GET_FIELD 'FIELD FIELD_FOR_OBJECT_INSTANCE name:INSTANCE type:com.example.wags.domain.usecase.apnea.forecast.RecordForecastCalculator visibility:public [final,static] declared in com.example.wags.domain.usecase.apnea.forecast.RecordForecastCalculator' type=com.example.wags.domain.usecase.apnea.forecast.RecordForecastCalculator origin=null
+                        records: GET_VAR 'val records: kotlin.collections.List<com.example.wags.data.db.entity.ApneaRecordEntity> [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.collections.List<com.example.wags.data.db.entity.ApneaRecordEntity> origin=null
+                        settings: GET_VAR 'val settings: com.example.wags.domain.usecase.apnea.forecast.ForecastSettings [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=com.example.wags.domain.usecase.apnea.forecast.ForecastSettings origin=null
+                        nowEpochMs: CALL 'public open fun currentTimeMillis (): kotlin.Long declared in java.lang.System' type=kotlin.Long origin=null
+                        recordLabel: CONST String type=kotlin.String value="rounds"
+                        ceilingMs: COMPOSITE type=kotlin.Long? origin=DEFAULT_VALUE
+                          CONST Null type=kotlin.Long? value=null
+                        drillParam: GET_VAR 'val bp: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=kotlin.Int origin=null
+                        $mask0: CONST Int type=kotlin.Int value=16
+                        $handler: CONST Null type=kotlin.Any? value=null
+                    CALL 'public final fun update <T> (function: kotlin.Function1<T of kotlinx.coroutines.flow.StateFlowKt.update, T of kotlinx.coroutines.flow.StateFlowKt.update>): kotlin.Unit [inline] declared in kotlinx.coroutines.flow.StateFlowKt' type=kotlin.Unit origin=null
+                      <T>: com.example.wags.ui.apnea.ApneaUiState
+                      $receiver: CALL 'public final fun access$get_uiState$p ($this: com.example.wags.ui.apnea.ApneaViewModel): kotlinx.coroutines.flow.MutableStateFlow<com.example.wags.ui.apnea.ApneaUiState> declared in com.example.wags.ui.apnea.ApneaViewModel' type=kotlinx.coroutines.flow.MutableStateFlow<com.example.wags.ui.apnea.ApneaUiState> origin=null
+                        $this: GET_FIELD 'FIELD FIELD_FOR_CAPTURED_VALUE name:this$0 type:com.example.wags.ui.apnea.ApneaViewModel visibility:public/*package*/ [final] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>' type=com.example.wags.ui.apnea.ApneaViewModel origin=null
+                          receiver: GET_VAR '<this>: com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> origin=null
+                      function: BLOCK type=kotlin.Function1<com.example.wags.ui.apnea.ApneaUiState, com.example.wags.ui.apnea.ApneaUiState> origin=LAMBDA
+                        COMPOSITE type=kotlin.Unit origin=null
+                        FUNCTION_REFERENCE 'private final fun invokeSuspend$lambda$0 ($forecast: com.example.wags.domain.usecase.apnea.forecast.RecordForecast, it: com.example.wags.ui.apnea.ApneaUiState): com.example.wags.ui.apnea.ApneaUiState declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>' type=kotlin.Function1<com.example.wags.ui.apnea.ApneaUiState, com.example.wags.ui.apnea.ApneaUiState> origin=INLINE_LAMBDA reflectionTarget=null
+                          $forecast: GET_VAR 'val forecast: com.example.wags.domain.usecase.apnea.forecast.RecordForecast [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=com.example.wags.domain.usecase.apnea.forecast.RecordForecast origin=null
+                  CATCH parameter=val e: java.lang.Exception [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend
+                    VAR CATCH_PARAMETER name:e type:java.lang.Exception [val]
+                    BLOCK type=kotlin.Int origin=null
+                      CALL 'public open fun w (p0: @[EnhancedNullability] kotlin.String?, p1: @[EnhancedNullability] kotlin.String?, p2: @[EnhancedNullability] kotlin.Throwable?): kotlin.Int declared in android.util.Log' type=kotlin.Int origin=null
+                        p0: CONST String type=kotlin.String value="ApneaVM"
+                        p1: CONST String type=kotlin.String value="Progressive O₂ forecast computation failed"
+                        p2: GET_VAR 'val e: java.lang.Exception [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend' type=java.lang.Exception origin=null
+                COMPOSITE type=kotlin.Unit origin=null
+          FUN name:create visibility:public modality:FINAL <> ($this:com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>, value:kotlin.Any?, $completion:kotlin.coroutines.Continuation<kotlin.Nothing>) returnType:kotlin.coroutines.Continuation<kotlin.Unit>
+            overridden:
+              public open fun create (value: kotlin.Any?, $completion: kotlin.coroutines.Continuation<kotlin.Nothing>): kotlin.coroutines.Continuation<kotlin.Unit> declared in kotlin.coroutines.jvm.internal.SuspendLambda
+            $this: VALUE_PARAMETER INSTANCE_RECEIVER name:<this> type:com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>
+            VALUE_PARAMETER name:value index:0 type:kotlin.Any?
+            VALUE_PARAMETER name:$completion index:1 type:kotlin.coroutines.Continuation<kotlin.Nothing>
+            BLOCK_BODY
+              VAR IR_TEMPORARY_VARIABLE name:tmp0_result type:com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> [val]
+                CONSTRUCTOR_CALL 'public/*package*/ constructor <init> (this$0: com.example.wags.ui.apnea.ApneaViewModel, $completion: kotlin.coroutines.Continuation<com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>>?) [primary] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> origin=null
+                  this$0: GET_FIELD 'FIELD FIELD_FOR_CAPTURED_VALUE name:this$0 type:com.example.wags.ui.apnea.ApneaViewModel visibility:public/*package*/ [final] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>' type=com.example.wags.ui.apnea.ApneaViewModel origin=null
+                    receiver: GET_VAR '<this>: com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.create' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> origin=null
+                  $completion: GET_VAR '$completion: kotlin.coroutines.Continuation<kotlin.Nothing> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.create' type=kotlin.coroutines.Continuation<kotlin.Nothing> origin=null
+              SET_FIELD 'FIELD FIELD_FOR_CAPTURED_VALUE name:L$0 type:kotlin.Any? visibility:public/*package*/ declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>' type=kotlin.Unit origin=null
+                receiver: GET_VAR 'val tmp0_result: com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.create' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> origin=null
+                value: GET_VAR 'value: kotlin.Any? declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.create' type=kotlin.Any? origin=null
+              RETURN type=kotlin.Nothing from='public final fun create (value: kotlin.Any?, $completion: kotlin.coroutines.Continuation<kotlin.Nothing>): kotlin.coroutines.Continuation<kotlin.Unit> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>'
+                GET_VAR 'val tmp0_result: com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> [val] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.create' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> origin=null
+          FUN name:invoke visibility:public modality:FINAL <> ($this:com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>, p1:kotlin.Array<out kotlin.Any>, p2:kotlin.coroutines.Continuation<kotlin.Unit>?) returnType:kotlin.Any?
+            overridden:
+              public abstract fun invoke (p1: P1 of kotlin.jvm.functions.Function2, p2: P2 of kotlin.jvm.functions.Function2): R of kotlin.jvm.functions.Function2 declared in kotlin.jvm.functions.Function2
+            $this: VALUE_PARAMETER INSTANCE_RECEIVER name:<this> type:com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>
+            VALUE_PARAMETER name:p1 index:0 type:kotlin.Array<out kotlin.Any>
+            VALUE_PARAMETER name:p2 index:1 type:kotlin.coroutines.Continuation<kotlin.Unit>?
+            BLOCK_BODY
+              RETURN type=kotlin.Nothing from='public final fun invoke (p1: kotlin.Array<out kotlin.Any>, p2: kotlin.coroutines.Continuation<kotlin.Unit>?): kotlin.Any? declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>'
+                CALL 'public final fun invokeSuspend ($result: kotlin.Result<kotlin.Any?>): kotlin.Any? declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>' type=kotlin.Any? origin=null
+                  $this: TYPE_OP type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> origin=IMPLICIT_CAST typeOperand=com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>
+                    CALL 'public final fun create (value: kotlin.Any?, $completion: kotlin.coroutines.Continuation<kotlin.Nothing>): kotlin.coroutines.Continuation<kotlin.Unit> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>' type=kotlin.coroutines.Continuation<kotlin.Unit> origin=null
+                      $this: GET_VAR '<this>: com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invoke' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> origin=null
+                      value: GET_VAR 'p1: kotlin.Array<out kotlin.Any> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invoke' type=kotlin.Array<out kotlin.Any> origin=null
+                      $completion: GET_VAR 'p2: kotlin.coroutines.Continuation<kotlin.Unit>? declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invoke' type=kotlin.coroutines.Continuation<kotlin.Unit>? origin=null
+                  $result: CALL 'public final fun <unsafe-coerce> <T, R> (v: T of kotlin.jvm.internal.<unsafe-coerce>): R of kotlin.jvm.internal.<unsafe-coerce> declared in kotlin.jvm.internal' type=kotlin.Result<kotlin.Any?> origin=null
+                    <T>: kotlin.Any?
+                    <R>: kotlin.Result<kotlin.Any?>
+                    v: GET_FIELD 'FIELD FIELD_FOR_OBJECT_INSTANCE name:INSTANCE type:kotlin.Unit visibility:public [final,static] declared in kotlin.Unit' type=kotlin.Unit origin=null
+          FIELD FIELD_FOR_CAPTURED_VALUE name:this$0 type:com.example.wags.ui.apnea.ApneaViewModel visibility:public/*package*/ [final]
+          FUN INLINE_LAMBDA name:invokeSuspend$lambda$0 visibility:private modality:FINAL <> ($forecast:com.example.wags.domain.usecase.apnea.forecast.RecordForecast, it:com.example.wags.ui.apnea.ApneaUiState) returnType:com.example.wags.ui.apnea.ApneaUiState
+            VALUE_PARAMETER BOUND_VALUE_PARAMETER name:$forecast index:0 type:com.example.wags.domain.usecase.apnea.forecast.RecordForecast
+            VALUE_PARAMETER name:it index:1 type:com.example.wags.ui.apnea.ApneaUiState
+            BLOCK_BODY
+              VAR name:$i$a$-update-ApneaViewModel$23$3$1 type:kotlin.Int [val]
+                CONST Int type=kotlin.Int value=0
+              RETURN type=kotlin.Nothing from='private final fun invokeSuspend$lambda$0 ($forecast: com.example.wags.domain.usecase.apnea.forecast.RecordForecast, it: com.example.wags.ui.apnea.ApneaUiState): com.example.wags.ui.apnea.ApneaUiState declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>'
+                CALL 'public final fun copy$default ($this: com.example.wags.ui.apnea.ApneaUiState, apneaState: com.example.wags.domain.usecase.apnea.ApneaState?, currentRound: kotlin.Int, totalRounds: kotlin.Int, remainingSeconds: kotlin.Long, currentTable: com.example.wags.domain.model.ApneaTable?, personalBestMs: kotlin.Long, recentRecords: kotlin.collections.List<com.example.wags.data.db.entity.ApneaRecordEntity>?, freeHoldActive: kotlin.Boolean, freeHoldDurationMs: kotlin.Long, selectedLungVolume: kotlin.String?, prepType: com.example.wags.domain.model.PrepType?, timeOfDay: com.example.wags.domain.model.TimeOfDay?, posture: com.example.wags.domain.model.Posture?, audio: com.example.wags.domain.model.AudioSetting?, voiceEnabled: kotlin.Boolean, vibrationEnabled: kotlin.Boolean, showTimer: kotlin.Boolean, bestTimeForSettingsMs: kotlin.Long, lastFreeHoldForSettingsMs: kotlin.Long, bestTimeForSettingsRecordId: kotlin.Long?, lastFreeHoldForSettingsRecordId: kotlin.Long?, bestTimeTrophyCategory: com.example.wags.domain.model.PersonalBestCategory?, progO2BreathPeriodSec: kotlin.Int, progO2BestMs: kotlin.Long, progO2TrophyCategory: com.example.wags.domain.model.PersonalBestCategory?, minBreathSessionDurationSec: kotlin.Int, minBreathBestMs: kotlin.Long, minBreathTrophyCategory: com.example.wags.domain.model.PersonalBestCategory?, contractionTableBestMs: kotlin.Long, contractionTableTrophyCategory: com.example.wags.domain.model.PersonalBestCategory?, selectedLength: com.example.wags.domain.model.TableLength?, selectedDifficulty: com.example.wags.domain.model.TableDifficulty?, contractionTimestamps: kotlin.collections.List<kotlin.Long>?, contractionCount: kotlin.Int, firstContractionElapsedMs: kotlin.Long?, currentRoundStartMs: kotlin.Long, lastHoldDurationMs: kotlin.Long, firstContractionTappedThisRound: kotlin.Boolean, roundFirstContractions: kotlin.collections.Map<kotlin.Int, kotlin.Long>?, liveOxHr: kotlin.Int?, liveOxSpO2: kotlin.Int?, settingsExpanded: kotlin.Boolean, newPersonalBest: com.example.wags.domain.model.PersonalBestResult?, filteredStats: com.example.wags.domain.model.ApneaStats?, allStats: com.example.wags.domain.model.ApneaStats?, showAllStats: kotlin.Boolean, liveHr: kotlin.Int?, liveSpO2: kotlin.Int?, freeHoldFirstContractionMs: kotlin.Long?, nowPlayingSong: com.example.wags.data.spotify.TrackInfo?, spotifyConnected: kotlin.Boolean, previousSongs: kotlin.collections.List<com.example.wags.data.spotify.SpotifyTrackDetail>?, loadingSongs: kotlin.Boolean, selectedSongs: kotlin.collections.List<com.example.wags.data.spotify.SpotifyTrackDetail>?, loadingSelectedSong: kotlin.Boolean, isGuidedMode: kotlin.Boolean, guidedAudios: kotlin.collections.List<com.example.wags.data.db.entity.GuidedAudioEntity>?, guidedSelectedId: kotlin.Long, guidedSelectedName: kotlin.String?, guidedCompletionStatuses: kotlin.collections.Map<kotlin.Long, com.example.wags.ui.apnea.GuidedCompletionStatus>?, recordForecast: com.example.wags.domain.usecase.apnea.forecast.RecordForecast?, progO2RecordForecast: com.example.wags.domain.usecase.apnea.forecast.RecordForecast?, minBreathRecordForecast: com.example.wags.domain.usecase.apnea.forecast.RecordForecast?, eucapnicConfig: com.example.wags.domain.model.EucapnicConfig?, showPastConfigurationsDialog: kotlin.Boolean, hyperRemainingLockDays: kotlin.Int, resonancePrepLocked: kotlin.Boolean, lastUsedPerSetting: kotlin.collections.Map<kotlin.String, kotlin.collections.Map<kotlin.String, kotlin.Long>>?, lastUsedPerCombo: kotlin.collections.Map<kotlin.String, kotlin.collections.Map<kotlin.String, kotlin.Long>>?, sectionLastUse: kotlin.collections.Map<com.example.wags.ui.apnea.ApneaSection, com.example.wags.ui.apnea.SectionLastUse>?, $mask0: kotlin.Int, $mask1: kotlin.Int, $mask2: kotlin.Int, $handler: kotlin.Any?): com.example.wags.ui.apnea.ApneaUiState declared in com.example.wags.ui.apnea.ApneaUiState' type=com.example.wags.ui.apnea.ApneaUiState origin=DEFAULT_DISPATCH_CALL
+                  $this: GET_VAR 'it: com.example.wags.ui.apnea.ApneaUiState declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend$lambda$0' type=com.example.wags.ui.apnea.ApneaUiState origin=null
+                  apneaState: COMPOSITE type=com.example.wags.domain.usecase.apnea.ApneaState? origin=DEFAULT_VALUE
+                    CONST Null type=com.example.wags.domain.usecase.apnea.ApneaState? value=null
+                  currentRound: COMPOSITE type=kotlin.Int origin=DEFAULT_VALUE
+                    CONST Int type=kotlin.Int value=0
+                  totalRounds: COMPOSITE type=kotlin.Int origin=DEFAULT_VALUE
+                    CONST Int type=kotlin.Int value=0
+                  remainingSeconds: COMPOSITE type=kotlin.Long origin=DEFAULT_VALUE
+                    CONST Long type=kotlin.Long value=0
+                  currentTable: COMPOSITE type=com.example.wags.domain.model.ApneaTable? origin=DEFAULT_VALUE
+                    CONST Null type=com.example.wags.domain.model.ApneaTable? value=null
+                  personalBestMs: COMPOSITE type=kotlin.Long origin=DEFAULT_VALUE
+                    CONST Long type=kotlin.Long value=0
+                  recentRecords: COMPOSITE type=kotlin.collections.List<com.example.wags.data.db.entity.ApneaRecordEntity>? origin=DEFAULT_VALUE
+                    CONST Null type=kotlin.collections.List<com.example.wags.data.db.entity.ApneaRecordEntity>? value=null
+                  freeHoldActive: COMPOSITE type=kotlin.Boolean origin=DEFAULT_VALUE
+                    CONST Boolean type=kotlin.Boolean value=false
+                  freeHoldDurationMs: COMPOSITE type=kotlin.Long origin=DEFAULT_VALUE
+                    CONST Long type=kotlin.Long value=0
+                  selectedLungVolume: COMPOSITE type=kotlin.String? origin=DEFAULT_VALUE
+                    CONST Null type=kotlin.String? value=null
+                  prepType: COMPOSITE type=com.example.wags.domain.model.PrepType? origin=DEFAULT_VALUE
+                    CONST Null type=com.example.wags.domain.model.PrepType? value=null
+                  timeOfDay: COMPOSITE type=com.example.wags.domain.model.TimeOfDay? origin=DEFAULT_VALUE
+                    CONST Null type=com.example.wags.domain.model.TimeOfDay? value=null
+                  posture: COMPOSITE type=com.example.wags.domain.model.Posture? origin=DEFAULT_VALUE
+                    CONST Null type=com.example.wags.domain.model.Posture? value=null
+                  audio: COMPOSITE type=com.example.wags.domain.model.AudioSetting? origin=DEFAULT_VALUE
+                    CONST Null type=com.example.wags.domain.model.AudioSetting? value=null
+                  voiceEnabled: COMPOSITE type=kotlin.Boolean origin=DEFAULT_VALUE
+                    CONST Boolean type=kotlin.Boolean value=false
+                  vibrationEnabled: COMPOSITE type=kotlin.Boolean origin=DEFAULT_VALUE
+                    CONST Boolean type=kotlin.Boolean value=false
+                  showTimer: COMPOSITE type=kotlin.Boolean origin=DEFAULT_VALUE
+                    CONST Boolean type=kotlin.Boolean value=false
+                  bestTimeForSettingsMs: COMPOSITE type=kotlin.Long origin=DEFAULT_VALUE
+                    CONST Long type=kotlin.Long value=0
+                  lastFreeHoldForSettingsMs: COMPOSITE type=kotlin.Long origin=DEFAULT_VALUE
+                    CONST Long type=kotlin.Long value=0
+                  bestTimeForSettingsRecordId: COMPOSITE type=kotlin.Long? origin=DEFAULT_VALUE
+                    CONST Null type=kotlin.Long? value=null
+                  lastFreeHoldForSettingsRecordId: COMPOSITE type=kotlin.Long? origin=DEFAULT_VALUE
+                    CONST Null type=kotlin.Long? value=null
+                  bestTimeTrophyCategory: COMPOSITE type=com.example.wags.domain.model.PersonalBestCategory? origin=DEFAULT_VALUE
+                    CONST Null type=com.example.wags.domain.model.PersonalBestCategory? value=null
+                  progO2BreathPeriodSec: COMPOSITE type=kotlin.Int origin=DEFAULT_VALUE
+                    CONST Int type=kotlin.Int value=0
+                  progO2BestMs: COMPOSITE type=kotlin.Long origin=DEFAULT_VALUE
+                    CONST Long type=kotlin.Long value=0
+                  progO2TrophyCategory: COMPOSITE type=com.example.wags.domain.model.PersonalBestCategory? origin=DEFAULT_VALUE
+                    CONST Null type=com.example.wags.domain.model.PersonalBestCategory? value=null
+                  minBreathSessionDurationSec: COMPOSITE type=kotlin.Int origin=DEFAULT_VALUE
+                    CONST Int type=kotlin.Int value=0
+                  minBreathBestMs: COMPOSITE type=kotlin.Long origin=DEFAULT_VALUE
+                    CONST Long type=kotlin.Long value=0
+                  minBreathTrophyCategory: COMPOSITE type=com.example.wags.domain.model.PersonalBestCategory? origin=DEFAULT_VALUE
+                    CONST Null type=com.example.wags.domain.model.PersonalBestCategory? value=null
+                  contractionTableBestMs: COMPOSITE type=kotlin.Long origin=DEFAULT_VALUE
+                    CONST Long type=kotlin.Long value=0
+                  contractionTableTrophyCategory: COMPOSITE type=com.example.wags.domain.model.PersonalBestCategory? origin=DEFAULT_VALUE
+                    CONST Null type=com.example.wags.domain.model.PersonalBestCategory? value=null
+                  selectedLength: COMPOSITE type=com.example.wags.domain.model.TableLength? origin=DEFAULT_VALUE
+                    CONST Null type=com.example.wags.domain.model.TableLength? value=null
+                  selectedDifficulty: COMPOSITE type=com.example.wags.domain.model.TableDifficulty? origin=DEFAULT_VALUE
+                    CONST Null type=com.example.wags.domain.model.TableDifficulty? value=null
+                  contractionTimestamps: COMPOSITE type=kotlin.collections.List<kotlin.Long>? origin=DEFAULT_VALUE
+                    CONST Null type=kotlin.collections.List<kotlin.Long>? value=null
+                  contractionCount: COMPOSITE type=kotlin.Int origin=DEFAULT_VALUE
+                    CONST Int type=kotlin.Int value=0
+                  firstContractionElapsedMs: COMPOSITE type=kotlin.Long? origin=DEFAULT_VALUE
+                    CONST Null type=kotlin.Long? value=null
+                  currentRoundStartMs: COMPOSITE type=kotlin.Long origin=DEFAULT_VALUE
+                    CONST Long type=kotlin.Long value=0
+                  lastHoldDurationMs: COMPOSITE type=kotlin.Long origin=DEFAULT_VALUE
+                    CONST Long type=kotlin.Long value=0
+                  firstContractionTappedThisRound: COMPOSITE type=kotlin.Boolean origin=DEFAULT_VALUE
+                    CONST Boolean type=kotlin.Boolean value=false
+                  roundFirstContractions: COMPOSITE type=kotlin.collections.Map<kotlin.Int, kotlin.Long>? origin=DEFAULT_VALUE
+                    CONST Null type=kotlin.collections.Map<kotlin.Int, kotlin.Long>? value=null
+                  liveOxHr: COMPOSITE type=kotlin.Int? origin=DEFAULT_VALUE
+                    CONST Null type=kotlin.Int? value=null
+                  liveOxSpO2: COMPOSITE type=kotlin.Int? origin=DEFAULT_VALUE
+                    CONST Null type=kotlin.Int? value=null
+                  settingsExpanded: COMPOSITE type=kotlin.Boolean origin=DEFAULT_VALUE
+                    CONST Boolean type=kotlin.Boolean value=false
+                  newPersonalBest: COMPOSITE type=com.example.wags.domain.model.PersonalBestResult? origin=DEFAULT_VALUE
+                    CONST Null type=com.example.wags.domain.model.PersonalBestResult? value=null
+                  filteredStats: COMPOSITE type=com.example.wags.domain.model.ApneaStats? origin=DEFAULT_VALUE
+                    CONST Null type=com.example.wags.domain.model.ApneaStats? value=null
+                  allStats: COMPOSITE type=com.example.wags.domain.model.ApneaStats? origin=DEFAULT_VALUE
+                    CONST Null type=com.example.wags.domain.model.ApneaStats? value=null
+                  showAllStats: COMPOSITE type=kotlin.Boolean origin=DEFAULT_VALUE
+                    CONST Boolean type=kotlin.Boolean value=false
+                  liveHr: COMPOSITE type=kotlin.Int? origin=DEFAULT_VALUE
+                    CONST Null type=kotlin.Int? value=null
+                  liveSpO2: COMPOSITE type=kotlin.Int? origin=DEFAULT_VALUE
+                    CONST Null type=kotlin.Int? value=null
+                  freeHoldFirstContractionMs: COMPOSITE type=kotlin.Long? origin=DEFAULT_VALUE
+                    CONST Null type=kotlin.Long? value=null
+                  nowPlayingSong: COMPOSITE type=com.example.wags.data.spotify.TrackInfo? origin=DEFAULT_VALUE
+                    CONST Null type=com.example.wags.data.spotify.TrackInfo? value=null
+                  spotifyConnected: COMPOSITE type=kotlin.Boolean origin=DEFAULT_VALUE
+                    CONST Boolean type=kotlin.Boolean value=false
+                  previousSongs: COMPOSITE type=kotlin.collections.List<com.example.wags.data.spotify.SpotifyTrackDetail>? origin=DEFAULT_VALUE
+                    CONST Null type=kotlin.collections.List<com.example.wags.data.spotify.SpotifyTrackDetail>? value=null
+                  loadingSongs: COMPOSITE type=kotlin.Boolean origin=DEFAULT_VALUE
+                    CONST Boolean type=kotlin.Boolean value=false
+                  selectedSongs: COMPOSITE type=kotlin.collections.List<com.example.wags.data.spotify.SpotifyTrackDetail>? origin=DEFAULT_VALUE
+                    CONST Null type=kotlin.collections.List<com.example.wags.data.spotify.SpotifyTrackDetail>? value=null
+                  loadingSelectedSong: COMPOSITE type=kotlin.Boolean origin=DEFAULT_VALUE
+                    CONST Boolean type=kotlin.Boolean value=false
+                  isGuidedMode: COMPOSITE type=kotlin.Boolean origin=DEFAULT_VALUE
+                    CONST Boolean type=kotlin.Boolean value=false
+                  guidedAudios: COMPOSITE type=kotlin.collections.List<com.example.wags.data.db.entity.GuidedAudioEntity>? origin=DEFAULT_VALUE
+                    CONST Null type=kotlin.collections.List<com.example.wags.data.db.entity.GuidedAudioEntity>? value=null
+                  guidedSelectedId: COMPOSITE type=kotlin.Long origin=DEFAULT_VALUE
+                    CONST Long type=kotlin.Long value=0
+                  guidedSelectedName: COMPOSITE type=kotlin.String? origin=DEFAULT_VALUE
+                    CONST Null type=kotlin.String? value=null
+                  guidedCompletionStatuses: COMPOSITE type=kotlin.collections.Map<kotlin.Long, com.example.wags.ui.apnea.GuidedCompletionStatus>? origin=DEFAULT_VALUE
+                    CONST Null type=kotlin.collections.Map<kotlin.Long, com.example.wags.ui.apnea.GuidedCompletionStatus>? value=null
+                  recordForecast: COMPOSITE type=com.example.wags.domain.usecase.apnea.forecast.RecordForecast? origin=DEFAULT_VALUE
+                    CONST Null type=com.example.wags.domain.usecase.apnea.forecast.RecordForecast? value=null
+                  progO2RecordForecast: WHEN type=com.example.wags.domain.usecase.apnea.forecast.RecordForecast? origin=IF
+                    BRANCH
+                      if: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=EQEQ
+                        arg0: CALL 'public final fun <get-status> (): com.example.wags.domain.usecase.apnea.forecast.ForecastStatus declared in com.example.wags.domain.usecase.apnea.forecast.RecordForecast' type=com.example.wags.domain.usecase.apnea.forecast.ForecastStatus origin=GET_PROPERTY
+                          $this: GET_VAR '$forecast: com.example.wags.domain.usecase.apnea.forecast.RecordForecast declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend$lambda$0' type=com.example.wags.domain.usecase.apnea.forecast.RecordForecast origin=null
+                        arg1: GET_FIELD 'FIELD FIELD_FOR_OBJECT_INSTANCE name:INSTANCE type:com.example.wags.domain.usecase.apnea.forecast.ForecastStatus.Ready visibility:public [final,static] declared in com.example.wags.domain.usecase.apnea.forecast.ForecastStatus.Ready' type=com.example.wags.domain.usecase.apnea.forecast.ForecastStatus.Ready origin=null
+                      then: GET_VAR '$forecast: com.example.wags.domain.usecase.apnea.forecast.RecordForecast declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invokeSuspend$lambda$0' type=com.example.wags.domain.usecase.apnea.forecast.RecordForecast origin=null
+                    BRANCH
+                      if: CONST Boolean type=kotlin.Boolean value=true
+                      then: CONST Null type=kotlin.Nothing? value=null
+                  minBreathRecordForecast: COMPOSITE type=com.example.wags.domain.usecase.apnea.forecast.RecordForecast? origin=DEFAULT_VALUE
+                    CONST Null type=com.example.wags.domain.usecase.apnea.forecast.RecordForecast? value=null
+                  eucapnicConfig: COMPOSITE type=com.example.wags.domain.model.EucapnicConfig? origin=DEFAULT_VALUE
+                    CONST Null type=com.example.wags.domain.model.EucapnicConfig? value=null
+                  showPastConfigurationsDialog: COMPOSITE type=kotlin.Boolean origin=DEFAULT_VALUE
+                    CONST Boolean type=kotlin.Boolean value=false
+                  hyperRemainingLockDays: COMPOSITE type=kotlin.Int origin=DEFAULT_VALUE
+                    CONST Int type=kotlin.Int value=0
+                  resonancePrepLocked: COMPOSITE type=kotlin.Boolean origin=DEFAULT_VALUE
+                    CONST Boolean type=kotlin.Boolean value=false
+                  lastUsedPerSetting: COMPOSITE type=kotlin.collections.Map<kotlin.String, kotlin.collections.Map<kotlin.String, kotlin.Long>>? origin=DEFAULT_VALUE
+                    CONST Null type=kotlin.collections.Map<kotlin.String, kotlin.collections.Map<kotlin.String, kotlin.Long>>? value=null
+                  lastUsedPerCombo: COMPOSITE type=kotlin.collections.Map<kotlin.String, kotlin.collections.Map<kotlin.String, kotlin.Long>>? origin=DEFAULT_VALUE
+                    CONST Null type=kotlin.collections.Map<kotlin.String, kotlin.collections.Map<kotlin.String, kotlin.Long>>? value=null
+                  sectionLastUse: COMPOSITE type=kotlin.collections.Map<com.example.wags.ui.apnea.ApneaSection, com.example.wags.ui.apnea.SectionLastUse>? origin=DEFAULT_VALUE
+                    CONST Null type=kotlin.collections.Map<com.example.wags.ui.apnea.ApneaSection, com.example.wags.ui.apnea.SectionLastUse>? value=null
+                  $mask0: CONST Int type=kotlin.Int value=-1
+                  $mask1: CONST Int type=kotlin.Int value=-536870913
+                  $mask2: CONST Int type=kotlin.Int value=63
+                  $handler: CONST Null type=kotlin.Any? value=null
+          FUN BRIDGE name:invoke visibility:public modality:OPEN <> ($this:com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>, p1:kotlin.Any?, p2:kotlin.Any?) returnType:kotlin.Any?
+            $this: VALUE_PARAMETER INSTANCE_RECEIVER name:<this> type:com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>
+            VALUE_PARAMETER BRIDGE name:p1 index:0 type:kotlin.Any?
+            VALUE_PARAMETER BRIDGE name:p2 index:1 type:kotlin.Any?
+            EXPRESSION_BODY
+              RETURN type=kotlin.Nothing from='public open fun invoke (p1: kotlin.Any?, p2: kotlin.Any?): kotlin.Any? declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>'
+                CALL 'public final fun invoke (p1: kotlin.Array<out kotlin.Any>, p2: kotlin.coroutines.Continuation<kotlin.Unit>?): kotlin.Any? declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>' type=kotlin.Any? origin=BRIDGE_DELEGATION
+                  $this: GET_VAR '<this>: com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invoke' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> origin=null
+                  p1: TYPE_OP type=kotlin.Array<*> origin=IMPLICIT_CAST typeOperand=kotlin.Array<*>
+                    GET_VAR 'p1: kotlin.Any? declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invoke' type=kotlin.Any? origin=null
+                  p2: TYPE_OP type=kotlin.coroutines.Continuation<*> origin=IMPLICIT_CAST typeOperand=kotlin.coroutines.Continuation<*>
+                    GET_VAR 'p2: kotlin.Any? declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>.invoke' type=kotlin.Any? origin=null
+        CONSTRUCTOR_CALL 'public/*package*/ constructor <init> (this$0: com.example.wags.ui.apnea.ApneaViewModel, $completion: kotlin.coroutines.Continuation<com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>>?) [primary] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided>' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend.<no name provided> origin=null
+          this$0: GET_FIELD 'FIELD FIELD_FOR_CAPTURED_VALUE name:this$0 type:com.example.wags.ui.apnea.ApneaViewModel visibility:public/*package*/ [final] declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>' type=com.example.wags.ui.apnea.ApneaViewModel origin=null
+            receiver: GET_VAR '<this>: com.example.wags.ui.apnea.ApneaViewModel.<no name provided> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided> origin=null
+          $completion: CONST Null type=kotlin.Nothing? value=null
+      $completion: GET_VAR '<this>: com.example.wags.ui.apnea.ApneaViewModel.<no name provided> declared in com.example.wags.ui.apnea.ApneaViewModel.<no name provided>.invokeSuspend' type=com.example.wags.ui.apnea.ApneaViewModel.<no name provided> origin=null
+
+	at org.jetbrains.kotlin.backend.jvm.codegen.FunctionCodegen.generate(FunctionCodegen.kt:47)
+	at org.jetbrains.kotlin.backend.jvm.codegen.FunctionCodegen.generate$default(FunctionCodegen.kt:40)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ClassCodegen.generateMethodNode(ClassCodegen.kt:406)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ClassCodegen.generateMethod(ClassCodegen.kt:423)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ClassCodegen.generate(ClassCodegen.kt:168)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ClassCodegen.generate(ClassCodegen.kt:181)
+	at org.jetbrains.kotlin.backend.jvm.FileCodegen.lower(JvmPhases.kt:39)
+	at org.jetbrains.kotlin.backend.common.phaser.PhaseFactoriesKt.createFilePhase$lambda$4(PhaseFactories.kt:71)
+	at org.jetbrains.kotlin.backend.common.phaser.PhaseBuildersKt$createSimpleNamedCompilerPhase$1.phaseBody(PhaseBuilders.kt:69)
+	at org.jetbrains.kotlin.backend.common.phaser.SimpleNamedCompilerPhase.phaseBody(CompilerPhase.kt:226)
+	at org.jetbrains.kotlin.backend.common.phaser.AbstractNamedCompilerPhase.invoke(CompilerPhase.kt:113)
+	at org.jetbrains.kotlin.backend.common.phaser.PerformByIrFilePhase.invokeSequential(performByIrFile.kt:62)
+	... 45 more
+Caused by: org.jetbrains.kotlin.codegen.CompilationException: Back-end (JVM) Internal error: Couldn't transform method node:
+invokeSuspend (Ljava/lang/Object;)Ljava/lang/Object;:
+    // annotable parameter count: 1 (visible)
+    // annotable parameter count: 1 (invisible)
+    TRYCATCHBLOCK L0 L1 L2 java/lang/Exception
+   L3
+    ALOAD 0
+    GETFIELD com/example/wags/ui/apnea/ApneaViewModel$23$3.L$0 : Ljava/lang/Object;
+    CHECKCAST [Ljava/lang/Object;
+    ASTORE 2
+   L4
+    INVOKESTATIC kotlin/jvm/internal/InlineMarker.beforeInlineCall ()V
+   L5
+    LINENUMBER 696 L5
+    LDC 150
+    ALOAD 0
+    CHECKCAST kotlin/coroutines/Continuation
+    ICONST_0
+    INVOKESTATIC kotlin/jvm/internal/InlineMarker.mark (I)V
+    INVOKESTATIC kotlinx/coroutines/DelayKt.delay (JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+    ICONST_1
+    INVOKESTATIC kotlin/jvm/internal/InlineMarker.mark (I)V
+    INVOKESTATIC kotlin/jvm/internal/InlineMarker.afterInlineCall ()V
+    POP
+   L6
+    LINENUMBER 697 L6
+   L7
+    INVOKESTATIC kotlin/jvm/internal/$PseudoInsn.SAVE_STACK_BEFORE_TRY ()V
+   L0
+    NOP
+    INVOKESTATIC kotlin/jvm/internal/$PseudoInsn.RESTORE_STACK_IN_TRY_CATCH ()V
+   L8
+    LINENUMBER 698 L8
+    ALOAD 2
+    ICONST_0
+    AALOAD
+    ASTORE 4
+   L9
+    ALOAD 4
+    LDC "null cannot be cast to non-null type kotlin.String"
+    INVOKESTATIC kotlin/jvm/internal/Intrinsics.checkNotNull (Ljava/lang/Object;Ljava/lang/String;)V
+    ALOAD 4
+    CHECKCAST java/lang/String
+   L10
+    ASTORE 3
+   L11
+    ALOAD 2
+    ICONST_1
+    AALOAD
+    ASTORE 5
+   L12
+    ALOAD 5
+    LDC "null cannot be cast to non-null type com.example.wags.domain.model.PrepType"
+    INVOKESTATIC kotlin/jvm/internal/Intrinsics.checkNotNull (Ljava/lang/Object;Ljava/lang/String;)V
+    ALOAD 5
+    CHECKCAST com/example/wags/domain/model/PrepType
+   L13
+    INVOKEVIRTUAL com/example/wags/domain/model/PrepType.name ()Ljava/lang/String;
+    ASTORE 4
+   L14
+   L15
+    LINENUMBER 699 L15
+    ALOAD 2
+    ICONST_2
+    AALOAD
+    ASTORE 6
+   L16
+    ALOAD 6
+    LDC "null cannot be cast to non-null type kotlin.String"
+    INVOKESTATIC kotlin/jvm/internal/Intrinsics.checkNotNull (Ljava/lang/Object;Ljava/lang/String;)V
+    ALOAD 6
+    CHECKCAST java/lang/String
+   L17
+    ASTORE 5
+   L18
+    ALOAD 2
+    ICONST_3
+    AALOAD
+    ASTORE 7
+   L19
+    ALOAD 7
+    LDC "null cannot be cast to non-null type com.example.wags.domain.model.Posture"
+    INVOKESTATIC kotlin/jvm/internal/Intrinsics.checkNotNull (Ljava/lang/Object;Ljava/lang/String;)V
+    ALOAD 7
+    CHECKCAST com/example/wags/domain/model/Posture
+   L20
+    INVOKEVIRTUAL com/example/wags/domain/model/Posture.name ()Ljava/lang/String;
+    ASTORE 6
+   L21
+   L22
+    LINENUMBER 700 L22
+    ALOAD 2
+    ICONST_4
+    AALOAD
+    ASTORE 8
+   L23
+    ALOAD 8
+    LDC "null cannot be cast to non-null type com.example.wags.domain.model.AudioSetting"
+    INVOKESTATIC kotlin/jvm/internal/Intrinsics.checkNotNull (Ljava/lang/Object;Ljava/lang/String;)V
+    ALOAD 8
+    CHECKCAST com/example/wags/domain/model/AudioSetting
+   L24
+    INVOKEVIRTUAL com/example/wags/domain/model/AudioSetting.name ()Ljava/lang/String;
+    ASTORE 7
+   L25
+    ALOAD 2
+    ICONST_5
+    AALOAD
+    ASTORE 9
+   L26
+    ALOAD 9
+    LDC "null cannot be cast to non-null type kotlin.Int"
+    INVOKESTATIC kotlin/jvm/internal/Intrinsics.checkNotNull (Ljava/lang/Object;Ljava/lang/String;)V
+    ALOAD 9
+    CHECKCAST java/lang/Integer
+   L27
+    INVOKEVIRTUAL java/lang/Integer.intValue ()I
+    ISTORE 8
+   L28
+   L29
+    LINENUMBER 701 L29
+    NEW com/example/wags/domain/usecase/apnea/forecast/ForecastSettings
+    DUP
+    ALOAD 3
+    ALOAD 4
+    ALOAD 5
+    ALOAD 6
+    ALOAD 7
+    INVOKESPECIAL com/example/wags/domain/usecase/apnea/forecast/ForecastSettings.<init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+    ASTORE 9
+   L30
+    INVOKESTATIC kotlin/jvm/internal/InlineMarker.beforeInlineCall ()V
+   L31
+    LINENUMBER 704 L31
+    ALOAD 0
+    GETFIELD com/example/wags/ui/apnea/ApneaViewModel$23$3.this$0 : Lcom/example/wags/ui/apnea/ApneaViewModel;
+    INVOKESTATIC com/example/wags/ui/apnea/ApneaViewModel.access$getApneaRepository$p (Lcom/example/wags/ui/apnea/ApneaViewModel;)Lcom/example/wags/data/repository/ApneaRepository;
+    ALOAD 0
+    CHECKCAST kotlin/coroutines/Continuation
+    ICONST_0
+    INVOKESTATIC kotlin/jvm/internal/InlineMarker.mark (I)V
+    INVOKEVIRTUAL com/example/wags/data/repository/ApneaRepository.getAllProgressiveO2Once (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+    ICONST_1
+    INVOKESTATIC kotlin/jvm/internal/InlineMarker.mark (I)V
+    INVOKESTATIC kotlin/jvm/internal/InlineMarker.afterInlineCall ()V
+    CHECKCAST java/util/List
+    ASTORE 10
+   L32
+   L33
+    LINENUMBER 705 L33
+    GETSTATIC com/example/wags/domain/usecase/apnea/forecast/RecordForecastCalculator.INSTANCE : Lcom/example/wags/domain/usecase/apnea/forecast/RecordForecastCalculator;
+   L34
+    LINENUMBER 706 L34
+    ALOAD 10
+   L35
+    LINENUMBER 707 L35
+    ALOAD 9
+   L36
+    LINENUMBER 708 L36
+    INVOKESTATIC java/lang/System.currentTimeMillis ()J
+   L37
+    LINENUMBER 709 L37
+    LDC "rounds"
+   L38
+    LINENUMBER 705 L38
+    ACONST_NULL
+   L39
+    LINENUMBER 710 L39
+    ILOAD 8
+    INVOKESTATIC java/lang/Integer.valueOf (I)Ljava/lang/Integer;
+   L40
+    LINENUMBER 705 L40
+    BIPUSH 16
+    ACONST_NULL
+    INVOKESTATIC com/example/wags/domain/usecase/apnea/forecast/RecordForecastCalculator.compute$default (Lcom/example/wags/domain/usecase/apnea/forecast/RecordForecastCalculator;Ljava/util/List;Lcom/example/wags/domain/usecase/apnea/forecast/ForecastSettings;JLjava/lang/String;Ljava/lang/Long;Ljava/lang/Integer;ILjava/lang/Object;)Lcom/example/wags/domain/usecase/apnea/forecast/RecordForecast;
+    ASTORE 11
+   L41
+   L42
+    LINENUMBER 712 L42
+    ALOAD 0
+    GETFIELD com/example/wags/ui/apnea/ApneaViewModel$23$3.this$0 : Lcom/example/wags/ui/apnea/ApneaViewModel;
+    INVOKESTATIC com/example/wags/ui/apnea/ApneaViewModel.access$get_uiState$p (Lcom/example/wags/ui/apnea/ApneaViewModel;)Lkotlinx/coroutines/flow/MutableStateFlow;
+    ASTORE 12
+    INVOKESTATIC kotlin/jvm/internal/InlineMarker.beforeInlineCall ()V
+    NOP
+   L43
+    ICONST_0
+    ISTORE 13
+   L44
+    LINENUMBER 2295 L44
+    NOP
+   L45
+    LINENUMBER 2296 L45
+    ALOAD 12
+    INVOKEINTERFACE kotlinx/coroutines/flow/MutableStateFlow.getValue ()Ljava/lang/Object; (itf)
+    ASTORE 14
+   L46
+    LINENUMBER 2297 L46
+    ALOAD 14
+    CHECKCAST com/example/wags/ui/apnea/ApneaUiState
+    ASTORE 15
+    INVOKESTATIC kotlin/jvm/internal/InlineMarker.beforeInlineCall ()V
+   L47
+    ICONST_0
+    ISTORE 16
+   L48
+    LINENUMBER 712 L48
+    ALOAD 15
+    ACONST_NULL
+    ICONST_0
+    ICONST_0
+    LCONST_0
+    ACONST_NULL
+    LCONST_0
+    ACONST_NULL
+    ICONST_0
+    LCONST_0
+    ACONST_NULL
+    ACONST_NULL
+    ACONST_NULL
+    ACONST_NULL
+    ACONST_NULL
+    ICONST_0
+    ICONST_0
+    ICONST_0
+    LCONST_0
+    LCONST_0
+    ACONST_NULL
+    ACONST_NULL
+    ACONST_NULL
+    ICONST_0
+    LCONST_0
+    ACONST_NULL
+    ICONST_0
+    LCONST_0
+    ACONST_NULL
+    LCONST_0
+    ACONST_NULL
+    ACONST_NULL
+    ACONST_NULL
+    ACONST_NULL
+    ICONST_0
+    ACONST_NULL
+    LCONST_0
+    LCONST_0
+    ICONST_0
+    ACONST_NULL
+    ACONST_NULL
+    ACONST_NULL
+    ICONST_0
+    ACONST_NULL
+    ACONST_NULL
+    ACONST_NULL
+    ICONST_0
+    ACONST_NULL
+    ACONST_NULL
+    ACONST_NULL
+    ACONST_NULL
+    ICONST_0
+    ACONST_NULL
+    ICONST_0
+    ACONST_NULL
+    ICONST_0
+    ICONST_0
+    ACONST_NULL
+    LCONST_0
+    ACONST_NULL
+    ACONST_NULL
+    ACONST_NULL
+    ALOAD 11
+    INVOKEVIRTUAL com/example/wags/domain/usecase/apnea/forecast/RecordForecast.getStatus ()Lcom/example/wags/domain/usecase/apnea/forecast/ForecastStatus;
+    GETSTATIC com/example/wags/domain/usecase/apnea/forecast/ForecastStatus$Ready.INSTANCE : Lcom/example/wags/domain/usecase/apnea/forecast/ForecastStatus$Ready;
+    INVOKESTATIC kotlin/jvm/internal/Intrinsics.areEqual (Ljava/lang/Object;Ljava/lang/Object;)Z
+    IFEQ L49
+    ALOAD 11
+    GOTO L50
+   L49
+    ACONST_NULL
+   L50
+    ACONST_NULL
+    ACONST_NULL
+    ICONST_0
+    ICONST_0
+    ICONST_0
+    ACONST_NULL
+    ACONST_NULL
+    ACONST_NULL
+    ICONST_M1
+    LDC -536870913
+    BIPUSH 63
+    ACONST_NULL
+    INVOKESTATIC com/example/wags/ui/apnea/ApneaUiState.copy$default (Lcom/example/wags/ui/apnea/ApneaUiState;Lcom/example/wags/domain/usecase/apnea/ApneaState;IIJLcom/example/wags/domain/model/ApneaTable;JLjava/util/List;ZJLjava/lang/String;Lcom/example/wags/domain/model/PrepType;Lcom/example/wags/domain/model/TimeOfDay;Lcom/example/wags/domain/model/Posture;Lcom/example/wags/domain/model/AudioSetting;ZZZJJLjava/lang/Long;Ljava/lang/Long;Lcom/example/wags/domain/model/PersonalBestCategory;IJLcom/example/wags/domain/model/PersonalBestCategory;IJLcom/example/wags/domain/model/PersonalBestCategory;JLcom/example/wags/domain/model/PersonalBestCategory;Lcom/example/wags/domain/model/TableLength;Lcom/example/wags/domain/model/TableDifficulty;Ljava/util/List;ILjava/lang/Long;JJZLjava/util/Map;Ljava/lang/Integer;Ljava/lang/Integer;ZLcom/example/wags/domain/model/PersonalBestResult;Lcom/example/wags/domain/model/ApneaStats;Lcom/example/wags/domain/model/ApneaStats;ZLjava/lang/Integer;Ljava/lang/Integer;Ljava/lang/Long;Lcom/example/wags/data/spotify/TrackInfo;ZLjava/util/List;ZLjava/util/List;ZZLjava/util/List;JLjava/lang/String;Ljava/util/Map;Lcom/example/wags/domain/usecase/apnea/forecast/RecordForecast;Lcom/example/wags/domain/usecase/apnea/forecast/RecordForecast;Lcom/example/wags/domain/usecase/apnea/forecast/RecordForecast;Lcom/example/wags/domain/model/EucapnicConfig;ZIZLjava/util/Map;Ljava/util/Map;Ljava/util/Map;IIILjava/lang/Object;)Lcom/example/wags/ui/apnea/ApneaUiState;
+    NOP
+    GOTO L51
+   L52
+   L53
+   L51
+    INVOKESTATIC kotlin/jvm/internal/InlineMarker.afterInlineCall ()V
+   L54
+    LINENUMBER 2297 L54
+    ASTORE 15
+   L55
+    LINENUMBER 2298 L55
+    ALOAD 12
+    ALOAD 14
+    ALOAD 15
+    INVOKEINTERFACE kotlinx/coroutines/flow/MutableStateFlow.compareAndSet (Ljava/lang/Object;Ljava/lang/Object;)Z (itf)
+    IFEQ L44
+   L56
+    LINENUMBER 2299 L56
+    NOP
+    GOTO L57
+   L58
+   L59
+   L57
+    INVOKESTATIC kotlin/jvm/internal/InlineMarker.afterInlineCall ()V
+   L60
+    GETSTATIC kotlin/Unit.INSTANCE : Lkotlin/Unit;
+    ASTORE 3
+   L1
+    GOTO L61
+   L2
+   L62
+    LINENUMBER 713 L62
+    ASTORE 4
+    INVOKESTATIC kotlin/jvm/internal/$PseudoInsn.RESTORE_STACK_IN_TRY_CATCH ()V
+   L63
+   L64
+    LINENUMBER 714 L64
+    LDC "ApneaVM"
+    LDC "Progressive O\u2082 forecast computation failed"
+    ALOAD 4
+    CHECKCAST java/lang/Throwable
+    INVOKESTATIC android/util/Log.w (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
+    INVOKESTATIC java/lang/Integer.valueOf (I)Ljava/lang/Integer;
+    ASTORE 3
+   L65
+   L61
+   L66
+    LINENUMBER 716 L66
+    NOP
+    GETSTATIC kotlin/Unit.INSTANCE : Lkotlin/Unit;
+    ARETURN
+   L67
+    LOCALVARIABLE $i$a$-update-ApneaViewModel$23$3$1\2\2297\0 I L48 L53 16
+    LOCALVARIABLE it\2 Lcom/example/wags/ui/apnea/ApneaUiState; L47 L53 15
+    LOCALVARIABLE prevValue\1 Ljava/lang/Object; L46 L59 14
+    LOCALVARIABLE nextValue\1 Ljava/lang/Object; L55 L59 15
+    LOCALVARIABLE $i$f$update\1\712 I L44 L59 13
+    LOCALVARIABLE $this$update\1 Lkotlinx/coroutines/flow/MutableStateFlow; L43 L59 12
+    LOCALVARIABLE lv Ljava/lang/String; L11 L60 3
+    LOCALVARIABLE pt Ljava/lang/String; L14 L60 4
+    LOCALVARIABLE tod Ljava/lang/String; L18 L60 5
+    LOCALVARIABLE pos Ljava/lang/String; L21 L60 6
+    LOCALVARIABLE aud Ljava/lang/String; L25 L60 7
+    LOCALVARIABLE bp I L28 L60 8
+    LOCALVARIABLE settings Lcom/example/wags/domain/usecase/apnea/forecast/ForecastSettings; L30 L60 9
+    LOCALVARIABLE records Ljava/util/List; L32 L60 10
+    LOCALVARIABLE forecast Lcom/example/wags/domain/usecase/apnea/forecast/RecordForecast; L41 L60 11
+    LOCALVARIABLE e Ljava/lang/Exception; L63 L65 4
+    LOCALVARIABLE arr [Ljava/lang/Object; L4 L67 2
+    LOCALVARIABLE this Lcom/example/wags/ui/apnea/ApneaViewModel$23$3; L3 L67 0
+    LOCALVARIABLE $result Ljava/lang/Object; L3 L67 1
+    MAXSTACK = 86
+    MAXLOCALS = 17
+
+File is unknown
+The root cause java.lang.OutOfMemoryError was thrown at: org.jetbrains.org.objectweb.asm.tree.analysis.Frame.<init>(Frame.java:78)
+	at org.jetbrains.kotlin.codegen.TransformationMethodVisitor.visitEnd(TransformationMethodVisitor.kt:89)
+	at org.jetbrains.org.objectweb.asm.tree.MethodNode.accept(MethodNode.java:772)
+	at org.jetbrains.kotlin.backend.jvm.codegen.CoroutineCodegenKt.acceptWithStateMachine(CoroutineCodegen.kt:76)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ClassCodegen.generateMethod(ClassCodegen.kt:440)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ClassCodegen.generate(ClassCodegen.kt:168)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitClass(ExpressionCodegen.kt:1000)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitClass(ExpressionCodegen.kt:138)
+	at org.jetbrains.kotlin.ir.declarations.IrClass.accept(IrClass.kt:72)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitStatementContainer(ExpressionCodegen.kt:579)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitContainerExpression(ExpressionCodegen.kt:593)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitContainerExpression(ExpressionCodegen.kt:138)
+	at org.jetbrains.kotlin.ir.visitors.IrElementVisitor$DefaultImpls.visitBlock(IrElementVisitor.kt:122)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitBlock(ExpressionCodegen.kt:413)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitBlock(ExpressionCodegen.kt:138)
+	at org.jetbrains.kotlin.ir.expressions.IrBlock.accept(IrBlock.kt:18)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.gen(ExpressionCodegen.kt:217)
+	at org.jetbrains.kotlin.backend.jvm.codegen.IrCallGenerator.genValueAndPut(IrCallGenerator.kt:48)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitCall$handleParameter(ExpressionCodegen.kt:616)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitCall(ExpressionCodegen.kt:644)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitCall(ExpressionCodegen.kt:138)
+	at org.jetbrains.kotlin.ir.expressions.IrCall.accept(IrCall.kt:24)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitStatementContainer(ExpressionCodegen.kt:579)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitBlockBody(ExpressionCodegen.kt:584)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitBlockBody(ExpressionCodegen.kt:138)
+	at org.jetbrains.kotlin.ir.expressions.IrBlockBody.accept(IrBlockBody.kt:20)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.generate(ExpressionCodegen.kt:240)
+	at org.jetbrains.kotlin.backend.jvm.codegen.FunctionCodegen.doGenerate(FunctionCodegen.kt:123)
+	at org.jetbrains.kotlin.backend.jvm.codegen.FunctionCodegen.generate(FunctionCodegen.kt:44)
+	... 56 more
+Caused by: java.lang.OutOfMemoryError: GC overhead limit exceeded
+	at org.jetbrains.org.objectweb.asm.tree.analysis.Frame.<init>(Frame.java:78)
+	at org.jetbrains.kotlin.codegen.optimization.fixStack.FixStackAnalyzer$FixStackFrame.<init>(FixStackAnalyzer.kt:98)
+	at org.jetbrains.kotlin.codegen.optimization.fixStack.FixStackAnalyzer.analyzer$lambda$0(FixStackAnalyzer.kt:46)
+	at org.jetbrains.kotlin.codegen.optimization.fixStack.FixStackAnalyzer$$Lambda$1752/0x00007dce72996e90.invoke(Unknown Source)
+	at org.jetbrains.kotlin.codegen.optimization.common.FastAnalyzer.fastMergeControlFlowEdge(FastAnalyzer.kt:256)
+	at org.jetbrains.kotlin.codegen.optimization.common.FastAnalyzer.mergeControlFlowEdge(FastAnalyzer.kt:214)
+	at org.jetbrains.kotlin.codegen.optimization.common.FastAnalyzer.processControlFlowEdge(FastAnalyzer.kt:208)
+	at org.jetbrains.kotlin.codegen.optimization.common.FastAnalyzer.processControlFlowEdge$default(FastAnalyzer.kt:206)
+	at org.jetbrains.kotlin.codegen.optimization.common.FastAnalyzer.visitOpInsn(FastAnalyzer.kt:292)
+	at org.jetbrains.kotlin.codegen.optimization.common.FastAnalyzer.visitMeaningfulInstruction(FastAnalyzer.kt:281)
+	at org.jetbrains.kotlin.codegen.optimization.common.FastAnalyzer.analyzeInstruction(FastAnalyzer.kt:113)
+	at org.jetbrains.kotlin.codegen.optimization.common.FastAnalyzer.analyzeMainLoop(FastAnalyzer.kt:74)
+	at org.jetbrains.kotlin.codegen.optimization.common.FastAnalyzer.analyze(FastAnalyzer.kt:53)
+	at org.jetbrains.kotlin.codegen.optimization.fixStack.FixStackAnalyzer.analyze(FixStackAnalyzer.kt:60)
+	at org.jetbrains.kotlin.codegen.optimization.fixStack.FixStackMethodTransformer.analyzeAndTransformBreakContinueGotos(FixStackMethodTransformer.kt:55)
+	at org.jetbrains.kotlin.codegen.optimization.fixStack.FixStackMethodTransformer.transform(FixStackMethodTransformer.kt:44)
+	at org.jetbrains.kotlin.codegen.coroutines.CoroutineTransformerMethodVisitor.performTransformations(CoroutineTransformerMethodVisitor.kt:82)
+	at org.jetbrains.kotlin.codegen.TransformationMethodVisitor.visitEnd(TransformationMethodVisitor.kt:67)
+	at org.jetbrains.org.objectweb.asm.tree.MethodNode.accept(MethodNode.java:772)
+	at org.jetbrains.kotlin.backend.jvm.codegen.CoroutineCodegenKt.acceptWithStateMachine(CoroutineCodegen.kt:76)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ClassCodegen.generateMethod(ClassCodegen.kt:440)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ClassCodegen.generate(ClassCodegen.kt:168)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitClass(ExpressionCodegen.kt:1000)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitClass(ExpressionCodegen.kt:138)
+	at org.jetbrains.kotlin.ir.declarations.IrClass.accept(IrClass.kt:72)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitStatementContainer(ExpressionCodegen.kt:579)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitContainerExpression(ExpressionCodegen.kt:593)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitContainerExpression(ExpressionCodegen.kt:138)
+	at org.jetbrains.kotlin.ir.visitors.IrElementVisitor$DefaultImpls.visitBlock(IrElementVisitor.kt:122)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitBlock(ExpressionCodegen.kt:413)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitBlock(ExpressionCodegen.kt:138)
+	at org.jetbrains.kotlin.ir.expressions.IrBlock.accept(IrBlock.kt:18)
+
+

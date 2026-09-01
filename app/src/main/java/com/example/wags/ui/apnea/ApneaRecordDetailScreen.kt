@@ -692,12 +692,12 @@ private fun RecordDetailContent(
                     val hrName = record.biofeedbackHrSound?.let { raw ->
                         runCatching { com.example.wags.domain.usecase.session.BiofeedbackHrSound.valueOf(raw) }
                             .getOrNull()
-                            ?.let { "${it.emoji} ${it.displayName}" }
+                            ?.let { it.displayName }
                     }
                     val texName = record.biofeedbackSpo2Texture?.let { raw ->
                         runCatching { com.example.wags.domain.usecase.session.BiofeedbackSpo2Texture.valueOf(raw) }
                             .getOrNull()
-                            ?.let { "${it.emoji} ${it.displayName}" }
+                            ?.let { it.displayName }
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
