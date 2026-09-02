@@ -248,7 +248,9 @@ fun ApneaScreen(
                             timeOfDay  = effectiveTod,
                             posture    = state.posture.name,
                             audio      = state.audio.name,
-                            comboDaysSince = comboDaysSince?.toString() ?: "∞"
+                            comboDaysSince = comboDaysSince?.toString() ?: "∞",
+                            // Tapping the collapsed summary line also expands the settings.
+                            onClick = { viewModel.toggleSettings() }
                         )
                     }
                     AnimatedVisibility(
@@ -683,15 +685,17 @@ private fun DrillCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Title, then the optional header action (e.g. the "auto set"
+                    // menu) sits immediately next to the name; the arrow is
+                    // pushed to the far right by the flexible spacer.
                     Text(
                         title,
                         style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f)
+                        fontWeight = FontWeight.SemiBold
                     )
-                    // Optional header action (e.g. the "auto set" menu) sits
-                    // immediately left of the arrow, vertically aligned with the title.
+                    Spacer(modifier = Modifier.width(6.dp))
                     headerAction?.invoke()
+                    Spacer(modifier = Modifier.weight(1f))
                     // Same trailing arrow as the main-screen navigation cards
                     Text("→", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
                 }
@@ -992,7 +996,7 @@ private fun FreeHoldContent(
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        horizontalAlignment = Alignment.Start,
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         // Personal best for current settings — trophies + time (compact)
@@ -1004,7 +1008,7 @@ private fun FreeHoldContent(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
+                    horizontalArrangement = Arrangement.Start
                 ) {
                     // Trophies → navigate to Personal Bests screen
                     Text(
@@ -1076,7 +1080,7 @@ private fun DrillSummaryContent(
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        horizontalAlignment = Alignment.Start,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         // Param label (e.g. "60s breath period", "5min session")
@@ -1093,7 +1097,7 @@ private fun DrillSummaryContent(
             val trophies = trophyCategory?.trophyEmojis() ?: "🏆"
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+                horizontalArrangement = Arrangement.Start
             ) {
                 Text(
                     trophies,

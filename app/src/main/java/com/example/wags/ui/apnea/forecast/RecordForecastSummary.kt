@@ -37,14 +37,14 @@ fun RecordForecastSummary(
 
     Column(
         modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.Start
     ) {
         // Probability row — tappable to open dialog
         Row(
             modifier = Modifier
                 .clickable(enabled = forecast != null) { showDialog.value = true }
                 .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.Center,
+            horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (forecast == null) {
