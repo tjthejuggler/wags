@@ -401,6 +401,25 @@ class BiofeedbackSonificationEngine @Inject constructor() {
     //  - bf_dawn_chorus.wav "Dawn Chorus 2020-05-06 0500.mp3" — CC BY-SA 4.0
     //  - bf_fire.wav       "Bones breaking wood fire ice crackling.ogg" — Public Domain
     @Volatile private var samplesByKind: Map<LayerKind, FloatArray?> = emptyMap()
+
+    // One-shot field recordings for the HR instruments (mono 22.05 kHz PCM16
+    // WAV in res/raw). When present, a strike plays the real recording,
+    // resampled so its pitch tracks the live HR exactly like the synth path;
+    // the additive-synthesis recipes remain as fallback.
+    //
+    // Sources (Wikimedia Commons):
+    //  - bfhr_gong.wav       "Gong55.ogg" — CC0
+    //  - bfhr_heartbeat.wav  "Emily's heartbeat.wav" — CC BY-SA 4.0
+    //  - bfhr_vibraphone.wav "F scale on vibraphone.oga" (first note) — CC BY-SA 4.0
+    //  - bfhr_triangle.wav   "LatinTriangle.ogg" — Public Domain
+    //  - bfhr_piano.wav      "68448 pinkyfinger Piano G.ogg" — CC BY 2.5
+    //  - bfhr_kalimba.wav    "Kalimba de coco (notas sueltas) 01.wav" — CC BY-SA 4.0
+    //  - bfhr_woodblock.wav  "Blok music.ogg" — CC BY-SA 4.0
+    //  - bfhr_tom.wav        "Tom drum 8 inch.ogg" — CC BY-SA 3.0
+    //  - bfhr_xylophone.wav  "Xylophone jingle.wav" (first note) — CC BY 3.0
+    //  - bfhr_tubular.wav    "Röhrenglocken (Windspiel).ogg" — CC BY-SA 3.0 DE
+    //  - BELL reuses the Tibetan singing bowl recording (bf_singing_bowl.wav).
+    @Volatile private var hrSamples: Map<BiofeedbackHrSound, FloatArray?> = emptyMap()
     private var samplesLoaded = false
     /** Live soundscape renderer — lazily rebuilt after samples load (immutable once created). */
     @Volatile private var soundscapeRenderer: SoundscapeRenderer? = null
@@ -445,6 +464,19 @@ class BiofeedbackSonificationEngine @Inject constructor() {
                 LayerKind.LOON to loadWav(context, R.raw.bf_loon),
                 LayerKind.DAWN_CHORUS to loadWav(context, R.raw.bf_dawn_chorus),
                 LayerKind.FIRE to loadWav(context, R.raw.bf_fire)
+            )
+            hrSamples = mapOf(
+                BiofeedbackHrSound.GONG to loadWav(context, R.raw.bfhr_gong),
+                BiofeedbackHrSound.BELL to loadWav(context, R.raw.bf_singing_bowl),
+                BiofeedbackHrSound.HEARTBEAT to loadWav(context, R.raw.bfhr_heartbeat),
+                BiofeedbackHrSound.MARIMBA to loadWav(context, R.raw.bfhr_vibraphone),
+                BiofeedbackHrSound.CHIME to loadWav(context, R.raw.bfhr_triangle),
+                BiofeedbackHrSound.PIANO to loadWav(context, R.raw.bfhr_piano),
+                BiofeedbackHrSound.KALIMBA to loadWav(context, R.raw.bfhr_kalimba),
+                BiofeedbackHrSound.WOODBLOCK to loadWav(context, R.raw.bfhr_woodblock),
+                BiofeedbackHrSound.TOM to loadWav(context, R.raw.bfhr_tom),
+                BiofeedbackHrSound.XYLOPHONE to loadWav(context, R.raw.bfhr_xylophone),
+                BiofeedbackHrSound.TUBULAR to loadWav(context, R.raw.bfhr_tubular)
             )
             soundscapeRenderer = null // rebuild with the loaded samples
             samplesLoaded = true
@@ -590,7 +622,7 @@ class BiofeedbackSonificationEngine @Inject constructor() {
             val pitch = 2.0.pow((bpm - DEFAULT_HR_BPM) / HR_PITCH_OCTAVE_BPM)
             val base = recipeFor(sound)
             val recipe = base.copy(baseFreqHz = base.baseFreqHz * pitch)
-            strike(out, nextBeat.toInt(), recipe, out.size)
+            strike(out, nextBeat.toInt(), recipe, out.size, sound = sound, rate = pitch.toFloat())
             nextBeat += (SAMPLE_RATE * 60.0 / bpm).toLong()
         }
         playPreview(out, durSamples)
@@ -686,7 +718,7 @@ class BiofeedbackSonificationEngine @Inject constructor() {
         val pitched = recipe.copy(baseFreqHz = recipe.baseFreqHz * hrPitch)
         while (nextBeatSample < chunkEnd) {
             val offsetInChunk = (nextBeatSample - totalSamples).toInt()
-            strike(beatTail, offsetInChunk, pitched)
+            strike(beatTail, offsetInChunk, pitched, sound = hrSound, rate = hrPitch.toFloat())
             nextBeatSample += beatIntervalSamples()
         }
 
@@ -703,8 +735,18 @@ class BiofeedbackSonificationEngine @Inject constructor() {
         return (SAMPLE_RATE * 60.0 / bpm).toLong().coerceAtLeast(1)
     }
 
-    /** Adds one instrument strike into [tail] starting [offset] samples in. */
-    private fun strike(tail: FloatArray, offset: Int, recipe: StrikeRecipe, limit: Int = TAIL_SAMPLES) {
+    /**
+     * Adds one instrument strike into [tail] starting [offset] samples in.
+     * If a real one-shot recording is loaded for [sound], the recording is
+     * played back (resampled by [rate] so pitch tracks HR); otherwise the
+     * additive-synthesis recipe renders the strike.
+     */
+    private fun strike(tail: FloatArray, offset: Int, recipe: StrikeRecipe, limit: Int = TAIL_SAMPLES, sound: BiofeedbackHrSound? = null, rate: Float = 1f) {
+        val sample = sound?.let { hrSamples[it] }
+        if (sample != null && sample.size > 4) {
+            strikeSampled(tail, offset, sample, recipe.amplitude * 1.35f, rate, limit)
+            return
+        }
         strikeOnce(tail, offset, recipe, recipe.amplitude, limit)
         if (recipe.secondThumpOffsetMs > 0) {
             strikeOnce(
@@ -714,6 +756,22 @@ class BiofeedbackSonificationEngine @Inject constructor() {
                 recipe.amplitude * 0.7f,
                 limit
             )
+        }
+    }
+
+    /** Plays a real one-shot recording into [tail] at playback [rate] (1 = original pitch). */
+    private fun strikeSampled(tail: FloatArray, offset: Int, sample: FloatArray, amplitude: Float, rate: Float, limit: Int) {
+        val srcRate = 22050 // bundled WAVs are 22.05 kHz
+        val step = (srcRate.toDouble() / SAMPLE_RATE) * rate
+        var pos = 0.0
+        var i = 0
+        val n = sample.size - 1
+        while (i + offset < limit && pos < n) {
+            val i0 = pos.toInt()
+            val frac = (pos - i0).toFloat()
+            tail[offset + i] += (sample[i0] + (sample[i0 + 1] - sample[i0]) * frac) * amplitude
+            pos += step
+            i++
         }
     }
 
