@@ -77,20 +77,25 @@ enum class BiofeedbackHrSound(
     TUBULAR(
         "Tubular Bells",
         "Long ringing orchestral tube per beat"
+    ),
+    NONE(
+        "None",
+        "No heartbeat sound — only the SpO2 soundscape plays"
     )
 }
 
 /**
- * Peaceful background texture whose tonal quality follows the live SpO2
- * percentage. Higher SpO2 → fuller, brighter, louder; falling SpO2 →
- * darker, quieter, lower. The mapping is strongly stepped at the decade
- * thresholds (90, 80, 70, 60, 50, 40 %) — each threshold crossed makes
- * the texture noticeably darker, lower and quieter, so desaturation is
- * clearly audible.
+ * Peaceful background *soundscape* that follows the live SpO2 percentage by
+ * telling a little story: each setting is a set of layered sounds, and as
+ * SpO2 falls through its bands (95 / 90 / 85 / 80 … 40 %) new layers are
+ * added — and sometimes taken away again — so the descent is heard as
+ * changing scenes rather than a single sound bending in pitch (there is NO
+ * pitch modulation from SpO2). See [BiofeedbackSoundscapes] for the exact
+ * layer progression of each setting.
  *
- * The nature textures (Ocean, Wind, Rain, Stream) are real field
- * recordings bundled as WAV resources (see BiofeedbackSonificationEngine)
- * whose playback pitch, brightness and volume are modulated live.
+ * The nature textures (Ocean, Wind, Rain, Stream) combine real field
+ * recordings bundled as WAV resources with procedurally synthesised layers
+ * (birds, thunder, crickets, whale-song, …).
  */
 enum class BiofeedbackSpo2Texture(
     val displayName: String,
@@ -98,31 +103,35 @@ enum class BiofeedbackSpo2Texture(
 ) {
     WARM_PAD(
         "Warm Pad",
-        "Slow harmonic drone that dims and sinks as SpO2 drops"
+        "A chord that empties voice by voice and grounds into a deep pulse"
     ),
     OCEAN(
         "Ocean",
-        "Real ocean-wave recording that slows and deepens as SpO2 drops"
+        "Sunny shore with gulls, growing surf, whale song, then the deep"
     ),
     WIND(
         "Wind",
-        "Real breeze recording that fades and darkens as SpO2 drops"
+        "Evening breeze with crickets builds to a distant storm, then dawn birds"
     ),
     RAIN(
         "Rain",
-        "Real rainfall recording that thins and deepens as SpO2 drops"
+        "Calm rain grows to storm with wind and thunder, then birds and playing children"
     ),
     STREAM(
         "Stream",
-        "Real brook recording that slows and stills as SpO2 drops"
+        "A brook with birds thins to drips and sinks into the deep current"
     ),
     DEEP_DRONE(
         "Deep Drone",
-        "Low cello-like drone that sinks a semitone per SpO2 decade"
+        "A low root that gains a fifth, a throb, and beating tension"
     ),
     CHOIR(
         "Choir Pad",
-        "Vowel-like choir swell that hollows out as SpO2 drops"
+        "A choir that loses its voices one register at a time"
+    ),
+    NONE(
+        "None",
+        "No SpO2 soundscape — only the heartbeat instrument plays"
     )
 }
 
@@ -189,12 +198,6 @@ class BiofeedbackSonificationEngine @Inject constructor() {
         private const val SPO2_CEIL = 100f
         private const val DEFAULT_SPO2 = 98f
         private const val SPO2_SMOOTHING = 0.08f   // noticeable but not jarring
-
-        /** Decade thresholds that add an extra pitch/timbre step when crossed. */
-        private val SPO2_DECADES = intArrayOf(90, 80, 70, 60, 50, 40)
-
-        /** Semitone drop per crossed decade threshold. */
-        private const val SEMITONES_PER_DECADE = 1.0
 
         // Master safety clamp
         private const val MASTER_LIMIT = 0.9f
@@ -337,6 +340,12 @@ class BiofeedbackSonificationEngine @Inject constructor() {
             amplitude = 0.24f,
             attackMs = 6
         )
+        BiofeedbackHrSound.NONE -> StrikeRecipe(
+            // Never scheduled — renderChunk skips strikes for NONE.
+            baseFreqHz = 440.0,
+            partials = listOf(Partial(1.00, 0.0f, 0.01)),
+            amplitude = 0f
+        )
     }
 
     // ── Audio lifecycle ────────────────────────────────────────────────────────
@@ -358,41 +367,86 @@ class BiofeedbackSonificationEngine @Inject constructor() {
     private var totalSamples = 0L
     private var nextBeatSample = 0L
 
-    // Pad oscillator phases / filter states
-    private var padPhase = DoubleArray(3)
-    private var lfoPhase = 0.0
-    private var gustLfoPhase = 0.0
-    private var noiseLp1 = 0f
-    private var noiseLp2 = 0f
-
     // ── Real-recording SpO2 textures ────────────────────────────────────────────
     // Field recordings (mono 22.05 kHz PCM16 WAV in res/raw) played back in a
     // loop with live-modulated pitch (resampling), brightness (one-pole LP)
     // and volume, driven by the SpO2 mapping.
     //
-    // Sources (Wikimedia Commons):
-    //  - bf_ocean.wav  "Waves.ogg" by Dsw4 — Public Domain
-    //  - bf_wind.wav   "Breeze birds and geese.ogg" by ezwa (PDSounds) — Public Domain
-    //  - bf_rain.wav   "Rain against the window.ogg" by cori (PDSounds) — Public Domain
-    //  - bf_stream.wav "Brook sound.ogg" by TwoWings — CC BY 3.0
-    private val SAMPLE_SRC_RATE = 22050
-    private val samplePos = DoubleArray(4)
-    private var sampleLp = 0f
-    @Volatile private var oceanSample: FloatArray? = null
-    @Volatile private var windSample: FloatArray? = null
-    @Volatile private var rainSample: FloatArray? = null
-    @Volatile private var streamSample: FloatArray? = null
+    // Sources (Wikimedia Commons; layers without an asset fall back to
+    // procedural synthesis in SoundscapeRenderer):
+    //  - bf_ocean.wav      "Waves.ogg" by Dsw4 — Public Domain
+    //  - bf_wind.wav       "Breeze birds and geese.ogg" by ezwa (PDSounds) — Public Domain
+    //  - bf_rain.wav       "Rain against the window.ogg" by cori (PDSounds) — Public Domain
+    //  - bf_stream.wav     "Brook sound.ogg" by TwoWings — CC BY 3.0
+    //  - bf_wind_gust.wav  "Wind in Swedish pine forest at 25 mps.ogg" — CC BY 4.0 (ArildV)
+    //  - bf_rain_heavy.wav "Rain (1).ogg" — Commons free licence
+    //  - bf_thunder.wav    "Storm thunderbolts.ogg" (PDSounds) — Public Domain
+    //  - bf_birds.wav      "Birds singing in garden.ogg" (PDSounds) — Public Domain
+    //  - bf_gulls.wav      "Gull 1.ogg" — Commons free licence
+    //  - bf_crickets.wav   "Cricket.ogg" — Commons free licence
+    //  - bf_whale.wav      "Humpback whale moo.ogg" — Commons free licence
+    //  - bf_children.wav   "Douzen kids on playground.ogg" — Commons free licence
+    //  - bf_rain_light.wav "Sound of light rainfall.ogg" — Commons free licence
+    //  - bf_drip.wav       "Water drops dripping.ogg" — Commons free licence
+    //  - bf_rain_roof.wav  "Rain on a veranda and t.ogg" — Public Domain
+    //  - bf_river.wav      "433589 jackthemurray stream-river-water-up-close.wav" — CC0
+    //  - bf_frogs.wav      "Frogs croak calling chorus at night.ogg" — CC BY-SA 4.0
+    //  - bf_owl.wav        "Maghreb owl hooting.wav" — CC BY-SA 4.0
+    //  - bf_wolf.wav       "Wolf howls.ogg" — Public Domain
+    //  - bf_bells.wav      "Cathedral Fribourg bells ringing 01.ogg" — CC BY-SA 4.0
+    //  - bf_singing_bowl.wav "Tibetan Singing Bowl hit 11inch.flac" — CC BY-SA 4.0
+    //  - bf_choir.wav      "Rorate Caeli ~ Gregorian Chant.ogg" — CC BY-SA 4.0
+    //  - bf_cicadas.wav    "Cicada orni (Singing).ogg" — CC BY-SA 2.5
+    //  - bf_loon.wav       "Common loon yodels.ogg" — CC BY-SA 2.5
+    //  - bf_dawn_chorus.wav "Dawn Chorus 2020-05-06 0500.mp3" — CC BY-SA 4.0
+    //  - bf_fire.wav       "Bones breaking wood fire ice crackling.ogg" — Public Domain
+    @Volatile private var samplesByKind: Map<LayerKind, FloatArray?> = emptyMap()
     private var samplesLoaded = false
+    /** Live soundscape renderer — lazily rebuilt after samples load (immutable once created). */
+    @Volatile private var soundscapeRenderer: SoundscapeRenderer? = null
+
+    private fun renderer(): SoundscapeRenderer =
+        soundscapeRenderer ?: synchronized(this) {
+            soundscapeRenderer ?: SoundscapeRenderer(samplesByKind, SAMPLE_RATE).also {
+                soundscapeRenderer = it
+            }
+        }
 
     /** Loads the bundled field recordings. Idempotent; call once at app/session start. */
     fun loadSamples(context: Context) {
         if (samplesLoaded) return
         synchronized(this) {
             if (samplesLoaded) return
-            oceanSample = loadWav(context, R.raw.bf_ocean)
-            windSample = loadWav(context, R.raw.bf_wind)
-            rainSample = loadWav(context, R.raw.bf_rain)
-            streamSample = loadWav(context, R.raw.bf_stream)
+            samplesByKind = mapOf(
+                LayerKind.OCEAN_BED to loadWav(context, R.raw.bf_ocean),
+                LayerKind.WIND_BED to loadWav(context, R.raw.bf_wind),
+                LayerKind.RAIN_BED to loadWav(context, R.raw.bf_rain),
+                LayerKind.STREAM_BED to loadWav(context, R.raw.bf_stream),
+                LayerKind.WIND_GUST to loadWav(context, R.raw.bf_wind_gust),
+                LayerKind.RAIN_HEAVY to loadWav(context, R.raw.bf_rain_heavy),
+                LayerKind.RAINSTORM to loadWav(context, R.raw.bf_rainstorm),
+                LayerKind.THUNDER to loadWav(context, R.raw.bf_thunder),
+                LayerKind.BIRDS to loadWav(context, R.raw.bf_birds),
+                LayerKind.GULLS to loadWav(context, R.raw.bf_gulls),
+                LayerKind.CRICKETS to loadWav(context, R.raw.bf_crickets),
+                LayerKind.WHALE to loadWav(context, R.raw.bf_whale),
+                LayerKind.CHILDREN to loadWav(context, R.raw.bf_children),
+                LayerKind.RAIN_LIGHT to loadWav(context, R.raw.bf_rain_light),
+                LayerKind.DRIP to loadWav(context, R.raw.bf_drip),
+                LayerKind.RAIN_ROOF to loadWav(context, R.raw.bf_rain_roof),
+                LayerKind.RIVER to loadWav(context, R.raw.bf_river),
+                LayerKind.FROGS to loadWav(context, R.raw.bf_frogs),
+                LayerKind.OWL to loadWav(context, R.raw.bf_owl),
+                LayerKind.WOLF to loadWav(context, R.raw.bf_wolf),
+                LayerKind.BELLS to loadWav(context, R.raw.bf_bells),
+                LayerKind.SINGING_BOWL to loadWav(context, R.raw.bf_singing_bowl),
+                LayerKind.CHOIR_VOICES to loadWav(context, R.raw.bf_choir),
+                LayerKind.CICADAS to loadWav(context, R.raw.bf_cicadas),
+                LayerKind.LOON to loadWav(context, R.raw.bf_loon),
+                LayerKind.DAWN_CHORUS to loadWav(context, R.raw.bf_dawn_chorus),
+                LayerKind.FIRE to loadWav(context, R.raw.bf_fire)
+            )
+            soundscapeRenderer = null // rebuild with the loaded samples
             samplesLoaded = true
         }
     }
@@ -441,39 +495,6 @@ class BiofeedbackSonificationEngine @Inject constructor() {
     private fun readLeShort(b: ByteArray, off: Int): Int =
         (b[off].toInt() and 0xFF) or ((b[off + 1].toInt() and 0xFF) shl 8)
 
-    /**
-     * Plays one looping field recording with SpO2-driven modulation:
-     * pitch (resample step), brightness (one-pole low-pass cutoff) and
-     * volume all follow the live mapping, including the decade steps.
-     */
-    private fun renderSampleTexture(
-        chunk: FloatArray,
-        sample: FloatArray?,
-        posIdx: Int,
-        t: Float,
-        pitch: Double,
-        swell: Float
-    ) {
-        if (sample == null || sample.size < 4) { chunk.fill(0f); return }
-        val step = pitch * SAMPLE_SRC_RATE.toDouble() / SAMPLE_RATE
-        val lpCoef = (0.03 + 0.17 * t).toFloat()          // darker as SpO2 drops
-        val gain = (0.16 + 0.38 * t) * swell              // receding as SpO2 drops
-        var pos = samplePos[posIdx]
-        val n = sample.size
-        for (i in chunk.indices) {
-            val i0 = pos.toInt()
-            val frac = (pos - i0).toFloat()
-            val s0 = sample[i0]
-            val s1 = sample[(i0 + 1) % n]
-            val raw = s0 + (s1 - s0) * frac
-            sampleLp += (raw - sampleLp) * lpCoef
-            chunk[i] = (sampleLp * gain).toFloat()
-            pos += step
-            if (pos >= n) pos -= n
-        }
-        samplePos[posIdx] = pos
-    }
-
     fun start(scope: CoroutineScope) {
         if (renderJob?.isActive == true) return
         val minBuf = AudioTrack.getMinBufferSize(
@@ -505,8 +526,6 @@ class BiofeedbackSonificationEngine @Inject constructor() {
         beatTail.fill(0f)
         totalSamples = 0L
         nextBeatSample = 0L
-        padPhase.fill(0.0)
-        noiseLp1 = 0f; noiseLp2 = 0f
 
         renderJob = scope.launch(Dispatchers.IO) {
             val chunk = FloatArray(CHUNK_SAMPLES)
@@ -561,6 +580,7 @@ class BiofeedbackSonificationEngine @Inject constructor() {
      */
     fun previewHrSound(sound: BiofeedbackHrSound) {
         stopPreview()
+        if (sound == BiofeedbackHrSound.NONE) return // silence is its own preview
         val durSamples = SAMPLE_RATE * 3
         val out = FloatArray(durSamples + TAIL_SAMPLES)
         var nextBeat = 0L
@@ -577,38 +597,31 @@ class BiofeedbackSonificationEngine @Inject constructor() {
     }
 
     /**
-     * Plays a 6-second demo of the given SpO2 texture: a simulated sweep
-     * from 98 % down to 65 % so the user hears the texture darken, sink and
-     * step down through the 90/80/70 thresholds.
+     * Plays a 14-second demo of the given SpO2 soundscape: a simulated sweep
+     * from 98 % down to 45 % so the user hears the layered story unfold —
+     * layers joining and leaving as the SpO2 falls through the bands. Uses a
+     * dedicated SoundscapeRenderer so live render state is untouched.
      */
     fun previewSpo2Texture(tex: BiofeedbackSpo2Texture) {
         stopPreview()
-        val savedTexture = texture
-        texture = tex
-        val durSamples = SAMPLE_RATE * 6
+        if (tex == BiofeedbackSpo2Texture.NONE) return
+        val previewRenderer = SoundscapeRenderer(samplesByKind, SAMPLE_RATE)
+        val durSamples = SAMPLE_RATE * 14
         val out = FloatArray(durSamples)
         val chunk = FloatArray(CHUNK_SAMPLES)
-        val savedT = smoothedSpo2T
-        val savedTotal = totalSamples
-        totalSamples = 0L
         var written = 0
-        // Sweep SpO2 98 → 65 %, updating the smoothed mapping per chunk
+        // Sweep SpO2 98 → 45 % across the demo so every band transition
+        // gets roughly a second of listening time.
         while (written < durSamples) {
             val frac = written.toDouble() / durSamples
-            val spo2 = 98.0 - 33.0 * frac
-            targetSpo2T = spo2ToT(spo2.toFloat())
-            smoothedSpo2T = targetSpo2T
-            renderTexture(chunk)
+            val spo2 = 98.0 - 53.0 * frac
+            previewRenderer.renderChunk(chunk, tex, spo2.toFloat())
             val n = minOf(CHUNK_SAMPLES, durSamples - written)
             System.arraycopy(chunk, 0, out, written, n)
             written += n
-            totalSamples += n
         }
-        // Restore live state — the preview borrows the render filters/phases
-        texture = savedTexture
-        targetSpo2T = savedT
-        smoothedSpo2T = savedT
-        totalSamples = savedTotal
+        // Soft-limit the preview mix.
+        for (i in out.indices) out[i] = out[i].coerceIn(-MASTER_LIMIT, MASTER_LIMIT)
         playPreview(out, durSamples)
     }
 
@@ -656,36 +669,17 @@ class BiofeedbackSonificationEngine @Inject constructor() {
     private fun spo2ToT(pct: Float): Float =
         ((pct - SPO2_FLOOR) / (SPO2_CEIL - SPO2_FLOOR)).coerceIn(0f, 1f)
 
-    /**
-     * Number of decade thresholds (90, 80, …, 40) that the live SpO2 has
-     * fallen below — each one adds an extra audible pitch/timbre step.
-     */
-    private fun decadeSteps(t: Float): Int {
-        val spo2 = SPO2_FLOOR + t * (SPO2_CEIL - SPO2_FLOOR)
-        return SPO2_DECADES.count { spo2 < it }
-    }
-
-    /**
-     * Overall pitch factor for the SpO2 texture: a smooth glide across the
-     * full 40..100 range PLUS one semitone down per crossed decade, so the
-     * drop at 90, 80, 70, 60, 50, 40 is unmistakable.
-     */
-    private fun spo2PitchFactor(t: Float): Double {
-        val glide = 0.75 + 0.25 * t                       // smooth −3 .. +0 semitones-ish
-        val steps = 2.0.pow(-decadeSteps(t) * SEMITONES_PER_DECADE / 12.0)
-        return glide * steps
-    }
-
     private fun renderChunk(chunk: FloatArray) {
         // Smooth the live feeds — slow drift, never jarring.
         smoothedHr += (targetHr - smoothedHr) * HR_SMOOTHING
         smoothedSpo2T += (targetSpo2T - smoothedSpo2T) * SPO2_SMOOTHING
 
-        // 1) Background texture layer
+        // 1) Background texture layer (layered soundscape — no SpO2 pitch bend)
         renderTexture(chunk)
 
         // 2) Schedule heartbeat strikes on the sample clock (jitter-free tempo).
         //    Pitch scales with the live HR so rising HR = rising pitch.
+        if (hrSound == BiofeedbackHrSound.NONE) return
         val chunkEnd = totalSamples + CHUNK_SAMPLES
         val recipe = recipeFor(hrSound)
         val hrPitch = 2.0.pow((smoothedHr.toDouble() - DEFAULT_HR_BPM) / HR_PITCH_OCTAVE_BPM)
@@ -744,95 +738,14 @@ class BiofeedbackSonificationEngine @Inject constructor() {
     }
 
     /**
-     * Renders the SpO2-mapped background texture for this chunk.
-     * `t = smoothedSpo2T` (0..1) drives volume / brightness / pitch:
-     * high SpO2 = full and warm; dropping SpO2 = darker, lower, quieter,
-     * with an extra semitone-and-timbre step at each decade threshold.
+     * Renders the SpO2-mapped background soundscape for this chunk. The
+     * smoothed SpO2 drives which layers of the soundscape are audible —
+     * layers cross-fade in/out as their bands are entered and left (see
+     * [BiofeedbackSoundscapes]). No pitch modulation from SpO2.
      */
     private fun renderTexture(chunk: FloatArray) {
-        val t = smoothedSpo2T
-        val chunkSec = CHUNK_MS / 1000.0
-        val pitch = spo2PitchFactor(t)
-        // Strong volume mapping — clearly audible across the SpO2 range.
-        val masterBase = (0.02 + 0.16 * t).toFloat()
-
-        // Shared slow LFO (breathing-speed swell)
-        lfoPhase += 2.0 * PI * 0.09 * chunkSec
-        if (lfoPhase > 2.0 * PI) lfoPhase -= 2.0 * PI
-        val swell = 0.80 + 0.20 * sin(lfoPhase)
-
-        when (texture) {
-            BiofeedbackSpo2Texture.WARM_PAD -> {
-                val master = masterBase * swell.toFloat()
-                val brightness = 0.20 + 0.80 * t          // upper harmonics fade with SpO2
-                val freqs = doubleArrayOf(110.0, 164.81, 220.0)
-                val gains = doubleArrayOf(1.0, 0.55, 0.38 * brightness)
-                for (i in chunk.indices) {
-                    val tt = i.toDouble() / SAMPLE_RATE
-                    var s = 0.0
-                    for (v in freqs.indices) {
-                        // Gentle detune wobble keeps the drone organic
-                        val wobble = 1.0 + 0.0015 * sin(2.0 * PI * 0.05 * tt + v * 1.7)
-                        s += sin(padPhase[v] * 2.0 * PI) * gains[v]
-                        padPhase[v] = (padPhase[v] + freqs[v] * pitch * wobble / SAMPLE_RATE) % 1.0
-                    }
-                    chunk[i] = (s / 3.0 * master).toFloat()
-                }
-            }
-
-            BiofeedbackSpo2Texture.OCEAN -> renderSampleTexture(chunk, oceanSample, 0, t, pitch, swell.toFloat())
-
-            BiofeedbackSpo2Texture.WIND -> renderSampleTexture(chunk, windSample, 1, t, pitch, swell.toFloat())
-
-            BiofeedbackSpo2Texture.RAIN -> renderSampleTexture(chunk, rainSample, 2, t, pitch, swell.toFloat())
-
-            BiofeedbackSpo2Texture.STREAM -> renderSampleTexture(chunk, streamSample, 3, t, pitch, swell.toFloat())
-
-            BiofeedbackSpo2Texture.DEEP_DRONE -> {
-                // Cello-like low drone: the decade steps dominate — one
-                // semitone per threshold makes the descent very obvious.
-                val master = (0.04 + 0.13 * t).toFloat() * swell.toFloat()
-                val brightness = 0.25 + 0.75 * t
-                val freqs = doubleArrayOf(65.41, 98.0, 130.81)
-                val gains = doubleArrayOf(1.0, 0.45, 0.30 * brightness)
-                for (i in chunk.indices) {
-                    val tt = i.toDouble() / SAMPLE_RATE
-                    var s = 0.0
-                    for (v in freqs.indices) {
-                        val vibrato = 1.0 + 0.002 * sin(2.0 * PI * 0.7 * tt + v)
-                        s += sin(padPhase[v] * 2.0 * PI) * gains[v]
-                        padPhase[v] = (padPhase[v] + freqs[v] * pitch * vibrato / SAMPLE_RATE) % 1.0
-                    }
-                    chunk[i] = (s / 3.0 * master).toFloat()
-                }
-            }
-
-            BiofeedbackSpo2Texture.CHOIR -> {
-                // Vowel-like pad: detuned triad + slow formant wobble. As
-                // SpO2 drops the upper voices fade (hollows out) and sink.
-                val master = masterBase * swell.toFloat()
-                val fullness = 0.15 + 0.85 * t
-                val freqs = doubleArrayOf(196.0, 246.94, 293.66)
-                val gains = doubleArrayOf(1.0, 0.7 * fullness, 0.55 * fullness * fullness)
-                for (i in chunk.indices) {
-                    val tt = i.toDouble() / SAMPLE_RATE
-                    var s = 0.0
-                    for (v in freqs.indices) {
-                        val chorus = 1.0 + 0.003 * sin(2.0 * PI * (0.11 + 0.05 * v) * tt + v * 2.3)
-                        s += sin(padPhase[v] * 2.0 * PI) * gains[v]
-                        padPhase[v] = (padPhase[v] + freqs[v] * pitch * chorus / SAMPLE_RATE) % 1.0
-                    }
-                    chunk[i] = (s / 3.0 * master).toFloat()
-                }
-            }
-
-        }
-    }
-
-    /** Deterministic-ish uniform noise in [-1, 1]. */
-    private var noiseSeed = 123456789L
-    private fun random(): Float {
-        noiseSeed = noiseSeed * 6364136223846793005L + 1442695040888963407L
-        return ((noiseSeed ushr 40) and 0xFFFFF).toFloat() / 0xFFFFF * 2f - 1f
+        if (texture == BiofeedbackSpo2Texture.NONE) { chunk.fill(0f); return }
+        val spo2 = SPO2_FLOOR + smoothedSpo2T * (SPO2_CEIL - SPO2_FLOOR)
+        renderer().renderChunk(chunk, texture, spo2)
     }
 }

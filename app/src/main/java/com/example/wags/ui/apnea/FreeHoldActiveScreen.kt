@@ -1802,10 +1802,60 @@ private fun FreeHoldActiveScreenContent(
                 )
             }
 
+            // Actual hold-start logic, factored out so the biofeedback
+            // missing-data confirmation can gate it.
+            val doStartHold: () -> Unit = {
+                viewModel.markHoldFlowStart()
+                if (state.currentPrepType == PrepType.EUCAPNIC_DIAPHRAGMATIC.name && state.eucapnicConfig != null) {
+                    if (state.eucapnicPrepCompleted) {
+                        // Eucapnic prep already done, start the actual hold
+                        viewModel.startFreeHold()
+                    } else {
+                        // Navigate to eucapnic pacer screen with the current config
+                        val config = state.eucapnicConfig!!
+                        navController.navigate(
+                            WagsRoutes.eucapnicPacer(
+                                lungVolume = state.currentLungVolume,
+                                timeOfDay = state.currentTimeOfDay,
+                                posture = state.currentPosture,
+                                audio = state.currentAudio,
+                                sessionType = "FREE_HOLD",
+                                prepDurationSec = config.prepDurationSec,
+                                breathsPerMin = config.breathsPerMin,
+                                inhaleSec = config.inhaleSec,
+                                topPauseSec = config.topPauseSec,
+                                exhaleSec = config.exhaleSec,
+                                bottomPauseSec = config.bottomPauseSec,
+                                breathDepthPercent = config.breathDepthPercent
+                            )
+                        )
+                    }
+                } else if (state.isHyperPrep && state.guidedHyperEnabled && !state.guidedCountdownComplete) {
+                    viewModel.showGuidedCountdown()
+                } else {
+                    viewModel.startFreeHold()
+                }
+            }
+
+            // Biofeedback pre-flight: when both HR instrument and SpO2
+            // soundscape are configured but a live feed is missing, confirm
+            // first (confirming sets the missing side to its None option).
+            val needsBiofeedbackConfirm = state.isBiofeedbackMode &&
+                state.biofeedbackHrSound != null &&
+                state.biofeedbackHrSound != BiofeedbackHrSound.NONE &&
+                state.biofeedbackSpo2Texture != null &&
+                state.biofeedbackSpo2Texture != BiofeedbackSpo2Texture.NONE &&
+                (state.liveHr == null || state.liveSpO2 == null)
+
             // Biofeedback sonification picker — shown when BIOFEEDBACK mode +
             // hold not active. Selected-config banner doubles as the trigger
             // (same pattern as the guided picker above).
             var showBiofeedbackPicker by remember { mutableStateOf(false) }
+            // Biofeedback missing-live-data confirmation — shown at hold start
+            // when both HR + SpO2 are configured but one live feed is absent.
+            var showBiofeedbackMissingData by remember { mutableStateOf(false) }
+            var biofeedbackMissingHr by remember { mutableStateOf(false) }
+            var biofeedbackMissingSpo2 by remember { mutableStateOf(false) }
             if (!state.freeHoldActive && state.isBiofeedbackMode) {
                 val hrSound = state.biofeedbackHrSound
                 val texture = state.biofeedbackSpo2Texture
@@ -1829,6 +1879,23 @@ private fun FreeHoldActiveScreenContent(
                     onPreviewHrSound = { viewModel.previewBiofeedbackHrSound(it) },
                     onPreviewSpo2Texture = { viewModel.previewBiofeedbackSpo2Texture(it) },
                     onStopPreview = { viewModel.stopBiofeedbackPreview() }
+                )
+            }
+            if (showBiofeedbackMissingData) {
+                BiofeedbackMissingDataDialog(
+                    missingHr = biofeedbackMissingHr,
+                    missingSpo2 = biofeedbackMissingSpo2,
+                    onConfirm = {
+                        showBiofeedbackMissingData = false
+                        if (biofeedbackMissingHr) {
+                            viewModel.setBiofeedbackHrSound(BiofeedbackHrSound.NONE)
+                        }
+                        if (biofeedbackMissingSpo2) {
+                            viewModel.setBiofeedbackSpo2Texture(BiofeedbackSpo2Texture.NONE)
+                        }
+                        doStartHold()
+                    },
+                    onDismiss = { showBiofeedbackMissingData = false }
                 )
             }
 
@@ -1881,10 +1948,6 @@ private fun FreeHoldActiveScreenContent(
                 )
             }
 
-            // Determine whether the start button should trigger guided countdown
-            val useGuidedStart = state.isHyperPrep
-                && state.guidedHyperEnabled
-                && !state.guidedCountdownComplete
 
             FreeHoldActiveContent(
                 freeHoldActive = state.freeHoldActive,
@@ -1899,35 +1962,12 @@ private fun FreeHoldActiveScreenContent(
                 modifier = Modifier.fillMaxSize(),
                 onShowTimerChange = { viewModel.setShowTimer(it) },
                 onStart = {
-                    viewModel.markHoldFlowStart()
-                    if (state.currentPrepType == PrepType.EUCAPNIC_DIAPHRAGMATIC.name && state.eucapnicConfig != null) {
-                        if (state.eucapnicPrepCompleted) {
-                            // Eucapnic prep already done, start the actual hold
-                            viewModel.startFreeHold()
-                        } else {
-                            // Navigate to eucapnic pacer screen with the current config
-                            val config = state.eucapnicConfig!!
-                            navController.navigate(
-                                WagsRoutes.eucapnicPacer(
-                                    lungVolume = state.currentLungVolume,
-                                    timeOfDay = state.currentTimeOfDay,
-                                    posture = state.currentPosture,
-                                    audio = state.currentAudio,
-                                    sessionType = "FREE_HOLD",
-                                    prepDurationSec = config.prepDurationSec,
-                                    breathsPerMin = config.breathsPerMin,
-                                    inhaleSec = config.inhaleSec,
-                                    topPauseSec = config.topPauseSec,
-                                    exhaleSec = config.exhaleSec,
-                                    bottomPauseSec = config.bottomPauseSec,
-                                    breathDepthPercent = config.breathDepthPercent
-                                )
-                            )
-                        }
-                    } else if (useGuidedStart) {
-                        viewModel.showGuidedCountdown()
+                    if (needsBiofeedbackConfirm) {
+                        biofeedbackMissingHr = state.liveHr == null
+                        biofeedbackMissingSpo2 = state.liveSpO2 == null
+                        showBiofeedbackMissingData = true
                     } else {
-                        viewModel.startFreeHold()
+                        doStartHold()
                     }
                 },
                 onFirstContraction = { viewModel.recordFreeHoldFirstContraction() },

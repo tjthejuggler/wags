@@ -159,7 +159,7 @@ fun BiofeedbackPickerDialog(
 
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Background texture (quality = live SpO2)",
+                    "Background soundscape (scenes = live SpO2)",
                     style = MaterialTheme.typography.labelMedium,
                     color = TextSecondary
                 )
@@ -238,4 +238,63 @@ private fun BiofeedbackOptionCard(
             }
         }
     }
+}
+
+// ── Missing live-data confirmation (shown at hold start) ─────────────────────
+
+/**
+ * Confirmation shown when starting a BIOFEEDBACK hold while both the HR
+ * instrument and the SpO2 soundscape are configured, but one of the live
+ * feeds is missing. Confirming sets the missing side to its "None" option
+ * and starts the hold; cancelling keeps the configuration untouched.
+ */
+@Composable
+fun BiofeedbackMissingDataDialog(
+    missingHr: Boolean,
+    missingSpo2: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val missing = buildList {
+        if (missingHr) add("heart rate")
+        if (missingSpo2) add("SpO2")
+    }.joinToString(" and ")
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = BackgroundDark,
+        title = {
+            Text(
+                "Missing live data",
+                style = MaterialTheme.typography.titleLarge,
+                color = TextPrimary
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    "Your biofeedback setup uses both HR and SpO2, but no live " +
+                        "$missing data is coming from the sensor right now.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Continue anyway? The $missing sound will be set to \"None\" " +
+                        "for this and future holds (you can change it back in the picker).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Continue", color = TextPrimary)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = TextSecondary)
+            }
+        }
+    )
 }
