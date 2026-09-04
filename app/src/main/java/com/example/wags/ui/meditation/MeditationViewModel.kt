@@ -187,6 +187,7 @@ class MeditationViewModel @Inject constructor(
     // screen-off and process lifecycle with the foreground service).  The
     // ViewModel only plays the ending chime.
     private var chimePlayer: MediaPlayer? = null
+    private var chimeFadeJob: Job? = null
 
     init {
         // Observe HR device connection
@@ -609,16 +610,21 @@ class MeditationViewModel @Inject constructor(
 
     // ── Private helpers ────────────────────────────────────────────────────────
 
-    /** Plays the ending chime sound once. Uses chime_end.mp3 from raw resources. */
+    /** Plays the ending chime sound once. Uses bf_singing_bowl.wav (16s soft
+     *  singing-bowl tone) from raw resources. Fades in gradually from silence
+     *  over ~5s and fades back out, so the transition out of meditation feels
+     *  peaceful rather than jarring. */
     private fun playChime() {
         stopChime()
-        
+
         // Play sound if enabled
         if (_uiState.value.timerSoundEnabled) {
             try {
-                chimePlayer = MediaPlayer.create(appContext, R.raw.chime_end)?.apply {
-                    setOnCompletionListener { it.release(); chimePlayer = null }
+                chimePlayer = MediaPlayer.create(appContext, R.raw.bf_singing_bowl)?.apply {
+                    // Start silent and fade in gently
+                    setVolume(0f, 0f)
                     start()
+                    fadeChimeIn(this)
                 }
             } catch (_: Exception) { /* chime failure is non-fatal */ }
         }
@@ -650,7 +656,50 @@ class MeditationViewModel @Inject constructor(
         } catch (_: Exception) { /* vibration failure is non-fatal */ }
     }
 
+    /** Fades the singing bowl in from silence over [fadeInMs] (quadratic ease-in
+     *  so the very beginning stays especially subtle), holds briefly, then fades
+     *  out and releases the player. Total ~12s. */
+    private fun fadeChimeIn(
+        player: MediaPlayer,
+        fadeInMs: Long = 5_000L,
+        holdMs: Long = 3_000L,
+        fadeOutMs: Long = 4_000L
+    ) {
+        chimeFadeJob?.cancel()
+        chimeFadeJob = viewModelScope.launch {
+            val steps = 100
+
+            // Fade in: t^2 keeps the opening seconds nearly whisper-quiet
+            repeat(steps + 1) { i ->
+                val t = i.toFloat() / steps
+                val vol = (t * t).coerceIn(0f, 1f)
+                player.runCatching { setVolume(vol, vol) }
+                    .onFailure { return@launch } // player released mid-fade
+                delay(fadeInMs / steps)
+            }
+
+            delay(holdMs)
+
+            // Fade out: smooth cosine ramp back to silence
+            repeat(steps + 1) { i ->
+                val t = i.toFloat() / steps
+                val vol = (0.5 * (1.0 + kotlin.math.cos(Math.PI * t.toDouble()))).toFloat().coerceIn(0f, 1f)
+                player.runCatching { setVolume(vol, vol) }
+                    .onFailure { return@launch }
+                delay(fadeOutMs / steps)
+            }
+
+            player.runCatching {
+                if (isPlaying) stop()
+                release()
+            }
+            if (chimePlayer === player) chimePlayer = null
+        }
+    }
+
     private fun stopChime() {
+        chimeFadeJob?.cancel()
+        chimeFadeJob = null
         chimePlayer?.runCatching {
             if (isPlaying) stop()
             release()
