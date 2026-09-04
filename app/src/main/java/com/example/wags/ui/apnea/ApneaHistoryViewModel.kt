@@ -115,6 +115,22 @@ data class TrophyStats(
     val total: DrillTrophyStats = DrillTrophyStats()
 )
 
+/**
+ * Shared multi-select filter mirrored from the All Records screen and applied
+ * to the Graphs/Stats/Settings-comparison tabs.
+ */
+data class SharedChartFilter(
+    val lungVolume: Set<String> = emptySet(),
+    val prepType: Set<String> = emptySet(),
+    val timeOfDay: Set<String> = emptySet(),
+    val posture: Set<String> = emptySet(),
+    val audio: Set<String> = emptySet(),
+    /** True when the timeOfDay set contains hour buckets (BY_HOUR mode). */
+    val byHourTod: Boolean = false,
+    /** Selected event types (real tableType values; the PB sentinel is excluded). */
+    val eventTypes: Set<String?> = emptySet()
+)
+
 data class ApneaHistoryUiState(
     val lungVolume: String = "FULL",
     val prepType: String = PrepType.NO_PREP.name,
@@ -251,6 +267,50 @@ class ApneaHistoryViewModel @Inject constructor(
         }
     }
 
+    // ── Shared filter state (mirrored from the All Records screen) ─────────────
+    private val _chartFilter = MutableStateFlow(SharedChartFilter())
+
+    /**
+     * Called by the History screen whenever the shared settings / event-type
+     * filters (rendered above the tab row) change. Applies to the Graphs tab
+     * chart data, the Stats tab single-value settings and the Settings
+     * comparison session types.
+     */
+    fun syncSharedFilters(
+        lungVolume: Set<String>,
+        prepType: Set<String>,
+        timeOfDay: Set<String>,
+        posture: Set<String>,
+        audio: Set<String>,
+        eventTypes: Set<String?>
+    ) {
+        _chartFilter.value = SharedChartFilter(
+            lungVolume = lungVolume,
+            prepType = prepType,
+            timeOfDay = timeOfDay,
+            posture = posture,
+            audio = audio,
+            byHourTod = timeOfDay.any { TimeBuckets.isHourBucket(it) },
+            eventTypes = eventTypes.filter { it != ApneaEventType.FREE_HOLD_PB_SENTINEL }.toSet()
+        )
+
+        // Stats tab speaks single-value-or-ALL: a lone selection maps to that
+        // value, anything broader maps to FILTER_ALL.
+        fun singleOrAll(values: Set<String>): String = values.singleOrNull() ?: FILTER_ALL
+        _lungVolume.value = singleOrAll(lungVolume)
+        _prepType.value   = singleOrAll(prepType)
+        _timeOfDay.value  = singleOrAll(timeOfDay)
+        _posture.value    = singleOrAll(posture)
+        _audio.value      = singleOrAll(audio)
+
+        // Settings comparison tab: map tableType values to comparison keys
+        val cmpKeys = eventTypes
+            .filter { it != ApneaEventType.FREE_HOLD_PB_SENTINEL }
+            .map { ComparisonSessionType.keyOf(it) }
+            .toSet()
+        if (cmpKeys.isNotEmpty()) _cmpSessionTypes.value = cmpKeys
+    }
+
     val uiState: StateFlow<ApneaHistoryUiState> = combine(
         combine(
             settingsFlow,
@@ -262,10 +322,10 @@ class ApneaHistoryViewModel @Inject constructor(
             apneaRepository.getAllRecords(),
             combine(_selectedDate, MutableStateFlow(Unit)) { d, _ -> d }
         ) { allStats, allRecords, selectedDate -> Triple(allStats, allRecords, selectedDate) },
-        combine(_trophyStats, _timePeriod, _periodOffset) { trophy, period, offset ->
-            Triple(trophy, period, offset)
+        combine(_trophyStats, _timePeriod, _periodOffset, _chartFilter) { trophy, period, offset, chartFilter ->
+            Quadruple(trophy, period, offset, chartFilter)
         }
-    ) { (settings, filteredStats, showAll), (allStats, allRecords, selectedDate), (trophyStats, timePeriod, periodOffset) ->
+    ) { (settings, filteredStats, showAll), (allStats, allRecords, selectedDate), (trophyStats, timePeriod, periodOffset, chartFilter) ->
         val (lv, pt, tod, pos, aud) = settings
         val zone = ZoneId.systemDefault()
 
@@ -277,11 +337,23 @@ class ApneaHistoryViewModel @Inject constructor(
             byDate[selectedDate] ?: emptyList()
         } else emptyList()
 
-        // Build chart data from free-hold records only (chronological, oldest first)
-        val freeHolds = allRecords.filter { it.tableType == null }.reversed()
-        val totalFreeHoldCount = freeHolds.size
-        val (filteredForChart, canBack, canFwd) = filterByPeriod(freeHolds, timePeriod, periodOffset, zone)
-        val chartData = buildChartData(filteredForChart, zone)
+        // Build chart data from records matching the shared filters
+        // (settings + event types), chronological, oldest first.
+        val settingsFiltered = allRecords.filter { r ->
+            r.lungVolume in chartFilter.lungVolume &&
+            r.prepType in chartFilter.prepType &&
+            r.posture in chartFilter.posture &&
+            r.audio in chartFilter.audio &&
+            (if (chartFilter.byHourTod) TimeBuckets.fromTimestamp(r.timestamp) else r.timeOfDay) in chartFilter.timeOfDay
+        }
+        val chartRecords = settingsFiltered
+            .filter { it.tableType in chartFilter.eventTypes }
+            .reversed()
+        val totalFreeHoldCount = chartRecords.size
+        val (filteredForChart, canBack, canFwd) = filterByPeriod(chartRecords, timePeriod, periodOffset, zone)
+        // Volume chart uses ALL training volume (any event type, settings-filtered)
+        val volumeRecords = filterByPeriod(settingsFiltered.reversed(), timePeriod, periodOffset, zone).records
+        val chartData = buildChartData(filteredForChart, zone, volumeRecords)
 
         ApneaHistoryUiState(
             lungVolume          = lv,
@@ -498,7 +570,8 @@ class ApneaHistoryViewModel @Inject constructor(
 
     private fun buildChartData(
         chronological: List<ApneaRecordEntity>,
-        zone: ZoneId
+        zone: ZoneId,
+        volumeChronological: List<ApneaRecordEntity>
     ): ApneaChartData {
         if (chronological.isEmpty()) return ApneaChartData()
 
@@ -519,9 +592,11 @@ class ApneaHistoryViewModel @Inject constructor(
 
             val durationSec = e.durationMs / 1000f
             holdDuration.add(ApneaChartPoint(x, durationSec, label))
-            minHr.add(ApneaChartPoint(x, e.minHrBpm, label))
-            maxHr.add(ApneaChartPoint(x, e.maxHrBpm, label))
-            e.lowestSpO2?.let { lowestSpO2.add(ApneaChartPoint(x, it.toFloat(), label)) }
+            // Physiologically impossible values (< 10) are sensor glitches —
+            // they would wreck the y-axis, so they are excluded.
+            if (e.minHrBpm >= 10f) minHr.add(ApneaChartPoint(x, e.minHrBpm, label))
+            if (e.maxHrBpm >= 10f) maxHr.add(ApneaChartPoint(x, e.maxHrBpm, label))
+            e.lowestSpO2?.let { if (it >= 10) lowestSpO2.add(ApneaChartPoint(x, it.toFloat(), label)) }
             e.firstContractionMs?.let { fc ->
                 firstContractionSec.add(ApneaChartPoint(x, fc / 1000f, label))
                 if (e.durationMs > 0L) {
@@ -530,12 +605,12 @@ class ApneaHistoryViewModel @Inject constructor(
             }
             if (durationSec > runningBestSec) runningBestSec = durationSec
             pbProgression.add(ApneaChartPoint(x, runningBestSec, label))
-            if (e.maxHrBpm > 0f && e.minHrBpm > 0f) {
+            if (e.maxHrBpm >= 10f && e.minHrBpm >= 10f) {
                 hrDrop.add(ApneaChartPoint(x, e.maxHrBpm - e.minHrBpm, label))
             }
         }
 
-        val (volumePoints, volumeUnit) = buildVolumeBuckets(chronological, zone)
+        val (volumePoints, volumeUnit) = buildVolumeBuckets(volumeChronological, zone)
 
         return ApneaChartData(
             holdDuration        = holdDuration,
@@ -787,6 +862,10 @@ class ApneaHistoryViewModel @Inject constructor(
 
 /** Simple 5-tuple to avoid Pair-of-Pairs nesting. */
 private data class Quintuple<A, B, C, D, E>(val first: A, val second: B, val third: C, val fourth: D, val fifth: E)
+
+/** Simple 4-tuple to avoid Triple-of-Pairs nesting. */
+private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+private operator fun <A, B, C, D> Quadruple<A, B, C, D>.component4() = fourth
 
 private operator fun <A, B, C, D, E> Quintuple<A, B, C, D, E>.component1() = first
 private operator fun <A, B, C, D, E> Quintuple<A, B, C, D, E>.component2() = second

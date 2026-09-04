@@ -10,6 +10,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -62,7 +64,10 @@ private enum class ApneaHistoryTab(val label: String) {
 @Composable
 fun ApneaHistoryScreen(
     navController: NavController,
-    viewModel: ApneaHistoryViewModel = hiltViewModel()
+    viewModel: ApneaHistoryViewModel = hiltViewModel(),
+    // Same nav-scoped instance the embedded All Records tab uses — the shared
+    // filter bar below reads and writes its filter state.
+    allRecordsViewModel: AllApneaRecordsViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val timeDimension by viewModel.timeDimension.collectAsStateWithLifecycle()
@@ -70,6 +75,30 @@ fun ApneaHistoryScreen(
     var selectedTabOrdinal by rememberSaveable { mutableIntStateOf(ApneaHistoryTab.GRAPHS.ordinal) }
     val selectedTab = ApneaHistoryTab.entries[selectedTabOrdinal]
     var displayedMonth by remember { mutableStateOf(YearMonth.now()) }
+
+    // ── Shared filters (rendered above the tab row) ──────────────────────────
+    val filterState by allRecordsViewModel.uiState.collectAsStateWithLifecycle()
+    val byHour = timeDimension == TimeDimension.BY_HOUR
+
+    // Filters default to "all" when the History screen is first opened
+    LaunchedEffect(Unit) {
+        allRecordsViewModel.resetFiltersToAll()
+    }
+
+    // Push shared filter changes into the history charts / stats / comparison
+    LaunchedEffect(
+        filterState.filterLungVolume, filterState.filterPrepType, filterState.filterTimeOfDay,
+        filterState.filterPosture, filterState.filterAudio, filterState.selectedEventTypes
+    ) {
+        viewModel.syncSharedFilters(
+            lungVolume = filterState.filterLungVolume,
+            prepType = filterState.filterPrepType,
+            timeOfDay = filterState.filterTimeOfDay,
+            posture = filterState.filterPosture,
+            audio = filterState.filterAudio,
+            eventTypes = filterState.selectedEventTypes
+        )
+    }
 
     // Single-session auto-navigate: when exactly 1 record is selected, navigate immediately
     val selectedDayRecords = state.selectedDayRecords
@@ -115,6 +144,37 @@ fun ApneaHistoryScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // ── Shared filter bar: two lines between the History title and
+            //    the tab row. Both filters show on Graphs / All Records; the
+            //    Stats tab shows only the settings filter; the Settings tab
+            //    shows only the event-types filter.
+            val showSettingsFilter = selectedTab in setOf(
+                ApneaHistoryTab.GRAPHS, ApneaHistoryTab.ALL_RECORDS, ApneaHistoryTab.STATS
+            )
+            val showEventTypesFilter = selectedTab in setOf(
+                ApneaHistoryTab.GRAPHS, ApneaHistoryTab.ALL_RECORDS, ApneaHistoryTab.SETTINGS
+            )
+            if (showSettingsFilter || showEventTypesFilter) {
+                // Most recent record — the "Current" target for the ultimate toggle.
+                val newestRecord = remember(filterState.records) {
+                    filterState.records.maxByOrNull { it.timestamp }
+                }
+                SharedHistoryFilterBar(
+                    state = filterState,
+                    byHour = byHour,
+                    newestRecord = newestRecord,
+                    showSettingsFilter = showSettingsFilter,
+                    showEventTypesFilter = showEventTypesFilter,
+                    onResetAll = allRecordsViewModel::resetFiltersToAll,
+                    onSetLungVolume = allRecordsViewModel::setLungVolumeFilter,
+                    onSetPrepType = allRecordsViewModel::setPrepTypeFilter,
+                    onSetTimeOfDay = allRecordsViewModel::setTimeOfDayFilter,
+                    onSetPosture = allRecordsViewModel::setPostureFilter,
+                    onSetAudio = allRecordsViewModel::setAudioFilter,
+                    onToggleEventType = allRecordsViewModel::toggleEventType
+                )
+            }
+
             // Tab row
             ScrollableTabRow(
                 selectedTabIndex = selectedTab.ordinal,
@@ -185,11 +245,6 @@ fun ApneaHistoryScreen(
                             )
                         )
                     },
-                    onSetLungVolume = { viewModel.setLungVolume(it) },
-                    onSetPrepType   = { viewModel.setPrepType(it) },
-                    onSetTimeOfDay  = { viewModel.setTimeOfDay(it) },
-                    onSetPosture    = { viewModel.setPosture(it) },
-                    onSetAudio      = { viewModel.setAudio(it) }
                 )
                 ApneaHistoryTab.SETTINGS -> SettingsComparisonTabContent(
                     viewModel = viewModel,
@@ -240,6 +295,220 @@ fun ApneaHistoryScreen(
     }
 }
 
+// ── Shared filter bar (above the tab row) ──────────────────────────────────────
+
+/**
+ * Two-line filter bar shared by the history tabs:
+ *  - line 1: collapsible settings filter (lung volume / prep / time / posture / audio)
+ *  - line 2: collapsible event-type filter
+ *
+ * Visibility of each line is controlled per tab by [showSettingsFilter] /
+ * [showEventTypesFilter]. All state and mutation callbacks come from the
+ * shared [AllApneaRecordsViewModel].
+ */
+@Composable
+private fun SharedHistoryFilterBar(
+    state: AllApneaRecordsUiState,
+    byHour: Boolean,
+    newestRecord: ApneaRecordEntity?,
+    showSettingsFilter: Boolean,
+    showEventTypesFilter: Boolean,
+    onResetAll: () -> Unit,
+    onSetLungVolume: (Set<String>) -> Unit,
+    onSetPrepType: (Set<String>) -> Unit,
+    onSetTimeOfDay: (Set<String>) -> Unit,
+    onSetPosture: (Set<String>) -> Unit,
+    onSetAudio: (Set<String>) -> Unit,
+    onToggleEventType: (String?) -> Unit
+) {
+    var filtersExpanded by rememberSaveable { mutableStateOf(false) }
+    var eventTypesExpanded by rememberSaveable { mutableStateOf(false) }
+
+    Surface(color = SurfaceDark, tonalElevation = 2.dp) {
+        Column {
+            if (showSettingsFilter) {
+                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { filtersExpanded = !filtersExpanded }
+                            .padding(vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "Filters",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextPrimary
+                        )
+                        // Ultimate All/Current toggle: jumps every category to
+                        // "all options" (or, when already all, to the most
+                        // recent record's settings). Only visible once the
+                        // filter is expanded.
+                        if (filtersExpanded) {
+                        val categories = listOf(
+                            state.filterLungVolume to SettingFilterOptions.LUNG_VOLUMES,
+                            state.filterPrepType to SettingFilterOptions.PREP_TYPES,
+                            state.filterTimeOfDay to SettingFilterOptions.timeOfDayOptions(byHour),
+                            state.filterPosture to SettingFilterOptions.POSTURES,
+                            state.filterAudio to SettingFilterOptions.AUDIOS
+                        )
+                        val anyNarrowed = categories.any { (sel, opts) -> !sel.coversAll(opts) }
+                        AllCurrentHeaderToggle(
+                            selectedCount = categories.sumOf { it.first.size },
+                            totalCount = categories.sumOf { it.second.size },
+                            onToggle = {
+                                if (anyNarrowed) {
+                                    onResetAll()
+                                } else {
+                                    newestRecord?.let { r ->
+                                        onSetLungVolume(setOf(r.lungVolume))
+                                        onSetPrepType(setOf(r.prepType))
+                                        onSetTimeOfDay(
+                                            setOf(if (byHour) TimeBuckets.fromTimestamp(r.timestamp) else r.timeOfDay)
+                                        )
+                                        onSetPosture(setOf(r.posture))
+                                        onSetAudio(setOf(r.audio))
+                                    }
+                                }
+                            },
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                        }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            if (!filtersExpanded) {
+                                Text(
+                                    buildFilterSummary(state, byHour),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = TextSecondary
+                                )
+                            }
+                            Icon(
+                                imageVector = if (filtersExpanded) Icons.Filled.KeyboardArrowUp
+                                              else Icons.Filled.KeyboardArrowDown,
+                                contentDescription = if (filtersExpanded) "Collapse" else "Expand",
+                                tint = TextSecondary
+                            )
+                        }
+                    }
+
+                    if (filtersExpanded) {
+                        Column(
+                            modifier = Modifier.padding(bottom = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            MultiSelectFilterCategory(
+                                label = "Lung Volume",
+                                options = SettingFilterOptions.LUNG_VOLUMES,
+                                optionLabel = SettingFilterOptions::lungVolumeLabel,
+                                selected = state.filterLungVolume,
+                                currentValue = null,
+                                onSelectionChange = onSetLungVolume
+                            )
+                            MultiSelectFilterCategory(
+                                label = "Prep",
+                                options = SettingFilterOptions.PREP_TYPES,
+                                optionLabel = SettingFilterOptions::prepTypeShortLabel,
+                                selected = state.filterPrepType,
+                                currentValue = null,
+                                onSelectionChange = onSetPrepType
+                            )
+                            MultiSelectFilterCategory(
+                                label = if (byHour) "Hour" else "Time of Day",
+                                options = SettingFilterOptions.timeOfDayOptions(byHour),
+                                optionLabel = SettingFilterOptions::timeBucketLabel,
+                                selected = state.filterTimeOfDay,
+                                currentValue = null,
+                                onSelectionChange = onSetTimeOfDay
+                            )
+                            MultiSelectFilterCategory(
+                                label = "Posture",
+                                options = SettingFilterOptions.POSTURES,
+                                optionLabel = SettingFilterOptions::postureLabel,
+                                selected = state.filterPosture,
+                                currentValue = null,
+                                onSelectionChange = onSetPosture
+                            )
+                            MultiSelectFilterCategory(
+                                label = "Audio",
+                                options = SettingFilterOptions.AUDIOS,
+                                optionLabel = SettingFilterOptions::audioLabel,
+                                selected = state.filterAudio,
+                                currentValue = null,
+                                onSelectionChange = onSetAudio
+                            )
+                        }
+                    }
+                }
+
+                if (showEventTypesFilter) {
+                    HorizontalDivider(color = SurfaceVariant.copy(alpha = 0.5f))
+                }
+            }
+
+            if (showEventTypesFilter) {
+                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { eventTypesExpanded = !eventTypesExpanded }
+                            .padding(vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "Event Types",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextPrimary
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            if (!eventTypesExpanded) {
+                                Text(
+                                    buildEventTypeSummary(state),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = TextSecondary
+                                )
+                            }
+                            Icon(
+                                imageVector = if (eventTypesExpanded) Icons.Filled.KeyboardArrowUp
+                                              else Icons.Filled.KeyboardArrowDown,
+                                contentDescription = if (eventTypesExpanded) "Collapse" else "Expand",
+                                tint = TextSecondary
+                            )
+                        }
+                    }
+
+                    if (eventTypesExpanded) {
+                        @OptIn(ExperimentalLayoutApi::class)
+                        FlowRow(
+                            modifier = Modifier.padding(bottom = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            ApneaEventType.ALL.forEach { type ->
+                                FilterChip(
+                                    selected = state.selectedEventTypes.contains(type.tableTypeValue),
+                                    onClick = { onToggleEventType(type.tableTypeValue) },
+                                    label = { Text(type.label, style = MaterialTheme.typography.labelSmall) },
+                                    colors = settingFilterChipColors()
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 // ── Stats tab ──────────────────────────────────────────────────────────────────
 
 @Composable
@@ -249,32 +518,9 @@ private fun StatsTabContent(
     onToggleShowAll: () -> Unit,
     onRecordClick: (Long) -> Unit,
     onTimeChartClick: (metricType: String, drillType: String, title: String) -> Unit,
-    onRankedHoldsClick: (metricKey: String) -> Unit,
-    onSetLungVolume: (String) -> Unit,
-    onSetPrepType: (String) -> Unit,
-    onSetTimeOfDay: (String) -> Unit,
-    onSetPosture: (String) -> Unit,
-    onSetAudio: (String) -> Unit
+    onRankedHoldsClick: (metricKey: String) -> Unit
 ) {
     val stats = if (state.showAllStats) state.allStats else state.filteredStats
-    var showSettingsDialog by remember { mutableStateOf(false) }
-
-    if (showSettingsDialog) {
-        StatsSettingsDialog(
-            lungVolume = state.lungVolume,
-            prepType   = state.prepType,
-            timeOfDay  = state.timeOfDay,
-            byHour     = byHour,
-            posture    = state.posture,
-            audio      = state.audio,
-            onSetLungVolume = onSetLungVolume,
-            onSetPrepType   = onSetPrepType,
-            onSetTimeOfDay  = onSetTimeOfDay,
-            onSetPosture    = onSetPosture,
-            onSetAudio      = onSetAudio,
-            onDismiss = { showSettingsDialog = false }
-        )
-    }
 
     Column(
         modifier = Modifier
@@ -296,16 +542,16 @@ private fun StatsTabContent(
                     color = if (state.showAllStats) TextPrimary else TextSecondary
                 )
                 if (!state.showAllStats) {
-                    // Clickable settings label — opens the settings popup
+                    // Active settings summary — changed via the shared filter
+                    // bar above the tab row
                     Text(
                         "${state.lungVolume.displaySettingLabel()}  ·  ${state.prepType.displaySettingLabel()}  ·  " +
                         "${state.timeOfDay.displaySettingLabel()}  ·  ${state.posture.displaySettingLabel()}  ·  ${state.audio.displaySettingLabel()}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondary,
-                        modifier = Modifier.clickable { showSettingsDialog = true }
+                        color = TextSecondary
                     )
                     Text(
-                        "Tap to change settings",
+                        "Change via the Filters bar above",
                         style = MaterialTheme.typography.labelSmall,
                         color = TextDisabled
                     )
@@ -334,6 +580,8 @@ private fun StatsTabContent(
 }
 
 // ── Settings popup dialog (for Stats tab) ─────────────────────────────────────
+// Removed: settings are now filtered via the shared SharedHistoryFilterBar.
+// (StatsSettingsDialog / SettingChip / SettingRow below were its UI pieces.)
 
 @Composable
 private fun StatsSettingsDialog(

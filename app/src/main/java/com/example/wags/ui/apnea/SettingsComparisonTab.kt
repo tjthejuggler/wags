@@ -53,7 +53,9 @@ fun SettingsComparisonTabContent(
     allRecordsViewModel: AllApneaRecordsViewModel = hiltViewModel()
 ) {
     val state by viewModel.settingsComparison.collectAsStateWithLifecycle()
-    var showTypeDialog by remember { mutableStateOf(false) }
+    // NOTE: the session-type filter moved to the shared Event Types filter bar
+    // above the tab row (see SharedHistoryFilterBar in ApneaHistoryScreen.kt);
+    // state.sessionTypes mirrors that selection.
     /** Bulk default for the lists below: raw averages or adjusted scores. */
     var scoreMode by rememberSaveable { mutableStateOf(false) }
     /** Per-list metric overrides — tapping a stat token re-ranks that one list. */
@@ -95,16 +97,6 @@ fun SettingsComparisonTabContent(
         openAverageInAllRecords(categoryTitle, opt.key)
     }
 
-    if (showTypeDialog) {
-        SessionTypeFilterDialog(
-            selected = state.sessionTypes,
-            onApply = {
-                viewModel.setComparisonSessionTypes(it)
-                showTypeDialog = false
-            },
-            onDismiss = { showTypeDialog = false }
-        )
-    }
 
     Column(
         modifier = Modifier
@@ -113,44 +105,15 @@ fun SettingsComparisonTabContent(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // ── Filter bar ────────────────────────────────────────────────────
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(SurfaceVariant)
-                    .clickable { showTypeDialog = true }
-                    .padding(horizontal = 12.dp, vertical = 10.dp)
-            ) {
-                val count = state.sessionTypes.size
-                Text(
-                    text = if (count == ComparisonSessionType.entries.size) "All session types"
-                    else "$count session type${if (count == 1) "" else "s"}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = EcgCyan,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(SurfaceVariant)
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = state.period.label,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = TextSecondary
-                )
-            }
-        }
+        // ── Active scope summary (types come from the shared bar) ──────────
+        val count = state.sessionTypes.size
+        Text(
+            text = if (count == ComparisonSessionType.entries.size) "All session types"
+            else "$count session type${if (count == 1) "" else "s"} selected",
+            style = MaterialTheme.typography.labelMedium,
+            color = EcgCyan,
+            fontWeight = FontWeight.Bold
+        )
 
         // ── Window length chips + step arrows ─────────────────────────────
         Row(

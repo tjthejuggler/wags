@@ -91,9 +91,8 @@ fun AllApneaRecordsScreen(
         }
     }
 
-    // Section collapse states — both collapsed by default
-    var filtersExpanded by remember { mutableStateOf(false) }
-    var eventTypesExpanded by remember { mutableStateOf(false) }
+    // (Settings + Event Types filters now live in the shared filter bar above
+    // the tab row on the History screen — see SharedHistoryFilterBar.)
 
     // Record row targeted by a chart-node jump — pulses for a few seconds.
     var highlightRecordId by remember { mutableStateOf<Long?>(null) }
@@ -183,163 +182,6 @@ fun AllApneaRecordsScreen(
                         }
                     }
 
-                    HorizontalDivider(color = SurfaceVariant.copy(alpha = 0.5f))
-
-                    // ── Collapsible Filters section ────────────────────
-                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        // Filters header row
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { filtersExpanded = !filtersExpanded }
-                                .padding(vertical = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "Filters",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = TextPrimary
-                            )
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                if (!filtersExpanded) {
-                                    // Show current filter summary when collapsed
-                                    Text(
-                                        buildFilterSummary(state, byHour),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = TextSecondary
-                                    )
-                                }
-                                Icon(
-                                    imageVector = if (filtersExpanded) Icons.Filled.KeyboardArrowUp
-                                                  else Icons.Filled.KeyboardArrowDown,
-                                    contentDescription = if (filtersExpanded) "Collapse" else "Expand",
-                                    tint = TextSecondary
-                                )
-                            }
-                        }
-
-                        if (filtersExpanded) {
-                            Column(
-                                modifier = Modifier.padding(bottom = 16.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                // Lung Volume
-                                MultiSelectFilterCategory(
-                                    label = "Lung Volume",
-                                    options = SettingFilterOptions.LUNG_VOLUMES,
-                                    optionLabel = SettingFilterOptions::lungVolumeLabel,
-                                    selected = state.filterLungVolume,
-                                    currentValue = newestRecord?.lungVolume,
-                                    onSelectionChange = { viewModel.setLungVolumeFilter(it) }
-                                )
-
-                                // Prep Type
-                                MultiSelectFilterCategory(
-                                    label = "Prep",
-                                    options = SettingFilterOptions.PREP_TYPES,
-                                    optionLabel = SettingFilterOptions::prepTypeShortLabel,
-                                    selected = state.filterPrepType,
-                                    currentValue = newestRecord?.prepType,
-                                    onSelectionChange = { viewModel.setPrepTypeFilter(it) }
-                                )
-
-                                // Time of Day / Hour Bucket
-                                MultiSelectFilterCategory(
-                                    label = if (byHour) "Hour" else "Time of Day",
-                                    options = SettingFilterOptions.timeOfDayOptions(byHour),
-                                    optionLabel = SettingFilterOptions::timeBucketLabel,
-                                    selected = state.filterTimeOfDay,
-                                    currentValue = newestRecord?.let {
-                                        if (byHour) TimeBuckets.fromTimestamp(it.timestamp) else it.timeOfDay
-                                    },
-                                    onSelectionChange = { viewModel.setTimeOfDayFilter(it) }
-                                )
-
-                                // Posture
-                                MultiSelectFilterCategory(
-                                    label = "Posture",
-                                    options = SettingFilterOptions.POSTURES,
-                                    optionLabel = SettingFilterOptions::postureLabel,
-                                    selected = state.filterPosture,
-                                    currentValue = newestRecord?.posture,
-                                    onSelectionChange = { viewModel.setPostureFilter(it) }
-                                )
-
-                                // Audio
-                                MultiSelectFilterCategory(
-                                    label = "Audio",
-                                    options = SettingFilterOptions.AUDIOS,
-                                    optionLabel = SettingFilterOptions::audioLabel,
-                                    selected = state.filterAudio,
-                                    currentValue = newestRecord?.audio,
-                                    onSelectionChange = { viewModel.setAudioFilter(it) }
-                                )
-                            }
-                        }
-                    }
-
-                    HorizontalDivider(color = SurfaceVariant.copy(alpha = 0.5f))
-
-                    // ── Collapsible Event Types section ────────────────
-                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { eventTypesExpanded = !eventTypesExpanded }
-                                .padding(vertical = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "Event Types",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = TextPrimary
-                            )
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                if (!eventTypesExpanded) {
-                                    Text(
-                                        buildEventTypeSummary(state),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = TextSecondary
-                                    )
-                                }
-                                Icon(
-                                    imageVector = if (eventTypesExpanded) Icons.Filled.KeyboardArrowUp
-                                                  else Icons.Filled.KeyboardArrowDown,
-                                    contentDescription = if (eventTypesExpanded) "Collapse" else "Expand",
-                                    tint = TextSecondary
-                                )
-                            }
-                        }
-
-                        if (eventTypesExpanded) {
-                            @OptIn(ExperimentalLayoutApi::class)
-                            FlowRow(
-                                modifier = Modifier.padding(bottom = 16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                ApneaEventType.ALL.forEach { type ->
-                                    val isSelected = state.selectedEventTypes.contains(type.tableTypeValue)
-                                    FilterChip(
-                                        selected = isSelected,
-                                        onClick = { viewModel.toggleEventType(type.tableTypeValue) },
-                                        label = { Text(type.label, style = MaterialTheme.typography.labelSmall) },
-                                        colors = settingFilterChipColors()
-                                    )
-                                }
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -435,18 +277,18 @@ fun AllApneaRecordsScreen(
 // Collapsed-state summary helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-private fun buildFilterSummary(state: AllApneaRecordsUiState, byHour: Boolean): String {
+internal fun buildFilterSummary(state: AllApneaRecordsUiState, byHour: Boolean): String {
     val parts = listOfNotNull(
         settingFilterSummaryPart(state.filterLungVolume, SettingFilterOptions.LUNG_VOLUMES, SettingFilterOptions::lungVolumeLabel),
-        settingFilterSummaryPart(state.filterPrepType, SettingFilterOptions.PREP_TYPES, SettingFilterOptions::prepTypeLabel),
+        settingFilterSummaryPart(state.filterPrepType, SettingFilterOptions.PREP_TYPES, SettingFilterOptions::prepTypeShortLabel),
         settingFilterSummaryPart(state.filterTimeOfDay, SettingFilterOptions.timeOfDayOptions(byHour), SettingFilterOptions::timeBucketLabel),
         settingFilterSummaryPart(state.filterPosture, SettingFilterOptions.POSTURES, SettingFilterOptions::postureLabel),
-        settingFilterSummaryPart(state.filterAudio, SettingFilterOptions.AUDIOS, SettingFilterOptions::audioLabel)
+        settingFilterSummaryPart(state.filterAudio, SettingFilterOptions.AUDIOS, SettingFilterOptions::audioShortLabel)
     )
     return if (parts.isEmpty()) "All" else parts.joinToString(" · ")
 }
 
-private fun buildEventTypeSummary(state: AllApneaRecordsUiState): String {
+internal fun buildEventTypeSummary(state: AllApneaRecordsUiState): String {
     val allCount = ApneaEventType.ALL.size
     val selectedCount = ApneaEventType.ALL.count { state.selectedEventTypes.contains(it.tableTypeValue) }
     return when {

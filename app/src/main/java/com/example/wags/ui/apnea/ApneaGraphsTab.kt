@@ -93,8 +93,8 @@ fun ApneaGraphsTabContent(
 
         if (chartData.holdDuration.isEmpty()) {
             ApneaGraphEmptyCard(
-                title = "No free holds in this window",
-                body = "Record a free hold (or step to another window) and your progress charts will appear here."
+                title = "No records in this window",
+                body = "No records match the current filters in this window. Adjust the filters above (or step to another window) and your progress charts will appear here."
             )
             return@Column
         }
@@ -102,7 +102,7 @@ fun ApneaGraphsTabContent(
         // ── Summary strip ─────────────────────────────────────────────────
         ApneaSummaryStrip(points = chartData.holdDuration)
         Text(
-            "$readingCount free holds total · showing ${timePeriod.label}",
+            "$readingCount records total · showing ${timePeriod.label}",
             style = MaterialTheme.typography.labelSmall,
             color = TextDisabled
         )
@@ -110,7 +110,7 @@ fun ApneaGraphsTabContent(
         // ── 1. Hold Duration (with rolling-average overlay) ───────────────
         ApneaGraphSectionCard(
             title = "Hold Duration",
-            subtitle = "Every free hold · dashed line = 5-hold rolling average"
+            subtitle = "Filtered records · dashed line = 5-hold rolling average"
         ) {
             ApneaMetricLineChart(
                 label = "Duration",
@@ -146,7 +146,7 @@ fun ApneaGraphsTabContent(
         if (chartData.volumePerBucket.isNotEmpty()) {
             ApneaGraphSectionCard(
                 title = "Training Volume",
-                subtitle = "Free holds per ${chartData.volumeBucketLabel} · gaps show missed training"
+                subtitle = "All training sessions per ${chartData.volumeBucketLabel} · gaps show missed training"
             ) {
                 ApneaVolumeBarChart(
                     points = chartData.volumePerBucket,

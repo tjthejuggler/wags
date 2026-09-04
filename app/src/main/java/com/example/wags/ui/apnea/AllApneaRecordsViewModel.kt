@@ -102,9 +102,9 @@ data class AllApneaRecordsUiState(
     // ── Event-type filter ─────────────────────────────────────────────────────
     /**
      * Which event types are currently selected (by tableTypeValue, including the PB sentinel).
-     * Starts with all real types selected (PB sentinel excluded by default).
+     * Defaults to Free Hold only (PB sentinel excluded).
      */
-    val selectedEventTypes: Set<String?> = ApneaEventType.REAL_TABLE_TYPE_VALUES,
+    val selectedEventTypes: Set<String?> = setOf(null),
 
     // ── Sort order ────────────────────────────────────────────────────────────
     val sortOrder: RecordSortOrder = RecordSortOrder.RECENT_DESC,
@@ -157,9 +157,11 @@ class AllApneaRecordsViewModel @Inject constructor(
         )
         val initPosture    = savedStateHandle.get<String>("posture")    ?: ""
         val initAudio      = savedStateHandle.get<String>("audio")      ?: ""
-        val initEventTypes = savedStateHandle.get<String>("eventTypes") ?: "ALL"
+        val initEventTypes = savedStateHandle.get<String>("eventTypes")
 
         val initialSelectedTypes: Set<String?> = when {
+            // No arg → default to Free Hold only
+            initEventTypes == null -> setOf(null)
             initEventTypes == "ALL" -> ApneaEventType.REAL_TABLE_TYPE_VALUES
             else -> {
                 // Comma-separated list; "FREE_HOLD" maps to null (free hold tableType)
@@ -193,6 +195,22 @@ class AllApneaRecordsViewModel @Inject constructor(
     }
 
     // ── Public filter actions ─────────────────────────────────────────────────
+
+    /** Resets every settings-filter category to "all options selected" and the event type to Free Hold. */
+    fun resetFiltersToAll() {
+        val byHour = timeDimensionStore.current == TimeDimension.BY_HOUR
+        _uiState.update {
+            it.copy(
+                filterLungVolume = SettingFilterOptions.LUNG_VOLUMES.toSet(),
+                filterPrepType   = SettingFilterOptions.PREP_TYPES.toSet(),
+                filterTimeOfDay  = SettingFilterOptions.timeOfDayOptions(byHour).toSet(),
+                filterPosture    = SettingFilterOptions.POSTURES.toSet(),
+                filterAudio      = SettingFilterOptions.AUDIOS.toSet(),
+                selectedEventTypes = setOf<String?>(null) // Free Hold
+            )
+        }
+        loadAllRecords()
+    }
 
     fun setLungVolumeFilter(value: Set<String>) {
         _uiState.update { it.copy(filterLungVolume = value) }

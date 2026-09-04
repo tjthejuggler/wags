@@ -68,6 +68,10 @@ object SettingFilterOptions {
     fun audioLabel(value: String): String =
         runCatching { AudioSetting.valueOf(value).displayName() }.getOrDefault(value)
 
+    /** Compact summary label ("Bio" instead of "Biofeedback"). */
+    fun audioShortLabel(value: String): String =
+        if (value == "BIOFEEDBACK") "Bio" else audioLabel(value)
+
     fun timeBucketLabel(value: String): String = TimeBuckets.display(value)
 }
 
