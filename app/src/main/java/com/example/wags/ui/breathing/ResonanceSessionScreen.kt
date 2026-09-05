@@ -114,6 +114,12 @@ fun ResonanceSessionScreen(
     // Color mode toggle — persisted to SharedPreferences
     var useColors by remember { mutableStateOf(apneaPrefs.getBoolean("breathing_colors", false)) }
 
+    // Night mode toggle — full-screen white flashes at breath transitions
+    var nightModeOn by remember { mutableStateOf(apneaPrefs.getBoolean("breathing_night_mode", false)) }
+
+    // Flash request for the night-mode overlay: (flash count, tick to force retrigger)
+    var flashRequest by remember { mutableStateOf(0 to 0) }
+
     // Vibration toggle — initialised from the pre-session setting, toggleable mid-session
     var vibrationOn by remember { mutableStateOf(vibrationEnabled) }
 
@@ -163,11 +169,12 @@ fun ResonanceSessionScreen(
         viewModel.startSession(deviceId)
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = BackgroundDark,
         topBar = {
             TopAppBar(
-                title = { Text("Resonance Breathing", style = MaterialTheme.typography.titleMedium) },
+                title = { Text("Resonance Breath", style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     // Back arrow → cancel without saving (shows discard dialog via SessionBackHandler)
                     IconButton(onClick = { viewModel.cancelSession() }) {
@@ -197,6 +204,18 @@ fun ResonanceSessionScreen(
                             style = MaterialTheme.typography.titleMedium,
                             modifier = if (!useColors) Modifier.grayscale() else Modifier,
                             color = if (useColors) PacerInhaleColor else TextDisabled
+                        )
+                    }
+                    // Night mode toggle — white screen flashes synced with breath transitions
+                    IconButton(onClick = {
+                        nightModeOn = !nightModeOn
+                        apneaPrefs.edit().putBoolean("breathing_night_mode", nightModeOn).apply()
+                    }) {
+                        Text(
+                            text = "🌙",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = if (!nightModeOn) Modifier.grayscale() else Modifier,
+                            color = if (nightModeOn) RsBone else TextDisabled
                         )
                     }
                     LiveSensorActionsCallback(onNavigateToSettings)
@@ -261,13 +280,21 @@ fun ResonanceSessionScreen(
                         }
                     }
                     
-                    // Vibration callback — only fires when toggle is on
-                    val vibrationCallback: ((Boolean) -> Unit)? = if (vibrationOn) {
-                        { inhaling ->
-                            if (inhaling) WagsFeedback.breathInhale(context)
-                            else WagsFeedback.breathExhale(context)
-                        }
-                    } else null
+                    // Phase transition callback — fires vibration (if on) and/or night-mode flashes.
+                    // inhaling=true  -> start of inhale: vibration + double white flash
+                    // inhaling=false -> inhale peak / start of exhale: vibration + single white flash
+                    val phaseTransitionCallback: ((Boolean) -> Unit)? =
+                        if (vibrationOn || nightModeOn) {
+                            { inhaling ->
+                                if (vibrationOn) {
+                                    if (inhaling) WagsFeedback.breathInhale(context)
+                                    else WagsFeedback.breathExhale(context)
+                                }
+                                if (nightModeOn) {
+                                    flashRequest = (if (inhaling) 2 else 1) to (flashRequest.second + 1)
+                                }
+                            }
+                        } else null
 
                     val isLandscape = LocalConfiguration.current.orientation ==
                             Configuration.ORIENTATION_LANDSCAPE
@@ -288,7 +315,7 @@ fun ResonanceSessionScreen(
                                     size = 280.dp,
                                     useColors = useColors,
                                     breathCycleCount = state.breathCycleCount,
-                                    onPhaseTransition = vibrationCallback
+                                    onPhaseTransition = phaseTransitionCallback
                                 )
                             }
 
@@ -470,7 +497,7 @@ fun ResonanceSessionScreen(
                                     size = 300.dp,
                                     useColors = useColors,
                                     breathCycleCount = state.breathCycleCount,
-                                    onPhaseTransition = vibrationCallback
+                                    onPhaseTransition = phaseTransitionCallback
                                 )
                             }
 
@@ -641,6 +668,42 @@ fun ResonanceSessionScreen(
                 }
             }
         }
+
+        }
+    }
+
+    // Night mode full-screen white flash overlay — drawn on top of everything
+    NightFlashOverlay(
+        flashCount = flashRequest.first,
+        flashTick = flashRequest.second
+    )
+    }
+
+/**
+ * Full-screen max-brightness white flash overlay for night mode.
+ * Plays [flashCount] quick flashes whenever [flashTick] changes (and count > 0).
+ * Perfectly in sync with vibration since both are driven by the same
+ * phase-transition event.
+ */
+@Composable
+private fun NightFlashOverlay(flashCount: Int, flashTick: Int) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(flashTick) {
+        if (flashCount > 0) {
+            repeat(flashCount) { i ->
+                visible = true
+                kotlinx.coroutines.delay(90)
+                visible = false
+                if (i < flashCount - 1) kotlinx.coroutines.delay(90)
+            }
+        }
+    }
+    if (visible) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.White)
+        )
     }
 }
 
