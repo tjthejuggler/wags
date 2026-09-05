@@ -1,13 +1,15 @@
 package com.example.wags.ui.apnea
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -109,8 +111,15 @@ fun BiofeedbackPickerDialog(
     onDismiss: () -> Unit,
     onPreviewHrSound: (BiofeedbackHrSound) -> Unit = {},
     onPreviewSpo2Texture: (BiofeedbackSpo2Texture) -> Unit = {},
-    onStopPreview: () -> Unit = {}
+    onStopPreview: () -> Unit = {},
+    hrVolume: Float = 1f,
+    spo2Volume: Float = 1f,
+    onHrVolumeChange: (Float) -> Unit = {},
+    onSpo2VolumeChange: (Float) -> Unit = {}
 ) {
+    // 0 = HR volume dialog, 1 = SpO2 volume dialog, null = none (set by
+    // long-pressing any card in the corresponding section).
+    var volumeDialogFor by remember { mutableStateOf<Int?>(null) }
     AlertDialog(
         onDismissRequest = { onStopPreview(); onDismiss() },
         containerColor = BackgroundDark,
@@ -143,6 +152,11 @@ fun BiofeedbackPickerDialog(
                     style = MaterialTheme.typography.labelMedium,
                     color = TextSecondary
                 )
+                Text(
+                    "Long-press a card to set its volume",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextDisabled
+                )
                 Spacer(Modifier.height(6.dp))
                 BiofeedbackHrSound.entries.forEach { sound ->
                     BiofeedbackOptionCard(
@@ -152,7 +166,8 @@ fun BiofeedbackPickerDialog(
                         onClick = {
                             onSelectHrSound(sound)
                             onPreviewHrSound(sound)
-                        }
+                        },
+                        onLongClick = { volumeDialogFor = 0 }
                     )
                     Spacer(Modifier.height(6.dp))
                 }
@@ -163,6 +178,11 @@ fun BiofeedbackPickerDialog(
                     style = MaterialTheme.typography.labelMedium,
                     color = TextSecondary
                 )
+                Text(
+                    "Long-press a card to set its volume",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextDisabled
+                )
                 Spacer(Modifier.height(6.dp))
                 BiofeedbackSpo2Texture.entries.forEach { tex ->
                     BiofeedbackOptionCard(
@@ -172,7 +192,8 @@ fun BiofeedbackPickerDialog(
                         onClick = {
                             onSelectSpo2Texture(tex)
                             onPreviewSpo2Texture(tex)
-                        }
+                        },
+                        onLongClick = { volumeDialogFor = 1 }
                     )
                     Spacer(Modifier.height(6.dp))
                 }
@@ -187,16 +208,73 @@ fun BiofeedbackPickerDialog(
             }
         }
     )
+
+    val dialogFor = volumeDialogFor
+    if (dialogFor != null) {
+        val isHr = dialogFor == 0
+        BiofeedbackVolumeDialog(
+            title = if (isHr) "Heartbeat volume" else "Soundscape volume",
+            volume = if (isHr) hrVolume else spo2Volume,
+            onVolumeChange = if (isHr) onHrVolumeChange else onSpo2VolumeChange,
+            onDismiss = { volumeDialogFor = null }
+        )
+    }
+}
+
+/** Small slider dialog for one biofeedback layer's volume. */
+@Composable
+private fun BiofeedbackVolumeDialog(
+    title: String,
+    volume: Float,
+    onVolumeChange: (Float) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = BackgroundDark,
+        title = {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleLarge,
+                color = TextPrimary
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    "${(volume * 100).toInt()}%",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary
+                )
+                Slider(
+                    value = volume,
+                    onValueChange = onVolumeChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = SliderDefaults.colors(
+                        thumbColor = TextSecondary,
+                        activeTrackColor = TextSecondary
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Done", color = TextPrimary)
+            }
+        }
+    )
 }
 
 // ── Option card (inside dialog) ──────────────────────────────────────────────
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun BiofeedbackOptionCard(
     title: String,
     subtitle: String,
     isSelected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClick: () -> Unit = {}
 ) {
     val borderColor = if (isSelected) TextSecondary else Color.Transparent
     val bgColor = if (isSelected) TextSecondary.copy(alpha = 0.08f) else SurfaceDark
@@ -210,7 +288,10 @@ private fun BiofeedbackOptionCard(
                 color = borderColor,
                 shape = MaterialTheme.shapes.medium
             )
-            .clickable(onClick = onClick),
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         colors = CardDefaults.cardColors(containerColor = bgColor)
     ) {
         Row(

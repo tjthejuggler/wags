@@ -163,6 +163,10 @@ data class FreeHoldActiveUiState(
     val biofeedbackHrSound: BiofeedbackHrSound? = null,
     /** Selected biofeedback SpO2 background texture (null = not configured yet). */
     val biofeedbackSpo2Texture: BiofeedbackSpo2Texture? = null,
+    /** Volume (0..1) of the biofeedback heartbeat layer — persisted across runs. */
+    val biofeedbackHrVolume: Float = 1f,
+    /** Volume (0..1) of the biofeedback SpO2 soundscape layer — persisted across runs. */
+    val biofeedbackSpo2Volume: Float = 1f,
     /** All guided audios in the library (for the picker dialog). */
     val guidedAudios: List<GuidedAudioEntity> = emptyList(),
     /** ID of the currently selected guided audio (-1 if none). */
@@ -286,6 +290,8 @@ class FreeHoldActiveViewModel @Inject constructor(
                     ?.let { runCatching { BiofeedbackHrSound.valueOf(it) }.getOrNull() },
                 biofeedbackSpo2Texture = prefs.getString("biofeedback_spo2_texture", null)
                     ?.let { runCatching { BiofeedbackSpo2Texture.valueOf(it) }.getOrNull() },
+                biofeedbackHrVolume = prefs.getFloat("biofeedback_hr_volume", 1f),
+                biofeedbackSpo2Volume = prefs.getFloat("biofeedback_spo2_volume", 1f),
                 guidedSelectedId = selId,
                 isHyperPrep = isHyperPrep,
                 guidedHyperEnabled = if (isHyperPrep) prefs.getBoolean("guided_hyper_enabled", false) else false,
@@ -605,14 +611,48 @@ class FreeHoldActiveViewModel @Inject constructor(
         _uiState.update { it.copy(biofeedbackSpo2Texture = texture) }
     }
 
-    /** Play a short demo of a heartbeat instrument in the picker. */
-    fun previewBiofeedbackHrSound(sound: BiofeedbackHrSound) {
-        biofeedbackEngine.previewHrSound(sound)
+    /** Set the heartbeat layer volume (0..1) — persisted across app runs. */
+    fun setBiofeedbackHrVolume(volume: Float) {
+        prefs.edit().putFloat("biofeedback_hr_volume", volume).apply()
+        biofeedbackEngine.setHrVolume(volume)
+        _uiState.update { it.copy(biofeedbackHrVolume = volume) }
     }
 
-    /** Play a short demo of an SpO2 background texture in the picker. */
+    /** Set the SpO2 soundscape layer volume (0..1) — persisted across app runs. */
+    fun setBiofeedbackSpo2Volume(volume: Float) {
+        prefs.edit().putFloat("biofeedback_spo2_volume", volume).apply()
+        biofeedbackEngine.setSpo2Volume(volume)
+        _uiState.update { it.copy(biofeedbackSpo2Volume = volume) }
+    }
+
+    /**
+     * Play a short demo of a heartbeat instrument in the picker, mixed with
+     * the currently-selected SpO2 soundscape (if any) so the combination can
+     * be auditioned at their relative volumes.
+     */
+    fun previewBiofeedbackHrSound(sound: BiofeedbackHrSound) {
+        val state = _uiState.value
+        biofeedbackEngine.previewHrSound(
+            sound,
+            withTexture = state.biofeedbackSpo2Texture ?: BiofeedbackSpo2Texture.NONE,
+            spo2Vol = state.biofeedbackSpo2Volume,
+            hrVol = state.biofeedbackHrVolume
+        )
+    }
+
+    /**
+     * Play a short demo of an SpO2 background texture in the picker, mixed
+     * with the currently-selected heartbeat instrument (if any) so the
+     * combination can be auditioned at their relative volumes.
+     */
     fun previewBiofeedbackSpo2Texture(texture: BiofeedbackSpo2Texture) {
-        biofeedbackEngine.previewSpo2Texture(texture)
+        val state = _uiState.value
+        biofeedbackEngine.previewSpo2Texture(
+            texture,
+            withSound = state.biofeedbackHrSound ?: BiofeedbackHrSound.NONE,
+            spo2Vol = state.biofeedbackSpo2Volume,
+            hrVol = state.biofeedbackHrVolume
+        )
     }
 
     /** Stop any in-flight picker preview. */
@@ -847,6 +887,8 @@ class FreeHoldActiveViewModel @Inject constructor(
         if (audio == AudioSetting.BIOFEEDBACK.name) {
             _uiState.value.biofeedbackHrSound?.let { biofeedbackEngine.setHrSound(it) }
             _uiState.value.biofeedbackSpo2Texture?.let { biofeedbackEngine.setSpo2Texture(it) }
+            biofeedbackEngine.setHrVolume(_uiState.value.biofeedbackHrVolume)
+            biofeedbackEngine.setSpo2Volume(_uiState.value.biofeedbackSpo2Volume)
             biofeedbackEngine.start(viewModelScope)
         }
 
@@ -1878,7 +1920,11 @@ private fun FreeHoldActiveScreenContent(
                     onDismiss = { showBiofeedbackPicker = false },
                     onPreviewHrSound = { viewModel.previewBiofeedbackHrSound(it) },
                     onPreviewSpo2Texture = { viewModel.previewBiofeedbackSpo2Texture(it) },
-                    onStopPreview = { viewModel.stopBiofeedbackPreview() }
+                    onStopPreview = { viewModel.stopBiofeedbackPreview() },
+                    hrVolume = state.biofeedbackHrVolume,
+                    spo2Volume = state.biofeedbackSpo2Volume,
+                    onHrVolumeChange = { viewModel.setBiofeedbackHrVolume(it) },
+                    onSpo2VolumeChange = { viewModel.setBiofeedbackSpo2Volume(it) }
                 )
             }
             if (showBiofeedbackMissingData) {
@@ -1959,6 +2005,11 @@ private fun FreeHoldActiveScreenContent(
                 guidedCountdownComplete = state.guidedCountdownComplete,
                 currentPrepType = state.currentPrepType,
                 eucapnicPrepCompleted = state.eucapnicPrepCompleted,
+                isBiofeedbackMode = state.isBiofeedbackMode,
+                hrVolume = state.biofeedbackHrVolume,
+                spo2Volume = state.biofeedbackSpo2Volume,
+                onHrVolumeChange = { viewModel.setBiofeedbackHrVolume(it) },
+                onSpo2VolumeChange = { viewModel.setBiofeedbackSpo2Volume(it) },
                 modifier = Modifier.fillMaxSize(),
                 onShowTimerChange = { viewModel.setShowTimer(it) },
                 onStart = {
@@ -1984,6 +2035,68 @@ private fun FreeHoldActiveScreenContent(
 // Content
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Subtle, unobtrusive volume control shown during an active biofeedback
+ * hold: two tiny symbols (♥ heartbeat, ≈ soundscape) that each expand a
+ * compact inline slider. Tapping the active symbol again collapses it.
+ */
+@Composable
+private fun BiofeedbackVolumeRow(
+    hrVolume: Float,
+    spo2Volume: Float,
+    onHrVolumeChange: (Float) -> Unit,
+    onSpo2VolumeChange: (Float) -> Unit
+) {
+    var expanded by remember { mutableStateOf<Int?>(null) } // 0 = HR, 1 = SpO2
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(
+            text = "♥",
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (expanded == 0) TextPrimary else TextSecondary,
+            modifier = Modifier
+                .clickable { expanded = if (expanded == 0) null else 0 }
+                .grayscale()
+        )
+        if (expanded == 0) {
+            Slider(
+                value = hrVolume,
+                onValueChange = onHrVolumeChange,
+                modifier = Modifier
+                    .width(120.dp)
+                    .height(28.dp),
+                colors = SliderDefaults.colors(
+                    thumbColor = TextSecondary,
+                    activeTrackColor = TextSecondary
+                )
+            )
+        }
+        Text(
+            text = "≈",
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (expanded == 1) TextPrimary else TextSecondary,
+            modifier = Modifier
+                .clickable { expanded = if (expanded == 1) null else 1 }
+                .grayscale()
+        )
+        if (expanded == 1) {
+            Slider(
+                value = spo2Volume,
+                onValueChange = onSpo2VolumeChange,
+                modifier = Modifier
+                    .width(120.dp)
+                    .height(28.dp),
+                colors = SliderDefaults.colors(
+                    thumbColor = TextSecondary,
+                    activeTrackColor = TextSecondary
+                )
+            )
+        }
+    }
+}
+
 @Composable
 private fun FreeHoldActiveContent(
     freeHoldActive: Boolean,
@@ -1995,6 +2108,11 @@ private fun FreeHoldActiveContent(
     guidedCountdownComplete: Boolean = false,
     currentPrepType: String = "NO_PREP",
     eucapnicPrepCompleted: Boolean = false,
+    isBiofeedbackMode: Boolean = false,
+    hrVolume: Float = 1f,
+    spo2Volume: Float = 1f,
+    onHrVolumeChange: (Float) -> Unit = {},
+    onSpo2VolumeChange: (Float) -> Unit = {},
     modifier: Modifier = Modifier,
     onShowTimerChange: (Boolean) -> Unit = {},
     onStart: () -> Unit,
@@ -2072,6 +2190,17 @@ private fun FreeHoldActiveContent(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.grayscale()
             )
+        }
+
+        // ── Biofeedback volume (subtle inline control during the hold) ────────
+        if (freeHoldActive && isBiofeedbackMode) {
+            BiofeedbackVolumeRow(
+                hrVolume = hrVolume,
+                spo2Volume = spo2Volume,
+                onHrVolumeChange = onHrVolumeChange,
+                onSpo2VolumeChange = onSpo2VolumeChange
+            )
+            Spacer(modifier = Modifier.height(8.dp))
         }
 
         // ── Next PB countdown during hold ────────────────────────────────────

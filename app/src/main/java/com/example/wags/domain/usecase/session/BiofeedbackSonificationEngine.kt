@@ -216,7 +216,14 @@ class BiofeedbackSonificationEngine @Inject constructor() {
         val amplitude: Float,
         val attackMs: Int = 5,
         /** For HEARTBEAT: a second, softer thump offset this many ms after the first. */
-        val secondThumpOffsetMs: Int = 0
+        val secondThumpOffsetMs: Int = 0,
+        /**
+         * Minimum spacing between strikes (ms). Sustained/melodic instruments
+         * (marimba, kalimba, xylophone, tubular bells, …) sound cluttered and
+         * rushed when re-struck on every single heartbeat, especially at high
+         * HR — their ring-out needs room to breathe. 0 = strike every beat.
+         */
+        val minRestrikeMs: Int = 0
     )
 
     private fun recipeFor(sound: BiofeedbackHrSound): StrikeRecipe = when (sound) {
@@ -242,19 +249,26 @@ class BiofeedbackSonificationEngine @Inject constructor() {
             amplitude = 0.26f
         )
         BiofeedbackHrSound.HEARTBEAT -> StrikeRecipe(
+            // Boosted after user feedback that it was barely audible — the
+            // sampled recording is now also peak-normalised on load.
             baseFreqHz = 58.0,
             partials = listOf(Partial(1.00, 1.00f, 0.10)),
-            amplitude = 0.50f,
+            amplitude = 0.85f,
             attackMs = 2,
             secondThumpOffsetMs = 110
         )
         BiofeedbackHrSound.MARIMBA -> StrikeRecipe(
-            baseFreqHz = 220.0,
+            // Warm wooden bar: the sampled vibraphone was too busy/rushed;
+            // this synth recipe rings longer and is spaced out per beat.
+            baseFreqHz = 196.0,
             partials = listOf(
-                Partial(1.00, 1.00f, 0.45),
-                Partial(3.95, 0.22f, 0.20)
+                Partial(1.00, 1.00f, 0.90),
+                Partial(3.93, 0.18f, 0.35),
+                Partial(9.20, 0.05f, 0.12)
             ),
-            amplitude = 0.40f
+            amplitude = 0.30f,
+            attackMs = 2,
+            minRestrikeMs = 900
         )
         BiofeedbackHrSound.CHIME -> StrikeRecipe(
             baseFreqHz = 880.0,
@@ -276,15 +290,17 @@ class BiofeedbackSonificationEngine @Inject constructor() {
             attackMs = 4
         )
         BiofeedbackHrSound.KALIMBA -> StrikeRecipe(
-            // Thumb piano: bright pluck with quick decay + metallic overtone
-            baseFreqHz = 523.25,
+            // Thumb piano: the bundled recording was effectively inaudible,
+            // so this now uses the synth path — soft pluck, gentle spacing.
+            baseFreqHz = 392.0,
             partials = listOf(
-                Partial(1.00, 1.00f, 0.35),
-                Partial(2.76, 0.28f, 0.15),
-                Partial(5.40, 0.08f, 0.08)
+                Partial(1.00, 1.00f, 0.50),
+                Partial(2.51, 0.20f, 0.20),
+                Partial(5.10, 0.06f, 0.08)
             ),
-            amplitude = 0.36f,
-            attackMs = 2
+            amplitude = 0.32f,
+            attackMs = 3,
+            minRestrikeMs = 600
         )
         BiofeedbackHrSound.HARP -> StrikeRecipe(
             // Plucked string: cascading partials, medium ring
@@ -299,14 +315,15 @@ class BiofeedbackSonificationEngine @Inject constructor() {
             attackMs = 3
         )
         BiofeedbackHrSound.WOODBLOCK -> StrikeRecipe(
-            // Dry wood click: high damped resonance, very fast decay
-            baseFreqHz = 1050.0,
+            // Dry wood click: the sampled recording was harsh/aggressive, so
+            // this synth version is much softer, lower-pitched and quieter.
+            baseFreqHz = 620.0,
             partials = listOf(
-                Partial(1.00, 1.00f, 0.05),
-                Partial(1.83, 0.45f, 0.03)
+                Partial(1.00, 1.00f, 0.06),
+                Partial(2.57, 0.30f, 0.035)
             ),
-            amplitude = 0.42f,
-            attackMs = 1
+            amplitude = 0.22f,
+            attackMs = 2
         )
         BiofeedbackHrSound.TOM -> StrikeRecipe(
             // Round floor-tom: low pitch bend feel via close partials
@@ -319,26 +336,31 @@ class BiofeedbackSonificationEngine @Inject constructor() {
             attackMs = 3
         )
         BiofeedbackHrSound.XYLOPHONE -> StrikeRecipe(
-            // Bright xylophone bar: strong 3rd partial, short ring
-            baseFreqHz = 659.26,
+            // Bright xylophone bar: softened + spaced out (was too fast and
+            // too dense at high HR — the strikes piled up on each other).
+            baseFreqHz = 523.25,
             partials = listOf(
-                Partial(1.00, 1.00f, 0.30),
-                Partial(3.02, 0.55f, 0.15),
-                Partial(6.50, 0.15f, 0.06)
+                Partial(1.00, 1.00f, 0.40),
+                Partial(3.01, 0.35f, 0.18),
+                Partial(6.40, 0.08f, 0.07)
             ),
-            amplitude = 0.34f,
-            attackMs = 1
+            amplitude = 0.26f,
+            attackMs = 2,
+            minRestrikeMs = 800
         )
         BiofeedbackHrSound.TUBULAR -> StrikeRecipe(
-            // Orchestral chime tube: inharmonic shimmer, long decay
-            baseFreqHz = 587.33,
+            // Orchestral chime tube: long ring-out that needs space between
+            // strikes, otherwise it becomes an inharmonic wall of sound.
+            baseFreqHz = 293.66,
             partials = listOf(
-                Partial(1.00, 1.00f, 2.4),
-                Partial(2.76, 0.35f, 1.6),
-                Partial(5.40, 0.15f, 0.9)
+                Partial(1.00, 1.00f, 3.2),
+                Partial(2.00, 0.40f, 2.2),
+                Partial(2.76, 0.25f, 1.4),
+                Partial(5.40, 0.08f, 0.7)
             ),
-            amplitude = 0.24f,
-            attackMs = 6
+            amplitude = 0.26f,
+            attackMs = 8,
+            minRestrikeMs = 2600
         )
         BiofeedbackHrSound.NONE -> StrikeRecipe(
             // Never scheduled — renderChunk skips strikes for NONE.
@@ -362,10 +384,17 @@ class BiofeedbackSonificationEngine @Inject constructor() {
     @Volatile private var hrSound: BiofeedbackHrSound = BiofeedbackHrSound.GONG
     @Volatile private var texture: BiofeedbackSpo2Texture = BiofeedbackSpo2Texture.WARM_PAD
 
+    // User-adjustable layer volumes (0..1), persisted by the caller. They are
+    // per-layer (HR instrument vs SpO2 soundscape) and applied to the live mix
+    // and to the picker previews alike.
+    @Volatile private var hrVolume = 1f
+    @Volatile private var spo2Volume = 1f
+
     // Render-loop state (owned by the IO coroutine only)
     private val beatTail = FloatArray(TAIL_SAMPLES)
     private var totalSamples = 0L
     private var nextBeatSample = 0L
+    private var lastStrikeSample = Long.MIN_VALUE / 2
 
     // ── Real-recording SpO2 textures ────────────────────────────────────────────
     // Field recordings (mono 22.05 kHz PCM16 WAV in res/raw) played back in a
@@ -465,18 +494,19 @@ class BiofeedbackSonificationEngine @Inject constructor() {
                 LayerKind.DAWN_CHORUS to loadWav(context, R.raw.bf_dawn_chorus),
                 LayerKind.FIRE to loadWav(context, R.raw.bf_fire)
             )
+            // Only the recordings that survived tuning are kept — each is
+            // peak-normalised so quiet recordings (e.g. the heartbeat) sit
+            // at a consistent audible level. MARIMBA / KALIMBA / WOODBLOCK /
+            // XYLOPHONE / TUBULAR fall through to their (reworked) synth
+            // recipes: the recordings were too harsh, too dense, rushed or
+            // inaudible.
             hrSamples = mapOf(
-                BiofeedbackHrSound.GONG to loadWav(context, R.raw.bfhr_gong),
-                BiofeedbackHrSound.BELL to loadWav(context, R.raw.bf_singing_bowl),
-                BiofeedbackHrSound.HEARTBEAT to loadWav(context, R.raw.bfhr_heartbeat),
-                BiofeedbackHrSound.MARIMBA to loadWav(context, R.raw.bfhr_vibraphone),
-                BiofeedbackHrSound.CHIME to loadWav(context, R.raw.bfhr_triangle),
-                BiofeedbackHrSound.PIANO to loadWav(context, R.raw.bfhr_piano),
-                BiofeedbackHrSound.KALIMBA to loadWav(context, R.raw.bfhr_kalimba),
-                BiofeedbackHrSound.WOODBLOCK to loadWav(context, R.raw.bfhr_woodblock),
-                BiofeedbackHrSound.TOM to loadWav(context, R.raw.bfhr_tom),
-                BiofeedbackHrSound.XYLOPHONE to loadWav(context, R.raw.bfhr_xylophone),
-                BiofeedbackHrSound.TUBULAR to loadWav(context, R.raw.bfhr_tubular)
+                BiofeedbackHrSound.GONG to normalize(loadWav(context, R.raw.bfhr_gong)),
+                BiofeedbackHrSound.BELL to normalize(loadWav(context, R.raw.bf_singing_bowl)),
+                BiofeedbackHrSound.HEARTBEAT to normalize(loadWav(context, R.raw.bfhr_heartbeat)),
+                BiofeedbackHrSound.CHIME to normalize(loadWav(context, R.raw.bfhr_triangle)),
+                BiofeedbackHrSound.PIANO to normalize(loadWav(context, R.raw.bfhr_piano)),
+                BiofeedbackHrSound.TOM to normalize(loadWav(context, R.raw.bfhr_tom))
             )
             soundscapeRenderer = null // rebuild with the loaded samples
             samplesLoaded = true
@@ -527,6 +557,17 @@ class BiofeedbackSonificationEngine @Inject constructor() {
     private fun readLeShort(b: ByteArray, off: Int): Int =
         (b[off].toInt() and 0xFF) or ((b[off + 1].toInt() and 0xFF) shl 8)
 
+    /** Peak-normalises a sample buffer to 0.95 so quiet recordings play loud enough. */
+    private fun normalize(s: FloatArray?): FloatArray? {
+        if (s == null || s.isEmpty()) return s
+        var peak = 0f
+        for (v in s) if (v > peak) peak = v else if (-v > peak) peak = -v
+        if (peak < 1e-4f) return s
+        val scale = 0.95f / peak
+        for (i in s.indices) s[i] *= scale
+        return s
+    }
+
     fun start(scope: CoroutineScope) {
         if (renderJob?.isActive == true) return
         val minBuf = AudioTrack.getMinBufferSize(
@@ -558,6 +599,7 @@ class BiofeedbackSonificationEngine @Inject constructor() {
         beatTail.fill(0f)
         totalSamples = 0L
         nextBeatSample = 0L
+        lastStrikeSample = Long.MIN_VALUE / 2
 
         renderJob = scope.launch(Dispatchers.IO) {
             val chunk = FloatArray(CHUNK_SAMPLES)
@@ -599,6 +641,12 @@ class BiofeedbackSonificationEngine @Inject constructor() {
     /** Choose the SpO2-mapped background texture. Thread-safe. */
     fun setSpo2Texture(tex: BiofeedbackSpo2Texture) { texture = tex }
 
+    /** Set the HR (heartbeat instrument) layer volume, 0..1. Thread-safe. */
+    fun setHrVolume(volume: Float) { hrVolume = volume.coerceIn(0f, 1f) }
+
+    /** Set the SpO2 (soundscape) layer volume, 0..1. Thread-safe. */
+    fun setSpo2Volume(volume: Float) { spo2Volume = volume.coerceIn(0f, 1f) }
+
     // ── Picker previews ─────────────────────────────────────────────────────────
 
     private val previewScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -606,55 +654,112 @@ class BiofeedbackSonificationEngine @Inject constructor() {
     private var previewTrack: AudioTrack? = null
 
     /**
-     * Plays a 3-second demo of the given heartbeat instrument: a simulated
-     * HR sweep from 55 → 110 bpm so the user hears both the tempo AND the
-     * pitch rise of that instrument. Replaces any preview in flight.
+     * Plays a demo of the given heartbeat instrument: a simulated HR sweep
+     * (55 → 110 bpm solo, 55 → 85 bpm when mixed) so the user hears both the
+     * tempo AND the pitch rise of that instrument. When [withTexture] is not
+     * NONE, the currently-selected SpO2 soundscape is rendered underneath at
+     * [spo2Vol] so the two layers can be auditioned together at their
+     * relative volumes. Replaces any preview in flight.
      */
-    fun previewHrSound(sound: BiofeedbackHrSound) {
+    fun previewHrSound(
+        sound: BiofeedbackHrSound,
+        withTexture: BiofeedbackSpo2Texture = BiofeedbackSpo2Texture.NONE,
+        spo2Vol: Float = 1f,
+        hrVol: Float = 1f
+    ) {
         stopPreview()
-        if (sound == BiofeedbackHrSound.NONE) return // silence is its own preview
-        val durSamples = SAMPLE_RATE * 3
+        val combined = withTexture != BiofeedbackSpo2Texture.NONE
+        if (sound == BiofeedbackHrSound.NONE && !combined) return // silence is its own preview
+        val durSamples = SAMPLE_RATE * (if (combined) 8 else 3)
         val out = FloatArray(durSamples + TAIL_SAMPLES)
-        var nextBeat = 0L
-        while (nextBeat < durSamples) {
-            val frac = nextBeat.toDouble() / durSamples
-            val bpm = 55.0 + 55.0 * frac                       // 55 → 110 bpm sweep
-            val pitch = 2.0.pow((bpm - DEFAULT_HR_BPM) / HR_PITCH_OCTAVE_BPM)
-            val base = recipeFor(sound)
-            val recipe = base.copy(baseFreqHz = base.baseFreqHz * pitch)
-            strike(out, nextBeat.toInt(), recipe, out.size, sound = sound, rate = pitch.toFloat())
-            nextBeat += (SAMPLE_RATE * 60.0 / bpm).toLong()
+        if (sound != BiofeedbackHrSound.NONE) {
+            renderPreviewStrikes(out, sound, durSamples, hrVol,
+                fromBpm = 55.0, toBpm = if (combined) 85.0 else 110.0)
         }
+        if (combined) renderPreviewTexture(out, withTexture, durSamples, spo2Vol, fromSpo2 = 98.0, toSpo2 = 70.0)
+        // Soft-limit the preview mix.
+        for (i in 0 until durSamples) out[i] = out[i].coerceIn(-MASTER_LIMIT, MASTER_LIMIT)
         playPreview(out, durSamples)
     }
 
     /**
-     * Plays a 14-second demo of the given SpO2 soundscape: a simulated sweep
-     * from 98 % down to 45 % so the user hears the layered story unfold —
-     * layers joining and leaving as the SpO2 falls through the bands. Uses a
-     * dedicated SoundscapeRenderer so live render state is untouched.
+     * Plays a demo of the given SpO2 soundscape (98 → 45 % solo sweep so the
+     * layered story is heard; 98 → 62 % when mixed). When [withSound] is not
+     * NONE, a gentle heartbeat instrument sweep is layered on top at
+     * [hrVol] so the combination can be auditioned at the relative volumes.
+     * Replaces any preview in flight.
      */
-    fun previewSpo2Texture(tex: BiofeedbackSpo2Texture) {
+    fun previewSpo2Texture(
+        tex: BiofeedbackSpo2Texture,
+        withSound: BiofeedbackHrSound = BiofeedbackHrSound.NONE,
+        spo2Vol: Float = 1f,
+        hrVol: Float = 1f
+    ) {
         stopPreview()
-        if (tex == BiofeedbackSpo2Texture.NONE) return
+        val combined = withSound != BiofeedbackHrSound.NONE
+        if (tex == BiofeedbackSpo2Texture.NONE && !combined) return
+        val durSamples = SAMPLE_RATE * (if (combined) 8 else 14)
+        val out = FloatArray(durSamples + TAIL_SAMPLES)
+        if (tex != BiofeedbackSpo2Texture.NONE) {
+            renderPreviewTexture(out, tex, durSamples, spo2Vol,
+                fromSpo2 = 98.0, toSpo2 = if (combined) 62.0 else 45.0)
+        }
+        if (combined) renderPreviewStrikes(out, withSound, durSamples, hrVol, fromBpm = 55.0, toBpm = 85.0)
+        // Soft-limit the preview mix.
+        for (i in 0 until durSamples) out[i] = out[i].coerceIn(-MASTER_LIMIT, MASTER_LIMIT)
+        playPreview(out, durSamples)
+    }
+
+    /** Renders a swept-bpm series of instrument strikes into [out] (preview only). */
+    private fun renderPreviewStrikes(
+        out: FloatArray,
+        sound: BiofeedbackHrSound,
+        durSamples: Int,
+        gain: Float,
+        fromBpm: Double,
+        toBpm: Double
+    ) {
+        val recipe0 = recipeFor(sound)
+        val minGapSamples = recipe0.minRestrikeMs * SAMPLE_RATE / 1000
+        var nextBeat = 0L
+        var lastStrike = Long.MIN_VALUE / 2
+        while (nextBeat < durSamples) {
+            val frac = nextBeat.toDouble() / durSamples
+            val bpm = fromBpm + (toBpm - fromBpm) * frac
+            if (recipe0.minRestrikeMs <= 0 || nextBeat - lastStrike >= minGapSamples) {
+                val pitch = 2.0.pow((bpm - DEFAULT_HR_BPM) / HR_PITCH_OCTAVE_BPM)
+                val recipe = recipe0.copy(baseFreqHz = recipe0.baseFreqHz * pitch)
+                strike(out, nextBeat.toInt(), recipe, out.size, sound = sound, rate = pitch.toFloat(), gain = gain)
+                lastStrike = nextBeat
+            }
+            nextBeat += (SAMPLE_RATE * 60.0 / bpm).toLong()
+        }
+    }
+
+    /** Renders a swept-SpO2 soundscape additively into [out] (preview only). */
+    private fun renderPreviewTexture(
+        out: FloatArray,
+        tex: BiofeedbackSpo2Texture,
+        durSamples: Int,
+        vol: Float,
+        fromSpo2: Double,
+        toSpo2: Double
+    ) {
         val previewRenderer = SoundscapeRenderer(samplesByKind, SAMPLE_RATE)
-        val durSamples = SAMPLE_RATE * 14
-        val out = FloatArray(durSamples)
         val chunk = FloatArray(CHUNK_SAMPLES)
         var written = 0
-        // Sweep SpO2 98 → 45 % across the demo so every band transition
-        // gets roughly a second of listening time.
         while (written < durSamples) {
             val frac = written.toDouble() / durSamples
-            val spo2 = 98.0 - 53.0 * frac
+            val spo2 = fromSpo2 + (toSpo2 - fromSpo2) * frac
             previewRenderer.renderChunk(chunk, tex, spo2.toFloat())
             val n = minOf(CHUNK_SAMPLES, durSamples - written)
-            System.arraycopy(chunk, 0, out, written, n)
+            if (vol == 1f) {
+                for (i in 0 until n) out[written + i] += chunk[i]
+            } else {
+                for (i in 0 until n) out[written + i] += chunk[i] * vol
+            }
             written += n
         }
-        // Soft-limit the preview mix.
-        for (i in out.indices) out[i] = out[i].coerceIn(-MASTER_LIMIT, MASTER_LIMIT)
-        playPreview(out, durSamples)
     }
 
     private fun playPreview(samples: FloatArray, length: Int) {
@@ -716,9 +821,13 @@ class BiofeedbackSonificationEngine @Inject constructor() {
         val recipe = recipeFor(hrSound)
         val hrPitch = 2.0.pow((smoothedHr.toDouble() - DEFAULT_HR_BPM) / HR_PITCH_OCTAVE_BPM)
         val pitched = recipe.copy(baseFreqHz = recipe.baseFreqHz * hrPitch)
+        val minGapSamples = recipe.minRestrikeMs * SAMPLE_RATE / 1000
         while (nextBeatSample < chunkEnd) {
             val offsetInChunk = (nextBeatSample - totalSamples).toInt()
-            strike(beatTail, offsetInChunk, pitched, sound = hrSound, rate = hrPitch.toFloat())
+            if (recipe.minRestrikeMs <= 0 || nextBeatSample - lastStrikeSample >= minGapSamples) {
+                strike(beatTail, offsetInChunk, pitched, sound = hrSound, rate = hrPitch.toFloat(), gain = hrVolume)
+                lastStrikeSample = nextBeatSample
+            }
             nextBeatSample += beatIntervalSamples()
         }
 
@@ -741,19 +850,22 @@ class BiofeedbackSonificationEngine @Inject constructor() {
      * played back (resampled by [rate] so pitch tracks HR); otherwise the
      * additive-synthesis recipe renders the strike.
      */
-    private fun strike(tail: FloatArray, offset: Int, recipe: StrikeRecipe, limit: Int = TAIL_SAMPLES, sound: BiofeedbackHrSound? = null, rate: Float = 1f) {
+    private fun strike(tail: FloatArray, offset: Int, recipe: StrikeRecipe, limit: Int = TAIL_SAMPLES, sound: BiofeedbackHrSound? = null, rate: Float = 1f, gain: Float = 1f) {
         val sample = sound?.let { hrSamples[it] }
         if (sample != null && sample.size > 4) {
-            strikeSampled(tail, offset, sample, recipe.amplitude * 1.35f, rate, limit)
+            // Clamp the resample rate so pitch-tracking can never turn a
+            // recording shrill/aggressive at high HR.
+            val clampedRate = rate.coerceIn(0.7f, 1.5f)
+            strikeSampled(tail, offset, sample, recipe.amplitude * 1.35f * gain, clampedRate, limit)
             return
         }
-        strikeOnce(tail, offset, recipe, recipe.amplitude, limit)
+        strikeOnce(tail, offset, recipe, recipe.amplitude * gain, limit)
         if (recipe.secondThumpOffsetMs > 0) {
             strikeOnce(
                 tail,
                 offset + recipe.secondThumpOffsetMs * SAMPLE_RATE / 1000,
                 recipe,
-                recipe.amplitude * 0.7f,
+                recipe.amplitude * 0.7f * gain,
                 limit
             )
         }
@@ -805,5 +917,8 @@ class BiofeedbackSonificationEngine @Inject constructor() {
         if (texture == BiofeedbackSpo2Texture.NONE) { chunk.fill(0f); return }
         val spo2 = SPO2_FLOOR + smoothedSpo2T * (SPO2_CEIL - SPO2_FLOOR)
         renderer().renderChunk(chunk, texture, spo2)
+        if (spo2Volume != 1f) {
+            for (i in chunk.indices) chunk[i] *= spo2Volume
+        }
     }
 }
