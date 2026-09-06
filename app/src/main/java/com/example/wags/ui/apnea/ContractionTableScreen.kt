@@ -199,6 +199,17 @@ fun ContractionTableScreen(
             )
         }
 
+        // Ask the user to confirm the song actually loaded in Spotify (with retry)
+        viewModel.preloadConfirm.collectAsState().value?.let { req ->
+            SpotifyPreloadConfirmDialog(
+                title = req.title,
+                artist = req.artist,
+                attempt = req.attempt,
+                onConfirmed = { viewModel.confirmPreloadLoaded() },
+                onRetry = { viewModel.retryPreload() }
+            )
+        }
+
         if (showEucapnicSettingsDialog && state.eucapnicConfig != null) {
             EucapnicSettingsDialog(
                 config = state.eucapnicConfig!!,

@@ -1273,7 +1273,10 @@ class FreeHoldActiveViewModel @Inject constructor(
 
                 viewModelScope.launch {
                     if (allUris.isNotEmpty()) {
-                        val success = spotifyManager.preloadTrackList(allUris)
+                        val first = newSelected.first()
+                        val success = spotifyManager.preloadTrackList(
+                            allUris, firstTrackTitle = first.title, firstTrackArtist = first.artist
+                        )
                         Log.d("FreeHold", "selectSong pre-load: success=$success for ${allUris.size} tracks")
                     }
                     _uiState.update { it.copy(loadingSelectedSong = false) }
@@ -1288,6 +1291,16 @@ class FreeHoldActiveViewModel @Inject constructor(
             }
         }
     }
+
+    // ── Spotify preload confirmation ────────────────────────────────────────
+    /** Non-null when a staged song could not be verified — UI shows a confirm dialog. */
+    val preloadConfirm = spotifyManager.preloadConfirm
+
+    /** User confirmed the song is loaded in Spotify. */
+    fun confirmPreloadLoaded() = spotifyManager.confirmPreloadLoaded()
+
+    /** User said the song did not load — retry staging the same selection now. */
+    fun retryPreload() = spotifyManager.retryPreload()
 
     fun clearSelectedSong() {
         _uiState.update { it.copy(selectedSongs = emptyList()) }
@@ -1634,6 +1647,17 @@ private fun FreeHoldActiveScreenContent(
                 },
                 onRefresh = { viewModel.loadPreviousSongs(forceRefresh = true) },
                 onDismiss = { showSongPicker = false }
+            )
+        }
+
+        // Ask the user to confirm the song actually loaded in Spotify (with retry)
+        viewModel.preloadConfirm.collectAsState().value?.let { req ->
+            SpotifyPreloadConfirmDialog(
+                title = req.title,
+                artist = req.artist,
+                attempt = req.attempt,
+                onConfirmed = { viewModel.confirmPreloadLoaded() },
+                onRetry = { viewModel.retryPreload() }
             )
         }
 

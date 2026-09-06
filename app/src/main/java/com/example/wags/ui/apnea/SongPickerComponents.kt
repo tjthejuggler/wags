@@ -203,6 +203,76 @@ fun SelectedSongBanner(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Spotify Preload Confirmation Dialog
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Shown after a song selection was flashed into Spotify but Wags could not
+ * automatically verify that Spotify actually loaded it (common when Spotify
+ * was not recently opened). Asks the user to confirm the song is loaded;
+ * tapping "Retry" immediately re-stages the same selection.
+ */
+@Composable
+fun SpotifyPreloadConfirmDialog(
+    title: String,
+    artist: String,
+    attempt: Int,
+    onConfirmed: () -> Unit,
+    onRetry: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onConfirmed,
+        containerColor = SurfaceDark,
+        titleContentColor = TextPrimary,
+        textContentColor = TextSecondary,
+        title = {
+            Text(
+                if (attempt <= 1) "Is the song loaded?" else "Still not loaded?",
+                style = MaterialTheme.typography.titleMedium,
+                color = TextPrimary
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    "Check Spotify — is this paused and ready to play?",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "🎵  $title",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextPrimary,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (artist.isNotBlank()) {
+                    Text(
+                        artist,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirmed) {
+                Text("✓ Yes, loaded", color = ReadinessGreen)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onRetry) {
+                Text("↻ No — retry", color = TextPrimary)
+            }
+        }
+    )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Song Picker Dialog
 // ─────────────────────────────────────────────────────────────────────────────
 

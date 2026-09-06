@@ -720,7 +720,10 @@ class ContractionTableViewModel @Inject constructor(
                 val allUris = newSelected.map { it.spotifyUri }.filter { it.isNotBlank() }
                 viewModelScope.launch {
                     if (allUris.isNotEmpty()) {
-                        spotifyManager.preloadTrackList(allUris)
+                        val first = newSelected.first()
+                        spotifyManager.preloadTrackList(
+                            allUris, firstTrackTitle = first.title, firstTrackArtist = first.artist
+                        )
                     }
                     _uiState.update { it.copy(loadingSelectedSong = false) }
                 }
@@ -733,6 +736,16 @@ class ContractionTableViewModel @Inject constructor(
             }
         }
     }
+
+    // ── Spotify preload confirmation ────────────────────────────────────────
+    /** Non-null when a staged song could not be verified — UI shows a confirm dialog. */
+    val preloadConfirm = spotifyManager.preloadConfirm
+
+    /** User confirmed the song is loaded in Spotify. */
+    fun confirmPreloadLoaded() = spotifyManager.confirmPreloadLoaded()
+
+    /** User said the song did not load — retry staging the same selection now. */
+    fun retryPreload() = spotifyManager.retryPreload()
 
     fun clearSelectedSong() {
         _uiState.update { it.copy(selectedSongs = emptyList()) }

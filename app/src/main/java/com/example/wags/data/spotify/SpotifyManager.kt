@@ -56,6 +56,10 @@ class SpotifyManager @Inject constructor(
         private const val KDE_CONNECT_PACKAGE = "org.kde.kdeconnect_tp"
         /** Max time (ms) to poll for Spotify metadata after sending a play command. */
         private const val METADATA_POLL_TIMEOUT_MS = 2_000L
+        /** Max time (ms) to poll for staged-track verification after a preload. */
+        private const val PRELOAD_VERIFY_TIMEOUT_MS = 4_000L
+        /** Interval (ms) between staged-track verification polls. */
+        private const val PRELOAD_VERIFY_INTERVAL_MS = 500L
         /** Interval (ms) between metadata poll attempts. */
         private const val METADATA_POLL_INTERVAL_MS = 250L
         /** Max attempts to retry startPlayback when Spotify was just launched. */
@@ -95,6 +99,15 @@ class SpotifyManager @Inject constructor(
     // Accumulated songs for the current session
     private val _sessionSongs = MutableStateFlow<List<TrackInfo>>(emptyList())
     val sessionSongs: StateFlow<List<TrackInfo>> = _sessionSongs.asStateFlow()
+
+    // ── Preload confirmation ──────────────────────────────────────────────────
+    // After staging a selected song via preloadTrackList(), we try to verify
+    // automatically that Spotify actually loaded it (by comparing Spotify's
+    // MediaSession metadata with the selected track). When verification is
+    // not possible or fails, we publish a confirm request here so the UI can
+    // ask the user "did it load?" and retry immediately if not.
+    private val _preloadConfirm = MutableStateFlow<PreloadConfirmRequest?>(null)
+    val preloadConfirm: StateFlow<PreloadConfirmRequest?> = _preloadConfirm.asStateFlow()
 
     // ── Song picker cache ─────────────────────────────────────────────────────
     // Enriched song list cached in memory AND in SharedPreferences so the picker
@@ -373,6 +386,8 @@ class SpotifyManager @Inject constructor(
      */
     fun startTracking() {
         if (isTracking) return
+        // A session is starting — any pending preload confirmation is stale.
+        _preloadConfirm.value = null
         isTracking = true
         sessionStartMs = System.currentTimeMillis()
         _sessionSongs.value = emptyList()
@@ -888,9 +903,15 @@ class SpotifyManager @Inject constructor(
      * the array itself defines the complete playback sequence.
      *
      * @param trackUris Ordered list of Spotify URIs like "spotify:track:XXXX"
+     * @param firstTrackTitle Display title of the first track (used for verification + confirm UI).
+     * @param firstTrackArtist Display artist of the first track (used for the confirm UI).
      * @return true if the tracks were successfully loaded and paused.
      */
-    suspend fun preloadTrackList(trackUris: List<String>): Boolean {
+    suspend fun preloadTrackList(
+        trackUris: List<String>,
+        firstTrackTitle: String? = null,
+        firstTrackArtist: String? = null
+    ): Boolean {
         if (trackUris.isEmpty()) {
             Log.w("SpotifyMgr", "preloadTrackList: empty track list")
             return false
@@ -919,7 +940,72 @@ class SpotifyManager @Inject constructor(
         }
 
         Log.d("SpotifyMgr", "preloadTrackList: staged ${trackUris.size} tracks (first via deep-link, rest queued best-effort)")
+
+        // Verify that Spotify actually loaded the first track. When we can read
+        // Spotify's metadata and it matches the selection, the stage succeeded
+        // and no user interaction is needed. Otherwise ask the user to confirm
+        // (with a one-tap retry) — this closes the long-standing gap where the
+        // deep-link flash appeared to work but nothing was actually staged.
+        if (isTracking) return true  // session already started; don't interfere
+        val verified = verifyStagedTrack(firstTrackTitle)
+        if (verified) {
+            _preloadConfirm.value = null
+        } else {
+            Log.d("SpotifyMgr", "preloadTrackList: could not verify staged track — requesting user confirmation")
+            _preloadConfirm.value = PreloadConfirmRequest(
+                trackUris = trackUris,
+                title = firstTrackTitle ?: "your song",
+                artist = firstTrackArtist ?: "",
+                attempt = (_preloadConfirm.value?.attempt ?: 0) + 1
+            )
+        }
         return true
+    }
+
+    /**
+     * Try to verify that the track staged by [preloadTrackList] is actually
+     * Spotify's current track, by comparing the MediaSession / broadcast
+     * metadata title with [expectedTitle] (case-insensitive).
+     *
+     * Returns false when no title is known, when Spotify's metadata cannot be
+     * read, or when the current track does not match — in all those cases the
+     * user should be asked to confirm.
+     */
+    private suspend fun verifyStagedTrack(expectedTitle: String?): Boolean {
+        if (expectedTitle.isNullOrBlank()) return false
+        val deadline = System.currentTimeMillis() + PRELOAD_VERIFY_TIMEOUT_MS
+        while (System.currentTimeMillis() < deadline) {
+            refreshSpotifyController()
+            val currentTitle = _currentSong.value?.title
+                ?: spotifyController?.metadata?.getString(MediaMetadata.METADATA_KEY_TITLE)
+            if (currentTitle != null &&
+                currentTitle.trim().equals(expectedTitle.trim(), ignoreCase = true)
+            ) {
+                Log.d("SpotifyMgr", "verifyStagedTrack: verified '$currentTitle'")
+                return true
+            }
+            delay(PRELOAD_VERIFY_INTERVAL_MS)
+        }
+        Log.d("SpotifyMgr", "verifyStagedTrack: NOT verified (expected '$expectedTitle')")
+        return false
+    }
+
+    /** User confirmed the staged song is loaded in Spotify — dismiss the popup. */
+    fun confirmPreloadLoaded() {
+        _preloadConfirm.value = null
+    }
+
+    /**
+     * User said the song did NOT load — immediately retry the staging
+     * (deep-link flash into Spotify, pause, return) for the same selection.
+     */
+    fun retryPreload() {
+        val req = _preloadConfirm.value ?: return
+        _preloadConfirm.value = null
+        scope.launch {
+            delay(400L) // brief pause so the popup dismisses before the flash
+            preloadTrackList(req.trackUris, req.title, req.artist)
+        }
     }
 
     /**
@@ -1148,4 +1234,20 @@ data class TrackInfo(
     val spotifyUri: String? = null,
     val startedAtMs: Long,
     val endedAtMs: Long? = null
+)
+
+/**
+ * Ask-the-user confirmation request published by [SpotifyManager.preloadConfirm]
+ * after a song selection could not be automatically verified in Spotify.
+ *
+ * @property trackUris The full ordered selection to re-stage on retry.
+ * @property title     Display title of the first (staged) track.
+ * @property artist    Display artist of the first (staged) track.
+ * @property attempt   1-based retry counter shown in the popup.
+ */
+data class PreloadConfirmRequest(
+    val trackUris: List<String>,
+    val title: String,
+    val artist: String,
+    val attempt: Int
 )

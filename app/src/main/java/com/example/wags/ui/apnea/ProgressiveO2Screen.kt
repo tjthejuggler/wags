@@ -196,6 +196,17 @@ fun ProgressiveO2Screen(
             )
         }
 
+        // Ask the user to confirm the song actually loaded in Spotify (with retry)
+        viewModel.preloadConfirm.collectAsState().value?.let { req ->
+            SpotifyPreloadConfirmDialog(
+                title = req.title,
+                artist = req.artist,
+                attempt = req.attempt,
+                onConfirmed = { viewModel.confirmPreloadLoaded() },
+                onRetry = { viewModel.retryPreload() }
+            )
+        }
+
         // Eucapnic settings dialog
         if (showEucapnicSettingsDialog && state.eucapnicConfig != null) {
             EucapnicSettingsDialog(
