@@ -676,18 +676,18 @@ class BiofeedbackSonificationEngine @Inject constructor() {
             renderPreviewStrikes(out, sound, durSamples, hrVol,
                 fromBpm = 55.0, toBpm = if (combined) 85.0 else 110.0)
         }
-        if (combined) renderPreviewTexture(out, withTexture, durSamples, spo2Vol, fromSpo2 = 98.0, toSpo2 = 70.0)
+        if (combined) renderPreviewTexture(out, withTexture, durSamples, spo2Vol, fromSpo2 = 98.0, toSpo2 = 98.0)
         // Soft-limit the preview mix.
         for (i in 0 until durSamples) out[i] = out[i].coerceIn(-MASTER_LIMIT, MASTER_LIMIT)
         playPreview(out, durSamples)
     }
 
     /**
-     * Plays a demo of the given SpO2 soundscape (98 → 45 % solo sweep so the
-     * layered story is heard; 98 → 62 % when mixed). When [withSound] is not
-     * NONE, a gentle heartbeat instrument sweep is layered on top at
-     * [hrVol] so the combination can be auditioned at the relative volumes.
-     * Replaces any preview in flight.
+     * Plays a demo of the given SpO2 soundscape rendered only at the highest
+     * SpO2 scene (98 %) — the first sound the user will hear when a hold
+     * starts. When [withSound] is not NONE, a gentle heartbeat instrument
+     * sweep is layered on top at [hrVol] so the combination can be auditioned
+     * at the relative volumes. Replaces any preview in flight.
      */
     fun previewSpo2Texture(
         tex: BiofeedbackSpo2Texture,
@@ -702,7 +702,7 @@ class BiofeedbackSonificationEngine @Inject constructor() {
         val out = FloatArray(durSamples + TAIL_SAMPLES)
         if (tex != BiofeedbackSpo2Texture.NONE) {
             renderPreviewTexture(out, tex, durSamples, spo2Vol,
-                fromSpo2 = 98.0, toSpo2 = if (combined) 62.0 else 45.0)
+                fromSpo2 = 98.0, toSpo2 = 98.0)
         }
         if (combined) renderPreviewStrikes(out, withSound, durSamples, hrVol, fromBpm = 55.0, toBpm = 85.0)
         // Soft-limit the preview mix.

@@ -2030,10 +2030,6 @@ private fun FreeHoldActiveScreenContent(
                 currentPrepType = state.currentPrepType,
                 eucapnicPrepCompleted = state.eucapnicPrepCompleted,
                 isBiofeedbackMode = state.isBiofeedbackMode,
-                hrVolume = state.biofeedbackHrVolume,
-                spo2Volume = state.biofeedbackSpo2Volume,
-                onHrVolumeChange = { viewModel.setBiofeedbackHrVolume(it) },
-                onSpo2VolumeChange = { viewModel.setBiofeedbackSpo2Volume(it) },
                 modifier = Modifier.fillMaxSize(),
                 onShowTimerChange = { viewModel.setShowTimer(it) },
                 onStart = {
@@ -2059,68 +2055,6 @@ private fun FreeHoldActiveScreenContent(
 // Content
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Subtle, unobtrusive volume control shown during an active biofeedback
- * hold: two tiny symbols (♥ heartbeat, ≈ soundscape) that each expand a
- * compact inline slider. Tapping the active symbol again collapses it.
- */
-@Composable
-private fun BiofeedbackVolumeRow(
-    hrVolume: Float,
-    spo2Volume: Float,
-    onHrVolumeChange: (Float) -> Unit,
-    onSpo2VolumeChange: (Float) -> Unit
-) {
-    var expanded by remember { mutableStateOf<Int?>(null) } // 0 = HR, 1 = SpO2
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Text(
-            text = "♥",
-            style = MaterialTheme.typography.bodyLarge,
-            color = if (expanded == 0) TextPrimary else TextSecondary,
-            modifier = Modifier
-                .clickable { expanded = if (expanded == 0) null else 0 }
-                .grayscale()
-        )
-        if (expanded == 0) {
-            Slider(
-                value = hrVolume,
-                onValueChange = onHrVolumeChange,
-                modifier = Modifier
-                    .width(120.dp)
-                    .height(28.dp),
-                colors = SliderDefaults.colors(
-                    thumbColor = TextSecondary,
-                    activeTrackColor = TextSecondary
-                )
-            )
-        }
-        Text(
-            text = "≈",
-            style = MaterialTheme.typography.bodyLarge,
-            color = if (expanded == 1) TextPrimary else TextSecondary,
-            modifier = Modifier
-                .clickable { expanded = if (expanded == 1) null else 1 }
-                .grayscale()
-        )
-        if (expanded == 1) {
-            Slider(
-                value = spo2Volume,
-                onValueChange = onSpo2VolumeChange,
-                modifier = Modifier
-                    .width(120.dp)
-                    .height(28.dp),
-                colors = SliderDefaults.colors(
-                    thumbColor = TextSecondary,
-                    activeTrackColor = TextSecondary
-                )
-            )
-        }
-    }
-}
-
 @Composable
 private fun FreeHoldActiveContent(
     freeHoldActive: Boolean,
@@ -2133,10 +2067,6 @@ private fun FreeHoldActiveContent(
     currentPrepType: String = "NO_PREP",
     eucapnicPrepCompleted: Boolean = false,
     isBiofeedbackMode: Boolean = false,
-    hrVolume: Float = 1f,
-    spo2Volume: Float = 1f,
-    onHrVolumeChange: (Float) -> Unit = {},
-    onSpo2VolumeChange: (Float) -> Unit = {},
     modifier: Modifier = Modifier,
     onShowTimerChange: (Boolean) -> Unit = {},
     onStart: () -> Unit,
@@ -2214,17 +2144,6 @@ private fun FreeHoldActiveContent(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.grayscale()
             )
-        }
-
-        // ── Biofeedback volume (subtle inline control during the hold) ────────
-        if (freeHoldActive && isBiofeedbackMode) {
-            BiofeedbackVolumeRow(
-                hrVolume = hrVolume,
-                spo2Volume = spo2Volume,
-                onHrVolumeChange = onHrVolumeChange,
-                onSpo2VolumeChange = onSpo2VolumeChange
-            )
-            Spacer(modifier = Modifier.height(8.dp))
         }
 
         // ── Next PB countdown during hold ────────────────────────────────────
