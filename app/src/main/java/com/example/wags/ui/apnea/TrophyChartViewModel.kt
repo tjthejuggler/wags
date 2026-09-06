@@ -138,20 +138,11 @@ class TrophyChartViewModel @Inject constructor(
             }
         }
 
-        // Map from recordId → trophyCount (only records that are current PBs)
-        val recordTrophies = mutableMapOf<Long, Int>()
-        for (drill in drills) {
-            val entries = apneaRepository.getAllPersonalBests(drill)
-            for (entry in entries) {
-                val id = entry.recordId ?: continue
-                // A record can appear in multiple entries (e.g. the global PB is also the exact PB).
-                // We want the highest trophyCount for each record.
-                val existing = recordTrophies[id] ?: 0
-                if (entry.trophyCount > existing) {
-                    recordTrophies[id] = entry.trophyCount
-                }
-            }
-        }
+        // Map from recordId → trophyCount (only records that are current PBs).
+        // Single DB read + in-memory sub-cube resolution — the per-combo query
+        // approach (getAllPersonalBests per drill) issued thousands of
+        // sequential SQL queries and never finished on device.
+        val recordTrophies = apneaRepository.getTrophyRecordCounts(drills)
 
         if (recordTrophies.isEmpty()) return emptyList()
 

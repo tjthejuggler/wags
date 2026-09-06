@@ -80,13 +80,13 @@ fun TrophyChartScreen(
                         Text(
                             if (state.showTotal) "Total trophies per day" else "Best single record per day",
                             style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
+                            color = TextPrimary.copy(alpha = 0.85f)
                         )
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Text("←", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
+                        Text("←", style = MaterialTheme.typography.headlineMedium, color = TextPrimary)
                     }
                 },
                 actions = {
@@ -107,7 +107,7 @@ fun TrophyChartScreen(
                         Text(
                             "Total",
                             fontSize = 12.sp,
-                            color = if (state.showTotal) TextPrimary else TextSecondary,
+                            color = if (state.showTotal) TextPrimary else TextPrimary.copy(alpha = 0.6f),
                             modifier = Modifier.padding(end = 4.dp)
                         )
                         Switch(
@@ -124,7 +124,7 @@ fun TrophyChartScreen(
                     }
                     // Settings button
                     IconButton(onClick = { viewModel.toggleSettingsPopup() }) {
-                        Text("⚙", style = MaterialTheme.typography.titleMedium, color = TextSecondary)
+                        Text("⚙", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
@@ -141,7 +141,7 @@ fun TrophyChartScreen(
                 modifier = Modifier.fillMaxSize().padding(padding),
                 contentAlignment = Alignment.Center
             ) {
-                Text("No trophy records yet", color = TextSecondary)
+                Text("No trophy records yet", color = TextPrimary.copy(alpha = 0.8f))
             }
         } else {
             TrophyBarChart(
@@ -276,15 +276,15 @@ private fun TrophyBarChart(
     val topPad = 16f
     val rightPad = 16f
 
-    val barColor = TextPrimary.copy(alpha = 0.85f)
-    val gridColor = TextDisabled.copy(alpha = 0.3f)
+    val barColor = TextPrimary.copy(alpha = 0.95f)
+    val gridColor = TextDisabled.copy(alpha = 0.5f)
     val dashEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f))
 
     val paint = remember {
         android.graphics.Paint().apply {
             isAntiAlias = true
             textSize = 26f
-            color = android.graphics.Color.argb(180, 144, 144, 144)
+            color = android.graphics.Color.argb(235, 240, 240, 240)
         }
     }
 

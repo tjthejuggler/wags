@@ -1236,6 +1236,72 @@ class ApneaRepository @Inject constructor(
     }
 
     /**
+     * Fast in-memory equivalent of running [getAllPersonalBests] for every
+     * drill in [drills] and merging the results: returns `recordId → highest
+     * trophy count that record holds in any drill pool`.
+     *
+     * The query-based variant above issues one SQL query per settings
+     * combination — thousands of sequential table scans per drill in
+     * By-the-Hour mode — which can keep a loading spinner spinning for
+     * minutes. This variant reads the table once and resolves every
+     * settings sub-cube winner in memory, producing identical counts:
+     * a record's trophy count is `6 - k`, where `k` is the smallest number
+     * of pinned settings for which the record is the sub-cube's best.
+     * Ties are broken by lowest recordId (matching
+     * `ORDER BY durationMs DESC LIMIT 1` over rowid order).
+     */
+    suspend fun getTrophyRecordCounts(drills: List<DrillContext>): Map<Long, Int> = withContext(ioDispatcher) {
+        if (drills.isEmpty()) return@withContext emptyMap()
+        val all = dao.getAllOnce().filter { it.countsAsRecord }
+        if (all.isEmpty()) return@withContext emptyMap()
+        val byHour = timeDimension.isByHour
+
+        fun todOf(r: ApneaRecordEntity): String =
+            if (byHour) TimeBuckets.fromTimestamp(r.timestamp) else r.timeOfDay
+
+        val result = HashMap<Long, Int>()
+
+        for (drill in drills) {
+            val pool = all.filter { r ->
+                r.tableType == drill.drillType &&
+                    (drill.drillParamValue == null || r.drillParamValue == drill.drillParamValue)
+            }
+            if (pool.isEmpty()) continue
+
+            // ── 6🏆 Global best for this drill pool ────────────────────────
+            pool.minWithOrNull(
+                compareByDescending<ApneaRecordEntity> { it.durationMs }.thenBy { it.recordId }
+            )?.let { result.merge(it.recordId, 6, ::maxOf) }
+
+            // ── 1🏆–5🏆: one winner per settings sub-cube ──────────────────
+            // Bitmask over the 5 settings (1=lv, 2=pt, 4=tod, 8=pos, 16=aud);
+            // trophies = 6 - number of pinned settings.
+            for (mask in 1..31) {
+                val trophies = 6 - Integer.bitCount(mask)
+                // sub-cube key → (durationMs, recordId) of its current winner
+                val best = HashMap<String, Pair<Long, Long>>()
+                for (r in pool) {
+                    val key = buildString {
+                        if (mask and 1 != 0) append(r.lungVolume).append('|')
+                        if (mask and 2 != 0) append(r.prepType).append('|')
+                        if (mask and 4 != 0) append(todOf(r)).append('|')
+                        if (mask and 8 != 0) append(r.posture).append('|')
+                        if (mask and 16 != 0) append(r.audio).append('|')
+                    }
+                    val cur = best[key]
+                    if (cur == null || r.durationMs > cur.first ||
+                        (r.durationMs == cur.first && r.recordId < cur.second)
+                    ) {
+                        best[key] = r.durationMs to r.recordId
+                    }
+                }
+                for ((_, id) in best.values) result.merge(id, trophies, ::maxOf)
+            }
+        }
+        result
+    }
+
+    /**
      * Returns all records for a [DrillContext] matching the given setting filters,
      * ordered by timestamp ascending (oldest first) — suitable for charting.
      * Pass empty string for any setting to relax that constraint.
