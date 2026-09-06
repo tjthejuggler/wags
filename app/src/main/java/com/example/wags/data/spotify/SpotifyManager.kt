@@ -64,6 +64,10 @@ class SpotifyManager @Inject constructor(
         private const val METADATA_POLL_INTERVAL_MS = 250L
         /** Max attempts to retry startPlayback when Spotify was just launched. */
         private const val PRELOAD_MAX_ATTEMPTS = 6
+        /** Max auto-retry attempts when staging a selected song into Spotify. */
+        private const val PRELOAD_AUTO_MAX_ATTEMPTS = 5
+        /** Pause (ms) between auto-retry staging attempts. */
+        private const val PRELOAD_AUTO_RETRY_DELAY_MS = 800L
         /** Delay (ms) between startPlayback retry attempts. */
         private const val PRELOAD_RETRY_DELAY_MS = 1_500L
         /** Delay (ms) after startPlayback succeeds before pausing (lets Spotify buffer). */
@@ -917,13 +921,51 @@ class SpotifyManager @Inject constructor(
             return false
         }
 
-        // Stage the FIRST selected track locally: deep-link it into Spotify,
-        // start it via Spotify's MediaSession, then pause. This leaves Spotify
-        // in exactly the "manually chosen + paused" state that resumes
-        // reliably on session start. The Web API play command is NOT used —
-        // it returns 204 even when silently dropped (Spotify 2026 behavior),
-        // which previously left nothing staged and wiped the user's queue.
-        primeSpotifyPlayer(trackUris.first(), pauseAfter = true)
+        // A session may have started while this preload was in flight — the
+        // user's music is already playing, don't interfere.
+        if (isTracking) return true
+
+        val firstUri = trackUris.first()
+
+        // ── Auto-retry staging loop ─────────────────────────────────────────
+        // Stage the first track (deep-link + session-play), verify it became
+        // Spotify's CURRENT track, and retry — all while the user stays in
+        // Spotify. A fully-closed Spotify often needs several attempts before
+        // its player engine initializes; previously each failed attempt meant
+        // a round-trip back to Wags and a manual re-select. Only return to
+        // Wags once the track is verified or all attempts are exhausted.
+        // Drop any stale "now playing" entry so verification below only accepts
+        // metadata observed FRESH after staging (a leftover title from an
+        // earlier session must not cause a false positive).
+        if (_currentSong.value != null) _currentSong.value = null
+
+        var verified = false
+        for (attempt in 1..PRELOAD_AUTO_MAX_ATTEMPTS) {
+            if (attempt > 1) delay(PRELOAD_AUTO_RETRY_DELAY_MS)
+            Log.d("SpotifyMgr", "preloadTrackList: staging attempt $attempt/$PRELOAD_AUTO_MAX_ATTEMPTS for $firstUri")
+            stageTrackViaDeepLink(firstUri)
+            if (verifyStagedTrack(firstTrackTitle)) {
+                verified = true
+                break
+            }
+        }
+
+        // Done (or gave up) — hand focus back to Wags.
+        bringAppToForeground()
+
+        if (verified) {
+            // Leave Spotify paused at position 0, ready to resume on session start.
+            if (!isTracking) sendPauseAndRewindCommand(rewind = false)
+            _preloadConfirm.value = null
+        } else {
+            Log.w("SpotifyMgr", "preloadTrackList: could not stage after $PRELOAD_AUTO_MAX_ATTEMPTS attempts — asking user")
+            _preloadConfirm.value = PreloadConfirmRequest(
+                trackUris = trackUris,
+                title = firstTrackTitle ?: "your song",
+                artist = firstTrackArtist ?: "",
+                attempt = (_preloadConfirm.value?.attempt ?: 0) + 1
+            )
+        }
 
         // Best-effort: queue tracks 2+ via the Web API so multi-song
         // selections keep their order when playback continues.
@@ -939,27 +981,32 @@ class SpotifyManager @Inject constructor(
             }
         }
 
-        Log.d("SpotifyMgr", "preloadTrackList: staged ${trackUris.size} tracks (first via deep-link, rest queued best-effort)")
+        Log.d("SpotifyMgr", "preloadTrackList: finished, verified=$verified, tracks=${trackUris.size}")
+        return verified
+    }
 
-        // Verify that Spotify actually loaded the first track. When we can read
-        // Spotify's metadata and it matches the selection, the stage succeeded
-        // and no user interaction is needed. Otherwise ask the user to confirm
-        // (with a one-tap retry) — this closes the long-standing gap where the
-        // deep-link flash appeared to work but nothing was actually staged.
-        if (isTracking) return true  // session already started; don't interfere
-        val verified = verifyStagedTrack(firstTrackTitle)
-        if (verified) {
-            _preloadConfirm.value = null
-        } else {
-            Log.d("SpotifyMgr", "preloadTrackList: could not verify staged track — requesting user confirmation")
-            _preloadConfirm.value = PreloadConfirmRequest(
-                trackUris = trackUris,
-                title = firstTrackTitle ?: "your song",
-                artist = firstTrackArtist ?: "",
-                attempt = (_preloadConfirm.value?.attempt ?: 0) + 1
-            )
+    /**
+     * Deep-link [spotifyUri] into Spotify and start playback via its
+     * MediaSession so its player initializes and the track becomes the
+     * "current" track. Does NOT pause and does NOT bring Wags back to the
+     * foreground — the caller decides what happens next (auto-retry, pause,
+     * or return to Wags).
+     */
+    private suspend fun stageTrackViaDeepLink(spotifyUri: String) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(spotifyUri)).apply {
+                setPackage(SPOTIFY_PACKAGE)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            Log.w("SpotifyMgr", "stageTrackViaDeepLink: deep-link failed", e)
         }
-        return true
+        // Give Spotify a moment to load the track page, then force its player
+        // engine to initialize via a direct session play.
+        delay(1_500L)
+        playViaSession()
+        delay(WAKE_PLAYER_DELAY_MS)
     }
 
     /**
