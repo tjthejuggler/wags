@@ -859,8 +859,15 @@ class ApneaRepository @Inject constructor(
         fun String.displayPos() = Posture.valueOf(this).displayName()
         fun String.displayAud() = AudioSetting.valueOf(this).displayName()
 
-        suspend fun entry(trophies: Int, label: String, lv: String, pt: String, tod: String, pos: String, aud: String): PersonalBestEntry {
-            val best = dao.getBestFreeHoldRecord(lv, pt, tod, pos, aud)
+        // One DB read + in-memory sub-cube winners instead of one SQL query
+        // per settings combination (thousands of sequential scans otherwise).
+        val winners = pbWinnerIndex(
+            dao.getAllOnce().filter { it.tableType == null },
+            byHour = timeDimension.isByHour
+        )
+
+        fun entry(trophies: Int, label: String, lv: String, pt: String, tod: String, pos: String, aud: String): PersonalBestEntry {
+            val best = winners[pbLookupKey(lv, pt, tod, pos, aud)]
             return PersonalBestEntry(
                 trophyCount = trophies,
                 label       = label,
@@ -1146,8 +1153,19 @@ class ApneaRepository @Inject constructor(
         fun String.displayPos() = Posture.valueOf(this).displayName()
         fun String.displayAud() = AudioSetting.valueOf(this).displayName()
 
-        suspend fun entry(trophies: Int, label: String, lv: String, pt: String, tod: String, pos: String, aud: String): PersonalBestEntry {
-            val best = dao.getBestDrillRecordRaw(buildBestDrillRecordQuery(drill, lv, pt, tod, pos, aud))
+        // One DB read + in-memory sub-cube winners instead of one SQL query
+        // per settings combination (thousands of sequential scans otherwise).
+        val winners = pbWinnerIndex(
+            dao.getAllOnce().filter { r ->
+                r.countsAsRecord &&
+                    r.tableType == drill.drillType &&
+                    (drill.drillParamValue == null || r.drillParamValue == drill.drillParamValue)
+            },
+            byHour = timeDimension.isByHour
+        )
+
+        fun entry(trophies: Int, label: String, lv: String, pt: String, tod: String, pos: String, aud: String): PersonalBestEntry {
+            val best = winners[pbLookupKey(lv, pt, tod, pos, aud)]
             return PersonalBestEntry(
                 trophyCount = trophies,
                 label       = label,
@@ -1234,6 +1252,61 @@ class ApneaRepository @Inject constructor(
 
         entries
     }
+
+    // ── In-memory PB sub-cube index ─────────────────────────────────────────────
+
+    /**
+     * Builds the winner index for a PB pool: for every subset of the 5 settings
+     * (bit 0 = lungVolume, 1 = prepType, 2 = timeOfDay, 3 = posture, 4 = audio)
+     * maps the pinned-values key to that sub-cube's best record (longest
+     * durationMs, lowest recordId on ties — matching
+     * `ORDER BY durationMs DESC LIMIT 1` over rowid order). The empty key is
+     * the global (all-settings-relaxed) winner. One table read replaces the
+     * one-SQL-query-per-combination approach, which issued thousands of
+     * sequential scans.
+     */
+    private fun pbWinnerIndex(
+        pool: List<ApneaRecordEntity>,
+        byHour: Boolean
+    ): Map<String, ApneaRecordEntity> {
+        if (pool.isEmpty()) return emptyMap()
+
+        fun todOf(r: ApneaRecordEntity): String =
+            if (byHour) TimeBuckets.fromTimestamp(r.timestamp) else r.timeOfDay
+
+        val fields = listOf<(ApneaRecordEntity) -> String>(
+            { it.lungVolume }, { it.prepType }, { todOf(it) }, { it.posture }, { it.audio }
+        )
+        val best = HashMap<String, ApneaRecordEntity>()
+        for (mask in 0..31) {
+            for (r in pool) {
+                val key = buildString {
+                    for (b in 0..4) if (mask and (1 shl b) != 0) append(fields[b](r)).append('|')
+                }
+                val cur = best[key]
+                if (cur == null || r.durationMs > cur.durationMs ||
+                    (r.durationMs == cur.durationMs && r.recordId < cur.recordId)
+                ) {
+                    best[key] = r
+                }
+            }
+        }
+        return best
+    }
+
+    /**
+     * Lookup key matching [pbWinnerIndex]: the pinned (non-empty) setting
+     * values joined by '|' in lungVolume | prepType | timeOfDay | posture |
+     * audio field order. Empty string = global.
+     */
+    private fun pbLookupKey(lv: String, pt: String, tod: String, pos: String, aud: String): String =
+        buildString {
+            if (lv.isNotEmpty())  append(lv).append('|')
+            if (pt.isNotEmpty())  append(pt).append('|')
+            if (tod.isNotEmpty()) append(tod).append('|')
+            if (pos.isNotEmpty()) append(pos).append('|')
+            if (aud.isNotEmpty()) append(aud).append('|')
+        }
 
     /**
      * Fast in-memory equivalent of running [getAllPersonalBests] for every
