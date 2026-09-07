@@ -114,6 +114,8 @@ fun ApneaTableScreen(
         var showSongPicker by remember { mutableStateOf(false) }
         // Guided audio picker dialog state
         var showGuidedPicker by remember { mutableStateOf(false) }
+        // Biofeedback sonification picker dialog state
+        var showBiofeedbackPicker by remember { mutableStateOf(false) }
         // Eucapnic settings dialog state
         var showEucapnicSettingsDialog by remember { mutableStateOf(false) }
 
@@ -150,6 +152,24 @@ fun ApneaTableScreen(
                 onAddNew = { uri, name, url -> viewModel.addGuidedAudio(uri, name, url) },
                 onDelete = { audio -> viewModel.deleteGuidedAudio(audio) },
                 onDismiss = { showGuidedPicker = false }
+            )
+        }
+
+        // Biofeedback sonification picker dialog
+        if (showBiofeedbackPicker) {
+            BiofeedbackPickerDialog(
+                selectedHrSound = state.biofeedbackHrSound,
+                selectedSpo2Texture = state.biofeedbackSpo2Texture,
+                onSelectHrSound = { viewModel.setBiofeedbackHrSound(it) },
+                onSelectSpo2Texture = { viewModel.setBiofeedbackSpo2Texture(it) },
+                onDismiss = { showBiofeedbackPicker = false },
+                onPreviewHrSound = { viewModel.previewBiofeedbackHrSound(it) },
+                onPreviewSpo2Texture = { viewModel.previewBiofeedbackSpo2Texture(it) },
+                onStopPreview = { viewModel.stopBiofeedbackPreview() },
+                hrVolume = state.biofeedbackHrVolume,
+                spo2Volume = state.biofeedbackSpo2Volume,
+                onHrVolumeChange = { viewModel.setBiofeedbackHrVolume(it) },
+                onSpo2VolumeChange = { viewModel.setBiofeedbackSpo2Volume(it) }
             )
         }
 
@@ -316,6 +336,23 @@ fun ApneaTableScreen(
                                 GuidedAudioPickerButton(onClick = {
                                     showGuidedPicker = true
                                 })
+                            }
+                        }
+                    }
+                    // Biofeedback sonification picker — shown when BIOFEEDBACK is
+                    // selected, session not active (Free Hold parity).
+                    if (state.audio == AudioSetting.BIOFEEDBACK && state.apneaState == ApneaState.IDLE) {
+                        item {
+                            val hrSound = state.biofeedbackHrSound
+                            val texture = state.biofeedbackSpo2Texture
+                            if (hrSound != null && texture != null) {
+                                SelectedBiofeedbackBanner(
+                                    hrSound = hrSound,
+                                    spo2Texture = texture,
+                                    onClick = { showBiofeedbackPicker = true }
+                                )
+                            } else {
+                                BiofeedbackPickerButton(onClick = { showBiofeedbackPicker = true })
                             }
                         }
                     }

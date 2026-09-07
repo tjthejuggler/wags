@@ -208,6 +208,16 @@ data class ApneaUiState(
     val loadingSelectedSong: Boolean = false,
     /** True when audio setting is GUIDED — controls whether the guided audio picker is shown. */
     val isGuidedMode: Boolean = false,
+    /** True when audio setting is BIOFEEDBACK — controls whether the biofeedback picker is shown. */
+    val isBiofeedbackMode: Boolean = false,
+    /** Selected biofeedback heartbeat instrument (null = not configured yet). */
+    val biofeedbackHrSound: com.example.wags.domain.usecase.session.BiofeedbackHrSound? = null,
+    /** Selected biofeedback SpO2 background texture (null = not configured yet). */
+    val biofeedbackSpo2Texture: com.example.wags.domain.usecase.session.BiofeedbackSpo2Texture? = null,
+    /** Volume (0..1) of the biofeedback heartbeat layer — persisted across runs. */
+    val biofeedbackHrVolume: Float = 1f,
+    /** Volume (0..1) of the biofeedback SpO2 soundscape layer — persisted across runs. */
+    val biofeedbackSpo2Volume: Float = 1f,
     /** All guided audios in the library (for the picker dialog). */
     val guidedAudios: List<GuidedAudioEntity> = emptyList(),
     /** ID of the currently selected guided audio (-1 if none). */
@@ -271,6 +281,8 @@ class ApneaViewModel @Inject constructor(
     private val hyperLockManager: HyperLockManager,
     private val resonancePrepGate: ResonancePrepGate,
     private val timeDimensionStore: ApneaTimeDimensionStore,
+    private val biofeedbackEngine: com.example.wags.domain.usecase.session.BiofeedbackSonificationEngine,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
@@ -413,8 +425,26 @@ class ApneaViewModel @Inject constructor(
                 voiceEnabled = audioHapticEngine.voiceEnabled,
                 vibrationEnabled = audioHapticEngine.vibrationEnabled,
                 isGuidedMode = savedAudio == AudioSetting.GUIDED,
+                isBiofeedbackMode = savedAudio == AudioSetting.BIOFEEDBACK,
+                biofeedbackHrSound = prefs.getString("biofeedback_hr_sound", null)
+                    ?.let { runCatching { com.example.wags.domain.usecase.session.BiofeedbackHrSound.valueOf(it) }.getOrNull() },
+                biofeedbackSpo2Texture = prefs.getString("biofeedback_spo2_texture", null)
+                    ?.let { runCatching { com.example.wags.domain.usecase.session.BiofeedbackSpo2Texture.valueOf(it) }.getOrNull() },
+                biofeedbackHrVolume = prefs.getFloat("biofeedback_hr_volume", 1f),
+                biofeedbackSpo2Volume = prefs.getFloat("biofeedback_spo2_volume", 1f),
                 guidedSelectedId = guidedAudioManager.selectedId
             )
+        }
+
+        // Load the bundled field recordings for the SpO2 nature textures.
+        biofeedbackEngine.loadSamples(appContext)
+
+        // ── Biofeedback sonification — feed live metrics to the engine ──────
+        viewModelScope.launch {
+            hrDataSource.liveHr.collect { hr -> hr?.let { biofeedbackEngine.updateHr(it.toFloat()) } }
+        }
+        viewModelScope.launch {
+            hrDataSource.liveSpO2.collect { spo2 -> spo2?.let { biofeedbackEngine.updateSpO2(it) } }
         }
 
         // ── Fresh app open: default to the most neglected viable combination ──
@@ -976,7 +1006,9 @@ class ApneaViewModel @Inject constructor(
                     hrDeviceId = deviceLabel,
                     posture = state.posture.name,
                     audio = tableEffectiveAudio,
-                    guidedAudioName = if (_audio.value == AudioSetting.GUIDED) _uiState.value.guidedSelectedName else null
+                    guidedAudioName = if (_audio.value == AudioSetting.GUIDED) _uiState.value.guidedSelectedName else null,
+                    biofeedbackHrSound = if (_audio.value == AudioSetting.BIOFEEDBACK) _uiState.value.biofeedbackHrSound?.name else null,
+                    biofeedbackSpo2Texture = if (_audio.value == AudioSetting.BIOFEEDBACK) _uiState.value.biofeedbackSpo2Texture?.name else null
                 )
             )
 
@@ -1153,6 +1185,14 @@ class ApneaViewModel @Inject constructor(
                 guidedAudioManager.startPlayback()
             }
         }
+        // Start biofeedback sonification if BIOFEEDBACK is selected
+        if (_audio.value == AudioSetting.BIOFEEDBACK) {
+            _uiState.value.biofeedbackHrSound?.let { biofeedbackEngine.setHrSound(it) }
+            _uiState.value.biofeedbackSpo2Texture?.let { biofeedbackEngine.setSpo2Texture(it) }
+            biofeedbackEngine.setHrVolume(_uiState.value.biofeedbackHrVolume)
+            biofeedbackEngine.setSpo2Volume(_uiState.value.biofeedbackSpo2Volume)
+            biofeedbackEngine.start(viewModelScope)
+        }
     }
 
     /** Flag to prevent auto-save when the user cancels a table session via back arrow. */
@@ -1170,6 +1210,10 @@ class ApneaViewModel @Inject constructor(
         // Stop guided audio if GUIDED is selected
         if (_audio.value == AudioSetting.GUIDED) {
             guidedAudioManager.stopPlayback()
+        }
+        // Stop biofeedback sonification if BIOFEEDBACK was selected
+        if (_audio.value == AudioSetting.BIOFEEDBACK) {
+            biofeedbackEngine.stop()
         }
         stateMachine.stop()
         audioHapticEngine.cancelWarningVibrations()
@@ -1195,6 +1239,10 @@ class ApneaViewModel @Inject constructor(
         // Stop guided audio if GUIDED was selected
         if (_audio.value == AudioSetting.GUIDED) {
             guidedAudioManager.stopPlayback()
+        }
+        // Stop biofeedback sonification if BIOFEEDBACK was selected
+        if (_audio.value == AudioSetting.BIOFEEDBACK) {
+            biofeedbackEngine.stop()
         }
         stateMachine.stop()
         audioHapticEngine.cancelWarningVibrations()
@@ -1322,6 +1370,10 @@ class ApneaViewModel @Inject constructor(
         if (_audio.value == AudioSetting.GUIDED) {
             guidedAudioManager.stopPlayback()
         }
+        // Stop biofeedback sonification if BIOFEEDBACK was selected
+        if (_audio.value == AudioSetting.BIOFEEDBACK) {
+            biofeedbackEngine.stop()
+        }
         _uiState.update {
             it.copy(
                 freeHoldActive = false,
@@ -1363,6 +1415,10 @@ class ApneaViewModel @Inject constructor(
         // Stop guided audio if GUIDED was selected
         if (state.audio == AudioSetting.GUIDED) {
             guidedAudioManager.stopPlayback()
+        }
+        // Stop biofeedback sonification if BIOFEEDBACK was selected
+        if (state.audio == AudioSetting.BIOFEEDBACK) {
+            biofeedbackEngine.stop()
         }
         // Honor the user's explicit audio choice; never downgrade MUSIC to SILENCE
         // based on unreliable Spotify track tracking.
@@ -1467,6 +1523,8 @@ class ApneaViewModel @Inject constructor(
                     firstContractionMs = firstContractionMs,
                     hrDeviceId = deviceLabel,
                     guidedAudioName = if (_audio.value == AudioSetting.GUIDED) _uiState.value.guidedSelectedName else null,
+                    biofeedbackHrSound = if (_audio.value == AudioSetting.BIOFEEDBACK) _uiState.value.biofeedbackHrSound?.name else null,
+                    biofeedbackSpo2Texture = if (_audio.value == AudioSetting.BIOFEEDBACK) _uiState.value.biofeedbackSpo2Texture?.name else null,
                     eucapnicPrepDurationSec = state.eucapnicConfig?.prepDurationSec,
                     eucapnicBreathsPerMin = state.eucapnicConfig?.breathsPerMin,
                     eucapnicInhaleSec = state.eucapnicConfig?.inhaleSec,
@@ -1900,7 +1958,8 @@ class ApneaViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 audio = audio,
-                isGuidedMode = isGuided
+                isGuidedMode = isGuided,
+                isBiofeedbackMode = audio == AudioSetting.BIOFEEDBACK
             )
         }
         if (isGuided) {
@@ -1914,6 +1973,63 @@ class ApneaViewModel @Inject constructor(
         } else {
             _uiState.update { it.copy(guidedSelectedName = "") }
         }
+    }
+
+    // ── Biofeedback sonification config (prefs shared with Free Hold) ────────
+
+    fun setBiofeedbackHrSound(sound: com.example.wags.domain.usecase.session.BiofeedbackHrSound) {
+        prefs.edit().putString("biofeedback_hr_sound", sound.name).apply()
+        biofeedbackEngine.setHrSound(sound)
+        _uiState.update { it.copy(biofeedbackHrSound = sound) }
+    }
+
+    fun setBiofeedbackSpo2Texture(texture: com.example.wags.domain.usecase.session.BiofeedbackSpo2Texture) {
+        prefs.edit().putString("biofeedback_spo2_texture", texture.name).apply()
+        biofeedbackEngine.setSpo2Texture(texture)
+        _uiState.update { it.copy(biofeedbackSpo2Texture = texture) }
+    }
+
+    /** Set the heartbeat layer volume (0..1) — persisted across app runs. */
+    fun setBiofeedbackHrVolume(volume: Float) {
+        prefs.edit().putFloat("biofeedback_hr_volume", volume).apply()
+        biofeedbackEngine.setHrVolume(volume)
+        _uiState.update { it.copy(biofeedbackHrVolume = volume) }
+    }
+
+    /** Set the SpO2 soundscape layer volume (0..1) — persisted across app runs. */
+    fun setBiofeedbackSpo2Volume(volume: Float) {
+        prefs.edit().putFloat("biofeedback_spo2_volume", volume).apply()
+        biofeedbackEngine.setSpo2Volume(volume)
+        _uiState.update { it.copy(biofeedbackSpo2Volume = volume) }
+    }
+
+    /** Audition a heartbeat instrument over the currently selected texture. */
+    fun previewBiofeedbackHrSound(sound: com.example.wags.domain.usecase.session.BiofeedbackHrSound) {
+        val state = _uiState.value
+        biofeedbackEngine.previewHrSound(
+            sound,
+            withTexture = state.biofeedbackSpo2Texture
+                ?: com.example.wags.domain.usecase.session.BiofeedbackSpo2Texture.NONE,
+            spo2Vol = state.biofeedbackSpo2Volume,
+            hrVol = state.biofeedbackHrVolume
+        )
+    }
+
+    /** Audition a SpO2 soundscape under the currently selected instrument. */
+    fun previewBiofeedbackSpo2Texture(texture: com.example.wags.domain.usecase.session.BiofeedbackSpo2Texture) {
+        val state = _uiState.value
+        biofeedbackEngine.previewSpo2Texture(
+            texture,
+            withSound = state.biofeedbackHrSound
+                ?: com.example.wags.domain.usecase.session.BiofeedbackHrSound.NONE,
+            spo2Vol = state.biofeedbackSpo2Volume,
+            hrVol = state.biofeedbackHrVolume
+        )
+    }
+
+    /** Stop any in-flight picker preview. */
+    fun stopBiofeedbackPreview() {
+        biofeedbackEngine.stopPreview()
     }
 
     // ── Guided audio library methods ─────────────────────────────────────────
@@ -2301,6 +2417,7 @@ class ApneaViewModel @Inject constructor(
         super.onCleared()
         audioHapticEngine.shutdown()
         guidedAudioManager.stopPlayback()
+        biofeedbackEngine.stop()
         stateMachine.stop()
     }
 }

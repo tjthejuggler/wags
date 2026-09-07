@@ -33,6 +33,9 @@ import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
 import com.example.wags.domain.usecase.apnea.GuidedAudioManager
 import com.example.wags.domain.usecase.apnea.HyperLockManager
 import com.example.wags.domain.usecase.apnea.ResonancePrepGate
+import com.example.wags.domain.usecase.session.BiofeedbackHrSound
+import com.example.wags.domain.usecase.session.BiofeedbackSonificationEngine
+import com.example.wags.domain.usecase.session.BiofeedbackSpo2Texture
 import com.example.wags.domain.usecase.apnea.ProgressiveO2Phase
 import com.example.wags.domain.usecase.apnea.ProgressiveO2RoundResult
 import com.example.wags.domain.usecase.apnea.ProgressiveO2State
@@ -97,6 +100,16 @@ data class ProgressiveO2UiState(
     val spotifyConnected: Boolean = false,
     val isMusicMode: Boolean = false,
     val isGuidedMode: Boolean = false,
+    /** True when audio setting is BIOFEEDBACK — controls whether the biofeedback picker is shown. */
+    val isBiofeedbackMode: Boolean = false,
+    /** Selected biofeedback heartbeat instrument (null = not configured yet). */
+    val biofeedbackHrSound: BiofeedbackHrSound? = null,
+    /** Selected biofeedback SpO2 background texture (null = not configured yet). */
+    val biofeedbackSpo2Texture: BiofeedbackSpo2Texture? = null,
+    /** Volume (0..1) of the biofeedback heartbeat layer — persisted across runs. */
+    val biofeedbackHrVolume: Float = 1f,
+    /** Volume (0..1) of the biofeedback SpO2 soundscape layer — persisted across runs. */
+    val biofeedbackSpo2Volume: Float = 1f,
     val guidedAudios: List<GuidedAudioEntity> = emptyList(),
     val guidedSelectedId: Long = -1L,
     val guidedSelectedName: String = "",
@@ -166,6 +179,8 @@ class ProgressiveO2ViewModel @Inject constructor(
     private val hyperLockManager: HyperLockManager,
     private val resonancePrepGate: ResonancePrepGate,
     private val timeDimensionStore: ApneaTimeDimensionStore,
+    private val biofeedbackEngine: BiofeedbackSonificationEngine,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
     @Named("apnea_prefs") private val prefs: SharedPreferences
 ) : ViewModel() {
 
@@ -256,6 +271,13 @@ class ProgressiveO2ViewModel @Inject constructor(
                 audio       = savedAudio,
                 isMusicMode = savedAudio == AudioSetting.MUSIC.name,
                 isGuidedMode = savedAudio == AudioSetting.GUIDED.name,
+                isBiofeedbackMode = savedAudio == AudioSetting.BIOFEEDBACK.name,
+                biofeedbackHrSound = prefs.getString("biofeedback_hr_sound", null)
+                    ?.let { runCatching { BiofeedbackHrSound.valueOf(it) }.getOrNull() },
+                biofeedbackSpo2Texture = prefs.getString("biofeedback_spo2_texture", null)
+                    ?.let { runCatching { BiofeedbackSpo2Texture.valueOf(it) }.getOrNull() },
+                biofeedbackHrVolume = prefs.getFloat("biofeedback_hr_volume", 1f),
+                biofeedbackSpo2Volume = prefs.getFloat("biofeedback_spo2_volume", 1f),
                 guidedSelectedId = guidedAudioManager.selectedId,
                 isHyperPrep = isHyperPrep,
                 guidedHyperEnabled = if (isHyperPrep) prefs.getBoolean("guided_hyper_enabled", false) else false,
@@ -265,6 +287,19 @@ class ProgressiveO2ViewModel @Inject constructor(
                 voiceEnabled = audioHapticEngine.voiceEnabled,
                 vibrationEnabled = audioHapticEngine.vibrationEnabled
             )
+        }
+
+        // Load the bundled field recordings for the SpO2 nature textures.
+        biofeedbackEngine.loadSamples(appContext)
+
+        // ── Biofeedback sonification — feed live metrics to the engine ──────
+        // Forwarding unconditionally is cheap (volatile writes); the engine
+        // only consumes the values while a session is actually running.
+        viewModelScope.launch {
+            hrDataSource.liveHr.collect { hr -> hr?.let { biofeedbackEngine.updateHr(it.toFloat()) } }
+        }
+        viewModelScope.launch {
+            hrDataSource.liveSpO2.collect { spo2 -> spo2?.let { biofeedbackEngine.updateSpO2(it) } }
         }
 
         // ── Resonance prep staleness lock ──────────────────────────────────────
@@ -406,7 +441,8 @@ class ProgressiveO2ViewModel @Inject constructor(
             it.copy(
                 audio = v,
                 isMusicMode = v == AudioSetting.MUSIC.name,
-                isGuidedMode = isGuided
+                isGuidedMode = isGuided,
+                isBiofeedbackMode = v == AudioSetting.BIOFEEDBACK.name
             )
         }
         if (isGuided) {
@@ -458,6 +494,61 @@ class ProgressiveO2ViewModel @Inject constructor(
     fun setVibrationEnabled(enabled: Boolean) {
         audioHapticEngine.vibrationEnabled = enabled
         _uiState.update { it.copy(vibrationEnabled = enabled) }
+    }
+
+    // ── Biofeedback sonification config (prefs shared with Free Hold) ────────
+
+    fun setBiofeedbackHrSound(sound: BiofeedbackHrSound) {
+        prefs.edit().putString("biofeedback_hr_sound", sound.name).apply()
+        biofeedbackEngine.setHrSound(sound)
+        _uiState.update { it.copy(biofeedbackHrSound = sound) }
+    }
+
+    fun setBiofeedbackSpo2Texture(texture: BiofeedbackSpo2Texture) {
+        prefs.edit().putString("biofeedback_spo2_texture", texture.name).apply()
+        biofeedbackEngine.setSpo2Texture(texture)
+        _uiState.update { it.copy(biofeedbackSpo2Texture = texture) }
+    }
+
+    /** Set the heartbeat layer volume (0..1) — persisted across app runs. */
+    fun setBiofeedbackHrVolume(volume: Float) {
+        prefs.edit().putFloat("biofeedback_hr_volume", volume).apply()
+        biofeedbackEngine.setHrVolume(volume)
+        _uiState.update { it.copy(biofeedbackHrVolume = volume) }
+    }
+
+    /** Set the SpO2 soundscape layer volume (0..1) — persisted across app runs. */
+    fun setBiofeedbackSpo2Volume(volume: Float) {
+        prefs.edit().putFloat("biofeedback_spo2_volume", volume).apply()
+        biofeedbackEngine.setSpo2Volume(volume)
+        _uiState.update { it.copy(biofeedbackSpo2Volume = volume) }
+    }
+
+    /** Audition a heartbeat instrument over the currently selected texture. */
+    fun previewBiofeedbackHrSound(sound: BiofeedbackHrSound) {
+        val state = _uiState.value
+        biofeedbackEngine.previewHrSound(
+            sound,
+            withTexture = state.biofeedbackSpo2Texture ?: BiofeedbackSpo2Texture.NONE,
+            spo2Vol = state.biofeedbackSpo2Volume,
+            hrVol = state.biofeedbackHrVolume
+        )
+    }
+
+    /** Audition a SpO2 soundscape under the currently selected instrument. */
+    fun previewBiofeedbackSpo2Texture(texture: BiofeedbackSpo2Texture) {
+        val state = _uiState.value
+        biofeedbackEngine.previewSpo2Texture(
+            texture,
+            withSound = state.biofeedbackHrSound ?: BiofeedbackHrSound.NONE,
+            spo2Vol = state.biofeedbackSpo2Volume,
+            hrVol = state.biofeedbackHrVolume
+        )
+    }
+
+    /** Stop any in-flight picker preview. */
+    fun stopBiofeedbackPreview() {
+        biofeedbackEngine.stopPreview()
     }
 
     // ── Guided audio library methods ─────────────────────────────────────────
@@ -904,6 +995,16 @@ class ProgressiveO2ViewModel @Inject constructor(
             }
         }
 
+        // Start biofeedback sonification if BIOFEEDBACK is selected — the
+        // live HR/SpO2 collectors in init{} keep the engine fed.
+        if (_uiState.value.audio == AudioSetting.BIOFEEDBACK.name) {
+            _uiState.value.biofeedbackHrSound?.let { biofeedbackEngine.setHrSound(it) }
+            _uiState.value.biofeedbackSpo2Texture?.let { biofeedbackEngine.setSpo2Texture(it) }
+            biofeedbackEngine.setHrVolume(_uiState.value.biofeedbackHrVolume)
+            biofeedbackEngine.setSpo2Volume(_uiState.value.biofeedbackSpo2Volume)
+            biofeedbackEngine.start(viewModelScope)
+        }
+
         // Start telemetry collection
         telemetrySamples.clear()
         telemetryJob?.cancel()
@@ -949,6 +1050,11 @@ class ProgressiveO2ViewModel @Inject constructor(
             guidedAudioManager.stopPlayback()
         }
 
+        // Stop biofeedback sonification if BIOFEEDBACK was selected
+        if (_uiState.value.isBiofeedbackMode) {
+            biofeedbackEngine.stop()
+        }
+
         // Mark inactive BEFORE stopping the state machine to prevent the
         // init-block observer from also saving when it sees COMPLETE.
         _uiState.update { it.copy(isSessionActive = false) }
@@ -989,6 +1095,11 @@ class ProgressiveO2ViewModel @Inject constructor(
         // Stop guided audio if GUIDED was selected
         if (_uiState.value.isGuidedMode) {
             guidedAudioManager.stopPlayback()
+        }
+
+        // Stop biofeedback sonification if BIOFEEDBACK was selected
+        if (_uiState.value.isBiofeedbackMode) {
+            biofeedbackEngine.stop()
         }
 
         _uiState.update { it.copy(isSessionActive = false) }
@@ -1165,6 +1276,8 @@ class ProgressiveO2ViewModel @Inject constructor(
                 audio = effectiveAudio,
                 drillParamValue = breathPeriodSec,
                 guidedAudioName = if (effectiveAudio == AudioSetting.GUIDED.name) _uiState.value.guidedSelectedName else null,
+                biofeedbackHrSound = if (effectiveAudio == AudioSetting.BIOFEEDBACK.name) currentState.biofeedbackHrSound?.name else null,
+                biofeedbackSpo2Texture = if (effectiveAudio == AudioSetting.BIOFEEDBACK.name) currentState.biofeedbackSpo2Texture?.name else null,
                 guidedHyper = wasGuided,
                 guidedRelaxedExhaleSec = if (wasGuided) currentState.guidedRelaxedExhaleSec else null,
                 guidedPurgeExhaleSec = if (wasGuided) currentState.guidedPurgeExhaleSec else null,
@@ -1360,6 +1473,7 @@ class ProgressiveO2ViewModel @Inject constructor(
 
     override fun onCleared() {
         guidedAudioManager.stopPlayback()
+        biofeedbackEngine.stop()
         // Also stop Spotify if still tracking
         if (_uiState.value.isMusicMode) {
             try {
