@@ -560,7 +560,14 @@ class FreeHoldActiveViewModel @Inject constructor(
         // time) — manual time-of-day selection is disabled.
         if (timeDimensionStore.isByHour) return
         timeOfDay = tod
-        prefs.edit().putString("setting_time_of_day", tod).apply()
+        // Stamp the edit time so the main ApneaScreen can adopt this tod choice
+        // on resume: it does not persist tod itself (smart-set from the clock),
+        // so the timestamp proves this value is a fresh user edit rather than a
+        // stale leftover from an earlier session.
+        prefs.edit()
+            .putString("setting_time_of_day", tod)
+            .putLong("setting_tod_edit_ms", System.currentTimeMillis())
+            .apply()
         _uiState.update { it.copy(currentTimeOfDay = tod) }
     }
 

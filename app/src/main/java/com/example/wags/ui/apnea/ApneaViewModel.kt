@@ -377,6 +377,17 @@ class ApneaViewModel @Inject constructor(
     /** Bumped after a free hold record is saved — triggers forecast recompute with fresh data. */
     private val _forecastRefreshTrigger = MutableStateFlow(0)
 
+    /**
+     * Watermark for adopting Time-of-Day edits made on other screens. This VM
+     * deliberately does NOT persist tod (it is smart-set from the clock), so a
+     * plain re-read of "setting_time_of_day" on resume could not distinguish a
+     * fresh edit from a stale value left by an earlier session. The Free Hold
+     * screen stamps "setting_tod_edit_ms" whenever the user edits tod there;
+     * only stamps newer than this watermark are adopted. Initialised to VM
+     * creation time so pre-existing stamps never override the smart-set value.
+     */
+    private var todEditWatermarkMs: Long = System.currentTimeMillis()
+
     init {
         // ── Restore persisted settings (except Time of Day which is always smart-set) ──
         val savedPb = prefs.getLong("pb_ms", 0L)
@@ -1949,6 +1960,57 @@ class ApneaViewModel @Inject constructor(
         _posture.value = posture
         _uiState.update { it.copy(posture = posture) }
         prefs.edit().putString("setting_posture", posture.name).apply()
+    }
+
+    /**
+     * ON_RESUME entry point: re-adopt the persisted 5 apnea settings when this
+     * screen comes back to the foreground. Settings can change elsewhere while
+     * this screen sits in the back stack — e.g. the settings dialog on the
+     * Free Hold screen writes "setting_lung_volume" / "setting_prep_type" /
+     * "setting_posture" / "setting_audio" (and "setting_time_of_day") to
+     * apnea_prefs, but this ViewModel only reads those keys at init. Without a
+     * re-read the banner and chips here would keep showing stale values after
+     * popping back.
+     *
+     * Time of Day is special: this VM does not persist it (smart-set from the
+     * clock), so it is only adopted when the Free Hold screen stamped a
+     * "setting_tod_edit_ms" marker newer than this VM's creation watermark —
+     * proving the tod value was deliberately chosen by the user, not left
+     * over from an earlier session.
+     */
+    fun syncSettingsOnResume() {
+        val s = _uiState.value
+
+        val savedLungVolume = prefs.getString("setting_lung_volume", s.selectedLungVolume) ?: s.selectedLungVolume
+        val savedPrepType = prefs.getString("setting_prep_type", s.prepType.name)?.let { name ->
+            runCatching { PrepType.valueOf(name) }.getOrNull() ?: s.prepType
+        } ?: s.prepType
+        val savedPosture = prefs.getString("setting_posture", s.posture.name)?.let { name ->
+            runCatching { Posture.valueOf(name) }.getOrNull() ?: s.posture
+        } ?: s.posture
+        val savedAudio = prefs.getString("setting_audio", s.audio.name)?.let { name ->
+            runCatching { AudioSetting.valueOf(name) }.getOrNull() ?: s.audio
+        } ?: s.audio
+
+        if (savedLungVolume != s.selectedLungVolume) setLungVolume(savedLungVolume)
+        if (savedPrepType != s.prepType) setPrepType(savedPrepType)
+        if (savedPosture != s.posture) setPosture(savedPosture)
+        if (savedAudio != s.audio) setAudio(savedAudio)
+
+        // Adopt a Time-of-Day edit made on the Free Hold screen only if it was
+        // stamped after this VM was created (see [todEditWatermarkMs]).
+        if (!timeDimensionStore.isByHour) {
+            val stamp = prefs.getLong("setting_tod_edit_ms", 0L)
+            if (stamp > todEditWatermarkMs) {
+                prefs.getString("setting_time_of_day", null)?.let { name ->
+                    runCatching { TimeOfDay.valueOf(name) }.getOrNull()?.let { tod ->
+                        _timeOfDay.value = tod
+                        _uiState.update { it.copy(timeOfDay = tod) }
+                        todEditWatermarkMs = stamp  // adopt each stamp exactly once
+                    }
+                }
+            }
+        }
     }
 
     fun setAudio(audio: AudioSetting) {

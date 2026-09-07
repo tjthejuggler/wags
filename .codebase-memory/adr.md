@@ -1,14 +1,17 @@
-# ADR: Biofeedback sonification config + playback on all apnea session types (2026-09-07)
+# ADR: Settings re-sync on ApneaScreen resume (all session-type screens)
+
+**Date:** 2026-09-07
+**Status:** Accepted (extended)
 
 ## Context
-The biofeedback audio config button + popup (BiofeedbackPickerButton / SelectedBiofeedbackBanner / BiofeedbackPickerDialog) and the live HR/SpO2 sonification (BiofeedbackSonificationEngine) existed only in the Free Hold path (FreeHoldActiveScreen/FreeHoldActiveViewModel). Selecting audio=BIOFEEDBACK on Min Breath, Contraction Table, Progressive O2, or classic tables gave no config UI and no sound.
+The 5 apnea settings (lung volume, prep type, time of day, posture, audio) live in the `apnea_prefs` SharedPreferences and can be edited from the main ApneaScreen chips and from every apnea session-type screen (FreeHoldActiveScreen dialog, ContractionTable, MinBreath, ProgressiveO2 settings sections), plus "Repeat Hold" via `ApneaRecordDetailViewModel.prepareRepeatHold`. `ApneaViewModel` only read those keys in `init`, so edits made while the main screen sat in the back stack were not reflected when the user popped back.
 
 ## Decision
-1. Reuse the exact Free Hold UI trio (BiofeedbackPickerButton, SelectedBiofeedbackBanner, BiofeedbackPickerDialog from ui/apnea/BiofeedbackAudioPicker.kt) on every apnea setup screen: MinBreathScreen, ContractionTableScreen, ProgressiveO2Screen, ApneaTableScreen. Placement mirrors the Guided picker section (banner replaces button once a config exists).
-2. Each ViewModel (MinBreathViewModel, ContractionTableViewModel, ProgressiveO2ViewModel, ApneaViewModel) now injects the singleton BiofeedbackSonificationEngine, loads samples in init, forwards liveHr/liveSpO2 unconditionally (cheap volatile writes), persists config in the shared apnea_prefs keys (biofeedback_hr_sound, biofeedback_spo2_texture, biofeedback_hr_volume, biofeedback_spo2_volume — shared across all screens so config is global), starts the engine in startSession/startFreeHold when audio==BIOFEEDBACK, and stops it in stop/cancel/onCleared.
-3. Drill records persist biofeedbackHrSound/biofeedbackSpo2Texture via the existing ApneaRecordEntity columns (previously only written by Free Hold), so record detail screens keep working for all drill types.
-4. Deliberate duplication of the ~40-line wiring per ViewModel (rather than a shared base class) keeps each drill VM self-contained, consistent with the existing per-VM Spotify/guided-audio duplication pattern in this codebase.
+- `ApneaViewModel.syncSettingsOnResume()` re-reads `setting_lung_volume`, `setting_prep_type`, `setting_posture`, `setting_audio` from apnea_prefs and adopts changed values through the existing setters (preserving HYPER/RESONANCE lock checks and guided/biofeedback side effects). It is generic: it adopts writes from ANY screen, not just Free Hold.
+- Time of Day: `ApneaViewModel` does not persist tod (smart-set from the clock). Every session-type ViewModel (`FreeHoldActiveViewModel.updateTimeOfDay`, `ContractionTableViewModel.setTimeOfDay`, `MinBreathViewModel.setTimeOfDay`, `ProgressiveO2ViewModel.setTimeOfDay`) now stamps `setting_tod_edit_ms` when the user edits tod there. `syncSettingsOnResume()` adopts the tod value only when the stamp is newer than the VM's creation watermark (`todEditWatermarkMs`), once per stamp.
+- `ApneaScreen`'s ON_RESUME `DisposableEffect` calls `viewModel.syncSettingsOnResume()` before `refreshDrillParams()`/`refreshForecast()`.
 
 ## Consequences
-- Biofeedback works end-to-end on every apnea session type with one shared config.
-- Engine is a singleton; concurrent sessions are not possible in-app, so start/stop races are bounded by lifecycle methods.
+- Settings edits made on ANY apnea session-type screen now appear on the main apnea screen when navigating back, without recreating the ViewModel.
+- Convention: any future writer that deliberately changes tod outside the main screen must also write `setting_tod_edit_ms` or the main screen will ignore the tod change.
+- All four session ViewModels already persisted the 4 non-tod settings under the same keys, so only the tod stamp needed adding to ContractionTable/MinBreath/ProgressiveO2.

@@ -421,7 +421,13 @@ class ProgressiveO2ViewModel @Inject constructor(
         // BY_HOUR mode: the bucket is automatic (derived from the session start
         // time) — manual time-of-day selection is disabled.
         if (timeDimensionStore.isByHour) return
-        prefs.edit().putString("setting_time_of_day", v).apply()
+        // Stamp the edit time so the main ApneaScreen adopts this tod choice on
+        // resume: it does not persist tod itself (smart-set from the clock), so
+        // the timestamp proves this is a fresh user edit, not a stale leftover.
+        prefs.edit()
+            .putString("setting_time_of_day", v)
+            .putLong("setting_tod_edit_ms", System.currentTimeMillis())
+            .apply()
         _uiState.update { it.copy(timeOfDay = v) }
         refreshForecast()
         loadPersonalBests()

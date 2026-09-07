@@ -70,11 +70,16 @@ fun ApneaScreen(
 
     LockPortrait()
 
-    // Re-read drill params (breath period, session duration) every time this screen is shown
+    // Re-read drill params (breath period, session duration) and the 5 apnea
+    // settings every time this screen is shown — the settings may have been
+    // changed on the Free Hold screen (or via "Repeat Hold") while this screen
+    // sat in the back stack; its ViewModel persists them to apnea_prefs, but
+    // ours only read them at init.
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                viewModel.syncSettingsOnResume()
                 viewModel.refreshDrillParams()
                 viewModel.refreshForecast()
             }
