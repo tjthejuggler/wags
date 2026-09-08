@@ -1,10 +1,18 @@
-# ADR: Apnea trophy tier colouring
+# ADR: App-wide portrait orientation lock
+
+**Date:** 2026-09-08
+**Status:** Accepted
 
 ## Context
-Apnea trophies are plain 🏆 emoji text previously rendered greyscale via Modifier.grayscale(). Requirement: colour every trophy group by its trophy count, using dull/greyed-out versions of tier colours.
+Holding the phone sideways rotated the main screen and apnea session screens (Min Breath, Progressive O2, etc.) into landscape. The app should be portrait everywhere, with landscape only on select large chart screens.
 
 ## Decision
-- Tier order (1–6): red, orange, green, blue, pink, yellow — hex values in trophyTierColor() in app/src/main/java/com/example/wags/ui/common/GrayscaleEmoji.kt.
-- Modifier.trophyTint(count) applies a hand-built 4x5 ColorMatrix: rec.709 luminance per output channel scaled by normalised per-channel multipliers (avg=1, strength=0.85). Do NOT compose matrices with ColorMatrix.timesAssign() — multiplication-order ambiguity produced broken/neutral results.
-- Applied at all trophy render sites: NewPersonalBestDialog, ApneaScreen cards + drill summaries, ApneaRecordDetailScreen trophies + PB badges, SectionHeader (trophyCount param, emoji override for ⚙️), FreeHoldActiveScreen live PB + next-PB countdown, RecordForecastDialog, PipResultCard (trophyCount param), history-screen Trophies tab icon (6 tiny yellow trophies, 9sp).
-- Tuning knobs: hexes in trophyTierColor(), strength constant in trophyTint().
+- Set `android:screenOrientation="portrait"` on `MainActivity` in `AndroidManifest.xml`. This is the single source of truth for the default orientation; runtime `requestedOrientation` overrides still work on top of it.
+- Intentional landscape exceptions remain the screens that force it at runtime: `TimeChartScreen`, `TrophyChartScreen`, `PbChartScreen` (dedicated full-screen graphs).
+- `RateRecommendationScreen` intentionally sets `SCREEN_ORIENTATION_UNSPECIFIED` to allow rotation (it has explicit landscape layouts); on dispose it restores the captured original (now portrait), so no rotation leaks to other screens.
+- The unused `LockPortrait()` composable in `ui/common/SessionGuards.kt` is retained as a utility but not required for the manifest-level policy.
+
+## Consequences
+- All screens default to portrait regardless of device rotation.
+- Landscape-capable screens must explicitly opt in via `requestedOrientation` overrides.
+- PiP support (`supportsPictureInPicture`) is unaffected by the orientation lock.
