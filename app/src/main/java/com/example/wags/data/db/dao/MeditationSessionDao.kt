@@ -27,6 +27,18 @@ interface MeditationSessionDao {
     @Query("SELECT * FROM meditation_sessions ORDER BY timestamp DESC")
     suspend fun getAll(): List<MeditationSessionEntity>
 
+    /**
+     * Most recent COMPLETED session whose start timestamp falls in the window.
+     * Used to de-duplicate the race where the service timer already finalised
+     * the session row and the ViewModel would otherwise insert a second one.
+     */
+    @Query(
+        "SELECT * FROM meditation_sessions WHERE completed = 1 " +
+            "AND timestamp BETWEEN :fromMs AND :toMs " +
+            "ORDER BY timestamp DESC LIMIT 1"
+    )
+    suspend fun getMostRecentCompletedBetween(fromMs: Long, toMs: Long): MeditationSessionEntity?
+
     @Query("SELECT * FROM meditation_sessions WHERE sessionId = :id LIMIT 1")
     suspend fun getById(id: Long): MeditationSessionEntity?
 

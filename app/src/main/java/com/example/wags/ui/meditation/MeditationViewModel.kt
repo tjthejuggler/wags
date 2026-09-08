@@ -179,6 +179,10 @@ class MeditationViewModel @Inject constructor(
     private var sessionJob: Job? = null
     private var sessionStartMs = 0L
     private val hrTimeSeries = mutableListOf<Float>()
+    /** rrBuffer.totalWrites() snapshot from the previous second — detects a
+     *  stalled RR stream so we stop re-recording the same (stale) interval as
+     *  a perfectly flat HR line. */
+    private var lastRrTotalWrites = 0L
     // Per-second telemetry samples accumulated during the session
     private val telemetrySamples = mutableListOf<MeditationTelemetryEntity>()
 
@@ -388,6 +392,7 @@ class MeditationViewModel @Inject constructor(
 
         hrTimeSeries.clear()
         telemetrySamples.clear()
+        lastRrTotalWrites = deviceManager.rrBuffer.totalWrites()
         sessionStartMs = System.currentTimeMillis()
 
         // Session audio playback is started by MeditationService (see
@@ -445,7 +450,15 @@ class MeditationViewModel @Inject constructor(
 
                 if (activeMonitorId != null) {
                     val rrSnapshot = deviceManager.rrBuffer.readLast(64)
-                    val polarHr = if (rrSnapshot.isNotEmpty())
+                    // Only trust the RR-derived HR when NEW RR samples arrived in
+                    // the last second.  If the stream stalled, the buffer keeps
+                    // returning the same last interval forever — recording that
+                    // every second produced a perfectly flat HR line.  Fall back
+                    // to the live HR broadcast instead.
+                    val rrTotalWrites = deviceManager.rrBuffer.totalWrites()
+                    val rrIsFresh = rrTotalWrites > lastRrTotalWrites
+                    lastRrTotalWrites = rrTotalWrites
+                    val polarHr = if (rrIsFresh && rrSnapshot.isNotEmpty())
                         (60_000.0 / rrSnapshot.last()).toFloat() else null
                     val currentHr = polarHr ?: hrDataSource.liveHr.value?.toFloat()
                     val liveRmssd = computeLiveRmssd(rrSnapshot)
@@ -657,12 +670,13 @@ class MeditationViewModel @Inject constructor(
     }
 
     /** Fades the singing bowl in from silence over [fadeInMs] (quadratic ease-in
-     *  so the very beginning stays especially subtle), holds briefly, then fades
-     *  out and releases the player. Total ~12s. */
+     *  so the very beginning stays especially subtle and the swell is gradual),
+     *  holds, then fades out and releases the player. Total ~16s — the full
+     *  length of the singing-bowl sample. */
     private fun fadeChimeIn(
         player: MediaPlayer,
-        fadeInMs: Long = 5_000L,
-        holdMs: Long = 3_000L,
+        fadeInMs: Long = 8_000L,
+        holdMs: Long = 4_000L,
         fadeOutMs: Long = 4_000L
     ) {
         chimeFadeJob?.cancel()
@@ -765,7 +779,17 @@ class MeditationViewModel @Inject constructor(
             // the flushed telemetry on next launch.
             val savedId = try {
                 withContext(ioDispatcher) {
-                    val existing = repository.getMostRecentIncompleteSession()
+                    var existing = repository.getMostRecentIncompleteSession()
+                    if (existing == null) {
+                        // The service timer may have ALREADY finalised our session
+                        // row (timer auto-stop race) — if a completed row was
+                        // started at the same moment as this session, update it
+                        // instead of inserting a duplicate entry.
+                        existing = repository.getCompletedSessionNearStart(sessionStartMs)
+                        if (existing != null) {
+                            Log.i("MeditationViewModel", "Service already finalised session ${existing.sessionId} — updating instead of duplicating")
+                        }
+                    }
                     if (existing != null) {
                         repository.finalizeSessionWithTelemetry(
                             updated = existing.copy(

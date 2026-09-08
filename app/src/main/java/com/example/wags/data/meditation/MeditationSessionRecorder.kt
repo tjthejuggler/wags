@@ -45,6 +45,8 @@ class MeditationSessionRecorder @Inject constructor(
 ) {
 
     private companion object {
+        /** fileName of the synthetic "None / silent" audio entity. */
+        private const val NO_AUDIO_SENTINEL = "None"
         /**
          * Incomplete sessions younger than this are never touched by recovery —
          * they may belong to a session that is starting right now (or is running
@@ -89,7 +91,7 @@ class MeditationSessionRecorder @Inject constructor(
         // A single INSERT takes < 1 ms and guarantees the session exists in the DB
         // even if the process is killed immediately afterwards.
         currentSessionId = runBlocking(ioDispatcher) {
-            val audioId = audioFileName?.let { findAudioId(it) }
+            val audioId = findAudioId(audioFileName)
             sessionDao.insert(
                 MeditationSessionEntity(
                     audioId = audioId,
@@ -324,7 +326,7 @@ class MeditationSessionRecorder @Inject constructor(
         endRmssd: Float?,
         lnSlope: Float?
     ): Long {
-        val audioId = audioFileName?.let { findAudioId(it) }
+        val audioId = findAudioId(audioFileName)
         val entity = MeditationSessionEntity(
             audioId = audioId,
             timestamp = sessionStartMs,
@@ -353,9 +355,15 @@ class MeditationSessionRecorder @Inject constructor(
         currentSessionId = null
     }
 
-    private suspend fun findAudioId(fileName: String): Long? {
+    private suspend fun findAudioId(fileName: String?): Long? {
         return try {
-            audioDao.getByFileName(fileName)?.audioId
+            when {
+                // Silent meditation: resolve to the "None" sentinel entity so the
+                // saved session shows "Silent" instead of "Unknown".
+                fileName == null || fileName == NO_AUDIO_SENTINEL ->
+                    audioDao.getNoneEntry()?.audioId
+                else -> audioDao.getByFileName(fileName)?.audioId
+            }
         } catch (e: Exception) {
             Log.e("MeditationSessionRecorder", "Failed to find audio ID for $fileName", e)
             null

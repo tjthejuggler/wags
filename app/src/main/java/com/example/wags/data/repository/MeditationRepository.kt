@@ -309,6 +309,18 @@ class MeditationRepository @Inject constructor(
     }
 
     /**
+     * Finds a COMPLETED session that was started within [toleranceMs] of
+     * [startMs] — i.e. almost certainly the row the MeditationService already
+     * finalised (timer auto-stop race).  Returning it lets the ViewModel UPDATE
+     * that row instead of inserting a duplicate session.
+     */
+    suspend fun getCompletedSessionNearStart(
+        startMs: Long,
+        toleranceMs: Long = 15_000L
+    ): MeditationSessionEntity? =
+        sessionDao.getMostRecentCompletedBetween(startMs - toleranceMs, startMs + toleranceMs)
+
+    /**
      * Atomically inserts a fresh completed session together with its telemetry
      * (fallback path when no pre-existing incomplete row is found).
      */

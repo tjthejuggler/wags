@@ -20,6 +20,7 @@ import android.provider.DocumentsContract
 import android.provider.Settings
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.example.wags.data.ble.HrDataSource
 import com.example.wags.data.ble.UnifiedDeviceManager
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -74,6 +75,9 @@ class MeditationService : Service() {
 
     @Inject
     lateinit var deviceManager: UnifiedDeviceManager
+
+    @Inject
+    lateinit var hrDataSource: HrDataSource
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var mediaPlayer: MediaPlayer? = null
@@ -570,14 +574,25 @@ class MeditationService : Service() {
 
     private fun startHrDataCollection() {
         hrDataCollectionJob = serviceScope.launch {
+            var lastRrTotalWrites = deviceManager.rrBuffer.totalWrites()
             while (isActive && isSessionActive) {
                 delay(1_000L)
 
                 try {
                     val rrSnapshot = deviceManager.rrBuffer.readLast(64)
-                    val polarHr = if (rrSnapshot.isNotEmpty()) {
+                    // Only derive HR from the RR buffer when NEW RR samples
+                    // arrived in the last second.  A stalled stream keeps the
+                    // same last interval in the buffer forever, and recording
+                    // that value every second produced a perfectly flat HR
+                    // line for entire sessions.  Fall back to the live HR
+                    // broadcast from the heart-rate characteristic instead.
+                    val rrTotalWrites = deviceManager.rrBuffer.totalWrites()
+                    val rrIsFresh = rrTotalWrites > lastRrTotalWrites
+                    lastRrTotalWrites = rrTotalWrites
+                    val polarHr = if (rrIsFresh && rrSnapshot.isNotEmpty()) {
                         (60_000.0 / rrSnapshot.last()).toFloat()
                     } else null
+                    val currentHr = polarHr ?: hrDataSource.liveHr.value?.toFloat()
 
                     val liveRmssd = if (rrSnapshot.size >= 2) {
                         val diffs = rrSnapshot.zipWithNext { a, b -> (b - a).toDouble() }
@@ -589,7 +604,7 @@ class MeditationService : Service() {
 
                     sessionRecorder.addTelemetrySample(
                         timestampMs = System.currentTimeMillis(),
-                        hrBpm = polarHr?.let { Math.round(it) },
+                        hrBpm = currentHr?.let { Math.round(it) },
                         rollingRmssdMs = liveRmssd
                     )
                 } catch (e: Exception) {
