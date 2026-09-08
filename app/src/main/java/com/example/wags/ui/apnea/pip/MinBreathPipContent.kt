@@ -6,6 +6,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wags.R
+import com.example.wags.domain.model.trophyCount
 import com.example.wags.domain.model.trophyEmojis
 import com.example.wags.domain.usecase.apnea.MinBreathPhase
 import com.example.wags.ui.apnea.MinBreathViewModel
@@ -79,7 +80,8 @@ fun MinBreathPipContent(
                 PipResultCard(
                     headline = formatPipMs(longestMs),
                     subline = "Min Breath · ${holds.size} holds",
-                    trophies = state.newPersonalBest?.category?.trophyEmojis() ?: ""
+                    trophies = state.newPersonalBest?.category?.trophyEmojis() ?: "",
+                    trophyCount = state.newPersonalBest?.category?.trophyCount() ?: 0
                 )
             }
             MinBreathPhase.HOLD -> {

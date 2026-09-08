@@ -38,6 +38,7 @@ import com.example.wags.domain.model.TimeBuckets
 import com.example.wags.domain.model.TimeDimension
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.ui.common.LiveSensorActionsNav
+import com.example.wags.ui.common.trophyTint
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
 import java.text.NumberFormat
@@ -194,9 +195,11 @@ fun ApneaHistoryScreen(
                         text = {
                             if (tab == ApneaHistoryTab.TROPHIES) {
                                 Text(
-                                    "🏆",
-                                    fontSize = 18.sp,
-                                    color = if (isSelected) TextPrimary else TextDisabled
+                                    "🏆🏆🏆🏆🏆🏆",
+                                    fontSize = 9.sp,
+                                    maxLines = 1,
+                                    color = if (isSelected) TextPrimary else TextDisabled,
+                                    modifier = Modifier.trophyTint(6)
                                 )
                             } else {
                                 Text(
@@ -756,7 +759,7 @@ private fun TrophiesTabContent(
         }
         grouped[6]?.let { section ->
             item {
-                SectionHeader(trophies = "🏆🏆🏆🏆🏆🏆", title = "Global Personal Best", subtitle = "Best across all settings")
+                SectionHeader(trophyCount = 6, title = "Global Personal Best", subtitle = "Best across all settings")
             }
             items(section) { entry ->
                 PersonalBestRow(entry = entry, textStyle = TrophyTextStyle.GLOBAL, onRecordClick = onRecordClick, onChartClick = { onChartClick(entry) })
@@ -765,7 +768,7 @@ private fun TrophiesTabContent(
         }
         grouped[5]?.let { section ->
             item {
-                SectionHeader(trophies = "🏆🏆🏆🏆🏆", title = "Single Setting Bests", subtitle = "Best for one setting (any other settings)")
+                SectionHeader(trophyCount = 5, title = "Single Setting Bests", subtitle = "Best for one setting (any other settings)")
             }
             items(section) { entry ->
                 PersonalBestRow(entry = entry, textStyle = TrophyTextStyle.ONE_SETTING, onRecordClick = onRecordClick, onChartClick = { onChartClick(entry) })
@@ -774,7 +777,7 @@ private fun TrophiesTabContent(
         }
         grouped[4]?.let { section ->
             item {
-                SectionHeader(trophies = "🏆🏆🏆🏆", title = "Two Setting Bests", subtitle = "Best for a pair of settings")
+                SectionHeader(trophyCount = 4, title = "Two Setting Bests", subtitle = "Best for a pair of settings")
             }
             items(section) { entry ->
                 PersonalBestRow(entry = entry, textStyle = TrophyTextStyle.TWO_SETTINGS, onRecordClick = onRecordClick, onChartClick = { onChartClick(entry) })
@@ -783,7 +786,7 @@ private fun TrophiesTabContent(
         }
         grouped[3]?.let { section ->
             item {
-                SectionHeader(trophies = "🏆🏆🏆", title = "Three Setting Bests", subtitle = "Best for a trio of settings")
+                SectionHeader(trophyCount = 3, title = "Three Setting Bests", subtitle = "Best for a trio of settings")
             }
             items(section) { entry ->
                 PersonalBestRow(entry = entry, textStyle = TrophyTextStyle.THREE_SETTINGS, onRecordClick = onRecordClick, onChartClick = { onChartClick(entry) })
@@ -792,7 +795,7 @@ private fun TrophiesTabContent(
         }
         grouped[2]?.let { section ->
             item {
-                SectionHeader(trophies = "🏆🏆", title = "Four Setting Bests", subtitle = "Best for four specific settings")
+                SectionHeader(trophyCount = 2, title = "Four Setting Bests", subtitle = "Best for four specific settings")
             }
             items(section) { entry ->
                 PersonalBestRow(entry = entry, textStyle = TrophyTextStyle.FOUR_SETTINGS, onRecordClick = onRecordClick, onChartClick = { onChartClick(entry) })
@@ -801,7 +804,7 @@ private fun TrophiesTabContent(
         }
         grouped[1]?.let { section ->
             item {
-                SectionHeader(trophies = "🏆", title = "Exact Setting Bests", subtitle = "Best for each specific combination of all 5 settings")
+                SectionHeader(trophyCount = 1, title = "Exact Setting Bests", subtitle = "Best for each specific combination of all 5 settings")
             }
             items(section) { entry ->
                 PersonalBestRow(entry = entry, textStyle = TrophyTextStyle.EXACT, onRecordClick = onRecordClick, onChartClick = { onChartClick(entry) })

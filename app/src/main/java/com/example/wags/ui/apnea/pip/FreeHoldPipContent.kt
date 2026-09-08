@@ -6,6 +6,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wags.R
+import com.example.wags.domain.model.trophyCount
 import com.example.wags.domain.model.trophyEmojis
 import com.example.wags.ui.apnea.FreeHoldActiveViewModel
 import com.example.wags.ui.common.pip.*
@@ -92,7 +93,8 @@ fun FreeHoldPipContent(
                 PipResultCard(
                     headline = formatPipMs(pb.durationMs),
                     subline = "New PB! ${pb.description}",
-                    trophies = pb.category.trophyEmojis()
+                    trophies = pb.category.trophyEmojis(),
+                    trophyCount = pb.category.trophyCount()
                 )
             }
             !state.freeHoldActive && !state.pbCheckPending -> {

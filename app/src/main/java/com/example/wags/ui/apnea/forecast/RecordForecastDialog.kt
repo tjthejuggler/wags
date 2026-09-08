@@ -16,6 +16,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.wags.domain.usecase.apnea.forecast.CategoryForecast
 import com.example.wags.domain.usecase.apnea.forecast.ForecastConfidence
 import com.example.wags.domain.usecase.apnea.forecast.RecordForecast
+import com.example.wags.ui.common.trophyTint
 
 /**
  * Full-screen popup showing all 32 record-breaking forecast categories,
@@ -119,7 +120,8 @@ private fun CategoryRow(cat: CategoryForecast) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     "🏆".repeat(cat.trophyCount),
-                    fontSize = 12.sp
+                    fontSize = 12.sp,
+                    modifier = Modifier.trophyTint(cat.trophyCount)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(

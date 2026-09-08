@@ -48,8 +48,10 @@ import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.RecordPbBadge
 import com.example.wags.domain.model.SpotifySong
 import com.example.wags.domain.model.TimeOfDay
+import com.example.wags.domain.model.trophyCount
 import com.example.wags.domain.model.trophyEmojis
 import com.example.wags.ui.common.grayscale
+import com.example.wags.ui.common.trophyTint
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.common.LiveSensorActionsNav
 import com.example.wags.ui.common.LiveSensorActionsNav
@@ -798,7 +800,7 @@ private fun RecordDetailContent(
                         Text(
                             "🏆".repeat(trophyCount),
                             style = MaterialTheme.typography.headlineSmall,
-                            modifier = Modifier.clickable { onTrophyClick() }.grayscale()
+                            modifier = Modifier.clickable { onTrophyClick() }.trophyTint(trophyCount)
                         )
                     }
                 }
@@ -823,11 +825,19 @@ private fun RecordDetailContent(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                "$trophies ${badge.description}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (badge.isCurrent) TextPrimary else TextSecondary
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    trophies,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.trophyTint(badge.category.trophyCount())
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    badge.description,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (badge.isCurrent) TextPrimary else TextSecondary
+                                )
+                            }
                             Text(
                                 status,
                                 style = MaterialTheme.typography.labelMedium,

@@ -6,6 +6,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wags.R
+import com.example.wags.domain.model.trophyCount
 import com.example.wags.domain.model.trophyEmojis
 import com.example.wags.domain.usecase.apnea.ProgressiveO2Phase
 import com.example.wags.ui.apnea.ProgressiveO2ViewModel
@@ -76,7 +77,8 @@ fun ProgressiveO2PipContent(
                 PipResultCard(
                     headline = formatPipMs(maxHoldMs),
                     subline = "Prog O₂ · $completedRounds rounds",
-                    trophies = state.newPersonalBest?.category?.trophyEmojis() ?: ""
+                    trophies = state.newPersonalBest?.category?.trophyEmojis() ?: "",
+                    trophyCount = state.newPersonalBest?.category?.trophyCount() ?: 0
                 )
             }
             ProgressiveO2Phase.HOLD -> {

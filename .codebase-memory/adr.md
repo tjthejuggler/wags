@@ -1,17 +1,10 @@
-# ADR: Settings re-sync on ApneaScreen resume (all session-type screens)
-
-**Date:** 2026-09-07
-**Status:** Accepted (extended)
+# ADR: Apnea trophy tier colouring
 
 ## Context
-The 5 apnea settings (lung volume, prep type, time of day, posture, audio) live in the `apnea_prefs` SharedPreferences and can be edited from the main ApneaScreen chips and from every apnea session-type screen (FreeHoldActiveScreen dialog, ContractionTable, MinBreath, ProgressiveO2 settings sections), plus "Repeat Hold" via `ApneaRecordDetailViewModel.prepareRepeatHold`. `ApneaViewModel` only read those keys in `init`, so edits made while the main screen sat in the back stack were not reflected when the user popped back.
+Apnea trophies are plain 🏆 emoji text previously rendered greyscale via Modifier.grayscale(). Requirement: colour every trophy group by its trophy count, using dull/greyed-out versions of tier colours.
 
 ## Decision
-- `ApneaViewModel.syncSettingsOnResume()` re-reads `setting_lung_volume`, `setting_prep_type`, `setting_posture`, `setting_audio` from apnea_prefs and adopts changed values through the existing setters (preserving HYPER/RESONANCE lock checks and guided/biofeedback side effects). It is generic: it adopts writes from ANY screen, not just Free Hold.
-- Time of Day: `ApneaViewModel` does not persist tod (smart-set from the clock). Every session-type ViewModel (`FreeHoldActiveViewModel.updateTimeOfDay`, `ContractionTableViewModel.setTimeOfDay`, `MinBreathViewModel.setTimeOfDay`, `ProgressiveO2ViewModel.setTimeOfDay`) now stamps `setting_tod_edit_ms` when the user edits tod there. `syncSettingsOnResume()` adopts the tod value only when the stamp is newer than the VM's creation watermark (`todEditWatermarkMs`), once per stamp.
-- `ApneaScreen`'s ON_RESUME `DisposableEffect` calls `viewModel.syncSettingsOnResume()` before `refreshDrillParams()`/`refreshForecast()`.
-
-## Consequences
-- Settings edits made on ANY apnea session-type screen now appear on the main apnea screen when navigating back, without recreating the ViewModel.
-- Convention: any future writer that deliberately changes tod outside the main screen must also write `setting_tod_edit_ms` or the main screen will ignore the tod change.
-- All four session ViewModels already persisted the 4 non-tod settings under the same keys, so only the tod stamp needed adding to ContractionTable/MinBreath/ProgressiveO2.
+- Tier order (1–6): red, orange, green, blue, pink, yellow — hex values in trophyTierColor() in app/src/main/java/com/example/wags/ui/common/GrayscaleEmoji.kt.
+- Modifier.trophyTint(count) applies a hand-built 4x5 ColorMatrix: rec.709 luminance per output channel scaled by normalised per-channel multipliers (avg=1, strength=0.85). Do NOT compose matrices with ColorMatrix.timesAssign() — multiplication-order ambiguity produced broken/neutral results.
+- Applied at all trophy render sites: NewPersonalBestDialog, ApneaScreen cards + drill summaries, ApneaRecordDetailScreen trophies + PB badges, SectionHeader (trophyCount param, emoji override for ⚙️), FreeHoldActiveScreen live PB + next-PB countdown, RecordForecastDialog, PipResultCard (trophyCount param), history-screen Trophies tab icon (6 tiny yellow trophies, 9sp).
+- Tuning knobs: hexes in trophyTierColor(), strength constant in trophyTint().

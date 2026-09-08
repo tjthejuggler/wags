@@ -55,6 +55,7 @@ import com.example.wags.domain.model.PbThresholds
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.trophyCount
 import com.example.wags.domain.model.trophyEmojis
+import com.example.wags.ui.common.trophyTint
 import com.example.wags.domain.model.SpotifySong
 import com.example.wags.domain.model.TimeBuckets
 import com.example.wags.domain.model.TimeOfDay
@@ -2149,7 +2150,7 @@ private fun FreeHoldActiveContent(
                 text = currentPbCategory.trophyEmojis(),
                 style = MaterialTheme.typography.headlineMedium,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.grayscale()
+                modifier = Modifier.trophyTint(currentPbCategory.trophyCount())
             )
         }
 
@@ -2161,7 +2162,8 @@ private fun FreeHoldActiveContent(
                 text = "$trophyPreview in $countdownText",
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextSecondary,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                modifier = Modifier.trophyTint(nextPbTarget.category.trophyCount())
             )
         }
 

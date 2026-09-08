@@ -39,7 +39,9 @@ import androidx.navigation.NavController
 import com.example.wags.data.spotify.TrackInfo
 import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.PersonalBestCategory
+import com.example.wags.domain.model.trophyCount
 import com.example.wags.domain.model.trophyEmojis
+import com.example.wags.ui.common.trophyTint
 import com.example.wags.domain.usecase.apnea.forecast.RecordForecast
 import com.example.wags.ui.apnea.forecast.RecordForecastSummary
 import com.example.wags.domain.model.Posture
@@ -550,7 +552,7 @@ internal fun NewPersonalBestDialog(
                             trophies,
                             style = MaterialTheme.typography.displayMedium,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.grayscale()
+                            modifier = Modifier.trophyTint(category.trophyCount())
                         )
                         Text(
                             headline,
@@ -1019,7 +1021,8 @@ private fun FreeHoldContent(
                     Text(
                         trophies,
                         style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.clickable { onTrophyClick() }.grayscale()
+                        modifier = Modifier.clickable { onTrophyClick() }
+                            .trophyTint(bestTimeTrophyCategory?.trophyCount() ?: 1)
                     )
                     Text(" ", style = MaterialTheme.typography.titleMedium)
                     // Duration → navigate to record detail
@@ -1107,7 +1110,8 @@ private fun DrillSummaryContent(
                 Text(
                     trophies,
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.clickable { onTrophyClick() }.grayscale()
+                    modifier = Modifier.clickable { onTrophyClick() }
+                        .trophyTint(trophyCategory?.trophyCount() ?: 1)
                 )
                 Text(" ", style = MaterialTheme.typography.titleMedium)
                 Text(

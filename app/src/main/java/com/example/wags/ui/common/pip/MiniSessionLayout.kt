@@ -11,6 +11,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.*
+import com.example.wags.ui.common.trophyTint
 import com.example.wags.ui.theme.*
 
 /**
@@ -72,7 +73,8 @@ fun PipLabel(text: String, color: Color = TextSecondary) {
 fun PipResultCard(
     headline: String,
     subline: String,
-    trophies: String
+    trophies: String,
+    trophyCount: Int = 0
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -99,7 +101,8 @@ fun PipResultCard(
                 text = trophies,
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
-                fontSize = 14.sp
+                fontSize = 14.sp,
+                modifier = if (trophyCount > 0) Modifier.trophyTint(trophyCount) else Modifier
             )
         }
         PipLabel("↺ tap Again", color = TextSecondary)

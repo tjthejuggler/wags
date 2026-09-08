@@ -19,7 +19,7 @@ import androidx.navigation.NavController
 import com.example.wags.domain.model.PersonalBestEntry
 import com.example.wags.domain.model.TimeBuckets
 import com.example.wags.domain.model.TimeOfDay
-import com.example.wags.ui.common.grayscale
+import com.example.wags.ui.common.trophyTint
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.common.StatsAndSensorActionsNav
 import com.example.wags.ui.theme.*
@@ -128,7 +128,7 @@ fun PersonalBestsScreen(
                 grouped[6]?.let { entries ->
                     item {
                         SectionHeader(
-                            trophies = "🏆🏆🏆🏆🏆🏆",
+                            trophyCount = 6,
                             title = "Global Personal Best",
                             subtitle = "Best across all settings"
                         )
@@ -150,7 +150,8 @@ fun PersonalBestsScreen(
                 visibleCurrentEntry?.let { entry ->
                     item {
                         SectionHeader(
-                            trophies = "⚙️",
+                            trophyCount = 0,
+                            emoji = "⚙️",
                             title = "Current Settings",
                             subtitle = entry.label
                         )
@@ -172,7 +173,7 @@ fun PersonalBestsScreen(
                 grouped[5]?.let { entries ->
                     item {
                         SectionHeader(
-                            trophies = "🏆🏆🏆🏆🏆",
+                            trophyCount = 5,
                             title = "Single Setting Bests",
                             subtitle = "Best for one setting (any other settings)"
                         )
@@ -194,7 +195,7 @@ fun PersonalBestsScreen(
                 grouped[4]?.let { entries ->
                     item {
                         SectionHeader(
-                            trophies = "🏆🏆🏆🏆",
+                            trophyCount = 4,
                             title = "Two Setting Bests",
                             subtitle = "Best for a pair of settings"
                         )
@@ -216,7 +217,7 @@ fun PersonalBestsScreen(
                 grouped[3]?.let { entries ->
                     item {
                         SectionHeader(
-                            trophies = "🏆🏆🏆",
+                            trophyCount = 3,
                             title = "Three Setting Bests",
                             subtitle = "Best for a trio of settings"
                         )
@@ -238,7 +239,7 @@ fun PersonalBestsScreen(
                 grouped[2]?.let { entries ->
                     item {
                         SectionHeader(
-                            trophies = "🏆🏆",
+                            trophyCount = 2,
                             title = "Four Setting Bests",
                             subtitle = "Best for four specific settings"
                         )
@@ -260,7 +261,7 @@ fun PersonalBestsScreen(
                 grouped[1]?.let { entries ->
                     item {
                         SectionHeader(
-                            trophies = "🏆",
+                            trophyCount = 1,
                             title = "Exact Setting Bests",
                             subtitle = "Best for each specific combination of all 5 settings"
                         )
@@ -287,19 +288,26 @@ fun PersonalBestsScreen(
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-internal fun SectionHeader(trophies: String, title: String, subtitle: String) {
+internal fun SectionHeader(trophyCount: Int, title: String, subtitle: String, emoji: String? = null) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 16.dp, bottom = 8.dp)
     ) {
-        Text(
-            "$trophies  $title",
-            style = MaterialTheme.typography.titleMedium,
-            color = TextPrimary,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.grayscale()
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                emoji ?: "🏆".repeat(trophyCount),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = if (emoji != null) Modifier else Modifier.trophyTint(trophyCount)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                color = TextPrimary,
+                fontWeight = FontWeight.Bold
+            )
+        }
         Text(
             subtitle,
             style = MaterialTheme.typography.bodySmall,
