@@ -12,6 +12,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import com.example.wags.R
 import javax.inject.Inject
+import javax.inject.Singleton
 import kotlin.math.PI
 import kotlin.math.exp
 import kotlin.math.pow
@@ -167,6 +168,7 @@ enum class BiofeedbackSpo2Texture(
  * is persisted anywhere. It exists purely for the live listening
  * experience while the biofeedback feature is being evaluated.
  */
+@Singleton
 class BiofeedbackSonificationEngine @Inject constructor() {
 
     companion object {
@@ -201,6 +203,47 @@ class BiofeedbackSonificationEngine @Inject constructor() {
 
         // Master safety clamp
         private const val MASTER_LIMIT = 0.9f
+
+        /** Soundscape layer → bundled raw resource (decoded lazily). */
+        private val RES_BY_KIND: Map<LayerKind, Int> = mapOf(
+            LayerKind.OCEAN_BED to R.raw.bf_ocean,
+            LayerKind.WIND_BED to R.raw.bf_wind,
+            LayerKind.RAIN_BED to R.raw.bf_rain,
+            LayerKind.STREAM_BED to R.raw.bf_stream,
+            LayerKind.WIND_GUST to R.raw.bf_wind_gust,
+            LayerKind.RAIN_HEAVY to R.raw.bf_rain_heavy,
+            LayerKind.RAINSTORM to R.raw.bf_rainstorm,
+            LayerKind.THUNDER to R.raw.bf_thunder,
+            LayerKind.BIRDS to R.raw.bf_birds,
+            LayerKind.GULLS to R.raw.bf_gulls,
+            LayerKind.CRICKETS to R.raw.bf_crickets,
+            LayerKind.WHALE to R.raw.bf_whale,
+            LayerKind.CHILDREN to R.raw.bf_children,
+            LayerKind.RAIN_LIGHT to R.raw.bf_rain_light,
+            LayerKind.DRIP to R.raw.bf_drip,
+            LayerKind.RAIN_ROOF to R.raw.bf_rain_roof,
+            LayerKind.RIVER to R.raw.bf_river,
+            LayerKind.FROGS to R.raw.bf_frogs,
+            LayerKind.OWL to R.raw.bf_owl,
+            LayerKind.WOLF to R.raw.bf_wolf,
+            LayerKind.BELLS to R.raw.bf_bells,
+            LayerKind.SINGING_BOWL to R.raw.bf_singing_bowl,
+            LayerKind.CHOIR_VOICES to R.raw.bf_choir,
+            LayerKind.CICADAS to R.raw.bf_cicadas,
+            LayerKind.LOON to R.raw.bf_loon,
+            LayerKind.DAWN_CHORUS to R.raw.bf_dawn_chorus,
+            LayerKind.FIRE to R.raw.bf_fire
+        )
+
+        /** HR instrument → bundled raw resource (decoded lazily; null = synth recipe). */
+        private val HR_RES: Map<BiofeedbackHrSound, Int> = mapOf(
+            BiofeedbackHrSound.GONG to R.raw.bfhr_gong,
+            BiofeedbackHrSound.BELL to R.raw.bf_singing_bowl,
+            BiofeedbackHrSound.HEARTBEAT to R.raw.bfhr_heartbeat,
+            BiofeedbackHrSound.CHIME to R.raw.bfhr_triangle,
+            BiofeedbackHrSound.PIANO to R.raw.bfhr_piano,
+            BiofeedbackHrSound.TOM to R.raw.bfhr_tom
+        )
     }
 
     /**
@@ -429,7 +472,8 @@ class BiofeedbackSonificationEngine @Inject constructor() {
     //  - bf_loon.wav       "Common loon yodels.ogg" — CC BY-SA 2.5
     //  - bf_dawn_chorus.wav "Dawn Chorus 2020-05-06 0500.mp3" — CC BY-SA 4.0
     //  - bf_fire.wav       "Bones breaking wood fire ice crackling.ogg" — Public Domain
-    @Volatile private var samplesByKind: Map<LayerKind, FloatArray?> = emptyMap()
+    private val samplesByKind: MutableMap<LayerKind, FloatArray?> =
+        java.util.Collections.synchronizedMap(HashMap())
 
     // One-shot field recordings for the HR instruments (mono 22.05 kHz PCM16
     // WAV in res/raw). When present, a strike plays the real recording,
@@ -448,9 +492,13 @@ class BiofeedbackSonificationEngine @Inject constructor() {
     //  - bfhr_xylophone.wav  "Xylophone jingle.wav" (first note) — CC BY 3.0
     //  - bfhr_tubular.wav    "Röhrenglocken (Windspiel).ogg" — CC BY-SA 3.0 DE
     //  - BELL reuses the Tibetan singing bowl recording (bf_singing_bowl.wav).
-    @Volatile private var hrSamples: Map<BiofeedbackHrSound, FloatArray?> = emptyMap()
-    private var samplesLoaded = false
-    /** Live soundscape renderer — lazily rebuilt after samples load (immutable once created). */
+    private val hrSamples: MutableMap<BiofeedbackHrSound, FloatArray?> =
+        java.util.Collections.synchronizedMap(HashMap())
+
+    /** Application context captured on the first loadSamples() call. */
+    @Volatile private var appContext: Context? = null
+
+    /** Live soundscape renderer — reads the lazily-populated sample map. */
     @Volatile private var soundscapeRenderer: SoundscapeRenderer? = null
 
     private fun renderer(): SoundscapeRenderer =
@@ -460,57 +508,53 @@ class BiofeedbackSonificationEngine @Inject constructor() {
             }
         }
 
-    /** Loads the bundled field recordings. Idempotent; call once at app/session start. */
+    /**
+     * Captures the application context used for lazy decoding. Eagerly
+     * decoding all ~33 bundled recordings here uses >200 MB of Java heap —
+     * nearly the entire 256 MB large-heap limit — and reliably OOM-crashes
+     * the app when an apnea session screen is opened (every ViewModel used
+     * to trigger a full decode). Samples are now decoded on demand via
+     * [layerFor] / [hrSampleFor], so only the one HR sound and the 1-3
+     * soundscape layers of the selected SpO2 texture are ever in memory
+     * (a few MB instead of hundreds).
+     */
     fun loadSamples(context: Context) {
-        if (samplesLoaded) return
-        synchronized(this) {
-            if (samplesLoaded) return
-            samplesByKind = mapOf(
-                LayerKind.OCEAN_BED to loadWav(context, R.raw.bf_ocean),
-                LayerKind.WIND_BED to loadWav(context, R.raw.bf_wind),
-                LayerKind.RAIN_BED to loadWav(context, R.raw.bf_rain),
-                LayerKind.STREAM_BED to loadWav(context, R.raw.bf_stream),
-                LayerKind.WIND_GUST to loadWav(context, R.raw.bf_wind_gust),
-                LayerKind.RAIN_HEAVY to loadWav(context, R.raw.bf_rain_heavy),
-                LayerKind.RAINSTORM to loadWav(context, R.raw.bf_rainstorm),
-                LayerKind.THUNDER to loadWav(context, R.raw.bf_thunder),
-                LayerKind.BIRDS to loadWav(context, R.raw.bf_birds),
-                LayerKind.GULLS to loadWav(context, R.raw.bf_gulls),
-                LayerKind.CRICKETS to loadWav(context, R.raw.bf_crickets),
-                LayerKind.WHALE to loadWav(context, R.raw.bf_whale),
-                LayerKind.CHILDREN to loadWav(context, R.raw.bf_children),
-                LayerKind.RAIN_LIGHT to loadWav(context, R.raw.bf_rain_light),
-                LayerKind.DRIP to loadWav(context, R.raw.bf_drip),
-                LayerKind.RAIN_ROOF to loadWav(context, R.raw.bf_rain_roof),
-                LayerKind.RIVER to loadWav(context, R.raw.bf_river),
-                LayerKind.FROGS to loadWav(context, R.raw.bf_frogs),
-                LayerKind.OWL to loadWav(context, R.raw.bf_owl),
-                LayerKind.WOLF to loadWav(context, R.raw.bf_wolf),
-                LayerKind.BELLS to loadWav(context, R.raw.bf_bells),
-                LayerKind.SINGING_BOWL to loadWav(context, R.raw.bf_singing_bowl),
-                LayerKind.CHOIR_VOICES to loadWav(context, R.raw.bf_choir),
-                LayerKind.CICADAS to loadWav(context, R.raw.bf_cicadas),
-                LayerKind.LOON to loadWav(context, R.raw.bf_loon),
-                LayerKind.DAWN_CHORUS to loadWav(context, R.raw.bf_dawn_chorus),
-                LayerKind.FIRE to loadWav(context, R.raw.bf_fire)
-            )
-            // Only the recordings that survived tuning are kept — each is
-            // peak-normalised so quiet recordings (e.g. the heartbeat) sit
-            // at a consistent audible level. MARIMBA / KALIMBA / WOODBLOCK /
-            // XYLOPHONE / TUBULAR fall through to their (reworked) synth
-            // recipes: the recordings were too harsh, too dense, rushed or
-            // inaudible.
-            hrSamples = mapOf(
-                BiofeedbackHrSound.GONG to normalize(loadWav(context, R.raw.bfhr_gong)),
-                BiofeedbackHrSound.BELL to normalize(loadWav(context, R.raw.bf_singing_bowl)),
-                BiofeedbackHrSound.HEARTBEAT to normalize(loadWav(context, R.raw.bfhr_heartbeat)),
-                BiofeedbackHrSound.CHIME to normalize(loadWav(context, R.raw.bfhr_triangle)),
-                BiofeedbackHrSound.PIANO to normalize(loadWav(context, R.raw.bfhr_piano)),
-                BiofeedbackHrSound.TOM to normalize(loadWav(context, R.raw.bfhr_tom))
-            )
-            soundscapeRenderer = null // rebuild with the loaded samples
-            samplesLoaded = true
+        if (appContext == null) {
+            synchronized(this) {
+                if (appContext == null) appContext = context.applicationContext
+            }
         }
+    }
+
+    /** Lazily decodes (and caches) the recording for one soundscape layer. */
+    private fun layerFor(kind: LayerKind): FloatArray? {
+        samplesByKind[kind]?.let { return it }
+        val ctx = appContext ?: return null
+        return synchronized(samplesByKind) {
+            samplesByKind.getOrPut(kind) { loadWav(ctx, RES_BY_KIND.getValue(kind)) }
+        }
+    }
+
+    /**
+     * Lazily decodes (and caches) the one-shot recording for one HR
+     * instrument. Only these six survived tuning — each peak-normalised so
+     * quiet recordings (e.g. the heartbeat) sit at a consistent audible
+     * level. All other sounds fall through to their synth recipes.
+     */
+    private fun hrSampleFor(sound: BiofeedbackHrSound): FloatArray? {
+        hrSamples[sound]?.let { return it }
+        val ctx = appContext ?: return null
+        return synchronized(hrSamples) {
+            hrSamples.getOrPut(sound) {
+                val res = HR_RES[sound] ?: return@getOrPut null
+                normalize(loadWav(ctx, res))
+            }
+        }
+    }
+
+    /** Decodes every layer used by [tex] so live rendering never hits synth fallback. */
+    private fun preloadTexture(tex: BiofeedbackSpo2Texture) {
+        SoundscapeRenderer.soundscapes[tex]?.forEach { layerFor(it.kind) }
     }
 
     /** Minimal RIFF/WAV parser: mono/stereo 16-bit PCM → mono FloatArray. */
@@ -570,6 +614,10 @@ class BiofeedbackSonificationEngine @Inject constructor() {
 
     fun start(scope: CoroutineScope) {
         if (renderJob?.isActive == true) return
+        // Decode only the selected texture's layers and the selected HR
+        // instrument now (a few MB) instead of the whole bundled library.
+        preloadTexture(texture)
+        hrSampleFor(hrSound)
         val minBuf = AudioTrack.getMinBufferSize(
             SAMPLE_RATE,
             AudioFormat.CHANNEL_OUT_MONO,
@@ -745,6 +793,7 @@ class BiofeedbackSonificationEngine @Inject constructor() {
         fromSpo2: Double,
         toSpo2: Double
     ) {
+        preloadTexture(tex) // decode just this texture's layers before rendering
         val previewRenderer = SoundscapeRenderer(samplesByKind, SAMPLE_RATE)
         val chunk = FloatArray(CHUNK_SAMPLES)
         var written = 0
@@ -851,7 +900,7 @@ class BiofeedbackSonificationEngine @Inject constructor() {
      * additive-synthesis recipe renders the strike.
      */
     private fun strike(tail: FloatArray, offset: Int, recipe: StrikeRecipe, limit: Int = TAIL_SAMPLES, sound: BiofeedbackHrSound? = null, rate: Float = 1f, gain: Float = 1f) {
-        val sample = sound?.let { hrSamples[it] }
+        val sample = sound?.let { hrSampleFor(it) }
         if (sample != null && sample.size > 4) {
             // Clamp the resample rate so pitch-tracking can never turn a
             // recording shrill/aggressive at high HR.
