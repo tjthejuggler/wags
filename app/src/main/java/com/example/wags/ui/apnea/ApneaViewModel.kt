@@ -243,6 +243,8 @@ data class ApneaUiState(
     val hyperRemainingLockDays: Int = 0,
     /** True when no resonance breathing session ended within the last ~5 minutes (RESONANCE prep locked). */
     val resonancePrepLocked: Boolean = false,
+    /** True while the user is press-and-holding a locked prep chip to preview its records. */
+    val previewingLockedPrep: Boolean = false,
     /**
      * Last-use timestamp (epoch ms) per setting column → setting value name.
      * Keys: "lungVolume", "prepType", "timeOfDay", "posture", "audio".
@@ -620,7 +622,9 @@ class ApneaViewModel @Inject constructor(
                 // Auto-deselect HYPER when the lock is engaged (e.g. right after
                 // finishing a HYPER session, or when restoring a stale persisted
                 // selection on launch).
-                if (_prepType.value == PrepType.HYPER && _uiState.value.hyperRemainingLockDays > 0) {
+                if (prepTypeBeforePreview == null &&
+                    _prepType.value == PrepType.HYPER && _uiState.value.hyperRemainingLockDays > 0
+                ) {
                     setPrepType(PrepType.NO_PREP)
                 }
             }
@@ -637,7 +641,8 @@ class ApneaViewModel @Inject constructor(
                 // mid-session (free hold or table). The rule is that a
                 // resonance-prepped activity cannot *start* after the 5-minute
                 // window; once it has started with RESONANCE it stays RESONANCE.
-                if (locked && _prepType.value == PrepType.RESONANCE &&
+                if (locked && prepTypeBeforePreview == null &&
+                    _prepType.value == PrepType.RESONANCE &&
                     stateMachine.state.value == ApneaState.IDLE &&
                     !_uiState.value.freeHoldActive
                 ) {
@@ -1945,6 +1950,44 @@ class ApneaViewModel @Inject constructor(
         if (type == PrepType.EUCAPNIC_DIAPHRAGMATIC && _uiState.value.eucapnicConfig == null) {
             _uiState.update { it.copy(eucapnicConfig = EucapnicConfig()) }
         }
+    }
+
+    // ── Press-and-hold preview of a LOCKED prep type ─────────────────────────
+    // Holding a finger on a locked prep chip (HYPER under its time lock,
+    // RESONANCE without a fresh resonance session) temporarily selects that
+    // prep so the record cards below show "what if" numbers. It is preview
+    // ONLY: the finger is on the chip, so no session card can be tapped, and
+    // the previous prep type is restored the instant the finger lifts.
+
+    /** Prep type selected before the preview started (null = no preview active). */
+    private var prepTypeBeforePreview: PrepType? = null
+    /** Safety net: auto-revert if the release event is ever lost (e.g. recomposition). */
+    private var prepPreviewRevertJob: Job? = null
+
+    fun previewLockedPrepType(type: PrepType) {
+        // Ignore when unlocked (a normal tap will select it) or already previewing.
+        val hyperLocked = type == PrepType.HYPER && _uiState.value.hyperRemainingLockDays > 0
+        val resonanceLocked = type == PrepType.RESONANCE && _uiState.value.resonancePrepLocked
+        if (!hyperLocked && !resonanceLocked) return
+        if (prepTypeBeforePreview != null) return
+        autoSetRecordJob?.cancel()
+        prepTypeBeforePreview = _prepType.value
+        setPrepType(type, force = true)
+        _uiState.update { it.copy(previewingLockedPrep = true) }
+        prepPreviewRevertJob?.cancel()
+        prepPreviewRevertJob = viewModelScope.launch {
+            delay(15_000)
+            clearPreviewLockedPrepType()
+        }
+    }
+
+    fun clearPreviewLockedPrepType() {
+        val saved = prepTypeBeforePreview ?: return
+        prepTypeBeforePreview = null
+        prepPreviewRevertJob?.cancel()
+        prepPreviewRevertJob = null
+        setPrepType(saved, force = true)
+        _uiState.update { it.copy(previewingLockedPrep = false) }
     }
 
     fun setTimeOfDay(tod: TimeOfDay) {

@@ -11,6 +11,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -25,7 +27,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -278,6 +280,8 @@ fun ApneaScreen(
                             resonancePrepLocked = state.resonancePrepLocked,
                             onLungVolumeChange = { viewModel.setLungVolume(it) },
                             onPrepTypeChange = { viewModel.setPrepType(it) },
+                            onPrepTypeHold = { viewModel.previewLockedPrepType(it) },
+                            onPrepTypeRelease = { viewModel.clearPreviewLockedPrepType() },
                             onTimeOfDayChange = { viewModel.setTimeOfDay(it) },
                             onPostureChange = { viewModel.setPosture(it) },
                             onAudioChange = { viewModel.setAudio(it) }
@@ -750,6 +754,9 @@ private fun ApneaSettingsContent(
     resonancePrepLocked: Boolean,
     onLungVolumeChange: (String) -> Unit,
     onPrepTypeChange: (PrepType) -> Unit,
+    /** Press-and-hold on a LOCKED prep chip: preview its records (release restores). */
+    onPrepTypeHold: (PrepType) -> Unit = {},
+    onPrepTypeRelease: () -> Unit = {},
     onTimeOfDayChange: (TimeOfDay) -> Unit,
     onPostureChange: (Posture) -> Unit,
     onAudioChange: (AudioSetting) -> Unit
@@ -784,6 +791,9 @@ private fun ApneaSettingsContent(
         Text("Prep Type", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             PrepType.entries.forEach { type ->
+                val hyperChipLocked = type == PrepType.HYPER && hyperRemainingLockDays > 0
+                val resonanceChipLocked = type == PrepType.RESONANCE && resonancePrepLocked
+                val chipLocked = hyperChipLocked || resonanceChipLocked
                 SettingChip(
                     selected = prepType == type,
                     onClick = { onPrepTypeChange(type) },
@@ -794,7 +804,11 @@ private fun ApneaSettingsContent(
                     hyperRemainingLockDays = if (type == PrepType.HYPER) hyperRemainingLockDays else null,
                     // Staleness lock on the RESONANCE chip: no resonance breathing
                     // session ended within the last ~5 minutes.
-                    locked = type == PrepType.RESONANCE && resonancePrepLocked
+                    locked = resonanceChipLocked,
+                    // Press-and-hold a locked chip to preview its records below;
+                    // releasing snaps back to the previously selected prep.
+                    onHold = if (chipLocked) ({ onPrepTypeHold(type) }) else null,
+                    onRelease = if (chipLocked) onPrepTypeRelease else null
                 )
             }
         }
@@ -879,9 +893,30 @@ private fun SettingChip(
     daysSinceUsed: Int?,
     daysSinceCombo: Int? = null,
     hyperRemainingLockDays: Int? = null,
-    locked: Boolean = false
+    locked: Boolean = false,
+    /** Non-null on locked chips: press starts the preview, release ends it. */
+    onHold: (() -> Unit)? = null,
+    onRelease: (() -> Unit)? = null
 ) {
-    Box {
+    Box(
+        // While the chip is locked its normal tap is a no-op anyway; watch the
+        // gesture in the INITIAL pass so the FilterChip's own click handling
+        // (which consumes the down event in the Main pass) can't hide it.
+        modifier = if (onHold != null) {
+            Modifier.pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    onHold()
+                    // Hold the preview until every pointer is up (or cancelled).
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (event.changes.all { !it.pressed }) break
+                    }
+                    onRelease?.invoke()
+                }
+            }
+        } else Modifier
+    ) {
         FilterChip(
             selected = selected,
             onClick = onClick,
