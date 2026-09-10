@@ -1172,7 +1172,12 @@ class MinBreathViewModel @Inject constructor(
     }
 
     fun markContraction() {
+        // Vibrate only when this tap actually records the FIRST contraction of
+        // the current hold — same guard as MinBreathStateMachine.markContraction().
+        val current = stateMachine.state.value
+        val accepted = current.phase == MinBreathPhase.HOLD && current.currentHoldContractionMs == null
         stateMachine.markContraction()
+        if (accepted) audioHapticEngine.vibrateContractionLogged()
     }
 
     fun switchToBreathing() {
