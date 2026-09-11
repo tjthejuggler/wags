@@ -1,18 +1,16 @@
-# ADR: App-wide portrait orientation lock
+# ADR: Hour-proximity weighting for By-the-Hour record forecasts
 
-**Date:** 2026-09-08
+**Date:** 2026-09-11
 **Status:** Accepted
 
 ## Context
-Holding the phone sideways rotated the main screen and apnea session screens (Min Breath, Progressive O2, etc.) into landscape. The app should be portrait everywhere, with landscape only on select large chart screens.
+The apnea "chance to beat PB" forecast in By-the-Hour mode fits one OLS regression over ALL records with the hour encoded as sin/cos cyclical features. Breath-hold ability differs strongly between night and morning, so distant-hour records should inform the prediction less than near-hour records.
 
 ## Decision
-- Set `android:screenOrientation="portrait"` on `MainActivity` in `AndroidManifest.xml`. This is the single source of truth for the default orientation; runtime `requestedOrientation` overrides still work on top of it.
-- Intentional landscape exceptions remain the screens that force it at runtime: `TimeChartScreen`, `TrophyChartScreen`, `PbChartScreen` (dedicated full-screen graphs).
-- `RateRecommendationScreen` intentionally sets `SCREEN_ORIENTATION_UNSPECIFIED` to allow rotation (it has explicit landscape layouts); on dispose it restores the captured original (now portrait), so no rotation leaks to other screens.
-- The unused `LockPortrait()` composable in `ui/common/SessionGuards.kt` is retained as a utility but not required for the manifest-level policy.
+- OlsRegression.fit() now accepts an optional per-observation weights vector (WLS): XᵀWX / XᵀWy / weighted RSS. Null weights preserve plain OLS.
+- RecordForecastCalculator computes weights in By-the-Hour mode only: Gaussian kernel on the *circular* hour distance between each record's timestamp hour and the target "Hxx" bucket, sigma = 3.0 hours, floored at 0.05 so distant hours still contribute.
+- PB threshold lookup (findBestForSubCombo) remains exact-hour matching; only the probability model is weighted.
 
 ## Consequences
-- All screens default to portrait regardless of device rotation.
-- Landscape-capable screens must explicitly opt in via `requestedOrientation` overrides.
-- PiP support (`supportsPictureInPicture`) is unaffected by the orientation lock.
+- A 07:00 record dominates a 06:00 prediction; a 22:00 record contributes ~5% weight.
+- Tunables live in RecordForecastCalculator: HOUR_WEIGHT_SIGMA, HOUR_WEIGHT_FLOOR.

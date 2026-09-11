@@ -24,30 +24,37 @@ object OlsRegression {
     )
 
     /**
-     * Fit an OLS regression.
+     * Fit an OLS (or weighted least-squares) regression.
      *
      * @param X  n×p design matrix (each row is one observation's feature vector).
      * @param y  n-vector of responses (log-seconds).
      * @param lambda  Ridge penalty (default 0.01). Prevents singularity when
      *                rare dummy levels have very few observations.
+     * @param weights  Optional n-vector of per-observation weights (WLS). When
+     *                non-null, each row's contribution to XᵀX / Xᵀy / RSS is
+     *                scaled by its weight. Null → ordinary least squares.
      * @return OlsFit, or null if the matrix is irrecoverably singular.
      */
     fun fit(
         X: Array<DoubleArray>,
         y: DoubleArray,
-        lambda: Double = 0.01
+        lambda: Double = 0.01,
+        weights: DoubleArray? = null
     ): OlsFit? {
         val n = X.size
         if (n == 0) return null
         val p = X[0].size
         if (n < p) return null  // under-determined even with ridge
+        if (weights != null && weights.size != n) return null
 
-        // ── Compute XᵀX ──────────────────────────────────────────────────────
+        // ── Compute XᵀWX ─────────────────────────────────────────────────────
         val xtx = Array(p) { DoubleArray(p) }
         for (i in 0 until n) {
+            val w = weights?.get(i) ?: 1.0
+            if (w == 0.0) continue
             for (j in 0 until p) {
                 for (k in 0 until p) {
-                    xtx[j][k] += X[i][j] * X[i][k]
+                    xtx[j][k] += w * X[i][j] * X[i][k]
                 }
             }
         }
@@ -57,11 +64,13 @@ object OlsRegression {
             xtx[j][j] += lambda
         }
 
-        // ── Compute Xᵀy ──────────────────────────────────────────────────────
+        // ── Compute XᵀWy ─────────────────────────────────────────────────────
         val xty = DoubleArray(p)
         for (i in 0 until n) {
+            val w = weights?.get(i) ?: 1.0
+            if (w == 0.0) continue
             for (j in 0 until p) {
-                xty[j] += X[i][j] * y[i]
+                xty[j] += w * X[i][j] * y[i]
             }
         }
 
@@ -74,16 +83,17 @@ object OlsRegression {
             }
         }
 
-        // ── Residual variance ─────────────────────────────────────────────────
+        // ── Residual variance (weighted RSS; effective n from weight sum) ─────
         val dof = max(1, n - p)
         var rss = 0.0
         for (i in 0 until n) {
+            val w = weights?.get(i) ?: 1.0
             var fitted = 0.0
             for (j in 0 until p) {
                 fitted += X[i][j] * beta[j]
             }
             val residual = y[i] - fitted
-            rss += residual * residual
+            rss += w * residual * residual
         }
         val residualVariance = rss / dof
 

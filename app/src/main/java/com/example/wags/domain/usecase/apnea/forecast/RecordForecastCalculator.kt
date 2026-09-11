@@ -5,6 +5,7 @@ import com.example.wags.data.db.entity.ApneaRecordEntity
 import com.example.wags.domain.model.PersonalBestCategory
 import com.example.wags.domain.model.TimeBuckets
 import com.example.wags.domain.model.trophyCount
+import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.sqrt
@@ -29,6 +30,16 @@ object RecordForecastCalculator {
     /** Minimum hold duration to include in the model (ms). */
     private const val MIN_DURATION_MS = 10_000L
 
+    /**
+     * Hour-proximity bandwidth (hours) for the By-the-Hour weighting kernel.
+     * Records within ~this many hours of the predicted hour dominate the fit;
+     * influence decays as a Gaussian on the circular hour distance.
+     */
+    private const val HOUR_WEIGHT_SIGMA = 3.0
+
+    /** Floor for hour-proximity weights so distant hours still contribute some data. */
+    private const val HOUR_WEIGHT_FLOOR = 0.05
+
     // ── Setting display names for labels ──────────────────────────────────────
     private val LUNG_DISPLAY = mapOf("FULL" to "Full", "EMPTY" to "Empty", "PARTIAL" to "Partial")
     private val PREP_DISPLAY  = mapOf("NO_PREP" to "No Prep", "RESONANCE" to "Resonance", "HYPER" to "Hyper")
@@ -46,6 +57,15 @@ object RecordForecastCalculator {
      */
     private fun displaySetting(i: Int, value: String): String =
         if (i == 2) TimeBuckets.display(value) else SETTING_DISPLAYS[i][value] ?: value
+
+    /**
+     * Circular distance between two hours of day, in [0, 11]: 23:00 vs 00:00
+     * is 1 hour apart, not 23.
+     */
+    private fun circularHourDistance(a: Int, b: Int): Int {
+        val d = kotlin.math.abs(a - b) % 24
+        return kotlin.math.min(d, 24 - d)
+    }
 
     /**
      * Compute the record-breaking forecast for the current settings.
@@ -130,9 +150,33 @@ object RecordForecastCalculator {
         ) ?: return insufficientDataForecast(pbRecords, settings, recordLabel)
 
         val (X, y) = designResult
-        val fit = OlsRegression.fit(X, y)
+
+        // By-the-Hour proximity weighting: a record's hour tells us more about
+        // nearby hours than distant ones (e.g. 07:00 informs 06:00 far better
+        // than 22:00 does). Weight each record by a Gaussian kernel on the
+        // circular hour distance to the hour being predicted, with a floor so
+        // every attempt still contributes some information.
+        val weights = if (byHour) {
+            val targetHour = TimeBuckets.hourOf(settings.timeOfDay)
+                ?: TimeBuckets.hourOfTimestamp(System.currentTimeMillis())
+            DoubleArray(regressionRecords.size) { i ->
+                val dist = circularHourDistance(
+                    TimeBuckets.hourOfTimestamp(regressionRecords[i].timestamp), targetHour
+                )
+                max(
+                    HOUR_WEIGHT_FLOOR,
+                    exp(-0.5 * (dist / HOUR_WEIGHT_SIGMA) * (dist / HOUR_WEIGHT_SIGMA))
+                )
+            }
+        } else null
+        if (weights != null) {
+            val effN = weights.sum()
+            Log.d(TAG, "By-the-Hour WLS: target=${settings.timeOfDay}, effectiveN=$effN")
+        }
+
+        val fit = OlsRegression.fit(X, y, weights = weights)
             ?: return insufficientDataForecast(pbRecords, settings, recordLabel)
-        Log.d(TAG, "OLS fit successful: X.size=${X.size}, y.size=${y.size}")
+        Log.d(TAG, "OLS fit successful: X.size=${X.size}, y.size=${y.size}, weighted=${weights != null}")
 
         // ── Predict for the pending hold ──────────────────────────────────────
         val xPending = FreeHoldFeatureExtractor.encodePendingHold(settings, daysSinceFirst, drillParam, byHour)
