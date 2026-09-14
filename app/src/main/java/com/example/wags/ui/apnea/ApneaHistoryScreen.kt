@@ -222,7 +222,22 @@ fun ApneaHistoryScreen(
                     canStepForward = state.canStepForward,
                     onTimePeriodChange = viewModel::setTimePeriod,
                     onStepBack = viewModel::stepBack,
-                    onStepForward = viewModel::stepForward
+                    onStepForward = viewModel::stepForward,
+                    onNodeDateClick = { date ->
+                        // Mirror the Calendar tab behaviour: a single hold on that
+                        // day opens its detail directly; several holds open the
+                        // Calendar tab's multi-session list for that date.
+                        val records = state.allRecordsByDate[date].orEmpty()
+                        when {
+                            records.size == 1 ->
+                                navController.navigate(WagsRoutes.apneaRecordDetail(records.first().recordId))
+                            records.size > 1 -> {
+                                displayedMonth = YearMonth.from(date)
+                                viewModel.selectDate(date)
+                                selectedTabOrdinal = ApneaHistoryTab.CALENDAR.ordinal
+                            }
+                        }
+                    }
                 )
                 ApneaHistoryTab.ALL_RECORDS -> AllApneaRecordsScreen(navController = navController)
                 ApneaHistoryTab.STATS -> StatsTabContent(

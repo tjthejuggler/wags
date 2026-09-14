@@ -526,12 +526,19 @@ class BiofeedbackSonificationEngine @Inject constructor() {
         }
     }
 
-    /** Lazily decodes (and caches) the recording for one soundscape layer. */
+    /**
+     * Lazily decodes (and caches) the recording for one soundscape layer.
+     * Pure-synth kinds (PAD_*, SPARKLE, SUB_PULSE, BEAT_DISSONANT, BREATH)
+     * have no bundled WAV — they return null and SoundscapeRenderer falls
+     * back to additive synthesis. Never call Map.getValue here: a missing
+     * key previously threw NoSuchElementException and crashed the picker.
+     */
     private fun layerFor(kind: LayerKind): FloatArray? {
         samplesByKind[kind]?.let { return it }
+        val res = RES_BY_KIND[kind] ?: return null // synth-only layer
         val ctx = appContext ?: return null
         return synchronized(samplesByKind) {
-            samplesByKind.getOrPut(kind) { loadWav(ctx, RES_BY_KIND.getValue(kind)) }
+            samplesByKind.getOrPut(kind) { loadWav(ctx, res) }
         }
     }
 

@@ -35,10 +35,12 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.wags.ui.theme.*
+import java.time.LocalDate
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -62,7 +64,9 @@ fun ApneaGraphsTabContent(
     canStepForward: Boolean,
     onTimePeriodChange: (ApneaChartTimePeriod) -> Unit,
     onStepBack: () -> Unit,
-    onStepForward: () -> Unit
+    onStepForward: () -> Unit,
+    /** Called when the user taps the date in a chart tooltip (ISO label parsed). */
+    onNodeDateClick: ((LocalDate) -> Unit)? = null
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
@@ -120,7 +124,8 @@ fun ApneaGraphsTabContent(
                 overlayLabel = "5-hold avg",
                 isLandscape = isLandscape,
                 isPrimary = true,
-                formatValue = ::formatSecondsCompact
+                formatValue = ::formatSecondsCompact,
+                onDateClick = onNodeDateClick
             )
         }
 
@@ -137,7 +142,8 @@ fun ApneaGraphsTabContent(
                     isLandscape = isLandscape,
                     isPrimary = true,
                     stepMode = true,
-                    formatValue = ::formatSecondsCompact
+                    formatValue = ::formatSecondsCompact,
+                    onDateClick = onNodeDateClick
                 )
             }
         }
@@ -150,7 +156,8 @@ fun ApneaGraphsTabContent(
             ) {
                 ApneaVolumeBarChart(
                     points = chartData.volumePerBucket,
-                    unitLabel = chartData.volumeBucketLabel
+                    unitLabel = chartData.volumeBucketLabel,
+                    onDateClick = onNodeDateClick
                 )
             }
         }
@@ -169,7 +176,8 @@ fun ApneaGraphsTabContent(
                             lineColor = ReadinessBlue,
                             invertGood = true,
                             isLandscape = isLandscape,
-                            formatValue = { "%.0f".format(it) }
+                            formatValue = { "%.0f".format(it) },
+                            onDateClick = onNodeDateClick
                         )
                     }
                     if (chartData.maxHr.isNotEmpty()) {
@@ -179,7 +187,8 @@ fun ApneaGraphsTabContent(
                             lineColor = ReadinessOrange,
                             invertGood = true,
                             isLandscape = isLandscape,
-                            formatValue = { "%.0f".format(it) }
+                            formatValue = { "%.0f".format(it) },
+                            onDateClick = onNodeDateClick
                         )
                     }
                     if (chartData.hrDrop.isNotEmpty()) {
@@ -188,7 +197,8 @@ fun ApneaGraphsTabContent(
                             points = chartData.hrDrop,
                             lineColor = ReadinessGreen,
                             isLandscape = isLandscape,
-                            formatValue = { "%.0f".format(it) }
+                            formatValue = { "%.0f".format(it) },
+                            onDateClick = onNodeDateClick
                         )
                     }
                 }
@@ -206,7 +216,8 @@ fun ApneaGraphsTabContent(
                     points = chartData.lowestSpO2,
                     lineColor = ReadinessGreen,
                     isLandscape = isLandscape,
-                    formatValue = { "%.0f".format(it) }
+                    formatValue = { "%.0f".format(it) },
+                    onDateClick = onNodeDateClick
                 )
             }
         }
@@ -224,7 +235,8 @@ fun ApneaGraphsTabContent(
                             points = chartData.firstContractionSec,
                             lineColor = CoherencePink,
                             isLandscape = isLandscape,
-                            formatValue = ::formatSecondsCompact
+                            formatValue = ::formatSecondsCompact,
+                            onDateClick = onNodeDateClick
                         )
                     }
                     if (chartData.contractionEasePct.isNotEmpty()) {
@@ -233,7 +245,8 @@ fun ApneaGraphsTabContent(
                             points = chartData.contractionEasePct,
                             lineColor = ReadinessGreen,
                             isLandscape = isLandscape,
-                            formatValue = { "%.0f%%".format(it) }
+                            formatValue = { "%.0f%%".format(it) },
+                            onDateClick = onNodeDateClick
                         )
                     }
                 }
@@ -468,6 +481,7 @@ private fun ApneaMetricLineChart(
     stepMode: Boolean = false,
     overlayPoints: List<ApneaChartPoint> = emptyList(),
     overlayLabel: String? = null,
+    onDateClick: ((LocalDate) -> Unit)? = null,
     formatValue: (Float) -> String
 ) {
     if (points.isEmpty()) {
@@ -541,13 +555,18 @@ private fun ApneaMetricLineChart(
                 .height(chartHeight)
         )
 
-        // Tooltip for the selected point
+        // Tooltip for the selected point — its date links to the record(s) of that day
         tooltipPoint?.let { tp ->
             ApneaTooltipCard(
                 value = formatValue(tp.value),
                 date = shortDate(tp.label),
                 color = lineColor,
-                vsAvg = if (avg > 0f) "%+.0f%% vs avg".format((tp.value / avg - 1f) * 100f) else null
+                vsAvg = if (avg > 0f) "%+.0f%% vs avg".format((tp.value / avg - 1f) * 100f) else null,
+                onDateClick = onDateClick?.let { cb ->
+                    {
+                        runCatching { LocalDate.parse(tp.label) }.getOrNull()?.let(cb)
+                    }
+                }
             )
         }
 
@@ -577,7 +596,13 @@ private fun ApneaMetricLineChart(
 // ── Tooltip card ────────────────────────────────────────────────────────────────
 
 @Composable
-private fun ApneaTooltipCard(value: String, date: String, color: Color, vsAvg: String?) {
+private fun ApneaTooltipCard(
+    value: String,
+    date: String,
+    color: Color,
+    vsAvg: String?,
+    onDateClick: (() -> Unit)? = null
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -588,7 +613,19 @@ private fun ApneaTooltipCard(value: String, date: String, color: Color, vsAvg: S
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column {
-            Text(date, style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+            Text(
+                date,
+                style = MaterialTheme.typography.labelMedium,
+                color = if (onDateClick != null) EcgCyan else TextSecondary,
+                textDecoration = if (onDateClick != null) TextDecoration.Underline else null,
+                modifier = if (onDateClick != null) {
+                    Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable(onClick = onDateClick)
+                } else {
+                    Modifier
+                }
+            )
             vsAvg?.let {
                 Text(it, style = MaterialTheme.typography.labelSmall, color = TextDisabled)
             }
@@ -812,7 +849,8 @@ private fun ApneaLineChartCanvas(
 @Composable
 private fun ApneaVolumeBarChart(
     points: List<ApneaChartPoint>,
-    unitLabel: String
+    unitLabel: String,
+    onDateClick: ((LocalDate) -> Unit)? = null
 ) {
     val textMeasurer = rememberTextMeasurer()
     val tickStyle = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, color = TextSecondary)
@@ -969,14 +1007,19 @@ private fun ApneaVolumeBarChart(
             }
         }
 
-        // Tooltip for the selected bucket
+        // Tooltip for the selected bucket — its date links to the record(s) of that day
         selectedIdx?.let { idx ->
             val p = points.getOrNull(idx) ?: return@let
             ApneaTooltipCard(
                 value = "${p.value.toInt()} hold${if (p.value == 1f) "" else "s"}",
                 date = "${unitLabel.replaceFirstChar { it.uppercase() }} of ${shortDate(p.label)}",
                 color = TextPrimary,
-                vsAvg = if (total > 0) "%+.0f%% vs avg".format((p.value / (total.toFloat() / points.size) - 1f) * 100f) else null
+                vsAvg = if (total > 0) "%+.0f%% vs avg".format((p.value / (total.toFloat() / points.size) - 1f) * 100f) else null,
+                onDateClick = onDateClick?.let { cb ->
+                    {
+                        runCatching { LocalDate.parse(p.label) }.getOrNull()?.let(cb)
+                    }
+                }
             )
         }
     }
