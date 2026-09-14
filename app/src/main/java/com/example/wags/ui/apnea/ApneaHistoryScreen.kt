@@ -38,6 +38,7 @@ import com.example.wags.domain.model.TimeBuckets
 import com.example.wags.domain.model.TimeDimension
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.ui.common.LiveSensorActionsNav
+import com.example.wags.ui.common.StatsIconButton
 import com.example.wags.ui.common.trophyTint
 import com.example.wags.ui.navigation.WagsRoutes
 import com.example.wags.ui.theme.*
@@ -65,6 +66,8 @@ private enum class ApneaHistoryTab(val label: String) {
 @Composable
 fun ApneaHistoryScreen(
     navController: NavController,
+    // Optional tab name to open directly (e.g. "TROPHIES"); empty = default Graphs tab.
+    initialTab: String = "",
     viewModel: ApneaHistoryViewModel = hiltViewModel(),
     // Same nav-scoped instance the embedded All Records tab uses — the shared
     // filter bar below reads and writes its filter state.
@@ -73,7 +76,12 @@ fun ApneaHistoryScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val timeDimension by viewModel.timeDimension.collectAsStateWithLifecycle()
     val trophyEntries by viewModel.trophyEntries.collectAsStateWithLifecycle()
-    var selectedTabOrdinal by rememberSaveable { mutableIntStateOf(ApneaHistoryTab.GRAPHS.ordinal) }
+    var selectedTabOrdinal by rememberSaveable {
+        mutableIntStateOf(
+            if (initialTab == ApneaHistoryTab.TROPHIES.name) ApneaHistoryTab.TROPHIES.ordinal
+            else ApneaHistoryTab.GRAPHS.ordinal
+        )
+    }
     val selectedTab = ApneaHistoryTab.entries[selectedTabOrdinal]
     var displayedMonth by remember { mutableStateOf(YearMonth.now()) }
 
@@ -126,6 +134,12 @@ fun ApneaHistoryScreen(
                     }
                 },
                 actions = {
+                    // Trophy graph shortcut — shown only on the Trophies tab.
+                    // Moved here from PersonalBestsScreen when the trophy views
+                    // were consolidated into this tab.
+                    if (selectedTab == ApneaHistoryTab.TROPHIES) {
+                        StatsIconButton(onClick = { navController.navigate(WagsRoutes.TROPHY_CHART) })
+                    }
                     val hasSensorData = LiveSensorActionsNav(navController)
                     if (!hasSensorData) {
                         IconButton(onClick = { navController.navigate(WagsRoutes.SETTINGS) }) {

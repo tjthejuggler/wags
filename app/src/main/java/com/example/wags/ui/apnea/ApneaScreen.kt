@@ -362,7 +362,16 @@ fun ApneaScreen(
                             navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
                         },
                         onTrophyClick = {
-                            navController.navigate(WagsRoutes.personalBests())
+                            navController.navigate(
+                                WagsRoutes.apneaHistory(
+                                    lungVolume = state.selectedLungVolume,
+                                    prepType   = state.prepType.name,
+                                    timeOfDay  = state.timeOfDay.name,
+                                    posture    = state.posture.name,
+                                    audio      = state.audio.name,
+                                    initialTab = "TROPHIES"
+                                )
+                            )
                         }
                     )
                 }
@@ -386,9 +395,13 @@ fun ApneaScreen(
                         recordForecast = state.progO2RecordForecast,
                         onTrophyClick = {
                             navController.navigate(
-                                WagsRoutes.personalBests(
-                                    drillType = "PROGRESSIVE_O2",
-                                    drillParamValue = state.progO2BreathPeriodSec
+                                WagsRoutes.apneaHistory(
+                                    lungVolume = state.selectedLungVolume,
+                                    prepType   = state.prepType.name,
+                                    timeOfDay  = state.timeOfDay.name,
+                                    posture    = state.posture.name,
+                                    audio      = state.audio.name,
+                                    initialTab = "TROPHIES"
                                 )
                             )
                         }
@@ -414,9 +427,13 @@ fun ApneaScreen(
                         recordForecast = state.minBreathRecordForecast,
                         onTrophyClick = {
                             navController.navigate(
-                                WagsRoutes.personalBests(
-                                    drillType = "MIN_BREATH",
-                                    drillParamValue = state.minBreathSessionDurationSec
+                                WagsRoutes.apneaHistory(
+                                    lungVolume = state.selectedLungVolume,
+                                    prepType   = state.prepType.name,
+                                    timeOfDay  = state.timeOfDay.name,
+                                    posture    = state.posture.name,
+                                    audio      = state.audio.name,
+                                    initialTab = "TROPHIES"
                                 )
                             )
                         }
@@ -442,7 +459,14 @@ fun ApneaScreen(
                         recordForecast = null,
                         onTrophyClick = {
                             navController.navigate(
-                                WagsRoutes.personalBests(drillType = "WONKA_FIRST_CONTRACTION")
+                                WagsRoutes.apneaHistory(
+                                    lungVolume = state.selectedLungVolume,
+                                    prepType   = state.prepType.name,
+                                    timeOfDay  = state.timeOfDay.name,
+                                    posture    = state.posture.name,
+                                    audio      = state.audio.name,
+                                    initialTab = "TROPHIES"
+                                )
                             )
                         }
                     )

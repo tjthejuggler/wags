@@ -84,7 +84,7 @@ object WagsRoutes {
     const val RESONANCE_SESSION = "resonance_session?vibration={vibration}&duration={duration}&infinity={infinity}&rate={rate}"
     const val RESONANCE_SESSION_DETAIL = "resonance_session_detail/{sessionId}"
     const val RATE_RECOMMENDATION = "rate_recommendation"
-    const val APNEA_HISTORY = "apnea_history/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{audio}"
+    const val APNEA_HISTORY = "apnea_history/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{audio}?initialTab={initialTab}"
     const val APNEA_RECORD_DETAIL = "apnea_record_detail/{recordId}"
     const val APNEA_ALL_RECORDS = "apnea_all_records/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{eventTypes}"
     const val FREE_HOLD_ACTIVE = "free_hold_active/{lungVolume}/{prepType}/{timeOfDay}/{posture}/{showTimer}/{audio}"
@@ -146,8 +146,9 @@ object WagsRoutes {
         prepType: String,
         timeOfDay: String,
         posture: String,
-        audio: String = "SILENCE"
-    ) = "apnea_history/$lungVolume/$prepType/$timeOfDay/$posture/$audio"
+        audio: String = "SILENCE",
+        initialTab: String = ""
+    ) = "apnea_history/$lungVolume/$prepType/$timeOfDay/$posture/$audio?initialTab=$initialTab"
     fun apneaRecordDetail(recordId: Long) = "apnea_record_detail/$recordId"
     fun hrvReadinessDetail(readingId: Long) = "hrv_readiness_detail/$readingId"
     fun morningReadinessDetail(readingId: Long) = "morning_readiness_detail/$readingId"
@@ -528,10 +529,14 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
                 navArgument("prepType")   { type = NavType.StringType },
                 navArgument("timeOfDay")  { type = NavType.StringType },
                 navArgument("posture")    { type = NavType.StringType },
-                navArgument("audio")      { type = NavType.StringType; defaultValue = "SILENCE" }
+                navArgument("audio")      { type = NavType.StringType; defaultValue = "SILENCE" },
+                navArgument("initialTab") { type = NavType.StringType; defaultValue = "" }
             )
         ) {
-            ApneaHistoryScreen(navController = navController)
+            ApneaHistoryScreen(
+                navController = navController,
+                initialTab = it.arguments?.getString("initialTab") ?: ""
+            )
         }
         composable(
             route = WagsRoutes.APNEA_RECORD_DETAIL,
