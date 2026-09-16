@@ -2,6 +2,7 @@ package com.example.wags.data.ble
 
 import android.util.Log
 import com.example.wags.domain.model.BleConnectionState
+import com.example.wags.domain.model.DeviceType
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
@@ -18,11 +19,14 @@ private const val TAG = "AutoConnect"
  * Orchestrates automatic BLE reconnection whenever the app is running but no
  * session is active.
  *
- * ## Strategy (v7 — unified device history)
+ * ## Strategy (v8 — preferred-device auto-connect)
  *
  * All devices (Polar, oximeter, generic BLE) are stored in a single unified
- * history list in [DevicePreferencesRepository]. The loop cycles through this
- * list and tries to connect each device until one succeeds.
+ * history list in [DevicePreferencesRepository], but **only preferred devices
+ * are eligible for auto-connect**: Polar H10 straps and O2Ring-style
+ * oximeters. Anything else that was ever connected must be reconnected
+ * manually from Settings. The loop cycles through the eligible list until
+ * one device succeeds.
  *
  * 1. **Get unified device history** — single ordered list of all saved devices
  * 2. **Cycle through devices** — for each, route to Polar SDK or generic GATT
@@ -186,10 +190,15 @@ class AutoConnectManager @Inject constructor(
                 Log.d(TAG, "Session ended — resuming")
             }
 
-            // ── 2. Get unified device history ─────────────────────────────────
-            val history = prefs.deviceHistory
+            // ── 2. Get unified device history (auto-connect eligible only) ────
+            val all = prefs.deviceHistory
+            val history = all.filter { it.isAutoConnectEligible() }
+            val skipped = all.size - history.size
+            if (skipped > 0) {
+                Log.d(TAG, "Auto-connect: skipping $skipped non-preferred device(s) — reconnect manually from Settings")
+            }
 
-            Log.d(TAG, "Device history: ${history.map { "${it.identifier}(polar=${it.isPolar})" }}")
+            Log.d(TAG, "Eligible history: ${history.map { "${it.identifier}(polar=${it.isPolar})" }}")
 
             if (history.isEmpty()) {
                 Log.d(TAG, "No saved devices — waiting ${NO_DEVICE_WAIT_MS}ms")
@@ -370,6 +379,17 @@ class AutoConnectManager @Inject constructor(
             val terminal = resultDeferred.await()
             terminal is BleConnectionState.Connected
         } ?: false
+    }
+
+    /**
+     * v8 auto-connect policy: only the devices this app is actually used
+     * with may reconnect on their own — Polar H10 straps and O2Ring-style
+     * oximeters. A saved Polar entry with a blank name (legacy history) is
+     * assumed to be the user's H10.
+     */
+    private fun SavedDevice.isAutoConnectEligible(): Boolean = when {
+        isPolar -> name.isBlank() || DeviceType.fromName(name) == DeviceType.POLAR_H10
+        else -> DeviceType.fromName(name) == DeviceType.OXIMETER
     }
 
     // ── Constants ─────────────────────────────────────────────────────────────

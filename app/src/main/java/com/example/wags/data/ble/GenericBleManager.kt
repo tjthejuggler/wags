@@ -108,6 +108,9 @@ class GenericBleManager @Inject constructor(
     private val notifyQueue = ArrayDeque<BluetoothGattCharacteristic>()
     private var notifyQueueBusy = false
 
+    /** Timestamp of the last CCCD descriptor write (stall watchdog). */
+    @Volatile private var lastDescriptorWriteAt = 0L
+
     // ── UI Scan ───────────────────────────────────────────────────────────────
 
     fun startScan() {
@@ -503,7 +506,11 @@ class GenericBleManager @Inject constructor(
                 deviceType
             )
 
-            // Start periodic live-data polling for O2Ring devices
+            // Start periodic live-data polling for O2Ring devices.
+            // The poll waits until every CCCD descriptor write has finished —
+            // Android BLE allows only one GATT operation at a time, and a
+            // writeCharacteristic issued while descriptor writes are still
+            // pending silently fails, leaving the ring connected but silent.
             if (isO2Ring) {
                 startO2RingPolling(gatt)
             }
@@ -540,8 +547,22 @@ class GenericBleManager @Inject constructor(
 
     // ── Notification queue drain ──────────────────────────────────────────────
 
+    /** True once every queued characteristic has its notifications enabled. */
+    private fun notifyQueueDrained(): Boolean = notifyQueue.isEmpty() && !notifyQueueBusy
+
     private fun drainNotifyQueue(gatt: BluetoothGatt) {
-        if (notifyQueueBusy || notifyQueue.isEmpty()) return
+        if (notifyQueueBusy) {
+            // Lost onDescriptorWrite callback watchdog: if a descriptor write
+            // never completes (dropped callback, GATT error), the queue would
+            // stall forever and the device would stay connected but silent.
+            if (System.currentTimeMillis() - lastDescriptorWriteAt > NOTIFY_TIMEOUT_MS) {
+                Log.w(TAG, "Descriptor write timeout — forcing queue continue")
+                notifyQueueBusy = false
+            } else {
+                return
+            }
+        }
+        if (notifyQueue.isEmpty()) return
         val chr = notifyQueue.removeFirst()
         notifyQueueBusy = true
         enableNotificationForChar(gatt, chr)
@@ -561,13 +582,21 @@ class GenericBleManager @Inject constructor(
         else
             BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            gatt.writeDescriptor(descriptor, value)
+        lastDescriptorWriteAt = System.currentTimeMillis()
+        val accepted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            gatt.writeDescriptor(descriptor, value) == BluetoothGatt.GATT_SUCCESS
         } else {
             @Suppress("DEPRECATION")
             descriptor.value = value
             @Suppress("DEPRECATION")
             gatt.writeDescriptor(descriptor)
+        }
+        if (!accepted) {
+            // The stack rejected the write (busy / disconnected) — don't wait
+            // for a callback that will never arrive.
+            Log.w(TAG, "writeDescriptor rejected for ${chr.uuid} — continuing queue")
+            notifyQueueBusy = false
+            drainNotifyQueue(gatt)
         }
     }
 
@@ -922,7 +951,12 @@ class GenericBleManager @Inject constructor(
     private fun startO2RingPolling(gatt: BluetoothGatt) {
         o2RingPollJob?.cancel()
         o2RingPollJob = scope.launch {
-            // Small delay to let notification subscriptions settle
+            // Wait until all notification subscriptions are complete — a GATT
+            // write issued before then is silently dropped by the stack.
+            val deadline = System.currentTimeMillis() + O2RING_SUBSCRIBE_TIMEOUT_MS
+            while (!notifyQueueDrained() && isActive && System.currentTimeMillis() < deadline) {
+                delay(100)
+            }
             delay(O2RING_INITIAL_DELAY_MS)
             while (isActive) {
                 synchronized(gattLock) {
@@ -959,5 +993,10 @@ class GenericBleManager @Inject constructor(
         // ── O2Ring polling timing ─────────────────────────────────────────────
         private const val O2RING_POLL_INTERVAL_MS = 2_000L
         private const val O2RING_INITIAL_DELAY_MS = 1_500L
+
+        /** Max wait for CCCD subscriptions before polling starts anyway. */
+        private const val O2RING_SUBSCRIBE_TIMEOUT_MS = 10_000L
+        /** Consider a descriptor write lost after this long without a callback. */
+        private const val NOTIFY_TIMEOUT_MS = 5_000L
     }
 }

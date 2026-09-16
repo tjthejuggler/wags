@@ -45,6 +45,8 @@ class PolarBleManager @Inject constructor(
         private const val RR_CONVERSION_FACTOR = 1000.0 / 1024.0
         private const val HR_STREAM_RETRY_DELAY_MS = 2_000L
         private const val HR_STREAM_MAX_RETRIES = 5
+        private const val HR_WATCHDOG_TICK_MS = 5_000L
+        private const val HR_STALE_MS = 15_000L
     }
 
     val rrBuffer = CircularBuffer<Double>(RR_BUFFER_SIZE)
@@ -67,6 +69,12 @@ class PolarBleManager @Inject constructor(
 
     private val streamJobs = mutableMapOf<String, Job>()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    /** Timestamp of the last HR sample received (any sample counts, even hr=0). */
+    @Volatile private var lastHrSampleAt = 0L
+
+    /** Restarts the HR stream when the device is connected but silent. */
+    private var hrWatchdogJob: Job? = null
 
     private val _scanResults = MutableStateFlow<List<PolarDeviceInfo>>(emptyList())
     val scanResults: StateFlow<List<PolarDeviceInfo>> = _scanResults.asStateFlow()
@@ -138,6 +146,8 @@ class PolarBleManager @Inject constructor(
                 )
                 // HR stream is started from bleSdkFeatureReady(FEATURE_HR) instead
                 // of here, because the SDK may not be ready to stream yet.
+                lastHrSampleAt = System.currentTimeMillis()
+                startHrWatchdog(polarDeviceInfo.deviceId)
             }
 
             override fun deviceConnecting(polarDeviceInfo: PolarDeviceInfo) {
@@ -148,6 +158,7 @@ class PolarBleManager @Inject constructor(
                 _connectionState.value = BleConnectionState.Disconnected
                 stopAllStreams(polarDeviceInfo.deviceId)
                 _liveHr.value = null
+                hrWatchdogJob?.cancel()
                 onDisconnected?.invoke()
             }
 
@@ -326,6 +337,7 @@ class PolarBleManager @Inject constructor(
                 try {
                     polarApi.startHrStreaming(deviceId).toKotlinFlow().collect { hrData ->
                         retries = 0 // reset on successful data
+                        lastHrSampleAt = System.currentTimeMillis()
                         hrData.samples.forEach { sample ->
                             Log.d(TAG, "HR sample: hr=${sample.hr}, rrsMs=${sample.rrsMs}, rrBuffer.totalWrites=${rrBuffer.totalWrites()}")
                             _liveHr.value = sample.hr
@@ -354,6 +366,33 @@ class PolarBleManager @Inject constructor(
                     delay(HR_STREAM_RETRY_DELAY_MS)
                 } else {
                     Log.e(TAG, "startHrStream($deviceId) — max retries reached, giving up")
+                }
+            }
+        }
+    }
+
+    /**
+     * Safety net for "connected but silent" H10s. The SDK fires FEATURE_HR
+     * once per connection; if the stream never starts — or dies after the
+     * bounded retries in [startHrStream] are exhausted — the device used to
+     * sit there without data until the app was restarted. The watchdog
+     * notices the silence and restarts the stream automatically.
+     */
+    private fun startHrWatchdog(deviceId: String) {
+        hrWatchdogJob?.cancel()
+        hrWatchdogJob = scope.launch {
+            while (isActive) {
+                delay(HR_WATCHDOG_TICK_MS)
+                val state = _connectionState.value
+                if (state !is BleConnectionState.Connected || state.deviceId != deviceId) {
+                    return@launch
+                }
+                val streamAlive = streamJobs["$deviceId-hr"]?.isActive == true
+                val silentFor = System.currentTimeMillis() - lastHrSampleAt
+                if (!streamAlive || silentFor > HR_STALE_MS) {
+                    Log.w(TAG, "HR watchdog: streamAlive=$streamAlive, silentFor=${silentFor}ms — restarting HR stream")
+                    lastHrSampleAt = System.currentTimeMillis() // back off before the next kick
+                    startHrStream(deviceId)
                 }
             }
         }
@@ -455,6 +494,7 @@ class PolarBleManager @Inject constructor(
     }
 
     fun cleanup() {
+        hrWatchdogJob?.cancel()
         scope.cancel()
         polarApi.cleanup()
     }

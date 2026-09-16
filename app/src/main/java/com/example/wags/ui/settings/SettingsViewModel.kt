@@ -20,6 +20,8 @@ import com.example.wags.data.spotify.SpotifyAuthManager
 import com.example.wags.domain.model.BleConnectionState
 import com.example.wags.domain.model.HabitEntry
 import com.example.wags.domain.model.ScannedDevice
+import com.example.wags.domain.model.DeviceType
+import kotlinx.coroutines.delay
 import com.example.wags.domain.model.TimeDimension
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
 import com.example.wags.domain.usecase.apnea.ApneaVibrationWarningConfig
@@ -64,6 +66,8 @@ data class SettingsUiState(
     val isScanning: Boolean = false,
     /** Unified scan results — all device types in one list. */
     val scanResults: List<ScannedDevice> = emptyList(),
+    /** True when the scan list also shows non-preferred (generic) devices. */
+    val showAllDevices: Boolean = false,
     // ── Garmin Watch ──────────────────────────────────────────────────────────
     val garminState: GarminConnectionState = GarminConnectionState.Uninitialized,
     // ── Meditation audio directory ─────────────────────────────────────────────
@@ -129,6 +133,7 @@ class SettingsViewModel @Inject constructor(
     private val timeDimensionStore: ApneaTimeDimensionStore
 ) : ViewModel() {
 
+    private val _showAllDevices = MutableStateFlow(false)
     private val _habitState = MutableStateFlow(buildInitialHabitState())
     private val _exportImportState = MutableStateFlow(ExportImportPartialState())
     private val _backfillState = MutableStateFlow(BackfillPartialState())
@@ -203,6 +208,8 @@ class SettingsViewModel @Inject constructor(
         state.copy(apneaVibration = apneaVibration)
     }.combine(timeDimensionStore.dimension) { state, dimension ->
         state.copy(apneaTimeDimension = dimension)
+    }.combine(_showAllDevices) { state, show ->
+        state.copy(showAllDevices = show)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -297,16 +304,32 @@ class SettingsViewModel @Inject constructor(
         deviceManager.stopScan()
     }
 
+    /** Toggle whether the scan list also shows non-preferred (generic) devices. */
+    fun setShowAllDevices(show: Boolean) {
+        _showAllDevices.value = show
+    }
+
     // ── Device connections (unified) ──────────────────────────────────────────
 
     /**
      * Connect to a scanned device. The device type is determined automatically
      * from the device name after connection.
+     *
+     * The UI scan is stopped asynchronously (short delay) rather than before
+     * the connect: both backends cancel/stop the scans they need themselves,
+     * and for generic devices the connect path re-scans the target briefly so
+     * it is fresh in the BLE stack cache when the GATT connect is issued.
+     * Because both managers are app-scoped singletons, the user can leave
+     * this screen immediately after tapping Connect — the connection and its
+     * data stream continue regardless of which screen is visible.
      */
     fun connectDevice(device: ScannedDevice) {
-        stopScan()
         autoConnectManager.notifyUserConnect()
         deviceManager.connect(device)
+        viewModelScope.launch {
+            delay(STOP_SCAN_AFTER_CONNECT_MS)
+            deviceManager.stopScan()
+        }
     }
 
     /**
@@ -483,7 +506,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     override fun onCleared() {
-        stopScan()
+        deviceManager.stopScan()
         super.onCleared()
     }
 
@@ -557,6 +580,9 @@ private data class ExportImportPartialState(
     val exportImportMessage: String? = null,
     val exportImportError: String? = null
 )
+
+/** Grace period after a manual connect before the UI scan is stopped. */
+private const val STOP_SCAN_AFTER_CONNECT_MS = 500L
 
 private data class BackfillPartialState(
     val isBackfilling: Boolean = false,

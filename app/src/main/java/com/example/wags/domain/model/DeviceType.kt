@@ -68,5 +68,24 @@ enum class DeviceType(val capabilities: Set<DeviceCapability>) {
                 else -> GENERIC_BLE
             }
         }
+
+        /**
+         * True for the device types this app is actually used with: the
+         * Polar H10 chest strap and pulse oximeters (O2Ring / Viatom /
+         * Wellue).
+         *
+         * Used by the Settings scan list (preferred sensors are shown
+         * immediately; everything else is hidden behind a "Show all"
+         * option) and by the auto-connect loop (only preferred devices
+         * may reconnect automatically).
+         *
+         * Note: [fromName] maps unknown "Polar …" names to [POLAR_H10],
+         * so an H10 whose name hasn't been resolved yet still counts as
+         * preferred.
+         */
+        fun isPreferred(name: String): Boolean {
+            val type = fromName(name)
+            return type == POLAR_H10 || type == OXIMETER
+        }
     }
 }

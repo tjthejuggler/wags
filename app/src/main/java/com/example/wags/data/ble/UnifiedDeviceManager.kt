@@ -146,7 +146,13 @@ class UnifiedDeviceManager @Inject constructor(
         if (isPolar) {
             polarBleManager.connectDevice(identifier)
         } else {
-            genericBleManager.connect(identifier)
+            // Scan-then-connect: a direct connectGatt() for a device that has
+            // just dropped out of the active scan frequently hangs forever on
+            // several Android BLE stacks. Briefly scanning for the target
+            // first makes the connection reliable (same path the
+            // AutoConnectManager uses). Falls back to a direct connect
+            // internally if the scanner is unavailable.
+            genericBleManager.connectWithScan(identifier)
         }
     }
 

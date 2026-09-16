@@ -158,15 +158,26 @@ fun GarminWatchSection(
 
 // ── Nearby sensors scan sub-section ───────────────────────────────────────────
 
+/**
+ * Preferred sensors (Polar H10, O2Ring-style oximeters) are shown directly;
+ * everything else the phone discovers is collapsed behind a "Show all
+ * devices" toggle so the list stays focused on the devices actually used.
+ */
 @Composable
 fun NearbySensorsSection(
     isScanning: Boolean,
     scanResults: List<ScannedDevice>,
     deviceState: BleConnectionState,
+    showAllDevices: Boolean,
+    onToggleShowAll: () -> Unit,
     onScan: () -> Unit,
     onStopScan: () -> Unit,
     onConnect: (ScannedDevice) -> Unit
 ) {
+    val preferred = scanResults.filter { DeviceType.isPreferred(it.name) }
+    val other = scanResults.filterNot { DeviceType.isPreferred(it.name) }
+        .sortedByDescending { it.rssi }
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -204,19 +215,48 @@ fun NearbySensorsSection(
         // Empty state
         if (scanResults.isEmpty() && !isScanning) {
             Text(
-                "No devices found. Make sure your sensors are powered on, then tap Scan.",
+                "No sensors found. Make sure your H10 / O2Ring is powered on, then tap Scan.",
                 style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary
             )
         }
 
-        // Scan results
-        scanResults.forEach { device ->
+        // Preferred sensors first (H10, O2Ring) — always visible
+        preferred.forEach { device ->
             DeviceResultRow(
                 device = device,
                 deviceState = deviceState,
                 onConnect = { onConnect(device) }
             )
+        }
+
+        // Everything else — collapsed behind a "Show all" toggle
+        if (other.isNotEmpty() && !showAllDevices) {
+            OutlinedButton(
+                onClick = onToggleShowAll,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
+            ) {
+                Text("Show all devices (${other.size})")
+            }
+        }
+        if (showAllDevices) {
+            other.forEach { device ->
+                DeviceResultRow(
+                    device = device,
+                    deviceState = deviceState,
+                    onConnect = { onConnect(device) }
+                )
+            }
+            if (other.isNotEmpty()) {
+                OutlinedButton(
+                    onClick = onToggleShowAll,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
+                ) {
+                    Text("Show preferred sensors only")
+                }
+            }
         }
     }
 }

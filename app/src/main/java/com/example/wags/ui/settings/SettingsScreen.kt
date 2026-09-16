@@ -129,6 +129,10 @@ fun SettingsScreen(
         viewModel.loadHabits()
     }
 
+    // Stop the UI discovery scan when leaving this screen. Connections are
+    // owned by app-scoped singletons (UnifiedDeviceManager / AutoConnectManager),
+    // so a connect that was just tapped keeps running — and its stream starts —
+    // no matter which screen the user navigates to.
     DisposableEffect(Unit) {
         onDispose { viewModel.stopScan() }
     }
@@ -210,6 +214,8 @@ fun SettingsScreen(
                         isScanning = state.isScanning,
                         scanResults = state.scanResults,
                         deviceState = state.deviceState,
+                        showAllDevices = state.showAllDevices,
+                        onToggleShowAll = { viewModel.setShowAllDevices(!state.showAllDevices) },
                         onScan = { requestScan() },
                         onStopScan = { viewModel.stopScan() },
                         onConnect = { viewModel.connectDevice(it) }
