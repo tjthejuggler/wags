@@ -532,13 +532,20 @@ class BiofeedbackSonificationEngine @Inject constructor() {
      * have no bundled WAV — they return null and SoundscapeRenderer falls
      * back to additive synthesis. Never call Map.getValue here: a missing
      * key previously threw NoSuchElementException and crashed the picker.
+     *
+     * Each recording is peak-normalised on load, exactly like the HR
+     * one-shots: the bundled field recordings vary hugely in level (the
+     * ocean waves file peaks at 0.43 vs 0.71 for the rain veranda), and an
+     * un-normalised quiet bed was inaudible under the HR instrument — the
+     * Ocean texture's opening scene (100–90 %) was effectively silent on
+     * phone speakers until the loon entered at 90 %.
      */
     private fun layerFor(kind: LayerKind): FloatArray? {
         samplesByKind[kind]?.let { return it }
         val res = RES_BY_KIND[kind] ?: return null // synth-only layer
         val ctx = appContext ?: return null
         return synchronized(samplesByKind) {
-            samplesByKind.getOrPut(kind) { loadWav(ctx, res) }
+            samplesByKind.getOrPut(kind) { normalize(loadWav(ctx, res)) }
         }
     }
 

@@ -144,13 +144,15 @@ class SoundscapeRenderer(
             ),
 
             // ── OCEAN — from a sunny lake shore into the abyss ──────────────
-            //  100-90  calm waves; gulls wheel overhead
+            //  100-90  calm waves; gulls wheel overhead (bed gain kept high —
+            //          wave rumble is low-frequency energy that phone
+            //          speakers barely reproduce, so it needs headroom)
             //   90-84  a loon calls across the water
             //   85-78  heavier surf swells and gusts
             //   78-62  we slip beneath: whale song rises from the deep
             //   65-40  deep sub pulse; 55-40 sparse sonar-like drips
             BiofeedbackSpo2Texture.OCEAN to listOf(
-                SoundscapeLayer(LayerKind.OCEAN_BED, 100, 40, 0.15f),
+                SoundscapeLayer(LayerKind.OCEAN_BED, 100, 40, 0.22f),
                 SoundscapeLayer(LayerKind.GULLS, 100, 90, 0.13f),
                 SoundscapeLayer(LayerKind.LOON, 90, 84, 0.15f),
                 SoundscapeLayer(LayerKind.WIND_GUST, 85, 78, 0.13f),
@@ -322,7 +324,12 @@ class SoundscapeRenderer(
             if (samples[kind] != null) renderBed(chunk, kind, st, gain, lpCoef) else fallback()
         }
         when (kind) {
-            LayerKind.OCEAN_BED -> renderBed(chunk, LayerKind.OCEAN_BED, st, gain, lpCoef = 0.20f)
+            // lpCoef 0.35 (cutoff ~2.5 kHz) instead of 0.20: the wave
+            // recording's audible "wash" lives in the 400 Hz–2 kHz band that
+            // the old filter removed, leaving only sub-rumble that phone
+            // speakers cannot reproduce (the opening ocean scene was silent
+            // until normalisation + this filter change).
+            LayerKind.OCEAN_BED -> renderBed(chunk, LayerKind.OCEAN_BED, st, gain, lpCoef = 0.35f)
             LayerKind.RAIN_ROOF -> bedOr(lpCoef = 0.35f) { renderRain(chunk, st, gain, heavy = false) }
             LayerKind.RIVER -> bedOr(lpCoef = 0.35f) { renderRain(chunk, st, gain, heavy = true) }
             LayerKind.FROGS -> bedOr(lpCoef = 0.45f) { renderCrickets(chunk, st, gain) }
