@@ -41,22 +41,14 @@ enum class RecordSortOrder(val label: String) {
  *   null  → Free Hold (tableType IS NULL)
  *   "O2"  → O₂ Table
  *   etc.
- *
- * The special sentinel [FREE_HOLD_PB_SENTINEL] ("FREE_HOLD_PB") is used to
- * represent "Free Hold Personal Bests" — it is not a real tableType value but
- * is handled specially in the ViewModel.
  */
 data class ApneaEventType(
     val label: String,
-    val tableTypeValue: String?   // null = free hold; FREE_HOLD_PB_SENTINEL = PB free holds
+    val tableTypeValue: String?   // null = free hold
 ) {
     companion object {
-        /** Sentinel value used in [tableTypeValue] to identify the PB-free-hold filter. */
-        const val FREE_HOLD_PB_SENTINEL = "FREE_HOLD_PB"
-
         val ALL: List<ApneaEventType> = listOf(
             ApneaEventType("Free Hold",              null),
-            ApneaEventType("Free Hold Best",         FREE_HOLD_PB_SENTINEL),
             ApneaEventType("O₂ Table",               "O2"),
             ApneaEventType("CO₂ Table",              "CO2"),
             ApneaEventType("Progressive O₂",         "PROGRESSIVE_O2"),
@@ -65,10 +57,9 @@ data class ApneaEventType(
             ApneaEventType("Contraction Count",       "WONKA_ENDURANCE"),
         )
 
-        /** All tableTypeValues that are "real" DB types (excludes the PB sentinel). */
+        /** All tableTypeValues that are "real" DB types. */
         val REAL_TABLE_TYPE_VALUES: Set<String?> =
             ALL.map { it.tableTypeValue }
-               .filter { it != FREE_HOLD_PB_SENTINEL }
                .toSet()
     }
 }
@@ -101,8 +92,8 @@ data class AllApneaRecordsUiState(
 
     // ── Event-type filter ─────────────────────────────────────────────────────
     /**
-     * Which event types are currently selected (by tableTypeValue, including the PB sentinel).
-     * Defaults to Free Hold only (PB sentinel excluded).
+     * Which event types are currently selected (by tableTypeValue).
+     * Defaults to Free Hold only.
      */
     val selectedEventTypes: Set<String?> = setOf(null),
 
@@ -241,8 +232,7 @@ class AllApneaRecordsViewModel @Inject constructor(
      * Replaces every filter at once (used when drilling into this screen from
      * elsewhere, e.g. tapping an average in the Settings comparison tab).
      *
-     * @param eventTypes tableType values to select (null = free hold); the
-     * "Free Hold Best" sentinel is never set by this path.
+     * @param eventTypes tableType values to select (null = free hold).
      */
     fun applyPresetFilters(
         lungVolume: String,
@@ -288,7 +278,7 @@ class AllApneaRecordsViewModel @Inject constructor(
     }
 
     fun selectAllEventTypes() {
-        // "Select All" includes every event type, including the PB sentinel
+        // "Select All" includes every event type
         val all = ApneaEventType.ALL.map { it.tableTypeValue }.toSet()
         _uiState.update { it.copy(selectedEventTypes = all) }
         loadAllRecords()
@@ -326,44 +316,12 @@ class AllApneaRecordsViewModel @Inject constructor(
                 return@launch
             }
 
-            // Separate the PB sentinel from real types
-            val pbSelected    = selected.contains(ApneaEventType.FREE_HOLD_PB_SENTINEL)
-            val realSelected  = selected.filter { it != ApneaEventType.FREE_HOLD_PB_SENTINEL }.toSet()
-
             val fetched: List<ApneaRecordEntity> = when {
                 // Nothing selected → empty
                 selected.isEmpty() -> emptyList()
 
-                // Only PB sentinel selected → fetch PB free holds
-                pbSelected && realSelected.isEmpty() -> {
-                    repository.getPagedPersonalBestFreeHolds(
-                        lungVolume = sqlFilter(s.filterLungVolume),
-                        prepType   = sqlFilter(s.filterPrepType),
-                        timeOfDay  = sqlFilter(s.filterTimeOfDay),
-                        posture    = sqlFilter(s.filterPosture),
-                        audio      = sqlFilter(s.filterAudio),
-                        pageSize   = FETCH_ALL,
-                        offset     = 0
-                    )
-                }
-
-                // PB sentinel + real types → fetch both and merge
-                pbSelected -> {
-                    val pbPage = repository.getPagedPersonalBestFreeHolds(
-                        lungVolume = sqlFilter(s.filterLungVolume),
-                        prepType   = sqlFilter(s.filterPrepType),
-                        timeOfDay  = sqlFilter(s.filterTimeOfDay),
-                        posture    = sqlFilter(s.filterPosture),
-                        audio      = sqlFilter(s.filterAudio),
-                        pageSize   = FETCH_ALL,
-                        offset     = 0
-                    )
-                    val realPage = fetchRealTypes(s, realSelected, FETCH_ALL, 0)
-                    (pbPage + realPage).distinctBy { it.recordId }
-                }
-
-                // Only real types (all selected = no type filter)
-                realSelected.size == ApneaEventType.REAL_TABLE_TYPE_VALUES.size -> {
+                // All selected = no type filter
+                selected.size == ApneaEventType.REAL_TABLE_TYPE_VALUES.size -> {
                     repository.getPagedRecords(
                         lungVolume = sqlFilter(s.filterLungVolume),
                         prepType   = sqlFilter(s.filterPrepType),
@@ -376,7 +334,7 @@ class AllApneaRecordsViewModel @Inject constructor(
                     )
                 }
 
-                else -> fetchRealTypes(s, realSelected, FETCH_ALL, 0)
+                else -> fetchRealTypes(s, selected, FETCH_ALL, 0)
             }
 
             // Multi-select refinement — the SQL layer only narrows single-value selections.
@@ -448,7 +406,7 @@ class AllApneaRecordsViewModel @Inject constructor(
      * Returns (null, "") when the chart should not be shown.
      *
      * For a single-type selection the chart shows the primary metric over time:
-     *   - Free Hold / Free Hold Best → hold duration (ms)
+     *   - Free Hold → hold duration (ms)
      *   - O₂ Table / CO₂ Table      → hold duration (ms) — longest hold in the session
      *   - Progressive O₂            → hold duration (ms)
      *   - Min Breath                → hold duration (ms)
@@ -469,8 +427,7 @@ class AllApneaRecordsViewModel @Inject constructor(
 
         // Determine Y metric extractor and label
         val metricPair: Pair<(ApneaRecordEntity) -> Float?, String> = when (singleType) {
-            null,
-            ApneaEventType.FREE_HOLD_PB_SENTINEL -> Pair(
+            null -> Pair(
                 { r: ApneaRecordEntity -> r.durationMs.toFloat() },
                 "Hold duration"
             )

@@ -1423,18 +1423,6 @@ class ApneaRepository @Inject constructor(
         }
     }
 
-    suspend fun getPagedPersonalBestFreeHolds(
-        lungVolume: String,
-        prepType: String,
-        timeOfDay: String,
-        posture: String,
-        audio: String,
-        pageSize: Int,
-        offset: Int
-    ): List<ApneaRecordEntity> = withContext(ioDispatcher) {
-        dao.getPagedPersonalBestFreeHolds(lungVolume, prepType, timeOfDay, posture, audio, pageSize, offset)
-    }
-
     suspend fun getById(recordId: Long): ApneaRecordEntity? =
         dao.getById(recordId)
 

@@ -639,38 +639,6 @@ interface ApneaRecordDao {
         offset: Int
     ): List<ApneaRecordEntity>
 
-    @Query("""
-        SELECT r.* FROM apnea_records r
-        WHERE r.tableType IS NULL
-          AND (:lungVolume = '' OR r.lungVolume = :lungVolume)
-          AND (:prepType   = '' OR r.prepType   = :prepType)
-          AND $TOD_MATCH_R_OR_EMPTY
-          AND (:posture    = '' OR r.posture    = :posture)
-          AND (:audio      = '' OR r.audio      = :audio)
-          AND NOT EXISTS (
-              SELECT 1 FROM apnea_records older
-              WHERE older.tableType IS NULL
-                AND (:lungVolume = '' OR older.lungVolume = :lungVolume)
-                AND (:prepType   = '' OR older.prepType   = :prepType)
-                AND $TOD_MATCH_OLDER_OR_EMPTY
-                AND (:posture    = '' OR older.posture    = :posture)
-                AND (:audio      = '' OR older.audio      = :audio)
-                AND older.timestamp < r.timestamp
-                AND older.durationMs >= r.durationMs
-          )
-        ORDER BY r.timestamp DESC
-        LIMIT :limit OFFSET :offset
-    """)
-    suspend fun getPagedPersonalBestFreeHolds(
-        lungVolume: String,
-        prepType: String,
-        timeOfDay: String,
-        posture: String,
-        audio: String,
-        limit: Int,
-        offset: Int
-    ): List<ApneaRecordEntity>
-
     // ── Global best (no setting constraints) ─────────────────────────────────
 
     @Query("SELECT MAX(durationMs) FROM apnea_records WHERE tableType IS NULL")

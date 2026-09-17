@@ -26,6 +26,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -39,6 +40,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.wags.domain.model.TimeBuckets
 import com.example.wags.ui.theme.*
 import java.time.LocalDate
 import kotlin.math.abs
@@ -148,7 +150,17 @@ fun ApneaGraphsTabContent(
             }
         }
 
-        // ── 3. Training volume ────────────────────────────────────────────
+        // ── 3. Personal bests by hour ─────────────────────────────────────
+        if (chartData.bestByHour.any { it.holds > 0 }) {
+            ApneaGraphSectionCard(
+                title = "Personal Bests by Hour",
+                subtitle = "Longest filtered hold per hour of day · gaps = no holds that hour"
+            ) {
+                ApneaHourBestBarChart(hourBests = chartData.bestByHour)
+            }
+        }
+
+        // ── 4. Training volume ────────────────────────────────────────────
         if (chartData.volumePerBucket.isNotEmpty()) {
             ApneaGraphSectionCard(
                 title = "Training Volume",
@@ -162,7 +174,7 @@ fun ApneaGraphsTabContent(
             }
         }
 
-        // ── 4. Heart Rate ─────────────────────────────────────────────────
+        // ── 5. Heart Rate ─────────────────────────────────────────────────
         if (chartData.minHr.isNotEmpty() || chartData.maxHr.isNotEmpty() || chartData.hrDrop.isNotEmpty()) {
             ApneaGraphSectionCard(
                 title = "Heart Rate",
@@ -205,7 +217,7 @@ fun ApneaGraphsTabContent(
             }
         }
 
-        // ── 5. Oximetry ───────────────────────────────────────────────────
+        // ── 6. Oximetry ───────────────────────────────────────────────────
         if (chartData.lowestSpO2.isNotEmpty()) {
             ApneaGraphSectionCard(
                 title = "Oximetry",
@@ -222,7 +234,7 @@ fun ApneaGraphsTabContent(
             }
         }
 
-        // ── 6. Contractions ───────────────────────────────────────────────
+        // ── 7. Contractions ───────────────────────────────────────────────
         if (chartData.firstContractionSec.isNotEmpty() || chartData.contractionEasePct.isNotEmpty()) {
             ApneaGraphSectionCard(
                 title = "Contractions",
@@ -1020,6 +1032,214 @@ private fun ApneaVolumeBarChart(
                         runCatching { LocalDate.parse(p.label) }.getOrNull()?.let(cb)
                     }
                 }
+            )
+        }
+    }
+}
+
+// ── Personal bests by hour bar chart ────────────────────────────────────────────
+
+/**
+ * Bar chart of the best filtered hold per hour of the day (24 fixed slots,
+ * index = hour). Empty hours show as gaps, the peak hour is highlighted, the
+ * current hour is marked with a dashed line and each bar is tap-to-inspect.
+ */
+@Composable
+private fun ApneaHourBestBarChart(hourBests: List<ApneaHourBest>) {
+    val textMeasurer = rememberTextMeasurer()
+    val tickStyle = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, color = TextSecondary)
+
+    val active = remember(hourBests) { hourBests.filter { it.holds > 0 } }
+    if (active.isEmpty()) {
+        Text(
+            "No data yet",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextDisabled,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center
+        )
+        return
+    }
+
+    val overallBest = active.maxOf { it.bestSec }
+    val yPad = (overallBest * 0.12f).coerceAtLeast(1f)
+    val yMax = overallBest + yPad
+    val ticks = remember(yMax) { niceTicks(0f, yMax, maxTicks = 3) }
+    val tickLayouts = remember(ticks) {
+        ticks.map { textMeasurer.measure(formatSecondsCompact(it), tickStyle) }
+    }
+    val maxTickWidth = tickLayouts.maxOf { it.size.width }
+
+    // Six evenly spaced hour labels: 00, 04, 08, 12, 16, 20
+    val xLabelHours = remember { listOf(0, 4, 8, 12, 16, 20) }
+    val xLayouts = remember(xLabelHours) {
+        xLabelHours.map { h -> textMeasurer.measure("%02d".format(h), tickStyle) }
+    }
+
+    val peakHour = remember(active) { active.maxByOrNull { it.bestSec }?.hour ?: 0 }
+    val totalHolds = remember(hourBests) { hourBests.sumOf { it.holds } }
+    val currentHour = remember { TimeBuckets.hourOfTimestamp(System.currentTimeMillis()) }
+
+    var selectedHour by remember { mutableStateOf<Int?>(null) }
+
+    val reveal = remember { Animatable(0f) }
+    LaunchedEffect(hourBests) {
+        reveal.snapTo(0f)
+        reveal.animateTo(1f, animationSpec = tween(durationMillis = 650, easing = FastOutSlowInEasing))
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "Overall best ${formatSecondsCompact(overallBest)} · $totalHolds holds",
+                style = MaterialTheme.typography.labelMedium,
+                color = TextSecondary
+            )
+            Text(
+                "tap a bar to inspect",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextDisabled
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+        ) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .pointerInput(hourBests) {
+                        detectTapGestures { tapOffset ->
+                            val gutter = maxTickWidth + 12.dp.toPx()
+                            val plotWidth = size.width - gutter - 6.dp.toPx()
+                            if (plotWidth <= 0f) return@detectTapGestures
+                            val slot = plotWidth / 24f
+                            val hour = ((tapOffset.x - gutter) / slot).toInt().coerceIn(0, 23)
+                            selectedHour = if (selectedHour == hour) null else hour
+                        }
+                    }
+            ) {
+                val gutter = maxTickWidth + 12.dp.toPx()
+                val plotLeft = gutter
+                val plotRight = size.width - 6.dp.toPx()
+                val plotTop = 6.dp.toPx()
+                val plotBottom = size.height - 2.dp.toPx()
+                val w = plotRight - plotLeft
+                val h = plotBottom - plotTop
+                if (w <= 0f || h <= 0f) return@Canvas
+
+                val slot = w / 24f
+                val barW = (slot * 0.62f).coerceAtLeast(2f)
+
+                // Gridlines + y labels
+                ticks.forEachIndexed { ti, tick ->
+                    val ty = plotBottom - (tick / yMax) * h
+                    drawLine(
+                        color = TextDisabled.copy(alpha = 0.18f),
+                        start = Offset(plotLeft, ty),
+                        end = Offset(plotRight, ty),
+                        strokeWidth = 1f
+                    )
+                    val layout = tickLayouts[ti]
+                    drawText(
+                        layout,
+                        topLeft = Offset(
+                            x = (gutter - 6.dp.toPx() - layout.size.width).coerceAtLeast(0f),
+                            y = (ty - layout.size.height / 2f).coerceIn(0f, size.height - layout.size.height)
+                        )
+                    )
+                }
+
+                // "Now" marker: dashed vertical line behind the current hour's slot
+                val nowCx = plotLeft + (currentHour + 0.5f) * slot
+                drawLine(
+                    color = TextSecondary.copy(alpha = 0.55f),
+                    start = Offset(nowCx, plotTop),
+                    end = Offset(nowCx, plotBottom),
+                    strokeWidth = 1.2f,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 5f))
+                )
+
+                // Bars (empty hours stay as gaps)
+                hourBests.forEach { hb ->
+                    if (hb.holds <= 0 || hb.bestSec <= 0f) return@forEach
+                    val fraction = (hb.bestSec / yMax) * reveal.value
+                    val barH = (fraction * h).coerceIn(0f, h)
+                    val x = plotLeft + hb.hour * slot + (slot - barW) / 2f
+                    val isPeak = hb.hour == peakHour
+                    val isSelected = hb.hour == selectedHour
+                    drawRoundRect(
+                        color = when {
+                            isSelected -> TextPrimary
+                            isPeak -> EcgCyan
+                            else -> EcgCyanDim.copy(alpha = 0.75f)
+                        },
+                        topLeft = Offset(x, plotBottom - barH),
+                        size = Size(barW, barH.coerceAtLeast(3f)),
+                        cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx())
+                    )
+                }
+
+                // Value label above the peak bar
+                val peakLayout = textMeasurer.measure(
+                    formatSecondsCompact(overallBest),
+                    tickStyle.copy(color = TextPrimary, fontWeight = FontWeight.Bold)
+                )
+                val peakX = plotLeft + peakHour * slot + slot / 2f
+                drawText(
+                    peakLayout,
+                    topLeft = Offset(
+                        x = (peakX - peakLayout.size.width / 2f)
+                            .coerceIn(plotLeft, (plotRight - peakLayout.size.width).coerceAtLeast(plotLeft)),
+                        y = (plotBottom - (overallBest / yMax) * h * reveal.value -
+                            peakLayout.size.height - 3.dp.toPx()).coerceAtLeast(0f)
+                    )
+                )
+            }
+
+            // X-axis hour labels
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(14.dp)
+            ) {
+                val gutter = maxTickWidth + 12.dp.toPx()
+                val plotLeft = gutter
+                val plotRight = size.width - 6.dp.toPx()
+                val w = plotRight - plotLeft
+                if (w <= 0f) return@Canvas
+                val slot = w / 24f
+                xLabelHours.forEachIndexed { li, hour ->
+                    val cx = plotLeft + (hour + 0.5f) * slot
+                    val layout = xLayouts[li]
+                    val x = (cx - layout.size.width / 2f)
+                        .coerceIn(plotLeft, (plotRight - layout.size.width).coerceAtLeast(plotLeft))
+                    drawText(layout, topLeft = Offset(x, 0f))
+                }
+            }
+        }
+
+        Text(
+            "┆ current hour · bright bar = peak hour",
+            style = MaterialTheme.typography.labelSmall,
+            color = TextDisabled
+        )
+
+        // Tooltip for the selected hour
+        selectedHour?.let { hour ->
+            val hb = hourBests.getOrNull(hour) ?: return@let
+            ApneaTooltipCard(
+                value = if (hb.holds > 0) formatSecondsCompact(hb.bestSec) else "—",
+                date = "Hour %02d · %d hold%s".format(hour, hb.holds, if (hb.holds == 1) "" else "s"),
+                color = TextPrimary,
+                vsAvg = null
             )
         }
     }

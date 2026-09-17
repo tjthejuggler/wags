@@ -54,6 +54,15 @@ enum class ApneaChartTimePeriod(val label: String, val days: Int?) {
 /** A single (x=index, y=value) point for a line chart. */
 data class ApneaChartPoint(val dayIndex: Float, val value: Float, val label: String)
 
+/** Aggregated best-hold stats for a single hour of the day (0–23). */
+data class ApneaHourBest(
+    val hour: Int,
+    /** Longest filtered hold that started in this hour (seconds). */
+    val bestSec: Float,
+    /** Number of filtered holds that started in this hour. */
+    val holds: Int
+)
+
 /** All chart series derived from the apnea free-hold history. */
 data class ApneaChartData(
     /** Hold duration (seconds) over time — free holds only. */
@@ -76,6 +85,8 @@ data class ApneaChartData(
     val contractionEasePct: List<ApneaChartPoint> = emptyList(),
     /** Peak-to-lowest heart-rate drop (bpm) per hold — only records with HR data. */
     val hrDrop: List<ApneaChartPoint> = emptyList(),
+    /** Best hold (seconds) per hour of day — 24 fixed slots, index = hour, from the filtered records. */
+    val bestByHour: List<ApneaHourBest> = (0..23).map { ApneaHourBest(it, 0f, 0) },
 )
 
 /**
@@ -127,7 +138,7 @@ data class SharedChartFilter(
     val audio: Set<String> = emptySet(),
     /** True when the timeOfDay set contains hour buckets (BY_HOUR mode). */
     val byHourTod: Boolean = false,
-    /** Selected event types (real tableType values; the PB sentinel is excluded). */
+    /** Selected event types (real tableType values). */
     val eventTypes: Set<String?> = emptySet()
 )
 
@@ -291,7 +302,7 @@ class ApneaHistoryViewModel @Inject constructor(
             posture = posture,
             audio = audio,
             byHourTod = timeOfDay.any { TimeBuckets.isHourBucket(it) },
-            eventTypes = eventTypes.filter { it != ApneaEventType.FREE_HOLD_PB_SENTINEL }.toSet()
+            eventTypes = eventTypes
         )
 
         // Stats tab speaks single-value-or-ALL: a lone selection maps to that
@@ -305,7 +316,6 @@ class ApneaHistoryViewModel @Inject constructor(
 
         // Settings comparison tab: map tableType values to comparison keys
         val cmpKeys = eventTypes
-            .filter { it != ApneaEventType.FREE_HOLD_PB_SENTINEL }
             .map { ComparisonSessionType.keyOf(it) }
             .toSet()
         if (cmpKeys.isNotEmpty()) _cmpSessionTypes.value = cmpKeys
@@ -583,6 +593,8 @@ class ApneaHistoryViewModel @Inject constructor(
         val pbProgression       = mutableListOf<ApneaChartPoint>()
         val contractionEasePct  = mutableListOf<ApneaChartPoint>()
         val hrDrop              = mutableListOf<ApneaChartPoint>()
+        val bestSecByHour       = FloatArray(24)
+        val holdsByHour         = IntArray(24)
 
         var runningBestSec = 0f
         chronological.forEachIndexed { idx, e ->
@@ -592,6 +604,10 @@ class ApneaHistoryViewModel @Inject constructor(
 
             val durationSec = e.durationMs / 1000f
             holdDuration.add(ApneaChartPoint(x, durationSec, label))
+            // Hour-of-day bests: bucket by the record's local start hour.
+            val hour = Instant.ofEpochMilli(e.timestamp).atZone(zone).hour
+            if (durationSec > bestSecByHour[hour]) bestSecByHour[hour] = durationSec
+            holdsByHour[hour]++
             // Physiologically impossible values (< 10) are sensor glitches —
             // they would wreck the y-axis, so they are excluded.
             if (e.minHrBpm >= 10f) minHr.add(ApneaChartPoint(x, e.minHrBpm, label))
@@ -623,6 +639,7 @@ class ApneaHistoryViewModel @Inject constructor(
             volumeBucketLabel   = volumeUnit,
             contractionEasePct  = contractionEasePct,
             hrDrop              = hrDrop,
+            bestByHour          = (0..23).map { h -> ApneaHourBest(h, bestSecByHour[h], holdsByHour[h]) },
         )
     }
 
