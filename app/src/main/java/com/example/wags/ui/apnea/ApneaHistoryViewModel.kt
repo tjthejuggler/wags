@@ -139,7 +139,14 @@ data class SharedChartFilter(
     /** True when the timeOfDay set contains hour buckets (BY_HOUR mode). */
     val byHourTod: Boolean = false,
     /** Selected event types (real tableType values). */
-    val eventTypes: Set<String?> = emptySet()
+    val eventTypes: Set<String?> = emptySet(),
+    /**
+     * Progressive O₂ breath-period narrowing from the shared bar's special
+     * row (null = every breath period).
+     */
+    val progO2Params: Set<Int>? = null,
+    /** Min Breath session-duration narrowing (null = every duration). */
+    val minBreathParams: Set<Int>? = null
 )
 
 data class ApneaHistoryUiState(
@@ -293,7 +300,9 @@ class ApneaHistoryViewModel @Inject constructor(
         timeOfDay: Set<String>,
         posture: Set<String>,
         audio: Set<String>,
-        eventTypes: Set<String?>
+        eventTypes: Set<String?>,
+        progO2Params: Set<Int>? = null,
+        minBreathParams: Set<Int>? = null
     ) {
         _chartFilter.value = SharedChartFilter(
             lungVolume = lungVolume,
@@ -302,7 +311,9 @@ class ApneaHistoryViewModel @Inject constructor(
             posture = posture,
             audio = audio,
             byHourTod = timeOfDay.any { TimeBuckets.isHourBucket(it) },
-            eventTypes = eventTypes
+            eventTypes = eventTypes,
+            progO2Params = progO2Params,
+            minBreathParams = minBreathParams
         )
 
         // Stats tab speaks single-value-or-ALL: a lone selection maps to that
@@ -358,6 +369,14 @@ class ApneaHistoryViewModel @Inject constructor(
         }
         val chartRecords = settingsFiltered
             .filter { it.tableType in chartFilter.eventTypes }
+            .filter { r ->
+                // Drill-parameter narrowing from the shared bar's special rows.
+                when (r.tableType) {
+                    "PROGRESSIVE_O2" -> chartFilter.progO2Params?.contains(r.drillParamValue) ?: true
+                    "MIN_BREATH"     -> chartFilter.minBreathParams?.contains(r.drillParamValue) ?: true
+                    else             -> true
+                }
+            }
             .reversed()
         val totalFreeHoldCount = chartRecords.size
         val (filteredForChart, canBack, canFwd) = filterByPeriod(chartRecords, timePeriod, periodOffset, zone)

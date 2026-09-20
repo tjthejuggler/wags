@@ -18,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -97,7 +98,8 @@ fun ApneaHistoryScreen(
     // Push shared filter changes into the history charts / stats / comparison
     LaunchedEffect(
         filterState.filterLungVolume, filterState.filterPrepType, filterState.filterTimeOfDay,
-        filterState.filterPosture, filterState.filterAudio, filterState.selectedEventTypes
+        filterState.filterPosture, filterState.filterAudio, filterState.selectedEventTypes,
+        filterState.selectedProgO2Params, filterState.selectedMinBreathParams
     ) {
         viewModel.syncSharedFilters(
             lungVolume = filterState.filterLungVolume,
@@ -105,7 +107,9 @@ fun ApneaHistoryScreen(
             timeOfDay = filterState.filterTimeOfDay,
             posture = filterState.filterPosture,
             audio = filterState.filterAudio,
-            eventTypes = filterState.selectedEventTypes
+            eventTypes = filterState.selectedEventTypes,
+            progO2Params = filterState.selectedProgO2Params,
+            minBreathParams = filterState.selectedMinBreathParams
         )
     }
 
@@ -186,7 +190,9 @@ fun ApneaHistoryScreen(
                     onSetTimeOfDay = allRecordsViewModel::setTimeOfDayFilter,
                     onSetPosture = allRecordsViewModel::setPostureFilter,
                     onSetAudio = allRecordsViewModel::setAudioFilter,
-                    onToggleEventType = allRecordsViewModel::toggleEventType
+                    onToggleEventType = allRecordsViewModel::toggleEventType,
+                    onSetProgO2Params = allRecordsViewModel::setProgO2ParamFilter,
+                    onSetMinBreathParams = allRecordsViewModel::setMinBreathParamFilter
                 )
             }
 
@@ -351,8 +357,11 @@ private fun SharedHistoryFilterBar(
     onSetTimeOfDay: (Set<String>) -> Unit,
     onSetPosture: (Set<String>) -> Unit,
     onSetAudio: (Set<String>) -> Unit,
-    onToggleEventType: (String?) -> Unit
+    onToggleEventType: (String?) -> Unit,
+    onSetProgO2Params: (Set<Int>?) -> Unit,
+    onSetMinBreathParams: (Set<Int>?) -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     var filtersExpanded by rememberSaveable { mutableStateOf(false) }
     var eventTypesExpanded by rememberSaveable { mutableStateOf(false) }
 
@@ -534,8 +543,112 @@ private fun SharedHistoryFilterBar(
                                 )
                             }
                         }
+
+                        // ── Special drill-parameter rows ─────────────────────
+                        // Same parameters the user must choose on the
+                        // Progressive O₂ / Min Breath screens before starting a
+                        // session — shown only while that type is selected.
+                        if (state.selectedEventTypes.contains("PROGRESSIVE_O2") &&
+                            state.progO2ParamOptions.isNotEmpty()
+                        ) {
+                            ParamChipsRow(
+                                label = "Progressive O₂ Breath Period",
+                                options = state.progO2ParamOptions.sorted(),
+                                selected = state.selectedProgO2Params,
+                                formatValue = { "${it}s" },
+                                currentValue = {
+                                    context.getSharedPreferences("apnea_prefs", android.content.Context.MODE_PRIVATE)
+                                        .getInt("prog_o2_breath_period_sec", 60)
+                                },
+                                onSelectionChange = onSetProgO2Params
+                            )
+                        }
+                        if (state.selectedEventTypes.contains("MIN_BREATH") &&
+                            state.minBreathParamOptions.isNotEmpty()
+                        ) {
+                            ParamChipsRow(
+                                label = "Min Breath Session Duration",
+                                options = state.minBreathParamOptions.sorted(),
+                                selected = state.selectedMinBreathParams,
+                                formatValue = { sec -> "${sec / 60}:${(sec % 60).toString().padStart(2, '0')}" },
+                                currentValue = {
+                                    context.getSharedPreferences("apnea_prefs", android.content.Context.MODE_PRIVATE)
+                                        .getInt("min_breath_session_duration_sec", 300)
+                                },
+                                onSelectionChange = onSetMinBreathParams
+                            )
+                        }
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * One special drill-parameter filter row: a drill-type label with an
+ * All/Current toggle above a flow of multi-select chips of that drill's
+ * parameter values (breath periods for Progressive O₂, session durations for
+ * Min Breath). Passing null to [onSelectionChange] removes the narrowing
+ * entirely. Chip styling mirrors [MultiSelectFilterCategory] exactly — same
+ * colors, border and unselected look — and the "Current" toggle selects the
+ * parameter value currently set on that drill's own screen (read live from
+ * [currentValue]).
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ParamChipsRow(
+    label: String,
+    options: List<Int>,
+    selected: Set<Int>?,
+    formatValue: (Int) -> String,
+    /** Reads the parameter value currently configured on the drill's screen. */
+    currentValue: () -> Int,
+    onSelectionChange: (Set<Int>?) -> Unit
+) {
+    val current = currentValue()
+    Column(modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(label, style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+            AllCurrentHeaderToggle(
+                selectedCount = selected?.size ?: options.size,
+                totalCount = options.size,
+                onToggle = {
+                    if (selected == null || selected.size * 2 <= options.size) {
+                        // "Current": narrow to the value set on the drill screen.
+                        onSelectionChange(setOf(current))
+                    } else {
+                        onSelectionChange(null) // back to unfiltered
+                    }
+                }
+            )
+        }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            // Always list the current drill-screen value, even if no record
+            // with it exists yet, so "Current" always has a chip to highlight.
+            val allOptions = (options.toSet() + current).sorted()
+            allOptions.forEach { value ->
+                val isSelected = selected?.contains(value) ?: false
+                FilterChip(
+                    selected = isSelected,
+                    onClick = {
+                        // Tap on an unfiltered row starts from every option selected.
+                        val sel = selected ?: allOptions.toSet()
+                        val next = if (value in sel) sel - value else sel + value
+                        onSelectionChange(next.ifEmpty { null })
+                    },
+                    label = { Text(formatValue(value), style = MaterialTheme.typography.labelSmall) },
+                    modifier = Modifier.height(30.dp),
+                    colors = settingFilterChipColors(),
+                    border = settingChipBorder(isSelected)
+                )
             }
         }
     }

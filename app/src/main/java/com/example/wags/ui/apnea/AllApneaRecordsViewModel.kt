@@ -97,6 +97,21 @@ data class AllApneaRecordsUiState(
      */
     val selectedEventTypes: Set<String?> = setOf(null),
 
+    // ── Drill-parameter filters (one special row per parametrised session type) ──
+    /**
+     * Breath-period values known to exist in Progressive O₂ records, plus any
+     * explicitly selected value (keeps chips stable while a narrowed filter is
+     * active). Drives the special chip row shown under the type list when
+     * Progressive O₂ is selected.
+     */
+    val progO2ParamOptions: Set<Int> = emptySet(),
+    /** Explicit breath-period selection; null = unfiltered (every option). */
+    val selectedProgO2Params: Set<Int>? = null,
+    /** Session-duration values known to exist in Min Breath records (plus any selected value). */
+    val minBreathParamOptions: Set<Int> = emptySet(),
+    /** Explicit session-duration selection; null = unfiltered (every option). */
+    val selectedMinBreathParams: Set<Int>? = null,
+
     // ── Sort order ────────────────────────────────────────────────────────────
     val sortOrder: RecordSortOrder = RecordSortOrder.RECENT_DESC,
 
@@ -197,7 +212,9 @@ class AllApneaRecordsViewModel @Inject constructor(
                 filterTimeOfDay  = SettingFilterOptions.timeOfDayOptions(byHour).toSet(),
                 filterPosture    = SettingFilterOptions.POSTURES.toSet(),
                 filterAudio      = SettingFilterOptions.AUDIOS.toSet(),
-                selectedEventTypes = setOf<String?>(null) // Free Hold
+                selectedEventTypes = setOf<String?>(null), // Free Hold
+                selectedProgO2Params = null,
+                selectedMinBreathParams = null
             )
         }
         loadAllRecords()
@@ -250,7 +267,9 @@ class AllApneaRecordsViewModel @Inject constructor(
                 filterTimeOfDay = presetToSelection(timeOfDay, SettingFilterOptions.timeOfDayOptions(byHour)),
                 filterPosture = presetToSelection(posture, SettingFilterOptions.POSTURES),
                 filterAudio = presetToSelection(audio, SettingFilterOptions.AUDIOS),
-                selectedEventTypes = eventTypes
+                selectedEventTypes = eventTypes,
+                selectedProgO2Params = null,
+                selectedMinBreathParams = null
             )
         }
         loadAllRecords()
@@ -286,6 +305,26 @@ class AllApneaRecordsViewModel @Inject constructor(
 
     fun clearAllEventTypes() {
         _uiState.update { it.copy(selectedEventTypes = emptySet()) }
+        loadAllRecords()
+    }
+
+    /**
+     * Narrows Progressive O₂ records to the given breath periods.
+     * null = unfiltered (every breath period). Same parameter the user picks
+     * on the Progressive O₂ screen before starting a session.
+     */
+    fun setProgO2ParamFilter(values: Set<Int>?) {
+        _uiState.update { it.copy(selectedProgO2Params = values) }
+        loadAllRecords()
+    }
+
+    /**
+     * Narrows Min Breath records to the given session durations.
+     * null = unfiltered (every duration). Same parameter the user picks on
+     * the Min Breath screen before starting a session.
+     */
+    fun setMinBreathParamFilter(values: Set<Int>?) {
+        _uiState.update { it.copy(selectedMinBreathParams = values) }
         loadAllRecords()
     }
 
@@ -339,12 +378,35 @@ class AllApneaRecordsViewModel @Inject constructor(
 
             // Multi-select refinement — the SQL layer only narrows single-value selections.
             val byHourTod = s.filterTimeOfDay.any { TimeBuckets.isHourBucket(it) }
-            val allRecords = fetched.filter { r ->
+            val settingsMatched = fetched.filter { r ->
                 r.lungVolume in s.filterLungVolume &&
                 r.prepType in s.filterPrepType &&
                 r.posture in s.filterPosture &&
                 r.audio in s.filterAudio &&
                 (if (byHourTod) TimeBuckets.fromTimestamp(r.timestamp) else r.timeOfDay) in s.filterTimeOfDay
+            }
+
+            // Drill-parameter option spaces: every breath period / session duration
+            // present in the settings-matched records, plus any explicitly selected
+            // value so a narrowed chip row never loses its options mid-filter.
+            val progO2Options = settingsMatched
+                .filter { it.tableType == "PROGRESSIVE_O2" }
+                .mapNotNull { it.drillParamValue }
+                .toSet() + (s.selectedProgO2Params ?: emptySet())
+            val minBreathOptions = settingsMatched
+                .filter { it.tableType == "MIN_BREATH" }
+                .mapNotNull { it.drillParamValue }
+                .toSet() + (s.selectedMinBreathParams ?: emptySet())
+
+            // Narrow each parametrised drill type by its own parameter selection
+            // (null selection = unfiltered). Records with a null drillParamValue
+            // only survive when the corresponding filter is unfiltered.
+            val allRecords = settingsMatched.filter { r ->
+                when (r.tableType) {
+                    "PROGRESSIVE_O2" -> s.selectedProgO2Params?.contains(r.drillParamValue) ?: true
+                    "MIN_BREATH"     -> s.selectedMinBreathParams?.contains(r.drillParamValue) ?: true
+                    else             -> true
+                }
             }
 
             // Apply sort order
@@ -360,11 +422,13 @@ class AllApneaRecordsViewModel @Inject constructor(
 
             _uiState.update { current ->
                 current.copy(
-                    records       = sorted,
-                    isLoading     = false,
-                    isInitialLoad = false,
-                    chartPoints   = chartPoints,
-                    chartYLabel   = chartYLabel
+                    records           = sorted,
+                    isLoading         = false,
+                    isInitialLoad     = false,
+                    chartPoints       = chartPoints,
+                    chartYLabel       = chartYLabel,
+                    progO2ParamOptions = progO2Options,
+                    minBreathParamOptions = minBreathOptions
                 )
             }
         }
