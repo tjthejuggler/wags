@@ -339,11 +339,14 @@ class MinBreathViewModel @Inject constructor(
             ) }
         }
 
-        // Observe state machine — only fire audio for COMPLETE
+        // Observe state machine — fire audio + end-of-session vibration on COMPLETE
         viewModelScope.launch {
             var previousPhase = MinBreathPhase.IDLE
             stateMachine.state.collect { state ->
                 if (state.phase == MinBreathPhase.COMPLETE && previousPhase != MinBreathPhase.COMPLETE) {
+                    // Strong 500 ms buzz so the user feels the session time
+                    // has been met — matches the "Session complete" voice cue.
+                    audioHapticEngine.vibrateHoldEnd()
                     audioHapticEngine.announceSessionComplete()
                     // Auto-save when session completes naturally (timer ran out)
                     if (_uiState.value.isSessionActive) {

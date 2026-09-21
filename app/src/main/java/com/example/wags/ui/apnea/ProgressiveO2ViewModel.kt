@@ -30,6 +30,7 @@ import com.example.wags.domain.model.TimeBuckets
 import com.example.wags.domain.model.TimeDimension
 import com.example.wags.domain.model.TimeOfDay
 import com.example.wags.domain.usecase.apnea.ApneaAudioHapticEngine
+import com.example.wags.domain.usecase.apnea.ApneaVibrationWarningConfig
 import com.example.wags.domain.usecase.apnea.GuidedAudioManager
 import com.example.wags.domain.usecase.apnea.HyperLockManager
 import com.example.wags.domain.usecase.apnea.ResonancePrepGate
@@ -222,6 +223,8 @@ class ProgressiveO2ViewModel @Inject constructor(
     // Track previous phase + timer for audio/haptic cues (edge-triggered warnings)
     private var previousPhase: ProgressiveO2Phase = ProgressiveO2Phase.IDLE
     private var previousTimerMs: Long = 0L
+    /** True once the current phase's warning waveform has been triggered. Reset on phase change. */
+    private var warningFiredForPhase = false
 
     // Spotify tracks played during the session (captured at stop time)
     private var trackedSongs: List<SpotifySong> = emptyList()
@@ -1148,27 +1151,32 @@ class ProgressiveO2ViewModel @Inject constructor(
             // Same phase — edge-trigger the warning waveform exactly once,
             // when the countdown crosses into the configured warning window.
             // (State ticks arrive every ~100 ms, so a plain range check would
-            // fire repeatedly.)
-            when (state.phase) {
-                ProgressiveO2Phase.BREATHING -> {
-                    val warning = audioHapticEngine.effectiveBreathWarning
-                    if (warning.enabled &&
-                        previousTimerMs > warning.windowMs &&
-                        state.timerMs <= warning.windowMs
-                    ) {
-                        audioHapticEngine.playBreathWarning()
+            // fire repeatedly.) Phases that started already inside their own
+            // window were handled in the phase-change branch below.
+            if (!warningFiredForPhase) {
+                when (state.phase) {
+                    ProgressiveO2Phase.BREATHING -> {
+                        val warning = audioHapticEngine.effectiveBreathWarning
+                        if (warning.enabled &&
+                            previousTimerMs > warning.windowMs &&
+                            state.timerMs <= warning.windowMs
+                        ) {
+                            audioHapticEngine.playBreathWarning(state.timerMs)
+                            warningFiredForPhase = true
+                        }
                     }
-                }
-                ProgressiveO2Phase.HOLD -> {
-                    val warning = audioHapticEngine.effectiveHoldWarning
-                    if (warning.enabled &&
-                        previousTimerMs > warning.windowMs &&
-                        state.timerMs <= warning.windowMs
-                    ) {
-                        audioHapticEngine.playHoldWarning()
+                    ProgressiveO2Phase.HOLD -> {
+                        val warning = audioHapticEngine.effectiveHoldWarning
+                        if (warning.enabled &&
+                            previousTimerMs > warning.windowMs &&
+                            state.timerMs <= warning.windowMs
+                        ) {
+                            audioHapticEngine.playHoldWarning(state.timerMs)
+                            warningFiredForPhase = true
+                        }
                     }
+                    else -> Unit
                 }
-                else -> Unit
             }
             previousTimerMs = state.timerMs
             return
@@ -1176,22 +1184,52 @@ class ProgressiveO2ViewModel @Inject constructor(
 
         // Phase changed — stop any in-flight warning waveform.
         audioHapticEngine.cancelWarningVibrations()
+        warningFiredForPhase = false
         previousTimerMs = state.timerMs
 
         when (state.phase) {
             ProgressiveO2Phase.HOLD -> {
                 audioHapticEngine.announceHoldBegin()
+                fireWarningIfPhaseStartsInsideWindow(
+                    warning = audioHapticEngine.effectiveHoldWarning,
+                    remainingMs = state.timerMs,
+                    play = { audioHapticEngine.playHoldWarning(it) }
+                )
             }
             ProgressiveO2Phase.BREATHING -> {
                 // When the hold countdown's final-second pulse is enabled it
                 // already covers this moment, so the generic buzz is skipped.
                 audioHapticEngine.vibrateHoldEnd(countdownCovered = true)
                 audioHapticEngine.announceBreath()
+                fireWarningIfPhaseStartsInsideWindow(
+                    warning = audioHapticEngine.effectiveBreathWarning,
+                    remainingMs = state.timerMs,
+                    play = { audioHapticEngine.playBreathWarning(it) }
+                )
             }
             ProgressiveO2Phase.COMPLETE -> {
                 audioHapticEngine.announceSessionComplete()
             }
             ProgressiveO2Phase.IDLE -> { /* no cue */ }
+        }
+    }
+
+    /**
+     * Short phases (round-1 15 s holds, short breath periods) can start
+     * already inside their own warning window — the countdown never *crosses*
+     * the window edge, so the same-phase trigger would never fire. When the
+     * new phase's full duration fits inside the window, start the warning
+     * immediately; the engine truncates the waveform so the final pulse still
+     * lands exactly at the phase end.
+     */
+    private inline fun fireWarningIfPhaseStartsInsideWindow(
+        warning: ApneaVibrationWarningConfig,
+        remainingMs: Long,
+        play: (remainingMs: Long) -> Unit
+    ) {
+        if (warning.enabled && remainingMs in 1..warning.windowMs) {
+            play(remainingMs)
+            warningFiredForPhase = true
         }
     }
 

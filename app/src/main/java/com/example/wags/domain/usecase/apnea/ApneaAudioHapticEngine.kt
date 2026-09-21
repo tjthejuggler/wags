@@ -160,15 +160,24 @@ class ApneaAudioHapticEngine @Inject constructor(
      * pulse). Call exactly once when the breathe-phase countdown enters the
      * configured warning window — the waveform then runs autonomously and is
      * aligned to end with the phase.
+     *
+     * @param remainingMs time left in the phase. When the phase is shorter
+     *   than the configured window (it started inside its own warning
+     *   window), the waveform is truncated to fit so the final pulse still
+     *   lands at the phase end.
      */
-    fun playBreathWarning() = playWarning(effectiveBreathWarning)
+    fun playBreathWarning(remainingMs: Long = effectiveBreathWarning.windowMs) =
+        playWarning(effectiveBreathWarning, remainingMs)
 
     /**
      * Plays the full hold-ending warning waveform (beats + optional final
      * pulse). Call exactly once when the hold countdown enters the configured
      * warning window.
+     *
+     * @param remainingMs time left in the phase — see [playBreathWarning].
      */
-    fun playHoldWarning() = playWarning(effectiveHoldWarning)
+    fun playHoldWarning(remainingMs: Long = effectiveHoldWarning.windowMs) =
+        playWarning(effectiveHoldWarning, remainingMs)
 
     /** Stops any in-flight warning waveform (phase changed / session stopped). */
     fun cancelWarningVibrations() {
@@ -282,11 +291,15 @@ class ApneaAudioHapticEngine @Inject constructor(
      * beat pulses at [ApneaVibrationWarningConfig.intervalSec] intervals for
      * the whole window minus the final pulse, then (optionally) one long
      * final pulse ending exactly when the phase ends.
+     *
+     * @param remainingMs time actually left in the phase — caps the window so
+     *   a phase that started inside its own warning window still gets a
+     *   (shortened) warning whose final pulse ends with the phase.
      */
-    private fun playWarning(cfg: ApneaVibrationWarningConfig) {
+    private fun playWarning(cfg: ApneaVibrationWarningConfig, remainingMs: Long) {
         if (!vibrationEnabled || !cfg.enabled || cfg.windowSec <= 0) return
 
-        val windowMs = cfg.windowMs
+        val windowMs = cfg.windowMs.coerceIn(1L, remainingMs.coerceAtLeast(1L))
         val finalMs = if (cfg.finalPulseEnabled)
             cfg.finalPulseMs.toLong().coerceIn(0L, windowMs * 4 / 5) else 0L
         val beatWindowMs = (windowMs - finalMs).coerceAtLeast(0L)
