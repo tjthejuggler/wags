@@ -539,7 +539,11 @@ private fun SharedHistoryFilterBar(
                                     selected = state.selectedEventTypes.contains(type.tableTypeValue),
                                     onClick = { onToggleEventType(type.tableTypeValue) },
                                     label = { Text(type.label, style = MaterialTheme.typography.labelSmall) },
-                                    colors = settingFilterChipColors()
+                                    modifier = Modifier.height(30.dp),
+                                    colors = settingFilterChipColors(),
+                                    border = settingChipBorder(
+                                        state.selectedEventTypes.contains(type.tableTypeValue)
+                                    )
                                 )
                             }
                         }
@@ -618,7 +622,11 @@ private fun ParamChipsRow(
                 selectedCount = selected?.size ?: options.size,
                 totalCount = options.size,
                 onToggle = {
-                    if (selected == null || selected.size * 2 <= options.size) {
+                    // Label logic in [AllCurrentHeaderToggle]: "Current" shows
+                    // while more than half the options are selected (null counts
+                    // as all), "All" shows at half or fewer. Mirror it exactly:
+                    // tap jumps to the state the label names.
+                    if (selected == null || selected.size * 2 > options.size) {
                         // "Current": narrow to the value set on the drill screen.
                         onSelectionChange(setOf(current))
                     } else {
@@ -635,14 +643,18 @@ private fun ParamChipsRow(
             // with it exists yet, so "Current" always has a chip to highlight.
             val allOptions = (options.toSet() + current).sorted()
             allOptions.forEach { value ->
-                val isSelected = selected?.contains(value) ?: false
+                // null selection = unfiltered = every option active, so every
+                // chip shows the selected look (mirrors MultiSelectFilterCategory).
+                val isSelected = selected == null || selected.contains(value)
                 FilterChip(
                     selected = isSelected,
                     onClick = {
                         // Tap on an unfiltered row starts from every option selected.
                         val sel = selected ?: allOptions.toSet()
                         val next = if (value in sel) sel - value else sel + value
-                        onSelectionChange(next.ifEmpty { null })
+                        // An empty set is a legitimate state: nothing selected,
+                        // blank stats. null stays reserved for "all" (All toggle).
+                        onSelectionChange(next)
                     },
                     label = { Text(formatValue(value), style = MaterialTheme.typography.labelSmall) },
                     modifier = Modifier.height(30.dp),
