@@ -4,6 +4,14 @@
 
 ## Changelog
 
+### 2026-09-24 — Fix: Hold-Ending vibration never warned in Progressive O2
+
+**Bug** — During Progressive O2 holds the "Hold Ending" warning vibration never fired in advance; vibration only came when the hold ended. The "Breath Ending" warning worked fine.
+
+**Root cause** — A stale-preferences bug, not a logic bug. The device's `apnea_prefs.xml` held a hold-warning config written by an older build with a legacy key schema (`apnea_vib_hold_interval_sec` instead of the current `apnea_vib_hold_interval_ms`). That stale config had `window_sec = 1`, squeezing the entire warning into the final second — perceptually identical to "no warning until it's over". Because the current code reloads stored values instead of resetting them, the bad config survived every app update. Breath warnings worked because no legacy `apnea_vib_breath_*` keys existed, so the 10 s defaults applied.
+
+**Fix** — Legacy-schema migration in [`loadWarningConfig`](app/src/main/java/com/example/wags/domain/usecase/apnea/ApneaAudioHapticEngine.kt:339): any warning config missing the `interval_ms` key (always written by current code) is detected as stale, wiped, and replaced by the default. Affected users automatically get the HOLD_DEFAULT 5 s window back; configs saved through current Settings are unaffected.
+
 ### 2026-08-17 — Apnea settings section + customizable hold/breath vibration warnings
 
 **Apnea section in Settings** ([`SettingsScreen.kt`](app/src/main/java/com/example/wags/ui/settings/SettingsScreen.kt:260))

@@ -339,15 +339,38 @@ class ApneaAudioHapticEngine @Inject constructor(
     private fun loadWarningConfig(
         prefix: String,
         default: ApneaVibrationWarningConfig
-    ): ApneaVibrationWarningConfig = ApneaVibrationWarningConfig(
-        enabled = prefs.getBoolean("${prefix}enabled", default.enabled),
-        windowSec = prefs.getInt("${prefix}window_sec", default.windowSec),
-        intensityPct = prefs.getInt("${prefix}intensity", default.intensityPct),
-        intervalMs = prefs.getInt("${prefix}interval_ms", default.intervalMs),
-        finalPulseEnabled = prefs.getBoolean("${prefix}final_enabled", default.finalPulseEnabled),
-        finalPulseMs = prefs.getInt("${prefix}final_ms", default.finalPulseMs),
-        finalIntensityPct = prefs.getInt("${prefix}final_intensity", default.finalIntensityPct)
-    )
+    ): ApneaVibrationWarningConfig {
+        // ── Legacy-schema migration ─────────────────────────────────────────
+        // An older build persisted warnings with a different key set
+        // (`interval_sec` instead of `interval_ms`) and could leave a hold
+        // warning squeezed into a 1 s window — perceptually identical to "no
+        // warning until the phase is already over". A config written by the
+        // current code ALWAYS contains `interval_ms`, so its absence reliably
+        // identifies stale legacy data. Wipe it and fall back to the default
+        // so the user gets a usable advance warning again. Any later edit in
+        // Settings persists the full current schema and is never touched.
+        if (!prefs.contains("${prefix}interval_ms")) {
+            prefs.edit()
+                .remove("${prefix}enabled")
+                .remove("${prefix}window_sec")
+                .remove("${prefix}intensity")
+                .remove("${prefix}interval_sec")
+                .remove("${prefix}final_enabled")
+                .remove("${prefix}final_ms")
+                .remove("${prefix}final_intensity")
+                .apply()
+            return default
+        }
+        return ApneaVibrationWarningConfig(
+            enabled = prefs.getBoolean("${prefix}enabled", default.enabled),
+            windowSec = prefs.getInt("${prefix}window_sec", default.windowSec),
+            intensityPct = prefs.getInt("${prefix}intensity", default.intensityPct),
+            intervalMs = prefs.getInt("${prefix}interval_ms", default.intervalMs),
+            finalPulseEnabled = prefs.getBoolean("${prefix}final_enabled", default.finalPulseEnabled),
+            finalPulseMs = prefs.getInt("${prefix}final_ms", default.finalPulseMs),
+            finalIntensityPct = prefs.getInt("${prefix}final_intensity", default.finalIntensityPct)
+        )
+    }
 
     private fun saveWarningConfig(prefix: String, cfg: ApneaVibrationWarningConfig) {
         prefs.edit()
