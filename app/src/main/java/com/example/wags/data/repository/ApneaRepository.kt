@@ -1917,4 +1917,82 @@ class ApneaRepository @Inject constructor(
             )
         )?.durationMs
     }
+
+    /**
+     * Pre-computes PB duration thresholds for every category level, scoped to a
+     * drill (e.g. Progressive O₂ at a given breath period). Mirrors
+     * [getPbThresholds] but uses drill-scoped record queries so only that
+     * drill's records count toward the thresholds.
+     *
+     * For each category level the threshold is the minimum best duration across
+     * all combinations at that level; a null value means no records exist for
+     * that level — any duration is a PB.
+     */
+    suspend fun getDrillPbThresholds(
+        drill: DrillContext,
+        lungVolume: String,
+        prepType: String,
+        timeOfDay: String,
+        posture: String,
+        audio: String
+    ): PbThresholds = withContext(ioDispatcher) {
+        val tod = normTod(timeOfDay)
+
+        // Best duration for the given subset of constrained settings
+        // (null argument = that setting is relaxed).
+        suspend fun bestWith(
+            constrainTod: Boolean, constrainLung: Boolean,
+            constrainPrep: Boolean, constrainPosture: Boolean, constrainAudio: Boolean
+        ): Long? = dao.getBestDrillRecordRaw(
+            buildBestDrillRecordQuery(
+                drill,
+                if (constrainLung) lungVolume else "",
+                if (constrainPrep) prepType else "",
+                if (constrainTod) tod else "",
+                if (constrainPosture) posture else "",
+                if (constrainAudio) audio else ""
+            )
+        )?.durationMs
+
+        val flags = listOf(
+            "timeOfDay", "lungVolume", "prepType", "posture", "audio"
+        )
+
+        // Minimum best across all k-of-5 setting combinations; null if any
+        // combination has no records (mirrors getPbThresholds semantics).
+        suspend fun minLevel(k: Int): Long? {
+            var acc: Long? = null
+            val pending = mutableListOf<List<Int>>()
+            fun combos(start: Int, chosen: List<Int>) {
+                if (chosen.size == k) {
+                    pending.add(chosen)
+                    return
+                }
+                for (i in start until flags.size) combos(i + 1, chosen + i)
+            }
+            combos(0, emptyList())
+            for (combo in pending) {
+                val keys = combo.map { flags[it] }.toSet()
+                val best = bestWith(
+                    constrainTod = "timeOfDay" in keys,
+                    constrainLung = "lungVolume" in keys,
+                    constrainPrep = "prepType" in keys,
+                    constrainPosture = "posture" in keys,
+                    constrainAudio = "audio" in keys
+                )
+                if (best == null) return null
+                if (acc == null || best < acc) acc = best
+            }
+            return acc
+        }
+
+        PbThresholds(
+            exactBestMs = bestWith(true, true, true, true, true),
+            fourSettingsBestMs = minLevel(4),
+            threeSettingsBestMs = minLevel(3),
+            twoSettingsBestMs = minLevel(2),
+            oneSettingBestMs = minLevel(1),
+            globalBestMs = bestWith(false, false, false, false, false)
+        )
+    }
 }

@@ -146,6 +146,11 @@ data class MinBreathUiState(
     val startMp3WithHyper: Boolean = false,
     // ── Personal best celebration ──────────────────────────────────────────────
     val newPersonalBest: PersonalBestResult? = null,
+    // ── Live hold-percentage personal bests (current session duration) ───────
+    /** Best hold % at the current session duration + current 5-setting combination. Null if no records. */
+    val holdPctCurrentSettings: Double? = null,
+    /** Best hold % at the current session duration across all settings. Null if no records. */
+    val holdPctAnySettings: Double? = null,
     // ── Record-breaking forecast ──────────────────────────────────────────────
     /** Forecast for the current settings combination. Null when insufficient data. */
     val recordForecast: RecordForecast? = null,
@@ -339,6 +344,9 @@ class MinBreathViewModel @Inject constructor(
             ) }
         }
 
+        // Load hold-% personal bests for the current duration + settings
+        loadHoldPctBests()
+
         // Observe state machine — fire audio + end-of-session vibration on COMPLETE
         viewModelScope.launch {
             var previousPhase = MinBreathPhase.IDLE
@@ -438,12 +446,42 @@ class MinBreathViewModel @Inject constructor(
         _uiState.update { it.copy(sessionDurationSec = sec) }
         prefs.edit().putInt("min_breath_session_duration_sec", sec).apply()
         refreshForecast()
+        loadHoldPctBests()
+    }
+
+    /**
+     * Loads the best hold-time percentages at the current session duration:
+     * one scoped to the current 5-setting combination, one across all settings.
+     * Percentage = totalHoldTimeMs / sessionDurationMs (matches DurationHistory).
+     */
+    private fun loadHoldPctBests() {
+        viewModelScope.launch {
+            try {
+                val s = _uiState.value
+                val durationMs = s.sessionDurationSec * 1000L
+                if (durationMs <= 0) return@launch
+                val records = apneaRepository.getAllMinBreathOnce()
+                    .filter { it.drillParamValue == s.sessionDurationSec && it.durationMs > 0 }
+                val exactBest = records.filter {
+                    it.lungVolume == s.lungVolume && it.prepType == s.prepType &&
+                        it.timeOfDay == s.timeOfDay && it.posture == s.posture && it.audio == s.audio
+                }.maxOfOrNull { it.durationMs }
+                val anyBest = records.maxOfOrNull { it.durationMs }
+                _uiState.update {
+                    it.copy(
+                        holdPctCurrentSettings = exactBest?.let { v -> v.toDouble() / durationMs * 100.0 },
+                        holdPctAnySettings = anyBest?.let { v -> v.toDouble() / durationMs * 100.0 }
+                    )
+                }
+            } catch (_: Exception) { }
+        }
     }
 
     fun setLungVolume(v: String) {
         prefs.edit().putString("setting_lung_volume", v).apply()
         _uiState.update { it.copy(lungVolume = v) }
         refreshForecast()
+        loadHoldPctBests()
     }
 
     fun setPrepType(v: String) {
@@ -474,6 +512,7 @@ class MinBreathViewModel @Inject constructor(
             )
         }
         refreshForecast()
+        loadHoldPctBests()
     }
 
     fun setTimeOfDay(v: String) {
@@ -489,12 +528,14 @@ class MinBreathViewModel @Inject constructor(
             .apply()
         _uiState.update { it.copy(timeOfDay = v) }
         refreshForecast()
+        loadHoldPctBests()
     }
 
     fun setPosture(v: String) {
         prefs.edit().putString("setting_posture", v).apply()
         _uiState.update { it.copy(posture = v) }
         refreshForecast()
+        loadHoldPctBests()
     }
 
     fun setAudio(v: String) {
@@ -523,6 +564,7 @@ class MinBreathViewModel @Inject constructor(
             _uiState.update { it.copy(guidedSelectedName = "") }
         }
         refreshForecast()
+        loadHoldPctBests()
     }
 
     // ── Voice / vibration toggles ────────────────────────────────────────────

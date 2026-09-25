@@ -24,6 +24,9 @@ import com.example.wags.domain.model.AudioSetting
 import com.example.wags.domain.model.EucapnicConfig
 import com.example.wags.domain.model.PrepType
 import com.example.wags.domain.model.DrillContext
+import com.example.wags.domain.model.NextPbTarget
+import com.example.wags.domain.model.PbThresholds
+import com.example.wags.domain.model.PersonalBestCategory
 import com.example.wags.domain.model.PersonalBestResult
 import com.example.wags.domain.model.SpotifySong
 import com.example.wags.domain.model.TimeBuckets
@@ -121,6 +124,11 @@ data class ProgressiveO2UiState(
     val loadingSelectedSong: Boolean = false,
     // ── Personal best celebration ──────────────────────────────────────────────
     val newPersonalBest: PersonalBestResult? = null,
+    // ── Live trophy display during the session (mirrors Free Hold) ───────────
+    /** Broadest PB category broken so far by the running total hold time (for trophy display). */
+    val currentPbCategory: PersonalBestCategory? = null,
+    /** Next PB milestone ahead of the running total hold time — trophies + time remaining. */
+    val nextPbTarget: NextPbTarget? = null,
     // ── Progressive O2 personal bests ───────────────────────────────────────────
     /** Best total hold time for current breath period + current 5 settings (ms). Null if no records. */
     val personalBestCurrentSettingsMs: Long? = null,
@@ -219,6 +227,14 @@ class ProgressiveO2ViewModel @Inject constructor(
      * while the session is still running (or in the instant between stop and save).
      */
     private var sessionPrepType: String? = null
+
+    // ── Live trophy display (mirrors Free Hold's real-time PB indication) ────
+    /** Pre-computed PB thresholds loaded at session start, scoped to this breath period. */
+    private var pbThresholds: PbThresholds? = null
+    /** Job for the 1-second trophy/next-tier update loop during a session. */
+    private var pbDisplayJob: Job? = null
+    /** Broadest category broken so far this session — never downgrades mid-session. */
+    private var lastShownCategory: PersonalBestCategory? = null
 
     // Track previous phase + timer for audio/haptic cues (edge-triggered warnings)
     private var previousPhase: ProgressiveO2Phase = ProgressiveO2Phase.IDLE
@@ -1030,7 +1046,48 @@ class ProgressiveO2ViewModel @Inject constructor(
             }
         }
 
+        // ── Live trophy display: load drill-scoped thresholds and tick ────────
+        lastShownCategory = null
+        pbThresholds = null
+        pbDisplayJob?.cancel()
+        pbDisplayJob = viewModelScope.launch {
+            pbThresholds = apneaRepository.getDrillPbThresholds(
+                drill = DrillContext.progressiveO2(_uiState.value.breathPeriodSec),
+                lungVolume = _uiState.value.lungVolume,
+                prepType = sessionPrepType ?: _uiState.value.prepType,
+                timeOfDay = _uiState.value.timeOfDay,
+                posture = _uiState.value.posture,
+                audio = _uiState.value.audio
+            )
+            while (true) {
+                delay(1_000L)
+                val thresholds = pbThresholds ?: continue
+                val elapsed = stateMachine.state.value.realTimeTotalHoldTimeMs
+                val broadest = thresholds.broadestBroken(elapsed)
+                if (broadest != null &&
+                    (lastShownCategory == null || broadest.ordinal > lastShownCategory!!.ordinal)
+                ) {
+                    lastShownCategory = broadest
+                }
+                _uiState.update {
+                    it.copy(
+                        currentPbCategory = lastShownCategory,
+                        nextPbTarget = thresholds.nextPbTarget(elapsed)
+                    )
+                }
+            }
+        }
+
         stateMachine.start(breathPeriodMs, viewModelScope)
+    }
+
+    /** Stops the live trophy display loop and clears its UI state. */
+    private fun stopPbDisplay() {
+        pbDisplayJob?.cancel()
+        pbDisplayJob = null
+        pbThresholds = null
+        lastShownCategory = null
+        _uiState.update { it.copy(currentPbCategory = null, nextPbTarget = null) }
     }
 
     /**
@@ -1063,6 +1120,8 @@ class ProgressiveO2ViewModel @Inject constructor(
         if (_uiState.value.isBiofeedbackMode) {
             biofeedbackEngine.stop()
         }
+
+        stopPbDisplay()
 
         // Mark inactive BEFORE stopping the state machine to prevent the
         // init-block observer from also saving when it sees COMPLETE.
@@ -1110,6 +1169,8 @@ class ProgressiveO2ViewModel @Inject constructor(
         if (_uiState.value.isBiofeedbackMode) {
             biofeedbackEngine.stop()
         }
+
+        stopPbDisplay()
 
         _uiState.update { it.copy(isSessionActive = false) }
         stateMachine.stop()

@@ -21,6 +21,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.wags.domain.model.PrepType
+import com.example.wags.domain.model.trophyCount
+import com.example.wags.ui.common.trophyTint
 import com.example.wags.domain.usecase.apnea.ProgressiveO2Phase
 import com.example.wags.domain.usecase.apnea.ProgressiveO2RoundResult
 import com.example.wags.ui.apnea.pip.ProgressiveO2PipContent
@@ -238,26 +240,25 @@ private fun ActiveContent(
 
         Spacer(Modifier.height(4.dp))
 
-        // ── Round indicator ─────────────────────────────────────────────
-        Text(
-            text = "Round ${session.currentRound}",
-            style = MaterialTheme.typography.titleMedium,
-            color = TextSecondary
-        )
-
-        // ── Target / next hold info ─────────────────────────────────────
-        if (phase == ProgressiveO2Phase.HOLD) {
+        // ── Live trophy display (mirrors Free Hold) ─────────────────────
+        val trophyCount = state.currentPbCategory?.trophyCount() ?: 0
+        if (trophyCount > 0) {
             Text(
-                text = "Target: ${formatMmSs(session.holdDurationMs)}",
-                style = MaterialTheme.typography.bodyLarge,
-                color = TextSecondary
+                text = "🏆".repeat(trophyCount),
+                style = MaterialTheme.typography.headlineMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.trophyTint(trophyCount)
             )
-        } else {
-            val nextHoldMs = (session.currentRound + 1) * 15_000L
+        }
+
+        state.nextPbTarget?.let { target ->
+            val trophyPreview = "🏆".repeat(target.category.trophyCount())
             Text(
-                text = "Next hold: ${formatMmSs(nextHoldMs)}",
-                style = MaterialTheme.typography.bodyLarge,
-                color = TextSecondary
+                text = "$trophyPreview in ${formatMmSs(target.remainingMs)}",
+                style = MaterialTheme.typography.headlineMedium,
+                color = TextSecondary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.trophyTint(target.category.trophyCount())
             )
         }
 
@@ -284,6 +285,10 @@ private fun ActiveContent(
         var showTooltip by remember { mutableStateOf(false) }
         var tooltipText by remember { mutableStateOf("") }
         
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -297,7 +302,7 @@ private fun ActiveContent(
                 onHideTooltip = { showTooltip = false }
             )
             
-            Text("/", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+            Text("·", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
             
             // Personal best for current breath period + current 5 settings
             HoldTimeWithTooltip(
@@ -308,7 +313,7 @@ private fun ActiveContent(
                 onHideTooltip = { showTooltip = false }
             )
             
-            Text("/", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+            Text("·", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
             
             // Personal best for current breath period across all 5 settings
             HoldTimeWithTooltip(
@@ -319,7 +324,7 @@ private fun ActiveContent(
                 onHideTooltip = { showTooltip = false }
             )
             
-            Text("/", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+            Text("·", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
             
             // Global personal best (all breath periods, all settings)
             HoldTimeWithTooltip(
@@ -329,6 +334,7 @@ private fun ActiveContent(
                 onShowTooltip = { showTooltip = true; tooltipText = "Personal best across all breath periods and settings" },
                 onHideTooltip = { showTooltip = false }
             )
+        }
         }
 
         // ── Voice/Vibration toggles ──────────────────────────────────────
@@ -524,8 +530,9 @@ private fun HoldTimeWithTooltip(
     Box {
         Text(
             text = time,
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = TextPrimary,
             modifier = Modifier
                 .combinedClickable(
                     onClick = {},

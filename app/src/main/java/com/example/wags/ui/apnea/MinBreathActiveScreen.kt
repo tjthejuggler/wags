@@ -1,7 +1,9 @@
 package com.example.wags.ui.apnea
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -155,13 +157,21 @@ private fun HoldContent(
             totalBreathTimeMs = session.totalBreathTimeMs,
             hr = state.liveHr, spo2 = state.liveSpO2, onStop = onStop
         )
+        HoldPctBar(
+            totalHoldMs = session.totalHoldTimeMs,
+            totalBreathMs = session.totalBreathTimeMs,
+            phaseElapsedMs = session.currentPhaseElapsedMs,
+            isHold = true,
+            pbExact = state.holdPctCurrentSettings,
+            pbAny = state.holdPctAnySettings
+        )
         Box(
             modifier = Modifier.fillMaxWidth().weight(1f),
             contentAlignment = Alignment.Center
         ) {
             if (session.currentHoldContractionMs == null) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().fillMaxHeight(0.85f).padding(horizontal = 12.dp),
+                    modifier = Modifier.fillMaxWidth().fillMaxHeight(0.75f).padding(horizontal = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Button(
@@ -186,7 +196,7 @@ private fun HoldContent(
             } else {
                 Button(
                     onClick = onBreath,
-                    modifier = Modifier.fillMaxWidth(0.92f).fillMaxHeight(0.85f),
+                    modifier = Modifier.fillMaxWidth(0.92f).fillMaxHeight(0.75f),
                     shape = MaterialTheme.shapes.large,
                     colors = ButtonDefaults.buttonColors(containerColor = ButtonPrimary, contentColor = TextPrimary)
                 ) {
@@ -219,27 +229,35 @@ private fun BreathingContent(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("BREATHING", style = MaterialTheme.typography.labelLarge,
+                    Text("BREATHING", style = MaterialTheme.typography.titleLarge,
                         color = TextPrimary, fontWeight = FontWeight.Bold)
                     Text("Remaining: ${formatMmSs(session.sessionRemainingMs)}",
-                        style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                        style = MaterialTheme.typography.titleMedium, color = TextSecondary)
                     SmallStopButton(onStop)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     Text("Breath: ${formatMmSsTenths(session.currentPhaseElapsedMs)}",
-                        style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                        style = MaterialTheme.typography.titleMedium, color = TextSecondary)
                     Text("Total breath: ${formatMmSs(session.totalBreathTimeMs + session.currentPhaseElapsedMs)}",
-                        style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                        style = MaterialTheme.typography.titleMedium, color = TextSecondary)
                 }
             }
         }
+        HoldPctBar(
+            totalHoldMs = session.totalHoldTimeMs,
+            totalBreathMs = session.totalBreathTimeMs,
+            phaseElapsedMs = session.currentPhaseElapsedMs,
+            isHold = false,
+            pbExact = state.holdPctCurrentSettings,
+            pbAny = state.holdPctAnySettings
+        )
         Box(
             modifier = Modifier.fillMaxWidth().weight(1f),
             contentAlignment = Alignment.Center
         ) {
             Button(
                 onClick = onHold,
-                modifier = Modifier.fillMaxWidth(0.92f).fillMaxHeight(0.85f),
+                modifier = Modifier.fillMaxWidth(0.92f).fillMaxHeight(0.75f),
                 shape = MaterialTheme.shapes.large,
                 colors = ButtonDefaults.buttonColors(containerColor = SurfaceVariant, contentColor = Color.White)
             ) {
@@ -332,27 +350,75 @@ private fun InfoBar(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(phaseLabel, style = MaterialTheme.typography.labelLarge,
+                Text(phaseLabel, style = MaterialTheme.typography.titleLarge,
                     color = TextPrimary, fontWeight = FontWeight.Bold)
                 Text("Remaining: ${formatMmSs(sessionRemainingMs)}",
-                    style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    style = MaterialTheme.typography.titleMedium, color = TextSecondary)
                 SmallStopButton(onStop)
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Hold: ${formatMmSsTenths(phaseElapsedMs)}",
-                    style = MaterialTheme.typography.bodyMedium, color = TextPrimary, fontWeight = FontWeight.Bold)
-                Text("Hold #$holdNumber", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    style = MaterialTheme.typography.headlineSmall, color = TextPrimary, fontWeight = FontWeight.Bold)
+                Text("Hold #$holdNumber", style = MaterialTheme.typography.titleMedium, color = TextSecondary)
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("H: ${formatMmSs(totalHoldTimeMs + phaseElapsedMs)}",
-                    style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    style = MaterialTheme.typography.titleMedium, color = TextSecondary)
                 Text("B: ${formatMmSs(totalBreathTimeMs)}",
-                    style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                if (hr != null) Text("❤️ $hr", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                if (spo2 != null) Text("SpO₂ $spo2%", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    style = MaterialTheme.typography.titleMedium, color = TextSecondary)
+                if (hr != null) Text("❤️ $hr", style = MaterialTheme.typography.titleMedium, color = TextSecondary)
+                if (spo2 != null) Text("SpO₂ $spo2%", style = MaterialTheme.typography.titleMedium, color = TextSecondary)
             }
         }
     }
+}
+
+/**
+ * Large, distance-readable hold-time percentages (mirrors Progressive O₂'s PB row):
+ * current live hold % / best hold % for the current settings + duration /
+ * best hold % across all settings at this duration.
+ */
+@Composable
+private fun HoldPctBar(
+    totalHoldMs: Long,
+    totalBreathMs: Long,
+    phaseElapsedMs: Long,
+    isHold: Boolean,
+    pbExact: Double?,
+    pbAny: Double?
+) {
+    val liveHold = totalHoldMs + if (isHold) phaseElapsedMs else 0L
+    val liveBreath = totalBreathMs + if (!isHold) phaseElapsedMs else 0L
+    val total = liveHold + liveBreath
+    val currentPct = if (total > 0) liveHold.toDouble() / total * 100.0 else 0.0
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            PctText("%.1f%%".format(currentPct))
+            Text("·", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
+            PctText(pbExact?.let { "%.1f%%".format(it) } ?: "--%")
+            Text("·", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
+            PctText(pbAny?.let { "%.1f%%".format(it) } ?: "--%")
+        }
+    }
+}
+
+@Composable
+private fun PctText(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.headlineMedium,
+        fontWeight = FontWeight.Bold,
+        color = TextPrimary
+    )
 }
 
 @Composable

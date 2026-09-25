@@ -2115,7 +2115,7 @@ private fun FreeHoldActiveContent(
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "First contraction: ${formatElapsedMs(fcMs)}",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     color = ReadinessOrange,
                     textAlign = TextAlign.Center
                 )
@@ -2134,7 +2134,7 @@ private fun FreeHoldActiveContent(
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "First contraction: ${formatElapsedMs(fcMs)}",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     color = ReadinessOrange,
                     textAlign = TextAlign.Center
                 )
@@ -2148,7 +2148,7 @@ private fun FreeHoldActiveContent(
         if (freeHoldActive && currentPbCategory != null) {
             Text(
                 text = currentPbCategory.trophyEmojis(),
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.displaySmall,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.trophyTint(currentPbCategory.trophyCount())
             )
@@ -2160,7 +2160,7 @@ private fun FreeHoldActiveContent(
             val trophyPreview = "🏆".repeat(nextPbTarget.category.trophyCount())
             Text(
                 text = "$trophyPreview in $countdownText",
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.headlineLarge,
                 color = TextSecondary,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.trophyTint(nextPbTarget.category.trophyCount())
