@@ -49,12 +49,16 @@ class MinBreathStateMachine @Inject constructor() {
     private var timerJob: Job? = null
     private var scope: CoroutineScope? = null
     private var phaseStartMs: Long = 0L
+    private var sessionStartMs: Long = 0L
+    private var sessionTotalMs: Long = 0L
 
     // ── Public API ──────────────────────────────────────────────────────────
 
     fun start(totalDurationMs: Long, scope: CoroutineScope) {
         this.scope = scope
         phaseStartMs = System.currentTimeMillis()
+        sessionStartMs = phaseStartMs
+        sessionTotalMs = totalDurationMs
         _state.value = MinBreathState(
             phase = MinBreathPhase.HOLD,
             totalDurationMs = totalDurationMs,
@@ -74,7 +78,7 @@ class MinBreathStateMachine @Inject constructor() {
         val current = _state.value
         if (current.phase != MinBreathPhase.HOLD) return
 
-        val holdDuration = current.currentPhaseElapsedMs
+        val holdDuration = (System.currentTimeMillis() - phaseStartMs).coerceAtLeast(0L)
         val result = MinBreathHoldResult(
             holdNumber = current.currentHoldNumber,
             holdDurationMs = holdDuration,
@@ -94,7 +98,7 @@ class MinBreathStateMachine @Inject constructor() {
         val current = _state.value
         if (current.phase != MinBreathPhase.BREATHING) return
 
-        val breathDuration = current.currentPhaseElapsedMs
+        val breathDuration = (System.currentTimeMillis() - phaseStartMs).coerceAtLeast(0L)
         phaseStartMs = System.currentTimeMillis()
         _state.value = current.copy(
             phase = MinBreathPhase.HOLD,
@@ -113,7 +117,11 @@ class MinBreathStateMachine @Inject constructor() {
 
     private fun completeSession() {
         val current = _state.value
-        val elapsed = current.currentPhaseElapsedMs
+        // Wall-clock elapsed since the current phase began (accurate even when
+        // the completing tick/stop happens between tick-loop updates).
+        val elapsed = if (current.phase == MinBreathPhase.HOLD ||
+            current.phase == MinBreathPhase.BREATHING
+        ) (System.currentTimeMillis() - phaseStartMs).coerceAtLeast(0L) else 0L
 
         _state.value = when (current.phase) {
             MinBreathPhase.HOLD -> {
@@ -142,20 +150,22 @@ class MinBreathStateMachine @Inject constructor() {
     private fun startTickLoop() {
         timerJob?.cancel()
         timerJob = scope?.launch {
-            var lastTickMs = System.currentTimeMillis()
             while (true) {
                 delay(100L)
                 val now = System.currentTimeMillis()
-                val delta = now - lastTickMs
-                lastTickMs = now
 
                 val current = _state.value
                 if (current.phase == MinBreathPhase.COMPLETE ||
                     current.phase == MinBreathPhase.IDLE
                 ) break
 
-                val newRemaining = (current.sessionRemainingMs - delta).coerceAtLeast(0L)
-                val newElapsed = current.currentPhaseElapsedMs + delta
+                // Wall-clock derived values: computing phase elapsed and session
+                // remaining from phaseStartMs/sessionStartMs (instead of
+                // accumulating per-tick deltas) prevents double-crediting time
+                // to a phase when the user switches hold<->breath between ticks,
+                // which previously inflated totals slightly above 100%.
+                val newRemaining = (sessionStartMs + sessionTotalMs - now).coerceAtLeast(0L)
+                val newElapsed = (now - phaseStartMs).coerceAtLeast(0L)
 
                 if (newRemaining <= 0L) {
                     _state.value = current.copy(

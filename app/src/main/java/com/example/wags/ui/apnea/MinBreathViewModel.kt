@@ -469,8 +469,13 @@ class MinBreathViewModel @Inject constructor(
                 val anyBest = records.maxOfOrNull { it.durationMs }
                 _uiState.update {
                     it.copy(
-                        holdPctCurrentSettings = exactBest?.let { v -> v.toDouble() / durationMs * 100.0 },
-                        holdPctAnySettings = anyBest?.let { v -> v.toDouble() / durationMs * 100.0 }
+                        // Clamp at 100%: legacy records saved with the old
+                        // tick-accumulation bug can hold slightly more time
+                        // than the nominal session duration.
+                        holdPctCurrentSettings = exactBest
+                            ?.let { v -> (v.toDouble() / durationMs * 100.0).coerceIn(0.0, 100.0) },
+                        holdPctAnySettings = anyBest
+                            ?.let { v -> (v.toDouble() / durationMs * 100.0).coerceIn(0.0, 100.0) }
                     )
                 }
             } catch (_: Exception) { }
