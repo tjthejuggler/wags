@@ -69,10 +69,20 @@ private fun MinBreathActiveScreenContent(
 
     // ── PB celebration dialog ──────────────────────────────────────────
     state.newPersonalBest?.let { pbResult ->
+        // Min Breath headlines the hold percentage (vs the nominal session
+        // duration, same metric as the in-session PB row), with the raw hold
+        // time shown in a smaller line underneath.
+        val sessionMs = state.sessionDurationSec * 1000L
+        val holdPctText = if (sessionMs > 0) {
+            "%.1f%%".format(
+                (pbResult.durationMs.toDouble() / sessionMs * 100.0).coerceIn(0.0, 100.0)
+            )
+        } else null
         NewPersonalBestDialog(
             newPbMs = pbResult.durationMs,
             categoryDescription = pbResult.description,
             category = pbResult.category,
+            pbPctText = holdPctText,
             onDismiss = { viewModel.dismissNewPersonalBest() }
         )
     }
@@ -162,6 +172,7 @@ private fun HoldContent(
             totalBreathMs = session.totalBreathTimeMs,
             phaseElapsedMs = session.currentPhaseElapsedMs,
             isHold = true,
+            pbHourExact = state.holdPctExactSettingsExactHour,
             pbExact = state.holdPctCurrentSettings,
             pbAny = state.holdPctAnySettings
         )
@@ -248,6 +259,7 @@ private fun BreathingContent(
             totalBreathMs = session.totalBreathTimeMs,
             phaseElapsedMs = session.currentPhaseElapsedMs,
             isHold = false,
+            pbHourExact = state.holdPctExactSettingsExactHour,
             pbExact = state.holdPctCurrentSettings,
             pbAny = state.holdPctAnySettings
         )
@@ -375,8 +387,10 @@ private fun InfoBar(
 
 /**
  * Large, distance-readable hold-time percentages (mirrors Progressive O₂'s PB row):
- * current live hold % / best hold % for the current settings + duration /
- * best hold % across all settings at this duration.
+ *  1. current live hold %,
+ *  2. best hold % for the current settings + duration + SAME time bucket (hour),
+ *  3. best hold % for the current settings + duration across all hours,
+ *  4. best hold % across all settings at this duration.
  */
 @Composable
 private fun HoldPctBar(
@@ -384,6 +398,7 @@ private fun HoldPctBar(
     totalBreathMs: Long,
     phaseElapsedMs: Long,
     isHold: Boolean,
+    pbHourExact: Double?,
     pbExact: Double?,
     pbAny: Double?
 ) {
@@ -399,25 +414,34 @@ private fun HoldPctBar(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Row(
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            PctText("%.1f%%".format(currentPct))
-            Text("·", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
-            PctText(pbExact?.let { "%.1f%%".format(it) } ?: "--%")
-            Text("·", style = MaterialTheme.typography.headlineMedium, color = TextSecondary)
-            PctText(pbAny?.let { "%.1f%%".format(it) } ?: "--%")
+            PctText("%.1f%%".format(currentPct), Modifier.weight(1f))
+            PctSeparator()
+            PctText(pbHourExact?.let { "%.1f%%".format(it) } ?: "--%", Modifier.weight(1f))
+            PctSeparator()
+            PctText(pbExact?.let { "%.1f%%".format(it) } ?: "--%", Modifier.weight(1f))
+            PctSeparator()
+            PctText(pbAny?.let { "%.1f%%".format(it) } ?: "--%", Modifier.weight(1f))
         }
     }
 }
 
 @Composable
-private fun PctText(text: String) {
+private fun PctSeparator() {
+    Text("·", style = MaterialTheme.typography.headlineSmall, color = TextSecondary)
+}
+
+@Composable
+private fun PctText(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
-        style = MaterialTheme.typography.headlineMedium,
+        style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold,
-        color = TextPrimary
+        color = TextPrimary,
+        textAlign = TextAlign.Center,
+        modifier = modifier
     )
 }
 

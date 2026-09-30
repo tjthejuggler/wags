@@ -501,6 +501,7 @@ internal fun NewPersonalBestDialog(
     newPbMs: Long,
     categoryDescription: String = "",
     category: PersonalBestCategory = PersonalBestCategory.EXACT,
+    pbPctText: String? = null,
     onDismiss: () -> Unit
 ) {
     val trophies = category.trophyEmojis()
@@ -589,13 +590,32 @@ internal fun NewPersonalBestDialog(
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center
                         )
-                        Text(
-                            formatMs(newPbMs),
-                            style = MaterialTheme.typography.displaySmall,
-                            color = TextPrimary,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center
-                        )
+                        if (pbPctText != null) {
+                            // Min Breath: headline the hold percentage (the metric
+                            // tracked during the session) with the raw hold time
+                            // in a smaller line underneath.
+                            Text(
+                                pbPctText,
+                                style = MaterialTheme.typography.displaySmall,
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                formatMs(newPbMs),
+                                style = MaterialTheme.typography.titleLarge,
+                                color = TextSecondary,
+                                textAlign = TextAlign.Center
+                            )
+                        } else {
+                            Text(
+                                formatMs(newPbMs),
+                                style = MaterialTheme.typography.displaySmall,
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                         Text(
                             subtitle,
                             style = MaterialTheme.typography.bodyMedium,

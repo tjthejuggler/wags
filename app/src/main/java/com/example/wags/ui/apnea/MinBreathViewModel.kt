@@ -147,7 +147,9 @@ data class MinBreathUiState(
     // ── Personal best celebration ──────────────────────────────────────────────
     val newPersonalBest: PersonalBestResult? = null,
     // ── Live hold-percentage personal bests (current session duration) ───────
-    /** Best hold % at the current session duration + current 5-setting combination. Null if no records. */
+    /** Best hold % at the current duration + all 5 settings + the SAME time bucket (hour/time-of-day). Null if no records. */
+    val holdPctExactSettingsExactHour: Double? = null,
+    /** Best hold % at the current duration + all settings EXCEPT time, across all hours of the day. Null if no records. */
     val holdPctCurrentSettings: Double? = null,
     /** Best hold % at the current session duration across all settings. Null if no records. */
     val holdPctAnySettings: Double? = null,
@@ -451,7 +453,9 @@ class MinBreathViewModel @Inject constructor(
 
     /**
      * Loads the best hold-time percentages at the current session duration:
-     * one scoped to the current 5-setting combination, one across all settings.
+     *  1. exact settings + exact time bucket (hour in BY_HOUR mode, else time-of-day),
+     *  2. exact settings across all hours of the day,
+     *  3. across all settings.
      * Percentage = totalHoldTimeMs / sessionDurationMs (matches DurationHistory).
      */
     private fun loadHoldPctBests() {
@@ -460,18 +464,35 @@ class MinBreathViewModel @Inject constructor(
                 val s = _uiState.value
                 val durationMs = s.sessionDurationSec * 1000L
                 if (durationMs <= 0) return@launch
+                val dimension = timeDimensionStore.current
+                // Effective time bucket of a record in the ACTIVE dimension:
+                // BY_HOUR derives the bucket from the record's start timestamp
+                // (the stored timeOfDay column is NOT used in that mode);
+                // TIME_OF_DAY uses the stored column directly.
+                fun recordBucket(timestampMs: Long, tod: String): String =
+                    if (dimension == TimeDimension.BY_HOUR)
+                        TimeBuckets.fromTimestamp(timestampMs)
+                    else tod
+                val currentBucket = TimeBuckets.normalizeSessionBucket(s.timeOfDay, dimension)
+
                 val records = apneaRepository.getAllMinBreathOnce()
                     .filter { it.drillParamValue == s.sessionDurationSec && it.durationMs > 0 }
-                val exactBest = records.filter {
+                val settingsMatched = records.filter {
                     it.lungVolume == s.lungVolume && it.prepType == s.prepType &&
-                        it.timeOfDay == s.timeOfDay && it.posture == s.posture && it.audio == s.audio
-                }.maxOfOrNull { it.durationMs }
+                        it.posture == s.posture && it.audio == s.audio
+                }
+                val hourExactBest = settingsMatched
+                    .filter { recordBucket(it.timestamp, it.timeOfDay) == currentBucket }
+                    .maxOfOrNull { it.durationMs }
+                val exactBest = settingsMatched.maxOfOrNull { it.durationMs }
                 val anyBest = records.maxOfOrNull { it.durationMs }
                 _uiState.update {
                     it.copy(
                         // Clamp at 100%: legacy records saved with the old
                         // tick-accumulation bug can hold slightly more time
                         // than the nominal session duration.
+                        holdPctExactSettingsExactHour = hourExactBest
+                            ?.let { v -> (v.toDouble() / durationMs * 100.0).coerceIn(0.0, 100.0) },
                         holdPctCurrentSettings = exactBest
                             ?.let { v -> (v.toDouble() / durationMs * 100.0).coerceIn(0.0, 100.0) },
                         holdPctAnySettings = anyBest

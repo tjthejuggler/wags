@@ -41,7 +41,8 @@ import javax.inject.Singleton
 class AutoBackupManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val exportRepository: DataExportImportRepository,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val debugPreferences: com.example.wags.data.debug.DebugPreferences
 ) {
 
     companion object {
@@ -100,8 +101,36 @@ class AutoBackupManager @Inject constructor(
         val elapsed = System.currentTimeMillis() - started
         Log.i(TAG, "Auto-backup written: ${target.name} ($bytes bytes, ${elapsed}ms)")
 
+        // Mirror the ZIP into the user's synced folder (the same SAF directory
+        // debug_wags.json goes to) so TailCue on the PC can ingest it. Optional:
+        // skipped silently when no directory is configured.
+        copyToSyncedDir(target)
+
         pruneOldBackups(dir)
         BackupResult.Created(target, bytes, elapsed)
+    }
+
+    /**
+     * Copies the freshly written backup ZIP into the SAF folder picked in
+     * Debug settings (the Syncthing-synced habitsdb folder on this device).
+     * Overwrites the same-day file; failures are logged, never thrown.
+     */
+    private fun copyToSyncedDir(file: File) {
+        try {
+            val dirUri = debugPreferences.debugFileDirUri
+            if (dirUri.isBlank()) return
+            val treeUri = Uri.parse(dirUri)
+            val dir = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, treeUri)
+                ?: return
+            dir.findFile(file.name)?.delete()
+            val target = dir.createFile("application/zip", file.name) ?: return
+            context.contentResolver.openOutputStream(target.uri)?.use { os ->
+                file.inputStream().use { it.copyTo(os) }
+            }
+            Log.i(TAG, "Auto-backup mirrored to synced folder: ${file.name}")
+        } catch (t: Throwable) {
+            Log.w(TAG, "Synced-folder mirror failed: ${t.message}", t)
+        }
     }
 
     /**
