@@ -181,6 +181,18 @@ class MorningReadinessHistoryViewModel @Inject constructor(
     ): MorningReadinessChartData {
         if (chronological.isEmpty()) return MorningReadinessChartData()
 
+        // Apply the time window first: keep only readings within the last
+        // `period.days` days, anchored on the most recent reading (not "today",
+        // so the chart isn't empty if recording paused a while ago).
+        val windowed = timePeriod.days?.let { days ->
+            val newestDate = Instant.ofEpochMilli(chronological.last().timestamp)
+                .atZone(zone).toLocalDate()
+            val windowStart = newestDate.minusDays(days.toLong())
+            chronological.filter { entity ->
+                Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate() >= windowStart
+            }
+        } ?: chronological
+
         // For YEAR and ALL time periods, aggregate by month
         val shouldAggregateByMonth = timePeriod == ChartTimePeriod.YEAR || timePeriod == ChartTimePeriod.ALL
 
@@ -204,7 +216,7 @@ class MorningReadinessHistoryViewModel @Inject constructor(
 
         if (shouldAggregateByMonth) {
             // Group by year-month and calculate averages
-            val byMonth: Map<String, List<MorningReadinessEntity>> = chronological.groupBy { entity ->
+            val byMonth: Map<String, List<MorningReadinessEntity>> = windowed.groupBy { entity ->
                 val date = Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate()
                 "${date.year}-${date.monthValue.toString().padStart(2, '0')}"
             }
@@ -259,7 +271,7 @@ class MorningReadinessHistoryViewModel @Inject constructor(
             }
         } else {
             // Use daily data for shorter time periods
-            chronological.forEachIndexed { idx, e ->
+            windowed.forEachIndexed { idx, e ->
                 val x = idx.toFloat()
                 val label = Instant.ofEpochMilli(e.timestamp)
                     .atZone(zone).toLocalDate().toString()
