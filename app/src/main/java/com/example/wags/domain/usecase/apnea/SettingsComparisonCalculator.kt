@@ -570,7 +570,7 @@ class SettingsComparisonCalculator @Inject constructor(
         fun lungVolumeName(key: String): String = when (key) {
             "FULL" -> "Full"
             "EMPTY" -> "Empty"
-            "PARTIAL" -> "Partial"
+            "PARTIAL" -> "Half"
             else -> key
         }
 

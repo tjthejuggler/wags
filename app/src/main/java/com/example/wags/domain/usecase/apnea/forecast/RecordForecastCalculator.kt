@@ -41,7 +41,7 @@ object RecordForecastCalculator {
     private const val HOUR_WEIGHT_FLOOR = 0.05
 
     // ── Setting display names for labels ──────────────────────────────────────
-    private val LUNG_DISPLAY = mapOf("FULL" to "Full", "EMPTY" to "Empty", "PARTIAL" to "Partial")
+    private val LUNG_DISPLAY = mapOf("FULL" to "Full", "EMPTY" to "Empty", "PARTIAL" to "Half")
     private val PREP_DISPLAY  = mapOf("NO_PREP" to "No Prep", "RESONANCE" to "Resonance", "HYPER" to "Hyper")
     private val TOD_DISPLAY   = mapOf("MORNING" to "Morning", "DAY" to "Day", "NIGHT" to "Night")
     private val POS_DISPLAY   = mapOf("SITTING" to "Sitting", "LAYING" to "Laying")
