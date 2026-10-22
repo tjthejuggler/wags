@@ -31,6 +31,9 @@ class WagsApplication : Application() {
     @Inject
     lateinit var eucapnicConfigRepository: EucapnicConfigRepository
 
+    @Inject
+    lateinit var morningReadinessBackfillRunner: com.example.wags.data.repository.MorningReadinessBackfillRunner
+
     override fun onCreate() {
         super.onCreate()
         installCrashLogger()
@@ -53,6 +56,10 @@ class WagsApplication : Application() {
 
         // Seed default eucapnic configurations on first run
         eucapnicConfigRepository.seedDefaultConfigurationsIfNeeded()
+
+        // One-shot (2026-10-22): recompute legacy morning-readiness supine HRV
+        // with pipeline v2 (dropped-beat reconstruction). No-op after first run.
+        morningReadinessBackfillRunner.runIfNeeded()
 
         // Listen for toast messages from GarminManager and show them
         scope.launch {

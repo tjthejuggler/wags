@@ -32,7 +32,7 @@ class ReadinessRepository @Inject constructor(
         dao.getAll()
 
     suspend fun getLast14ForBaseline(): List<DailyReadingEntity> =
-        dao.getLast14()
+        dao.getLast14ForBaseline()
 
     suspend fun getById(id: Long): DailyReadingEntity? =
         dao.getById(id)

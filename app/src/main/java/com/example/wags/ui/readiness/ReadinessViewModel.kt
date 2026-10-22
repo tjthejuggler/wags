@@ -14,8 +14,9 @@ import com.example.wags.data.repository.ReadinessRepository
 import com.example.wags.di.IoDispatcher
 import com.example.wags.di.MathDispatcher
 import com.example.wags.domain.model.HrvMetrics
-import com.example.wags.domain.model.ReadinessScore
 import com.example.wags.domain.usecase.hrv.ArtifactCorrectionUseCase
+import com.example.wags.domain.usecase.hrv.MissedBeatReconstructor
+import com.example.wags.domain.model.ReadinessScore
 import com.example.wags.domain.usecase.hrv.FrequencyDomainCalculator
 import com.example.wags.domain.usecase.hrv.TimeDomainHrvCalculator
 import com.example.wags.domain.usecase.readiness.ReadinessScoreCalculator
@@ -40,9 +41,9 @@ enum class ReadinessSessionState { IDLE, PREPARING, RECORDING, PROCESSING, COMPL
 
 /** The three available measurement durations. */
 enum class HrvDuration(val seconds: Long, val label: String) {
-    SHORT(120L, "2 min"),
-    MEDIUM(180L, "3 min"),
-    LONG(300L, "5 min")
+    SHORT(60L, "1 min"),
+    MEDIUM(120L, "2 min"),
+    LONG(240L, "4 min")
 }
 
 /**
@@ -68,6 +69,8 @@ data class ReadinessUiState(
     val hrvMetrics: HrvMetrics? = null,
     val readinessScore: ReadinessScore? = null,
     val errorMessage: String? = null,
+    /** Non-null when the completed capture had low beat coverage; metrics are flagged. */
+    val qualityWarning: String? = null,
     /** Non-null when an HR-related dialog should be shown (no device, or no data streaming). */
     val hrDialogMessage: String? = null,
     val liveHr: Int? = null,
@@ -97,6 +100,9 @@ class ReadinessViewModel @Inject constructor(
         private const val TAG = "ReadinessVM"
         private const val PREFS_NAME = "hrv_readiness_prefs"
         private const val KEY_SELECTED_METRIC = "selected_circle_metric"
+
+        /** Minimum fraction of expected beats that must survive for an unflagged reading. */
+        private const val MIN_COVERAGE_RATIO = 0.60
     }
 
     private val _uiState = MutableStateFlow(ReadinessUiState())
@@ -195,10 +201,17 @@ class ReadinessViewModel @Inject constructor(
                 )
             }
 
+            // FIX (2026-10-22): the old loop decremented `remaining` by 1 s on
+            // every 500 ms poll, so every test ran at HALF its advertised
+            // duration (the "2 min" test actually recorded 60 s — the real
+            // cause of the ~57-sample captures). Countdown now uses wall-clock
+            // elapsed time so the recording lasts exactly durationSeconds.
+            val recordStartMs = android.os.SystemClock.elapsedRealtime()
             var remaining = durationSeconds
             while (remaining > 0 && isActive) {
                 delay(500L) // Poll at 2 Hz for smoother chart updates
-                remaining = (remaining - 1L).coerceAtLeast(0L)
+                val elapsedSec = (android.os.SystemClock.elapsedRealtime() - recordStartMs) / 1000L
+                remaining = (durationSeconds - elapsedSec).coerceAtLeast(0L)
                 val totalWrites = deviceManager.rrBuffer.totalWrites()
                 val newCount = (totalWrites - rrWritesAtStart).toInt()
                     .coerceAtMost(deviceManager.rrBuffer.capacity)
@@ -226,7 +239,11 @@ class ReadinessViewModel @Inject constructor(
 
     private fun computeLiveRmssd(rr: List<Double>): Float? {
         if (rr.size < 2) return null
-        val diffs = (1 until rr.size).map { rr[it] - rr[it - 1] }
+        // Reconstruct dropped beats before differencing — otherwise a single
+        // missed beat (+1000 ms diff) rockets the live RMSSD exactly like the
+        // stored-metrics flaw fixed in pipeline v2 (2026-10-22).
+        val cleaned = MissedBeatReconstructor.reconstruct(rr).rr
+        val diffs = (1 until cleaned.size).map { cleaned[it] - cleaned[it - 1] }
         return Math.sqrt(diffs.sumOf { it * it } / diffs.size).toFloat()
     }
 
@@ -253,6 +270,22 @@ class ReadinessViewModel @Inject constructor(
                 }
                 val score = readinessScoreCalculator.calculate(hrv.lnRmssd.toFloat(), baseline)
 
+                // Quality gate (pipeline v2, 2026-10-22): a clean capture should
+                // record roughly durationSeconds * hr / 60 beats. When coverage
+                // is poor the sensor dropped beats / lost contact — flag the
+                // reading so it is excluded from baselines, and warn the user.
+                val durationSeconds = _uiState.value.sessionDurationSeconds
+                val expectedBeats = hrDataSource.liveHr.value
+                    ?.let { (durationSeconds * it / 60.0) } ?: 0.0
+                val lowCoverage = expectedBeats > 0 &&
+                        hrv.sampleCount < MIN_COVERAGE_RATIO * expectedBeats
+                val qualityWarning = if (lowCoverage) {
+                    "Low beat coverage: captured ${hrv.sampleCount} of ~${expectedBeats.toInt()} " +
+                    "expected beats. The sensor may have dropped beats or lost contact — " +
+                    "moisten the strap electrodes and ensure a snug fit, then re-test. " +
+                    "This reading is flagged and excluded from baseline calculations."
+                } else null
+
                 withContext(ioDispatcher) {
                     readinessRepository.saveReading(
                         DailyReadingEntity(
@@ -264,7 +297,10 @@ class ReadinessViewModel @Inject constructor(
                             hfPowerMs2 = freq.hfPowerMs2.toFloat(),
                             sdnnMs = hrv.sdnnMs.toFloat(),
                             readinessScore = score.score,
-                            hrDeviceId = sessionHrDeviceLabel
+                            hrDeviceId = sessionHrDeviceLabel,
+                            metricsVersion = ArtifactCorrectionUseCase.METRICS_VERSION,
+                            qualityFlag = lowCoverage,
+                            sessionDurationSeconds = durationSeconds.toInt()
                         )
                     )
                 }
@@ -273,7 +309,8 @@ class ReadinessViewModel @Inject constructor(
                     it.copy(
                         sessionState = ReadinessSessionState.COMPLETE,
                         hrvMetrics = hrv,
-                        readinessScore = score
+                        readinessScore = score,
+                        qualityWarning = qualityWarning
                     )
                 }
                 // Signal the Habit app that an HRV Readiness session completed

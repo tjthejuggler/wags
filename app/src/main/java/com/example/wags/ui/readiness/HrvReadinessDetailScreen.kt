@@ -307,6 +307,39 @@ private fun HrvDetailContent(
         HrvDetailSection(title = "Recording") {
             HrvDetailRow("HR Device", reading.hrDeviceId ?: "None recorded")
             HrvDetailRow("Session ID", reading.readingId.toString())
+            HrvDetailRow(
+                "Metrics Pipeline",
+                if (reading.metricsVersion >= 2) "v2 (drop-beat corrected)" else "v1 (legacy)"
+            )
+        }
+
+        if (reading.qualityFlag) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = SurfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        "⚠ Data quality flag",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        if (reading.metricsVersion >= 2) {
+                            "This capture had low beat coverage (dropped beats or loose sensor " +
+                            "contact). Its metrics are excluded from baseline calculations."
+                        } else {
+                            "Legacy-pipeline reading with implausibly high RMSSD — most likely " +
+                            "caused by dropped beats inflating the metric. Excluded from " +
+                            "baseline calculations."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                }
+            }
         }
 
         Spacer(Modifier.height(16.dp))

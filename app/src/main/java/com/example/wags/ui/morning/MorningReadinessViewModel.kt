@@ -519,7 +519,10 @@ private fun MorningReadinessResult.toEntity(
     cvPenaltyApplied = cvPenaltyApplied,
     rhrLimiterApplied = rhrLimiterApplied,
     hrDeviceId = hrDeviceId,
-    standTimestampMs = standTimestampMs
+    standTimestampMs = standTimestampMs,
+    // Pipeline v2 (2026-10-22): dropped-beat reconstruction + quotient filter.
+    metricsVersion = 2,
+    qualityFlag = artifactPercentSupine > 50f
 )
 
 /**

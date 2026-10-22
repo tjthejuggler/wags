@@ -32,7 +32,7 @@ import com.example.wags.data.db.entity.*
         ForecastCalibrationEntity::class,
         EucapnicPastConfigurationEntity::class
     ],
-    version = 44,
+    version = 46,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -1261,6 +1261,68 @@ abstract class WagsDatabase : RoomDatabase() {
                 )
                 db.execSQL(
                     "ALTER TABLE apnea_records ADD COLUMN biofeedbackSpo2Texture TEXT DEFAULT NULL"
+                )
+            }
+        }
+
+        /**
+         * v44 → v45 (2026-10-22): HRV pipeline v2 — dropped-beat reconstruction.
+         *
+         * The legacy artifact pipeline DELETED merged (dropped-beat) RR
+         * intervals, splicing non-adjacent beats together and inflating RMSSD
+         * (observed: RMSSD 194 ms with pNN50 25% — mathematically inconsistent
+         * with clean physiology).
+         *
+         * This migration:
+         *  1. Adds metricsVersion + qualityFlag columns to daily_readings and
+         *     morning_readings so pre/post-change data stays comparable.
+         *  2. Marks legacy readings with physiologically implausible RMSSD
+         *     (> 150 ms) as quality-flagged. Flagged rows are excluded from
+         *     baselines but retained in history. daily_readings has no stored
+         *     raw RR so those metrics cannot be recomputed; morning_readings
+         *     supine metrics are recomputed from stored telemetry at app
+         *     startup by MorningReadinessBackfillRunner.
+         */
+        val MIGRATION_44_45 = object : Migration(44, 45) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE daily_readings ADD COLUMN metricsVersion INTEGER NOT NULL DEFAULT 1"
+                )
+                db.execSQL(
+                    "ALTER TABLE daily_readings ADD COLUMN qualityFlag INTEGER NOT NULL DEFAULT 0"
+                )
+                db.execSQL(
+                    "ALTER TABLE morning_readiness ADD COLUMN metricsVersion INTEGER NOT NULL DEFAULT 1"
+                )
+                db.execSQL(
+                    "ALTER TABLE morning_readiness ADD COLUMN qualityFlag INTEGER NOT NULL DEFAULT 0"
+                )
+                // Flag implausible legacy HRV-readiness RMSSD values
+                db.execSQL(
+                    "UPDATE daily_readings SET qualityFlag = 1 WHERE rawRmssdMs > 150"
+                )
+                // Flag implausible legacy morning supine RMSSD values
+                db.execSQL(
+                    "UPDATE morning_readiness SET qualityFlag = 1 WHERE supineRmssdMs > 150"
+                )
+            }
+        }
+
+        /**
+         * v45 → v46 (2026-10-22): HRV readiness timing fix.
+         *
+         * The readiness countdown decremented 1 s per 500 ms poll, so every
+         * test ran at HALF its advertised length (a "2 min" test recorded
+         * only 60 s of beats — the real cause of the ~57-sample captures).
+         *
+         * Adds sessionDurationSeconds to daily_readings. All legacy rows were
+         * recorded with the halved timer, so they default to 60 s regardless
+         * of which option was tapped, keeping old/new data comparable.
+         */
+        val MIGRATION_45_46 = object : Migration(45, 46) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE daily_readings ADD COLUMN sessionDurationSeconds INTEGER NOT NULL DEFAULT 60"
                 )
             }
         }

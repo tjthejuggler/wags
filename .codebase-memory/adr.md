@@ -1,16 +1,17 @@
-# ADR: Hour-proximity weighting for By-the-Hour record forecasts
+# ADR: HRV Readiness Duration Timer Fix + 1/2/4-min Options (2026-10-22)
 
-**Date:** 2026-09-11
-**Status:** Accepted
+## Status
+Accepted (supersedes part of the pipeline-v2 ADR's "low coverage" hypothesis)
 
 ## Context
-The apnea "chance to beat PB" forecast in By-the-Hour mode fits one OLS regression over ALL records with the hour encoded as sin/cos cyclical features. Breath-hold ability differs strongly between night and morning, so distant-hour records should inform the prediction less than near-hour records.
+Follow-up to pipeline v2: the real reason captures had only ~57 beats in a "2-minute" test was not the sensor. The recording loop in ReadinessViewModel polled every 500 ms but decremented `remaining` by 1 s per poll — every test ran at HALF its advertised duration ("2 min" = 60 s actual; "3 min" would have been 90 s; "5 min" 150 s).
 
 ## Decision
-- OlsRegression.fit() now accepts an optional per-observation weights vector (WLS): XᵀWX / XᵀWy / weighted RSS. Null weights preserve plain OLS.
-- RecordForecastCalculator computes weights in By-the-Hour mode only: Gaussian kernel on the *circular* hour distance between each record's timestamp hour and the target "Hxx" bucket, sigma = 3.0 hours, floored at 0.05 so distant hours still contribute.
-- PB threshold lookup (findBestForSubCombo) remains exact-hour matching; only the probability model is weighted.
+1. Countdown is now wall-clock based (`SystemClock.elapsedRealtime()`); the 500 ms poll only refreshes the UI. Durations are now exact.
+2. Duration options changed to 60 / 120 / 240 s (1/2/4 min) — SHORT is now the true 1-minute test.
+3. `daily_readings.sessionDurationSeconds` added (Room v46). ALL legacy rows default to 60 s (every legacy capture used the halved timer, and the user only ever tapped the "2 min" option), so history is treated as if it had been a 1-minute test — keeping old and new data comparable.
+4. The quality-gate expected-beats calculation uses the actual duration, so a 1-min test at ~60 BPM expects ~60 beats, not 120.
 
-## Consequences
-- A 07:00 record dominates a 06:00 prediction; a 22:00 record contributes ~5% weight.
-- Tunables live in RecordForecastCalculator: HOUR_WEIGHT_SIGMA, HOUR_WEIGHT_FLOOR.
+## Verified
+- MorningReadinessTimer uses delay(1000)/-1s — correct, no halving bug there.
+- Unit tests still pass; installed on device.

@@ -66,5 +66,24 @@ data class MorningReadinessEntity(
      * Null for readings recorded before this column was added (migration 13→14).
      */
     @androidx.room.ColumnInfo(defaultValue = "NULL")
-    val standTimestampMs: Long? = null
+    val standTimestampMs: Long? = null,
+
+    /**
+     * Version of the HRV artifact-correction pipeline that produced this
+     * reading's supine/standing metrics (migration 44→45, 2026-10-22).
+     *  1 = legacy pipeline (pre-2026-10-22; susceptible to dropped-beat
+     *      RMSSD inflation — supine metrics backfilled from telemetry where
+     *      possible, otherwise see qualityFlag)
+     *  2 = pipeline with MissedBeatReconstructor + final quotient filter,
+     *      or a v2 recomputation from stored telemetry
+     */
+    @androidx.room.ColumnInfo(defaultValue = "1")
+    val metricsVersion: Int = 1,
+
+    /**
+     * True when this reading's metrics are considered unreliable and should
+     * be excluded from baseline calculations (but kept in history/charts).
+     */
+    @androidx.room.ColumnInfo(defaultValue = "0")
+    val qualityFlag: Boolean = false
 )

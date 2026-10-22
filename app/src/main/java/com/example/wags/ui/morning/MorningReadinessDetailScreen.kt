@@ -317,6 +317,41 @@ private fun MorningReadinessDetailContent(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // Pipeline version / quality banner (v2 change, 2026-10-22)
+        if (reading.qualityFlag || reading.metricsVersion < 2) {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceVariant)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (reading.qualityFlag) {
+                        Text(
+                            "⚠ Data quality flag",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "Implausible supine RMSSD — likely dropped beats inflating the " +
+                            "legacy metric. Excluded from baseline calculations.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                    }
+                    if (reading.metricsVersion < 2) {
+                        Text(
+                            "Legacy metrics pipeline (v1). Supine HRV was recorded before " +
+                            "drop-beat correction was introduced on 2026-10-22.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                    }
+                }
+            }
+        }
+
         // ── Header: date/time + score ─────────────────────────────────────────
         Card(colors = CardDefaults.cardColors(containerColor = SurfaceVariant)) {
             Column(

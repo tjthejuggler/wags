@@ -34,14 +34,16 @@ interface MorningReadinessDao {
     @Query("SELECT * FROM morning_readiness ORDER BY timestamp DESC")
     suspend fun getAll(): List<MorningReadinessEntity>
 
-    // For 90-day rolling baseline queries
-    @Query("SELECT supineRmssdMs FROM morning_readiness WHERE timestamp >= :sinceMs ORDER BY timestamp DESC")
+    // For 90-day rolling baseline queries.
+    // Since pipeline v2 (migration 44→45) these exclude quality-flagged
+    // readings (implausible legacy RMSSD) from baseline statistics.
+    @Query("SELECT supineRmssdMs FROM morning_readiness WHERE timestamp >= :sinceMs AND qualityFlag = 0 ORDER BY timestamp DESC")
     suspend fun getSupineRmssdSince(sinceMs: Long): List<Double>
 
-    @Query("SELECT standingRmssdMs FROM morning_readiness WHERE timestamp >= :sinceMs ORDER BY timestamp DESC")
+    @Query("SELECT standingRmssdMs FROM morning_readiness WHERE timestamp >= :sinceMs AND qualityFlag = 0 ORDER BY timestamp DESC")
     suspend fun getStandingRmssdSince(sinceMs: Long): List<Double>
 
-    @Query("SELECT supineRhr FROM morning_readiness WHERE timestamp >= :sinceMs ORDER BY timestamp DESC")
+    @Query("SELECT supineRhr FROM morning_readiness WHERE timestamp >= :sinceMs AND qualityFlag = 0 ORDER BY timestamp DESC")
     suspend fun getSupineRhrSince(sinceMs: Long): List<Int>
 
     @Query("SELECT thirtyFifteenRatio FROM morning_readiness WHERE timestamp >= :sinceMs AND thirtyFifteenRatio IS NOT NULL ORDER BY timestamp DESC")
@@ -53,8 +55,25 @@ interface MorningReadinessDao {
     @Query("SELECT hooperTotal FROM morning_readiness WHERE timestamp >= :sinceMs AND hooperTotal IS NOT NULL ORDER BY timestamp DESC")
     suspend fun getHooperTotalSince(sinceMs: Long): List<Float>
 
-    @Query("SELECT supineLnRmssd FROM morning_readiness WHERE timestamp >= :sinceMs ORDER BY timestamp DESC")
+    @Query("SELECT supineLnRmssd FROM morning_readiness WHERE timestamp >= :sinceMs AND qualityFlag = 0 ORDER BY timestamp DESC")
     suspend fun getSupineLnRmssdSince(sinceMs: Long): List<Double>
+
+    /** Legacy rows still on metrics pipeline v1 (candidates for the v2 backfill). */
+    @Query("SELECT * FROM morning_readiness WHERE metricsVersion = 1 ORDER BY timestamp ASC")
+    suspend fun getLegacyMetricsV1(): List<MorningReadinessEntity>
+
+    /**
+     * Writes pipeline-v2 recomputed supine metrics for a legacy row
+     * (used by MorningReadinessBackfillRunner after migration 44→45).
+     */
+    @Query("UPDATE morning_readiness SET supineRmssdMs = :rmssdMs, supineLnRmssd = :lnRmssd, supineSdnnMs = :sdnnMs, metricsVersion = 2, qualityFlag = :qualityFlag WHERE id = :id")
+    suspend fun updateSupineMetricsV2(
+        id: Long,
+        rmssdMs: Double,
+        lnRmssd: Double,
+        sdnnMs: Double,
+        qualityFlag: Boolean
+    )
 
     @Query("DELETE FROM morning_readiness WHERE id = :id")
     suspend fun deleteById(id: Long)

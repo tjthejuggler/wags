@@ -401,6 +401,17 @@ private fun CompleteContent(state: ReadinessUiState) {
         state.hrvMetrics?.let { metrics ->
             HrvMetricsCard(metrics = metrics)
         }
+        state.qualityWarning?.let { warning ->
+            Text(
+                text = "⚠ $warning",
+                style = MaterialTheme.typography.bodySmall,
+                color = Ash,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            )
+        }
     }
 }
 

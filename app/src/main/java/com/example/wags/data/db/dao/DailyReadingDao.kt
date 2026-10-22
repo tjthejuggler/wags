@@ -28,6 +28,14 @@ interface DailyReadingDao {
     @Query("SELECT * FROM daily_readings ORDER BY timestamp DESC LIMIT 14")
     suspend fun getLast14(): List<DailyReadingEntity>
 
+    /**
+     * Baseline history for the readiness Z-score, excluding quality-flagged
+     * readings (implausible legacy RMSSD or low-coverage captures) since
+     * pipeline v2 (migration 44→45).
+     */
+    @Query("SELECT * FROM daily_readings WHERE qualityFlag = 0 ORDER BY timestamp DESC LIMIT 14")
+    suspend fun getLast14ForBaseline(): List<DailyReadingEntity>
+
     @Query("SELECT * FROM daily_readings WHERE readingId = :id LIMIT 1")
     suspend fun getById(id: Long): DailyReadingEntity?
 
