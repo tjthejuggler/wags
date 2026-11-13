@@ -9,8 +9,6 @@ import com.example.wags.data.ble.AutoConnectManager
 import com.example.wags.data.ble.DevicePreferencesRepository
 import com.example.wags.data.ble.UnifiedDeviceManager
 import com.example.wags.data.debug.DebugPreferences
-import com.example.wags.data.garmin.GarminConnectionState
-import com.example.wags.data.garmin.GarminManager
 import com.example.wags.data.ipc.HabitBackfillManager
 import com.example.wags.data.ipc.HabitIntegrationRepository
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
@@ -68,8 +66,6 @@ data class SettingsUiState(
     val scanResults: List<ScannedDevice> = emptyList(),
     /** True when the scan list also shows non-preferred (generic) devices. */
     val showAllDevices: Boolean = false,
-    // ── Garmin Watch ──────────────────────────────────────────────────────────
-    val garminState: GarminConnectionState = GarminConnectionState.Uninitialized,
     // ── Meditation audio directory ─────────────────────────────────────────────
     val meditationAudioDirUri: String = "",
     // ── Tail / Habit app integration ──────────────────────────────────────────
@@ -124,7 +120,6 @@ class SettingsViewModel @Inject constructor(
     private val habitRepo: HabitIntegrationRepository,
     private val habitBackfillManager: HabitBackfillManager,
     private val meditationRepository: com.example.wags.data.repository.MeditationRepository,
-    private val garminManager: GarminManager,
     private val dataExportImportRepo: DataExportImportRepository,
     private val spotifyAuthManager: SpotifyAuthManager,
     private val debugPrefs: DebugPreferences,
@@ -144,8 +139,7 @@ class SettingsViewModel @Inject constructor(
         deviceManager.connectionState,
         deviceManager.isScanning,
         deviceManager.scanResults,
-        devicePrefs.snapshot,
-        garminManager.connectionState
+        devicePrefs.snapshot
     ) { args ->
         @Suppress("UNCHECKED_CAST")
         val deviceState   = args[0] as BleConnectionState
@@ -153,13 +147,11 @@ class SettingsViewModel @Inject constructor(
         @Suppress("UNCHECKED_CAST")
         val scanResults   = args[2] as List<ScannedDevice>
         val snap          = args[3] as com.example.wags.data.ble.DevicePrefsSnapshot
-        val garminState   = args[4] as GarminConnectionState
 
         SettingsUiState(
             deviceState           = deviceState,
             isScanning            = scanning,
             scanResults           = scanResults,
-            garminState           = garminState,
             meditationAudioDirUri = snap.meditationAudioDirUri
         )
     }.combine(_habitState) { bleState, habit ->

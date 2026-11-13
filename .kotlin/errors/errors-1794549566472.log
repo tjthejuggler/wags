@@ -1,0 +1,1093 @@
+kotlin version: 2.0.21
+error message: org.jetbrains.kotlin.backend.common.BackendException: Backend Internal error: Exception during IR lowering
+File being compiled: /home/twain/AndroidStudioProjects/wags/app/src/main/java/com/example/wags/ui/apnea/ApneaGraphsTab.kt
+The root cause java.lang.RuntimeException was thrown at: org.jetbrains.kotlin.backend.jvm.codegen.FunctionCodegen.generate(FunctionCodegen.kt:47)
+	at org.jetbrains.kotlin.backend.common.CodegenUtil.reportBackendException(CodegenUtil.kt:253)
+	at org.jetbrains.kotlin.backend.common.CodegenUtil.reportBackendException$default(CodegenUtil.kt:236)
+	at org.jetbrains.kotlin.backend.common.phaser.PerformByIrFilePhase.invokeSequential(performByIrFile.kt:65)
+	at org.jetbrains.kotlin.backend.common.phaser.PerformByIrFilePhase.invoke(performByIrFile.kt:52)
+	at org.jetbrains.kotlin.backend.common.phaser.PerformByIrFilePhase.invoke(performByIrFile.kt:38)
+	at org.jetbrains.kotlin.backend.common.phaser.NamedCompilerPhase.phaseBody(CompilerPhase.kt:166)
+	at org.jetbrains.kotlin.backend.common.phaser.AbstractNamedCompilerPhase.invoke(CompilerPhase.kt:113)
+	at org.jetbrains.kotlin.backend.common.phaser.CompositePhase.invoke(PhaseBuilders.kt:27)
+	at org.jetbrains.kotlin.backend.common.phaser.CompositePhase.invoke(PhaseBuilders.kt:14)
+	at org.jetbrains.kotlin.backend.common.phaser.NamedCompilerPhase.phaseBody(CompilerPhase.kt:166)
+	at org.jetbrains.kotlin.backend.common.phaser.AbstractNamedCompilerPhase.invoke(CompilerPhase.kt:113)
+	at org.jetbrains.kotlin.backend.common.phaser.CompilerPhaseKt.invokeToplevel(CompilerPhase.kt:62)
+	at org.jetbrains.kotlin.backend.jvm.JvmIrCodegenFactory.invokeCodegen(JvmIrCodegenFactory.kt:371)
+	at org.jetbrains.kotlin.codegen.CodegenFactory.generateModule(CodegenFactory.kt:47)
+	at org.jetbrains.kotlin.backend.jvm.JvmIrCodegenFactory.generateModuleInFrontendIRMode(JvmIrCodegenFactory.kt:433)
+	at org.jetbrains.kotlin.cli.jvm.compiler.pipeline.JvmCompilerPipelineKt.generateCodeFromIr(jvmCompilerPipeline.kt:246)
+	at org.jetbrains.kotlin.cli.jvm.compiler.pipeline.JvmCompilerPipelineKt.compileModulesUsingFrontendIrAndLightTree(jvmCompilerPipeline.kt:142)
+	at org.jetbrains.kotlin.cli.jvm.K2JVMCompiler.doExecute(K2JVMCompiler.kt:148)
+	at org.jetbrains.kotlin.cli.jvm.K2JVMCompiler.doExecute(K2JVMCompiler.kt:43)
+	at org.jetbrains.kotlin.cli.common.CLICompiler.execImpl(CLICompiler.kt:103)
+	at org.jetbrains.kotlin.cli.common.CLICompiler.execImpl(CLICompiler.kt:49)
+	at org.jetbrains.kotlin.cli.common.CLITool.exec(CLITool.kt:101)
+	at org.jetbrains.kotlin.incremental.IncrementalJvmCompilerRunner.runCompiler(IncrementalJvmCompilerRunner.kt:464)
+	at org.jetbrains.kotlin.incremental.IncrementalJvmCompilerRunner.runCompiler(IncrementalJvmCompilerRunner.kt:73)
+	at org.jetbrains.kotlin.incremental.IncrementalCompilerRunner.doCompile(IncrementalCompilerRunner.kt:506)
+	at org.jetbrains.kotlin.incremental.IncrementalCompilerRunner.compileImpl(IncrementalCompilerRunner.kt:423)
+	at org.jetbrains.kotlin.incremental.IncrementalCompilerRunner.compileNonIncrementally(IncrementalCompilerRunner.kt:301)
+	at org.jetbrains.kotlin.incremental.IncrementalCompilerRunner.compile(IncrementalCompilerRunner.kt:129)
+	at org.jetbrains.kotlin.daemon.CompileServiceImplBase.execIncrementalCompiler(CompileServiceImpl.kt:675)
+	at org.jetbrains.kotlin.daemon.CompileServiceImplBase.access$execIncrementalCompiler(CompileServiceImpl.kt:92)
+	at org.jetbrains.kotlin.daemon.CompileServiceImpl.compile(CompileServiceImpl.kt:1660)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.rmi/sun.rmi.server.UnicastServerRef.dispatch(UnicastServerRef.java:360)
+	at java.rmi/sun.rmi.transport.Transport$1.run(Transport.java:200)
+	at java.rmi/sun.rmi.transport.Transport$1.run(Transport.java:197)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:712)
+	at java.rmi/sun.rmi.transport.Transport.serviceCall(Transport.java:196)
+	at java.rmi/sun.rmi.transport.tcp.TCPTransport.handleMessages(TCPTransport.java:587)
+	at java.rmi/sun.rmi.transport.tcp.TCPTransport$ConnectionHandler.run0(TCPTransport.java:828)
+	at java.rmi/sun.rmi.transport.tcp.TCPTransport$ConnectionHandler.lambda$run$0(TCPTransport.java:705)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:399)
+	at java.rmi/sun.rmi.transport.tcp.TCPTransport$ConnectionHandler.run(TCPTransport.java:704)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+Caused by: java.lang.RuntimeException: Exception while generating code for:
+FUN name:ApneaLineChartCanvas-4g2kuZs visibility:private modality:FINAL <> (points:kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>, lineColor:androidx.compose.ui.graphics.Color, yMin:kotlin.Float, yMax:kotlin.Float, modifier:androidx.compose.ui.Modifier?, overlayPoints:kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>?, overlayColor:androidx.compose.ui.graphics.Color, stepMode:kotlin.Boolean, tooltipPoint:com.example.wags.ui.apnea.ApneaChartPoint?, onTap:kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit>?, formatValue:kotlin.Function1<kotlin.Float, kotlin.String>, $composer:androidx.compose.runtime.Composer?, $changed:kotlin.Int, $changed1:kotlin.Int, $default:kotlin.Int) returnType:kotlin.Unit
+  annotations:
+    Composable
+    ComposableTarget(applier = "androidx.compose.ui.UiComposable")
+  VALUE_PARAMETER name:points index:0 type:kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>
+  VALUE_PARAMETER name:lineColor index:1 type:androidx.compose.ui.graphics.Color
+  VALUE_PARAMETER name:yMin index:2 type:kotlin.Float
+  VALUE_PARAMETER name:yMax index:3 type:kotlin.Float
+  VALUE_PARAMETER name:modifier index:4 type:androidx.compose.ui.Modifier? [assignable]
+  VALUE_PARAMETER name:overlayPoints index:5 type:kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>? [assignable]
+  VALUE_PARAMETER name:overlayColor index:6 type:androidx.compose.ui.graphics.Color [assignable]
+  VALUE_PARAMETER name:stepMode index:7 type:kotlin.Boolean [assignable]
+  VALUE_PARAMETER name:tooltipPoint index:8 type:com.example.wags.ui.apnea.ApneaChartPoint? [assignable]
+  VALUE_PARAMETER name:onTap index:9 type:kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit>? [assignable]
+  VALUE_PARAMETER name:formatValue index:10 type:kotlin.Function1<kotlin.Float, kotlin.String>
+  VALUE_PARAMETER name:$composer index:11 type:androidx.compose.runtime.Composer? [assignable]
+  VALUE_PARAMETER name:$changed index:12 type:kotlin.Int
+  VALUE_PARAMETER name:$changed1 index:13 type:kotlin.Int
+  VALUE_PARAMETER MASK_FOR_DEFAULT_FUNCTION name:$default index:14 type:kotlin.Int
+  BLOCK_BODY
+    BLOCK type=kotlin.Unit origin=null
+      SET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+        CALL 'public abstract fun startRestartGroup (key: kotlin.Int): androidx.compose.runtime.Composer declared in androidx.compose.runtime.Composer' type=androidx.compose.runtime.Composer origin=null
+          $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+          key: CONST Int type=kotlin.Int value=-146613096
+      CALL 'public final fun sourceInformation (composer: androidx.compose.runtime.Composer, sourceInformation: kotlin.String): kotlin.Unit declared in androidx.compose.runtime.ComposerKt' type=kotlin.Unit origin=null
+        composer: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+        sourceInformation: CONST String type=kotlin.String value="C(ApneaLineChartCanvas)P(6,1:c#ui.graphics.Color,10,9,2,5,4:c#ui.graphics.Color,7,8,3)666@24991L2,676@25261L22,677@25318L10,679@25402L60,680@25485L107,685@25677L67,686@25764L138,691@25968L27,692@26085L137,692@26000L222,697@26246L26,699@26278L7376:ApneaGraphsTab.kt#rchyug"
+    VAR name:$dirty type:kotlin.Int [val]
+      GET_VAR '$changed: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+    VAR name:$dirty1 type:kotlin.Int [val]
+      GET_VAR '$changed1: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+    WHEN type=kotlin.Unit origin=IF
+      BRANCH
+        if: CALL 'public final fun not (): kotlin.Boolean [operator] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+          $this: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+            arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+              $this: GET_VAR '$default: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+              other: CONST Int type=kotlin.Int value=1
+            arg1: CONST Int type=kotlin.Int value=0
+        then: SET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Unit origin=null
+          CALL 'public final fun or (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: CONST Int type=kotlin.Int value=6
+      BRANCH
+        if: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+          arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR '$changed: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: CONST Int type=kotlin.Int value=6
+          arg1: CONST Int type=kotlin.Int value=0
+        then: SET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Unit origin=null
+          CALL 'public final fun or (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: WHEN type=kotlin.Int origin=IF
+              BRANCH
+                if: CALL 'public open fun changedInstance (value: kotlin.Any?): kotlin.Boolean declared in androidx.compose.runtime.Composer' type=kotlin.Boolean origin=null
+                  $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  value: GET_VAR 'points: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> origin=null
+                then: CONST Int type=kotlin.Int value=4
+              BRANCH
+                if: CONST Boolean type=kotlin.Boolean value=true
+                then: CONST Int type=kotlin.Int value=2
+    WHEN type=kotlin.Unit origin=IF
+      BRANCH
+        if: CALL 'public final fun not (): kotlin.Boolean [operator] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+          $this: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+            arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+              $this: GET_VAR '$default: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+              other: CONST Int type=kotlin.Int value=2
+            arg1: CONST Int type=kotlin.Int value=0
+        then: SET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Unit origin=null
+          CALL 'public final fun or (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: CONST Int type=kotlin.Int value=48
+      BRANCH
+        if: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+          arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR '$changed: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: CONST Int type=kotlin.Int value=48
+          arg1: CONST Int type=kotlin.Int value=0
+        then: SET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Unit origin=null
+          CALL 'public final fun or (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: WHEN type=kotlin.Int origin=IF
+              BRANCH
+                if: CALL 'public open fun changed (value: kotlin.Long): kotlin.Boolean declared in androidx.compose.runtime.Composer' type=kotlin.Boolean origin=null
+                  $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  value: CALL 'public final fun <unsafe-coerce> <T, R> (v: T of kotlin.jvm.internal.<unsafe-coerce>): R of kotlin.jvm.internal.<unsafe-coerce> declared in kotlin.jvm.internal' type=kotlin.Long origin=null
+                    <T>: androidx.compose.ui.graphics.Color
+                    <R>: kotlin.Long
+                    v: GET_VAR 'lineColor: androidx.compose.ui.graphics.Color declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.graphics.Color origin=null
+                then: CONST Int type=kotlin.Int value=32
+              BRANCH
+                if: CONST Boolean type=kotlin.Boolean value=true
+                then: CONST Int type=kotlin.Int value=16
+    WHEN type=kotlin.Unit origin=IF
+      BRANCH
+        if: CALL 'public final fun not (): kotlin.Boolean [operator] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+          $this: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+            arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+              $this: GET_VAR '$default: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+              other: CONST Int type=kotlin.Int value=4
+            arg1: CONST Int type=kotlin.Int value=0
+        then: SET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Unit origin=null
+          CALL 'public final fun or (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: CONST Int type=kotlin.Int value=384
+      BRANCH
+        if: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+          arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR '$changed: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: CONST Int type=kotlin.Int value=384
+          arg1: CONST Int type=kotlin.Int value=0
+        then: SET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Unit origin=null
+          CALL 'public final fun or (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: WHEN type=kotlin.Int origin=IF
+              BRANCH
+                if: CALL 'public open fun changed (value: kotlin.Float): kotlin.Boolean declared in androidx.compose.runtime.Composer' type=kotlin.Boolean origin=null
+                  $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  value: GET_VAR 'yMin: kotlin.Float declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Float origin=null
+                then: CONST Int type=kotlin.Int value=256
+              BRANCH
+                if: CONST Boolean type=kotlin.Boolean value=true
+                then: CONST Int type=kotlin.Int value=128
+    WHEN type=kotlin.Unit origin=IF
+      BRANCH
+        if: CALL 'public final fun not (): kotlin.Boolean [operator] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+          $this: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+            arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+              $this: GET_VAR '$default: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+              other: CONST Int type=kotlin.Int value=8
+            arg1: CONST Int type=kotlin.Int value=0
+        then: SET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Unit origin=null
+          CALL 'public final fun or (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: CONST Int type=kotlin.Int value=3072
+      BRANCH
+        if: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+          arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR '$changed: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: CONST Int type=kotlin.Int value=3072
+          arg1: CONST Int type=kotlin.Int value=0
+        then: SET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Unit origin=null
+          CALL 'public final fun or (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: WHEN type=kotlin.Int origin=IF
+              BRANCH
+                if: CALL 'public open fun changed (value: kotlin.Float): kotlin.Boolean declared in androidx.compose.runtime.Composer' type=kotlin.Boolean origin=null
+                  $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  value: GET_VAR 'yMax: kotlin.Float declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Float origin=null
+                then: CONST Int type=kotlin.Int value=2048
+              BRANCH
+                if: CONST Boolean type=kotlin.Boolean value=true
+                then: CONST Int type=kotlin.Int value=1024
+    WHEN type=kotlin.Unit origin=IF
+      BRANCH
+        if: CALL 'public final fun not (): kotlin.Boolean [operator] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+          $this: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+            arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+              $this: GET_VAR '$default: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+              other: CONST Int type=kotlin.Int value=16
+            arg1: CONST Int type=kotlin.Int value=0
+        then: SET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Unit origin=null
+          CALL 'public final fun or (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: CONST Int type=kotlin.Int value=24576
+      BRANCH
+        if: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+          arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR '$changed: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: CONST Int type=kotlin.Int value=24576
+          arg1: CONST Int type=kotlin.Int value=0
+        then: SET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Unit origin=null
+          CALL 'public final fun or (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: WHEN type=kotlin.Int origin=IF
+              BRANCH
+                if: CALL 'public abstract fun changed (value: kotlin.Any?): kotlin.Boolean declared in androidx.compose.runtime.Composer' type=kotlin.Boolean origin=null
+                  $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  value: GET_VAR 'modifier: androidx.compose.ui.Modifier? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.Modifier? origin=null
+                then: CONST Int type=kotlin.Int value=16384
+              BRANCH
+                if: CONST Boolean type=kotlin.Boolean value=true
+                then: CONST Int type=kotlin.Int value=8192
+    WHEN type=kotlin.Unit origin=IF
+      BRANCH
+        if: CALL 'public final fun not (): kotlin.Boolean [operator] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+          $this: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+            arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+              $this: GET_VAR '$default: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+              other: CONST Int type=kotlin.Int value=32
+            arg1: CONST Int type=kotlin.Int value=0
+        then: SET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Unit origin=null
+          CALL 'public final fun or (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: CONST Int type=kotlin.Int value=196608
+      BRANCH
+        if: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+          arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR '$changed: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: CONST Int type=kotlin.Int value=196608
+          arg1: CONST Int type=kotlin.Int value=0
+        then: SET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Unit origin=null
+          CALL 'public final fun or (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: WHEN type=kotlin.Int origin=IF
+              BRANCH
+                if: CALL 'public open fun changedInstance (value: kotlin.Any?): kotlin.Boolean declared in androidx.compose.runtime.Composer' type=kotlin.Boolean origin=null
+                  $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  value: GET_VAR 'overlayPoints: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>? origin=null
+                then: CONST Int type=kotlin.Int value=131072
+              BRANCH
+                if: CONST Boolean type=kotlin.Boolean value=true
+                then: CONST Int type=kotlin.Int value=65536
+    WHEN type=kotlin.Unit origin=IF
+      BRANCH
+        if: CALL 'public final fun not (): kotlin.Boolean [operator] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+          $this: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+            arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+              $this: GET_VAR '$default: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+              other: CONST Int type=kotlin.Int value=64
+            arg1: CONST Int type=kotlin.Int value=0
+        then: SET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Unit origin=null
+          CALL 'public final fun or (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: CONST Int type=kotlin.Int value=1572864
+      BRANCH
+        if: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+          arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR '$changed: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: CONST Int type=kotlin.Int value=1572864
+          arg1: CONST Int type=kotlin.Int value=0
+        then: SET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Unit origin=null
+          CALL 'public final fun or (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: WHEN type=kotlin.Int origin=IF
+              BRANCH
+                if: CALL 'public open fun changed (value: kotlin.Long): kotlin.Boolean declared in androidx.compose.runtime.Composer' type=kotlin.Boolean origin=null
+                  $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  value: CALL 'public final fun <unsafe-coerce> <T, R> (v: T of kotlin.jvm.internal.<unsafe-coerce>): R of kotlin.jvm.internal.<unsafe-coerce> declared in kotlin.jvm.internal' type=kotlin.Long origin=null
+                    <T>: androidx.compose.ui.graphics.Color
+                    <R>: kotlin.Long
+                    v: GET_VAR 'overlayColor: androidx.compose.ui.graphics.Color [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.graphics.Color origin=null
+                then: CONST Int type=kotlin.Int value=1048576
+              BRANCH
+                if: CONST Boolean type=kotlin.Boolean value=true
+                then: CONST Int type=kotlin.Int value=524288
+    WHEN type=kotlin.Unit origin=IF
+      BRANCH
+        if: CALL 'public final fun not (): kotlin.Boolean [operator] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+          $this: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+            arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+              $this: GET_VAR '$default: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+              other: CONST Int type=kotlin.Int value=128
+            arg1: CONST Int type=kotlin.Int value=0
+        then: SET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Unit origin=null
+          CALL 'public final fun or (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: CONST Int type=kotlin.Int value=12582912
+      BRANCH
+        if: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+          arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR '$changed: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: CONST Int type=kotlin.Int value=12582912
+          arg1: CONST Int type=kotlin.Int value=0
+        then: SET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Unit origin=null
+          CALL 'public final fun or (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: WHEN type=kotlin.Int origin=IF
+              BRANCH
+                if: CALL 'public open fun changed (value: kotlin.Boolean): kotlin.Boolean declared in androidx.compose.runtime.Composer' type=kotlin.Boolean origin=null
+                  $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  value: GET_VAR 'stepMode: kotlin.Boolean [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Boolean origin=null
+                then: CONST Int type=kotlin.Int value=8388608
+              BRANCH
+                if: CONST Boolean type=kotlin.Boolean value=true
+                then: CONST Int type=kotlin.Int value=4194304
+    WHEN type=kotlin.Unit origin=IF
+      BRANCH
+        if: CALL 'public final fun not (): kotlin.Boolean [operator] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+          $this: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+            arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+              $this: GET_VAR '$default: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+              other: CONST Int type=kotlin.Int value=256
+            arg1: CONST Int type=kotlin.Int value=0
+        then: SET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Unit origin=null
+          CALL 'public final fun or (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: CONST Int type=kotlin.Int value=100663296
+      BRANCH
+        if: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+          arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR '$changed: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: CONST Int type=kotlin.Int value=100663296
+          arg1: CONST Int type=kotlin.Int value=0
+        then: SET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Unit origin=null
+          CALL 'public final fun or (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: WHEN type=kotlin.Int origin=IF
+              BRANCH
+                if: CALL 'public abstract fun changed (value: kotlin.Any?): kotlin.Boolean declared in androidx.compose.runtime.Composer' type=kotlin.Boolean origin=null
+                  $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  value: GET_VAR 'tooltipPoint: com.example.wags.ui.apnea.ApneaChartPoint? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=com.example.wags.ui.apnea.ApneaChartPoint? origin=null
+                then: CONST Int type=kotlin.Int value=67108864
+              BRANCH
+                if: CONST Boolean type=kotlin.Boolean value=true
+                then: CONST Int type=kotlin.Int value=33554432
+    WHEN type=kotlin.Unit origin=IF
+      BRANCH
+        if: CALL 'public final fun not (): kotlin.Boolean [operator] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+          $this: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+            arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+              $this: GET_VAR '$default: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+              other: CONST Int type=kotlin.Int value=512
+            arg1: CONST Int type=kotlin.Int value=0
+        then: SET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Unit origin=null
+          CALL 'public final fun or (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: CONST Int type=kotlin.Int value=805306368
+      BRANCH
+        if: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+          arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR '$changed: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: CONST Int type=kotlin.Int value=805306368
+          arg1: CONST Int type=kotlin.Int value=0
+        then: SET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Unit origin=null
+          CALL 'public final fun or (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: WHEN type=kotlin.Int origin=IF
+              BRANCH
+                if: CALL 'public open fun changedInstance (value: kotlin.Any?): kotlin.Boolean declared in androidx.compose.runtime.Composer' type=kotlin.Boolean origin=null
+                  $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  value: GET_VAR 'onTap: kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit>? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit>? origin=null
+                then: CONST Int type=kotlin.Int value=536870912
+              BRANCH
+                if: CONST Boolean type=kotlin.Boolean value=true
+                then: CONST Int type=kotlin.Int value=268435456
+    WHEN type=kotlin.Unit origin=IF
+      BRANCH
+        if: CALL 'public final fun not (): kotlin.Boolean [operator] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+          $this: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+            arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+              $this: GET_VAR '$default: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+              other: CONST Int type=kotlin.Int value=1024
+            arg1: CONST Int type=kotlin.Int value=0
+        then: SET_VAR 'val $dirty1: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Unit origin=null
+          CALL 'public final fun or (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR 'val $dirty1: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: CONST Int type=kotlin.Int value=6
+      BRANCH
+        if: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+          arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR '$changed1: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: CONST Int type=kotlin.Int value=6
+          arg1: CONST Int type=kotlin.Int value=0
+        then: SET_VAR 'val $dirty1: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Unit origin=null
+          CALL 'public final fun or (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+            $this: GET_VAR 'val $dirty1: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+            other: WHEN type=kotlin.Int origin=IF
+              BRANCH
+                if: CALL 'public open fun changedInstance (value: kotlin.Any?): kotlin.Boolean declared in androidx.compose.runtime.Composer' type=kotlin.Boolean origin=null
+                  $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  value: GET_VAR 'formatValue: kotlin.Function1<kotlin.Float, kotlin.String> declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Function1<kotlin.Float, kotlin.String> origin=null
+                then: CONST Int type=kotlin.Int value=4
+              BRANCH
+                if: CONST Boolean type=kotlin.Boolean value=true
+                then: CONST Int type=kotlin.Int value=2
+    WHEN type=kotlin.Unit origin=IF
+      BRANCH
+        if: CALL 'public final fun OROR (arg0: kotlin.Boolean, arg1: kotlin.Boolean): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+          arg0: CALL 'public final fun OROR (arg0: kotlin.Boolean, arg1: kotlin.Boolean): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+            arg0: CALL 'public final fun not (): kotlin.Boolean [operator] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+              $this: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+                arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+                  $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+                  other: CONST Int type=kotlin.Int value=306783379
+                arg1: CONST Int type=kotlin.Int value=306783378
+            arg1: CALL 'public final fun not (): kotlin.Boolean [operator] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+              $this: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+                arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+                  $this: GET_VAR 'val $dirty1: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+                  other: CONST Int type=kotlin.Int value=3
+                arg1: CONST Int type=kotlin.Int value=2
+          arg1: CALL 'public final fun not (): kotlin.Boolean [operator] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+            $this: CALL 'public abstract fun <get-skipping> (): kotlin.Boolean declared in androidx.compose.runtime.Composer' type=kotlin.Boolean origin=null
+              $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+        then: BLOCK type=kotlin.Unit origin=null
+          WHEN type=kotlin.Unit origin=IF
+            BRANCH
+              if: CALL 'public final fun not (): kotlin.Boolean [operator] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+                $this: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+                  arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+                    $this: GET_VAR '$default: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+                    other: CONST Int type=kotlin.Int value=16
+                  arg1: CONST Int type=kotlin.Int value=0
+              then: SET_VAR 'modifier: androidx.compose.ui.Modifier? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.Modifier? origin=null
+                GET_FIELD 'FIELD FIELD_FOR_OBJECT_INSTANCE name:Companion type:androidx.compose.ui.Modifier.Companion visibility:public [final,static] declared in androidx.compose.ui.Modifier' type=androidx.compose.ui.Modifier.Companion origin=null
+          WHEN type=kotlin.Unit origin=IF
+            BRANCH
+              if: CALL 'public final fun not (): kotlin.Boolean [operator] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+                $this: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+                  arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+                    $this: GET_VAR '$default: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+                    other: CONST Int type=kotlin.Int value=32
+                  arg1: CONST Int type=kotlin.Int value=0
+              then: SET_VAR 'overlayPoints: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>? origin=null
+                CALL 'public final fun emptyList <T> (): kotlin.collections.List<T of kotlin.collections.CollectionsKt.emptyList> declared in kotlin.collections.CollectionsKt' type=kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> origin=null
+                  <T>: com.example.wags.ui.apnea.ApneaChartPoint
+          WHEN type=kotlin.Unit origin=IF
+            BRANCH
+              if: CALL 'public final fun not (): kotlin.Boolean [operator] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+                $this: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+                  arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+                    $this: GET_VAR '$default: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+                    other: CONST Int type=kotlin.Int value=64
+                  arg1: CONST Int type=kotlin.Int value=0
+              then: SET_VAR 'overlayColor: androidx.compose.ui.graphics.Color [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.graphics.Color origin=null
+                CALL 'public final fun <get-TextSecondary> (): androidx.compose.ui.graphics.Color declared in com.example.wags.ui.theme.ColorKt' type=androidx.compose.ui.graphics.Color origin=GET_PROPERTY
+          WHEN type=kotlin.Unit origin=IF
+            BRANCH
+              if: CALL 'public final fun not (): kotlin.Boolean [operator] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+                $this: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+                  arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+                    $this: GET_VAR '$default: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+                    other: CONST Int type=kotlin.Int value=128
+                  arg1: CONST Int type=kotlin.Int value=0
+              then: SET_VAR 'stepMode: kotlin.Boolean [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Boolean origin=null
+                CONST Boolean type=kotlin.Boolean value=false
+          WHEN type=kotlin.Unit origin=IF
+            BRANCH
+              if: CALL 'public final fun not (): kotlin.Boolean [operator] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+                $this: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+                  arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+                    $this: GET_VAR '$default: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+                    other: CONST Int type=kotlin.Int value=256
+                  arg1: CONST Int type=kotlin.Int value=0
+              then: SET_VAR 'tooltipPoint: com.example.wags.ui.apnea.ApneaChartPoint? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=com.example.wags.ui.apnea.ApneaChartPoint? origin=null
+                CONST Null type=kotlin.Nothing? value=null
+          WHEN type=kotlin.Unit origin=IF
+            BRANCH
+              if: CALL 'public final fun not (): kotlin.Boolean [operator] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+                $this: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+                  arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+                    $this: GET_VAR '$default: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+                    other: CONST Int type=kotlin.Int value=512
+                  arg1: CONST Int type=kotlin.Int value=0
+              then: SET_VAR 'onTap: kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit>? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit>? origin=null
+                BLOCK type=kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit> origin=null
+                  BLOCK type=kotlin.Unit origin=null
+                    CALL 'public abstract fun startReplaceGroup (key: kotlin.Int): kotlin.Unit declared in androidx.compose.runtime.Composer' type=kotlin.Unit origin=null
+                      $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                      key: CONST Int type=kotlin.Int value=-850784753
+                    CALL 'public final fun sourceInformation (composer: androidx.compose.runtime.Composer, sourceInformation: kotlin.String): kotlin.Unit declared in androidx.compose.runtime.ComposerKt' type=kotlin.Unit origin=null
+                      composer: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                      sourceInformation: CONST String type=kotlin.String value="CC(remember):ApneaGraphsTab.kt#9igjgp"
+                  VAR IR_TEMPORARY_VARIABLE name:tmp0_group type:kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit> [val]
+                    CALL 'public final fun cache <T> (invalid: kotlin.Boolean, block: @[DisallowComposableCalls] kotlin.Function0<T of androidx.compose.runtime.ComposerKt.cache>): T of androidx.compose.runtime.ComposerKt.cache [inline] declared in androidx.compose.runtime.ComposerKt' type=kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit> origin=null
+                      <T>: kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit>
+                      $receiver: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                      invalid: CONST Boolean type=kotlin.Boolean value=false
+                      block: BLOCK type=kotlin.Function0<kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit>> origin=LAMBDA
+                        COMPOSITE type=kotlin.Unit origin=null
+                        FUNCTION_REFERENCE 'private final fun ApneaLineChartCanvas_4g2kuZs$lambda$46 (): kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit> declared in com.example.wags.ui.apnea.ApneaGraphsTabKt' type=kotlin.Function0<kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit>> origin=INLINE_LAMBDA reflectionTarget=null
+                  CALL 'public abstract fun endReplaceGroup (): kotlin.Unit declared in androidx.compose.runtime.Composer' type=kotlin.Unit origin=null
+                    $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  GET_VAR 'val tmp0_group: kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit> [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit> origin=null
+          WHEN type=kotlin.Unit origin=IF
+            BRANCH
+              if: CALL 'public final fun isTraceInProgress (): kotlin.Boolean declared in androidx.compose.runtime.ComposerKt' type=kotlin.Boolean origin=null
+              then: CALL 'public final fun traceEventStart (key: kotlin.Int, dirty1: kotlin.Int, dirty2: kotlin.Int, info: kotlin.String): kotlin.Unit declared in androidx.compose.runtime.ComposerKt' type=kotlin.Unit origin=null
+                key: CONST Int type=kotlin.Int value=-146613096
+                dirty1: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+                dirty2: GET_VAR 'val $dirty1: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+                info: CONST String type=kotlin.String value="com.example.wags.ui.apnea.ApneaLineChartCanvas (ApneaGraphsTab.kt:668)"
+          BLOCK type=kotlin.Unit origin=null
+            COMPOSITE type=kotlin.Unit origin=null
+              BLOCK type=kotlin.Unit origin=null
+                CALL 'public abstract fun startReplaceGroup (key: kotlin.Int): kotlin.Unit declared in androidx.compose.runtime.Composer' type=kotlin.Unit origin=null
+                  $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  key: CONST Int type=kotlin.Int value=-850783053
+                CALL 'public final fun sourceInformation (composer: androidx.compose.runtime.Composer, sourceInformation: kotlin.String): kotlin.Unit declared in androidx.compose.runtime.ComposerKt' type=kotlin.Unit origin=null
+                  composer: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  sourceInformation: CONST String type=kotlin.String value="670@25097L118,670@25069L146"
+            WHEN type=kotlin.Unit origin=IF
+              BRANCH
+                if: CALL 'public final fun less (arg0: kotlin.Int, arg1: kotlin.Int): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=LT
+                  arg0: CALL 'public abstract fun <get-size> (): kotlin.Int declared in kotlin.collections.List' type=kotlin.Int origin=GET_PROPERTY
+                    $this: GET_VAR 'points: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> origin=null
+                  arg1: CONST Int type=kotlin.Int value=2
+                then: BLOCK type=kotlin.Unit origin=null
+                  CALL 'public final fun Canvas (modifier: androidx.compose.ui.Modifier, onDraw: @[ExtensionFunctionType] kotlin.Function1<androidx.compose.ui.graphics.drawscope.DrawScope, kotlin.Unit>, $composer: androidx.compose.runtime.Composer?, $changed: kotlin.Int): kotlin.Unit declared in androidx.compose.foundation.CanvasKt' type=kotlin.Unit origin=null
+                    modifier: GET_VAR 'modifier: androidx.compose.ui.Modifier? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.Modifier? origin=null
+                    onDraw: BLOCK type=@[ExtensionFunctionType] kotlin.Function1<androidx.compose.ui.graphics.drawscope.DrawScope, kotlin.Unit> origin=null
+                      BLOCK type=kotlin.Unit origin=null
+                        CALL 'public abstract fun startReplaceGroup (key: kotlin.Int): kotlin.Unit declared in androidx.compose.runtime.Composer' type=kotlin.Unit origin=null
+                          $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                          key: CONST Int type=kotlin.Int value=-850781245
+                        CALL 'public final fun sourceInformation (composer: androidx.compose.runtime.Composer, sourceInformation: kotlin.String): kotlin.Unit declared in androidx.compose.runtime.ComposerKt' type=kotlin.Unit origin=null
+                          composer: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                          sourceInformation: CONST String type=kotlin.String value="CC(remember):ApneaGraphsTab.kt#9igjgp"
+                      VAR IR_TEMPORARY_VARIABLE name:tmp1_group type:@[ExtensionFunctionType] kotlin.Function1<androidx.compose.ui.graphics.drawscope.DrawScope, kotlin.Unit> [val]
+                        CALL 'public final fun cache <T> (invalid: kotlin.Boolean, block: @[DisallowComposableCalls] kotlin.Function0<T of androidx.compose.runtime.ComposerKt.cache>): T of androidx.compose.runtime.ComposerKt.cache [inline] declared in androidx.compose.runtime.ComposerKt' type=@[ExtensionFunctionType] kotlin.Function1<androidx.compose.ui.graphics.drawscope.DrawScope, kotlin.Unit> origin=null
+                          <T>: @[ExtensionFunctionType] kotlin.Function1<androidx.compose.ui.graphics.drawscope.DrawScope, kotlin.Unit>
+                          $receiver: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                          invalid: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+                            arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+                              $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+                              other: CONST Int type=kotlin.Int value=112
+                            arg1: CONST Int type=kotlin.Int value=32
+                          block: BLOCK type=kotlin.Function0<@[ExtensionFunctionType] kotlin.Function1<androidx.compose.ui.graphics.drawscope.DrawScope, kotlin.Unit>> origin=LAMBDA
+                            COMPOSITE type=kotlin.Unit origin=null
+                            FUNCTION_REFERENCE 'private final fun ApneaLineChartCanvas_4g2kuZs$lambda$48 ($lineColor: androidx.compose.ui.graphics.Color): @[ExtensionFunctionType] kotlin.Function1<androidx.compose.ui.graphics.drawscope.DrawScope, kotlin.Unit> declared in com.example.wags.ui.apnea.ApneaGraphsTabKt' type=kotlin.Function0<@[ExtensionFunctionType] kotlin.Function1<androidx.compose.ui.graphics.drawscope.DrawScope, kotlin.Unit>> origin=INLINE_LAMBDA reflectionTarget=null
+                              $lineColor: GET_VAR 'lineColor: androidx.compose.ui.graphics.Color declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.graphics.Color origin=null
+                      CALL 'public abstract fun endReplaceGroup (): kotlin.Unit declared in androidx.compose.runtime.Composer' type=kotlin.Unit origin=null
+                        $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                      GET_VAR 'val tmp1_group: @[ExtensionFunctionType] kotlin.Function1<androidx.compose.ui.graphics.drawscope.DrawScope, kotlin.Unit> [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=@[ExtensionFunctionType] kotlin.Function1<androidx.compose.ui.graphics.drawscope.DrawScope, kotlin.Unit> origin=null
+                    $composer: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                    $changed: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+                      $this: CONST Int type=kotlin.Int value=14
+                      other: CALL 'public final fun shr (bitCount: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+                        $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+                        bitCount: CONST Int type=kotlin.Int value=12
+                  BLOCK type=kotlin.Nothing origin=null
+                    COMPOSITE type=kotlin.Unit origin=null
+                      CALL 'public abstract fun endReplaceGroup (): kotlin.Unit declared in androidx.compose.runtime.Composer' type=kotlin.Unit origin=null
+                        $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                      COMPOSITE type=kotlin.Unit origin=null
+                        WHEN type=kotlin.Unit origin=IF
+                          BRANCH
+                            if: CALL 'public final fun isTraceInProgress (): kotlin.Boolean declared in androidx.compose.runtime.ComposerKt' type=kotlin.Boolean origin=null
+                            then: CALL 'public final fun traceEventEnd (): kotlin.Unit declared in androidx.compose.runtime.ComposerKt' type=kotlin.Unit origin=null
+                        BLOCK type=kotlin.Unit origin=null
+                          BLOCK type=kotlin.Unit origin=FOLDED_SAFE_CALL
+                            WHEN type=kotlin.Unit origin=FOLDED_SAFE_CALL
+                              BRANCH
+                                if: COMPOSITE type=kotlin.Boolean origin=null
+                                  VAR IR_TEMPORARY_VARIABLE name:tmp9_safe_receiver type:androidx.compose.runtime.ScopeUpdateScope? [val]
+                                    CALL 'public abstract fun endRestartGroup (): androidx.compose.runtime.ScopeUpdateScope? declared in androidx.compose.runtime.Composer' type=androidx.compose.runtime.ScopeUpdateScope? origin=null
+                                      $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                                  CALL 'public final fun not (): kotlin.Boolean [operator] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+                                    $this: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+                                      arg0: GET_VAR 'val tmp9_safe_receiver: androidx.compose.runtime.ScopeUpdateScope? [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.ScopeUpdateScope? origin=null
+                                      arg1: CONST Null type=kotlin.Nothing? value=null
+                                then: CALL 'public abstract fun updateScope (block: kotlin.Function2<androidx.compose.runtime.Composer, kotlin.Int, kotlin.Unit>): kotlin.Unit declared in androidx.compose.runtime.ScopeUpdateScope' type=kotlin.Unit origin=null
+                                  $this: GET_VAR 'val tmp9_safe_receiver: androidx.compose.runtime.ScopeUpdateScope? [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.ScopeUpdateScope? origin=null
+                                  block: BLOCK type=kotlin.Function2<androidx.compose.runtime.Composer?, kotlin.Int, kotlin.Unit> origin=LAMBDA
+                                    COMPOSITE type=kotlin.Unit origin=null
+                                    CALL 'public final fun <jvm-indy> <T> (dynamicCall: T of kotlin.jvm.internal.<jvm-indy>, bootstrapMethodHandle: kotlin.Any, vararg bootstrapMethodArguments: kotlin.Any): T of kotlin.jvm.internal.<jvm-indy> declared in kotlin.jvm.internal' type=kotlin.Function2<androidx.compose.runtime.Composer?, kotlin.Int, kotlin.Unit> origin=null
+                                      <T>: kotlin.Function2<androidx.compose.runtime.Composer?, kotlin.Int, kotlin.Unit>
+                                      dynamicCall: CALL 'public final fun invoke (p0: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>, p1: androidx.compose.ui.graphics.Color, p2: kotlin.Float, p3: kotlin.Float, p4: androidx.compose.ui.Modifier?, p5: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>?, p6: androidx.compose.ui.graphics.Color, p7: kotlin.Boolean, p8: com.example.wags.ui.apnea.ApneaChartPoint?, p9: kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit>?, p10: kotlin.Function1<kotlin.Float, kotlin.String>, p11: kotlin.Int, p12: kotlin.Int, p13: kotlin.Int): kotlin.Function2<androidx.compose.runtime.Composer?, kotlin.Int, kotlin.Unit> declared in kotlin.jvm.internal.invokeDynamic' type=kotlin.Function2<androidx.compose.runtime.Composer?, kotlin.Int, kotlin.Unit> origin=null
+                                        p0: GET_VAR 'points: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> origin=null
+                                        p1: GET_VAR 'lineColor: androidx.compose.ui.graphics.Color declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.graphics.Color origin=null
+                                        p2: GET_VAR 'yMin: kotlin.Float declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Float origin=null
+                                        p3: GET_VAR 'yMax: kotlin.Float declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Float origin=null
+                                        p4: GET_VAR 'modifier: androidx.compose.ui.Modifier? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.Modifier? origin=null
+                                        p5: GET_VAR 'overlayPoints: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>? origin=null
+                                        p6: GET_VAR 'overlayColor: androidx.compose.ui.graphics.Color [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.graphics.Color origin=null
+                                        p7: GET_VAR 'stepMode: kotlin.Boolean [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Boolean origin=null
+                                        p8: GET_VAR 'tooltipPoint: com.example.wags.ui.apnea.ApneaChartPoint? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=com.example.wags.ui.apnea.ApneaChartPoint? origin=null
+                                        p9: GET_VAR 'onTap: kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit>? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit>? origin=null
+                                        p10: GET_VAR 'formatValue: kotlin.Function1<kotlin.Float, kotlin.String> declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Function1<kotlin.Float, kotlin.String> origin=null
+                                        p11: GET_VAR '$changed: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+                                        p12: GET_VAR '$changed1: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+                                        p13: GET_VAR '$default: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+                                      bootstrapMethodHandle: CALL 'public final fun <jvm-method-handle> (tag: kotlin.Int, owner: kotlin.String, name: kotlin.String, descriptor: kotlin.String, isInterface: kotlin.Boolean): kotlin.Any declared in kotlin.jvm.internal' type=kotlin.Any origin=null
+                                        tag: CONST Int type=kotlin.Int value=6
+                                        owner: CONST String type=kotlin.String value="java/lang/invoke/LambdaMetafactory"
+                                        name: CONST String type=kotlin.String value="metafactory"
+                                        descriptor: CONST String type=kotlin.String value="(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;"
+                                        isInterface: CONST Boolean type=kotlin.Boolean value=false
+                                      bootstrapMethodArguments: VARARG type=kotlin.Array<kotlin.Any> varargElementType=kotlin.Any
+                                        CALL 'public final fun <jvm-original-method-type> (method: kotlin.Any): kotlin.Any declared in kotlin.jvm.internal' type=kotlin.Any origin=null
+                                          method: RAW_FUNCTION_REFERENCE 'public abstract fun invoke (p1: P1 of kotlin.Function2, p2: P2 of kotlin.Function2): R of kotlin.Function2 [operator] declared in kotlin.Function2' type=kotlin.Any
+                                        RAW_FUNCTION_REFERENCE 'private final fun ApneaLineChartCanvas_4g2kuZs$lambda$49 ($points: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>, $lineColor: androidx.compose.ui.graphics.Color, $yMin: kotlin.Float, $yMax: kotlin.Float, $modifier: androidx.compose.ui.Modifier?, $overlayPoints: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>?, $overlayColor: androidx.compose.ui.graphics.Color, $stepMode: kotlin.Boolean, $tooltipPoint: com.example.wags.ui.apnea.ApneaChartPoint?, $onTap: kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit>?, $formatValue: kotlin.Function1<kotlin.Float, kotlin.String>, $$changed: kotlin.Int, $$changed1: kotlin.Int, $$default: kotlin.Int, $composer: androidx.compose.runtime.Composer?, $force: kotlin.Int): kotlin.Unit? declared in com.example.wags.ui.apnea.ApneaGraphsTabKt' type=kotlin.Any
+                                        CALL 'public final fun <jvm-original-method-type> (method: kotlin.Any): kotlin.Any declared in kotlin.jvm.internal' type=kotlin.Any origin=null
+                                          method: RAW_FUNCTION_REFERENCE 'public abstract fun invoke (p1: androidx.compose.runtime.Composer?, p2: kotlin.Int?): kotlin.Unit? [fake_override,operator] declared in kotlin.jvm.internal.invokeDynamic.<fake>' type=kotlin.Any
+                              BRANCH
+                                if: CONST Boolean type=kotlin.Boolean value=true
+                                then: CONST Null type=kotlin.Any? value=null
+                    RETURN type=kotlin.Nothing from='private final fun ApneaLineChartCanvas-4g2kuZs (points: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>, lineColor: androidx.compose.ui.graphics.Color, yMin: kotlin.Float, yMax: kotlin.Float, modifier: androidx.compose.ui.Modifier?, overlayPoints: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>?, overlayColor: androidx.compose.ui.graphics.Color, stepMode: kotlin.Boolean, tooltipPoint: com.example.wags.ui.apnea.ApneaChartPoint?, onTap: kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit>?, formatValue: kotlin.Function1<kotlin.Float, kotlin.String>, $composer: androidx.compose.runtime.Composer?, $changed: kotlin.Int, $changed1: kotlin.Int, $default: kotlin.Int): kotlin.Unit declared in com.example.wags.ui.apnea.ApneaGraphsTabKt'
+                      GET_FIELD 'FIELD FIELD_FOR_OBJECT_INSTANCE name:INSTANCE type:kotlin.Unit visibility:public [final,static] declared in kotlin.Unit' type=kotlin.Unit origin=null
+            COMPOSITE type=kotlin.Unit origin=null
+              CALL 'public abstract fun endReplaceGroup (): kotlin.Unit declared in androidx.compose.runtime.Composer' type=kotlin.Unit origin=null
+                $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+          VAR name:textMeasurer type:androidx.compose.ui.text.TextMeasurer [val]
+            CALL 'public final fun rememberTextMeasurer (cacheSize: kotlin.Int, $composer: androidx.compose.runtime.Composer?, $changed: kotlin.Int, $default: kotlin.Int): androidx.compose.ui.text.TextMeasurer declared in androidx.compose.ui.text.TextMeasurerHelperKt' type=androidx.compose.ui.text.TextMeasurer origin=null
+              cacheSize: COMPOSITE type=kotlin.Int origin=DEFAULT_VALUE
+                CONST Int type=kotlin.Int value=0
+              $composer: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+              $changed: CONST Int type=kotlin.Int value=0
+              $default: CONST Int type=kotlin.Int value=1
+          VAR name:tickStyle type:androidx.compose.ui.text.TextStyle [val]
+            BLOCK type=androidx.compose.ui.text.TextStyle origin=ARGUMENTS_REORDERING_FOR_CALL
+              VAR IR_TEMPORARY_VARIABLE name:tmp0_$this type:androidx.compose.ui.text.TextStyle [val]
+                CALL 'public final fun <get-labelSmall> (): androidx.compose.ui.text.TextStyle declared in androidx.compose.material3.Typography' type=androidx.compose.ui.text.TextStyle origin=GET_PROPERTY
+                  $this: CALL 'public final fun <get-typography> ($composer: androidx.compose.runtime.Composer?, $changed: kotlin.Int): androidx.compose.material3.Typography declared in androidx.compose.material3.MaterialTheme' type=androidx.compose.material3.Typography origin=GET_PROPERTY
+                    $this: GET_FIELD 'FIELD FIELD_FOR_OBJECT_INSTANCE name:INSTANCE type:androidx.compose.material3.MaterialTheme visibility:public [final,static] declared in androidx.compose.material3.MaterialTheme' type=androidx.compose.material3.MaterialTheme origin=null
+                    $composer: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                    $changed: GET_FIELD 'FIELD name:$stable type:kotlin.Int visibility:public [final,static] declared in androidx.compose.material3.MaterialTheme' type=kotlin.Int origin=null
+              VAR IR_TEMPORARY_VARIABLE name:tmp1_fontSize type:androidx.compose.ui.unit.TextUnit [val]
+                CALL 'public final fun <get-sp> (): androidx.compose.ui.unit.TextUnit declared in androidx.compose.ui.unit.TextUnitKt' type=androidx.compose.ui.unit.TextUnit origin=GET_PROPERTY
+                  $receiver: CONST Int type=kotlin.Int value=9
+              VAR IR_TEMPORARY_VARIABLE name:tmp2_color type:androidx.compose.ui.graphics.Color [val]
+                CALL 'public final fun <get-TextSecondary> (): androidx.compose.ui.graphics.Color declared in com.example.wags.ui.theme.ColorKt' type=androidx.compose.ui.graphics.Color origin=GET_PROPERTY
+              CALL 'public final fun copy-p1EtxEg$default ($this: androidx.compose.ui.text.TextStyle, color: androidx.compose.ui.graphics.Color, fontSize: androidx.compose.ui.unit.TextUnit, fontWeight: androidx.compose.ui.text.font.FontWeight?, fontStyle: androidx.compose.ui.text.font.FontStyle?, fontSynthesis: androidx.compose.ui.text.font.FontSynthesis?, fontFamily: androidx.compose.ui.text.font.FontFamily?, fontFeatureSettings: kotlin.String?, letterSpacing: androidx.compose.ui.unit.TextUnit, baselineShift: androidx.compose.ui.text.style.BaselineShift?, textGeometricTransform: androidx.compose.ui.text.style.TextGeometricTransform?, localeList: androidx.compose.ui.text.intl.LocaleList?, background: androidx.compose.ui.graphics.Color, textDecoration: androidx.compose.ui.text.style.TextDecoration?, shadow: androidx.compose.ui.graphics.Shadow?, drawStyle: androidx.compose.ui.graphics.drawscope.DrawStyle?, textAlign: androidx.compose.ui.text.style.TextAlign, textDirection: androidx.compose.ui.text.style.TextDirection, lineHeight: androidx.compose.ui.unit.TextUnit, textIndent: androidx.compose.ui.text.style.TextIndent?, platformStyle: androidx.compose.ui.text.PlatformTextStyle?, lineHeightStyle: androidx.compose.ui.text.style.LineHeightStyle?, lineBreak: androidx.compose.ui.text.style.LineBreak, hyphens: androidx.compose.ui.text.style.Hyphens, textMotion: androidx.compose.ui.text.style.TextMotion?, $mask0: kotlin.Int, $handler: kotlin.Any?): androidx.compose.ui.text.TextStyle declared in androidx.compose.ui.text.TextStyle' type=androidx.compose.ui.text.TextStyle origin=DEFAULT_DISPATCH_CALL
+                $this: GET_VAR 'val tmp0_$this: androidx.compose.ui.text.TextStyle [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.text.TextStyle origin=null
+                color: GET_VAR 'val tmp2_color: androidx.compose.ui.graphics.Color [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.graphics.Color origin=null
+                fontSize: GET_VAR 'val tmp1_fontSize: androidx.compose.ui.unit.TextUnit [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.unit.TextUnit origin=null
+                fontWeight: COMPOSITE type=androidx.compose.ui.text.font.FontWeight? origin=DEFAULT_VALUE
+                  CONST Null type=androidx.compose.ui.text.font.FontWeight? value=null
+                fontStyle: COMPOSITE type=androidx.compose.ui.text.font.FontStyle? origin=DEFAULT_VALUE
+                  CONST Null type=androidx.compose.ui.text.font.FontStyle? value=null
+                fontSynthesis: COMPOSITE type=androidx.compose.ui.text.font.FontSynthesis? origin=DEFAULT_VALUE
+                  CONST Null type=androidx.compose.ui.text.font.FontSynthesis? value=null
+                fontFamily: COMPOSITE type=androidx.compose.ui.text.font.FontFamily? origin=DEFAULT_VALUE
+                  CONST Null type=androidx.compose.ui.text.font.FontFamily? value=null
+                fontFeatureSettings: COMPOSITE type=kotlin.String? origin=DEFAULT_VALUE
+                  CONST Null type=kotlin.String? value=null
+                letterSpacing: COMPOSITE type=androidx.compose.ui.unit.TextUnit origin=DEFAULT_VALUE
+                  CALL 'public final fun <unsafe-coerce> <T, R> (v: T of kotlin.jvm.internal.<unsafe-coerce>): R of kotlin.jvm.internal.<unsafe-coerce> declared in kotlin.jvm.internal' type=androidx.compose.ui.unit.TextUnit origin=null
+                    <T>: kotlin.Long
+                    <R>: androidx.compose.ui.unit.TextUnit
+                    v: CONST Long type=kotlin.Long value=0
+                baselineShift: COMPOSITE type=androidx.compose.ui.text.style.BaselineShift? origin=DEFAULT_VALUE
+                  CONST Null type=androidx.compose.ui.text.style.BaselineShift? value=null
+                textGeometricTransform: COMPOSITE type=androidx.compose.ui.text.style.TextGeometricTransform? origin=DEFAULT_VALUE
+                  CONST Null type=androidx.compose.ui.text.style.TextGeometricTransform? value=null
+                localeList: COMPOSITE type=androidx.compose.ui.text.intl.LocaleList? origin=DEFAULT_VALUE
+                  CONST Null type=androidx.compose.ui.text.intl.LocaleList? value=null
+                background: COMPOSITE type=androidx.compose.ui.graphics.Color origin=DEFAULT_VALUE
+                  CALL 'public final fun <unsafe-coerce> <T, R> (v: T of kotlin.jvm.internal.<unsafe-coerce>): R of kotlin.jvm.internal.<unsafe-coerce> declared in kotlin.jvm.internal' type=androidx.compose.ui.graphics.Color origin=null
+                    <T>: kotlin.Long
+                    <R>: androidx.compose.ui.graphics.Color
+                    v: CONST Long type=kotlin.Long value=0
+                textDecoration: COMPOSITE type=androidx.compose.ui.text.style.TextDecoration? origin=DEFAULT_VALUE
+                  CONST Null type=androidx.compose.ui.text.style.TextDecoration? value=null
+                shadow: COMPOSITE type=androidx.compose.ui.graphics.Shadow? origin=DEFAULT_VALUE
+                  CONST Null type=androidx.compose.ui.graphics.Shadow? value=null
+                drawStyle: COMPOSITE type=androidx.compose.ui.graphics.drawscope.DrawStyle? origin=DEFAULT_VALUE
+                  CONST Null type=androidx.compose.ui.graphics.drawscope.DrawStyle? value=null
+                textAlign: COMPOSITE type=androidx.compose.ui.text.style.TextAlign origin=DEFAULT_VALUE
+                  CALL 'public final fun <unsafe-coerce> <T, R> (v: T of kotlin.jvm.internal.<unsafe-coerce>): R of kotlin.jvm.internal.<unsafe-coerce> declared in kotlin.jvm.internal' type=androidx.compose.ui.text.style.TextAlign origin=null
+                    <T>: kotlin.Int
+                    <R>: androidx.compose.ui.text.style.TextAlign
+                    v: CONST Int type=kotlin.Int value=0
+                textDirection: COMPOSITE type=androidx.compose.ui.text.style.TextDirection origin=DEFAULT_VALUE
+                  CALL 'public final fun <unsafe-coerce> <T, R> (v: T of kotlin.jvm.internal.<unsafe-coerce>): R of kotlin.jvm.internal.<unsafe-coerce> declared in kotlin.jvm.internal' type=androidx.compose.ui.text.style.TextDirection origin=null
+                    <T>: kotlin.Int
+                    <R>: androidx.compose.ui.text.style.TextDirection
+                    v: CONST Int type=kotlin.Int value=0
+                lineHeight: COMPOSITE type=androidx.compose.ui.unit.TextUnit origin=DEFAULT_VALUE
+                  CALL 'public final fun <unsafe-coerce> <T, R> (v: T of kotlin.jvm.internal.<unsafe-coerce>): R of kotlin.jvm.internal.<unsafe-coerce> declared in kotlin.jvm.internal' type=androidx.compose.ui.unit.TextUnit origin=null
+                    <T>: kotlin.Long
+                    <R>: androidx.compose.ui.unit.TextUnit
+                    v: CONST Long type=kotlin.Long value=0
+                textIndent: COMPOSITE type=androidx.compose.ui.text.style.TextIndent? origin=DEFAULT_VALUE
+                  CONST Null type=androidx.compose.ui.text.style.TextIndent? value=null
+                platformStyle: COMPOSITE type=androidx.compose.ui.text.PlatformTextStyle? origin=DEFAULT_VALUE
+                  CONST Null type=androidx.compose.ui.text.PlatformTextStyle? value=null
+                lineHeightStyle: COMPOSITE type=androidx.compose.ui.text.style.LineHeightStyle? origin=DEFAULT_VALUE
+                  CONST Null type=androidx.compose.ui.text.style.LineHeightStyle? value=null
+                lineBreak: COMPOSITE type=androidx.compose.ui.text.style.LineBreak origin=DEFAULT_VALUE
+                  CALL 'public final fun <unsafe-coerce> <T, R> (v: T of kotlin.jvm.internal.<unsafe-coerce>): R of kotlin.jvm.internal.<unsafe-coerce> declared in kotlin.jvm.internal' type=androidx.compose.ui.text.style.LineBreak origin=null
+                    <T>: kotlin.Int
+                    <R>: androidx.compose.ui.text.style.LineBreak
+                    v: CONST Int type=kotlin.Int value=0
+                hyphens: COMPOSITE type=androidx.compose.ui.text.style.Hyphens origin=DEFAULT_VALUE
+                  CALL 'public final fun <unsafe-coerce> <T, R> (v: T of kotlin.jvm.internal.<unsafe-coerce>): R of kotlin.jvm.internal.<unsafe-coerce> declared in kotlin.jvm.internal' type=androidx.compose.ui.text.style.Hyphens origin=null
+                    <T>: kotlin.Int
+                    <R>: androidx.compose.ui.text.style.Hyphens
+                    v: CONST Int type=kotlin.Int value=0
+                textMotion: COMPOSITE type=androidx.compose.ui.text.style.TextMotion? origin=DEFAULT_VALUE
+                  CONST Null type=androidx.compose.ui.text.style.TextMotion? value=null
+                $mask0: CONST Int type=kotlin.Int value=16777212
+                $handler: CONST Null type=kotlin.Any? value=null
+          VAR name:ticks type:kotlin.collections.List<kotlin.Float> [val]
+            BLOCK type=kotlin.collections.List<kotlin.Float> origin=null
+              BLOCK type=kotlin.Unit origin=null
+                CALL 'public abstract fun startReplaceGroup (key: kotlin.Int): kotlin.Unit declared in androidx.compose.runtime.Composer' type=kotlin.Unit origin=null
+                  $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  key: CONST Int type=kotlin.Int value=-850771543
+                CALL 'public final fun sourceInformation (composer: androidx.compose.runtime.Composer, sourceInformation: kotlin.String): kotlin.Unit declared in androidx.compose.runtime.ComposerKt' type=kotlin.Unit origin=null
+                  composer: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  sourceInformation: CONST String type=kotlin.String value="CC(remember):ApneaGraphsTab.kt#9igjgp"
+              VAR IR_TEMPORARY_VARIABLE name:tmp2_group type:kotlin.collections.List<kotlin.Float> [val]
+                CALL 'public final fun cache <T> (invalid: kotlin.Boolean, block: @[DisallowComposableCalls] kotlin.Function0<T of androidx.compose.runtime.ComposerKt.cache>): T of androidx.compose.runtime.ComposerKt.cache [inline] declared in androidx.compose.runtime.ComposerKt' type=kotlin.collections.List<kotlin.Float> origin=null
+                  <T>: kotlin.collections.List<kotlin.Float>
+                  $receiver: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  invalid: CALL 'public final fun or (other: kotlin.Boolean): kotlin.Boolean [infix] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+                    $this: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+                      arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+                        $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+                        other: CONST Int type=kotlin.Int value=896
+                      arg1: CONST Int type=kotlin.Int value=256
+                    other: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+                      arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+                        $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+                        other: CONST Int type=kotlin.Int value=7168
+                      arg1: CONST Int type=kotlin.Int value=2048
+                  block: BLOCK type=kotlin.Function0<kotlin.collections.List<kotlin.Float>> origin=LAMBDA
+                    COMPOSITE type=kotlin.Unit origin=null
+                    FUNCTION_REFERENCE 'private final fun ApneaLineChartCanvas_4g2kuZs$lambda$50 ($yMin: kotlin.Float, $yMax: kotlin.Float): kotlin.collections.List<kotlin.Float> declared in com.example.wags.ui.apnea.ApneaGraphsTabKt' type=kotlin.Function0<kotlin.collections.List<kotlin.Float>> origin=INLINE_LAMBDA reflectionTarget=null
+                      $yMin: GET_VAR 'yMin: kotlin.Float declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Float origin=null
+                      $yMax: GET_VAR 'yMax: kotlin.Float declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Float origin=null
+              CALL 'public abstract fun endReplaceGroup (): kotlin.Unit declared in androidx.compose.runtime.Composer' type=kotlin.Unit origin=null
+                $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+              GET_VAR 'val tmp2_group: kotlin.collections.List<kotlin.Float> [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<kotlin.Float> origin=null
+          VAR name:tickLayouts type:kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult> [val]
+            BLOCK type=kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult> origin=null
+              BLOCK type=kotlin.Unit origin=null
+                CALL 'public abstract fun startReplaceGroup (key: kotlin.Int): kotlin.Unit declared in androidx.compose.runtime.Composer' type=kotlin.Unit origin=null
+                  $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  key: CONST Int type=kotlin.Int value=-850768840
+                CALL 'public final fun sourceInformation (composer: androidx.compose.runtime.Composer, sourceInformation: kotlin.String): kotlin.Unit declared in androidx.compose.runtime.ComposerKt' type=kotlin.Unit origin=null
+                  composer: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  sourceInformation: CONST String type=kotlin.String value="CC(remember):ApneaGraphsTab.kt#9igjgp"
+              VAR IR_TEMPORARY_VARIABLE name:tmp3_group type:kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult> [val]
+                CALL 'public final fun cache <T> (invalid: kotlin.Boolean, block: @[DisallowComposableCalls] kotlin.Function0<T of androidx.compose.runtime.ComposerKt.cache>): T of androidx.compose.runtime.ComposerKt.cache [inline] declared in androidx.compose.runtime.ComposerKt' type=kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult> origin=null
+                  <T>: kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult>
+                  $receiver: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  invalid: CALL 'public final fun or (other: kotlin.Boolean): kotlin.Boolean [infix] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+                    $this: CALL 'public abstract fun changed (value: kotlin.Any?): kotlin.Boolean declared in androidx.compose.runtime.Composer' type=kotlin.Boolean origin=null
+                      $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                      value: GET_VAR 'val ticks: kotlin.collections.List<kotlin.Float> [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<kotlin.Float> origin=null
+                    other: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+                      arg0: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+                        $this: GET_VAR 'val $dirty1: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+                        other: CONST Int type=kotlin.Int value=14
+                      arg1: CONST Int type=kotlin.Int value=4
+                  block: BLOCK type=kotlin.Function0<kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult>> origin=LAMBDA
+                    COMPOSITE type=kotlin.Unit origin=null
+                    FUNCTION_REFERENCE 'private final fun ApneaLineChartCanvas_4g2kuZs$lambda$52 ($ticks: kotlin.collections.List<kotlin.Float>, $textMeasurer: androidx.compose.ui.text.TextMeasurer, $formatValue: kotlin.Function1<kotlin.Float, kotlin.String>, $tickStyle: androidx.compose.ui.text.TextStyle): kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult> declared in com.example.wags.ui.apnea.ApneaGraphsTabKt' type=kotlin.Function0<kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult>> origin=INLINE_LAMBDA reflectionTarget=null
+                      $ticks: GET_VAR 'val ticks: kotlin.collections.List<kotlin.Float> [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<kotlin.Float> origin=null
+                      $textMeasurer: GET_VAR 'val textMeasurer: androidx.compose.ui.text.TextMeasurer [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.text.TextMeasurer origin=null
+                      $formatValue: GET_VAR 'formatValue: kotlin.Function1<kotlin.Float, kotlin.String> declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Function1<kotlin.Float, kotlin.String> origin=null
+                      $tickStyle: GET_VAR 'val tickStyle: androidx.compose.ui.text.TextStyle [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.text.TextStyle origin=null
+              CALL 'public abstract fun endReplaceGroup (): kotlin.Unit declared in androidx.compose.runtime.Composer' type=kotlin.Unit origin=null
+                $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+              GET_VAR 'val tmp3_group: kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult> [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult> origin=null
+          VAR name:maxTickWidth type:kotlin.Int [val]
+            CALL 'public final fun maxOf <T, R> (selector: kotlin.Function1<T of kotlin.collections.CollectionsKt.maxOf, R of kotlin.collections.CollectionsKt.maxOf>): R of kotlin.collections.CollectionsKt.maxOf [inline] declared in kotlin.collections.CollectionsKt' type=kotlin.Int origin=null
+              <T>: androidx.compose.ui.text.TextLayoutResult
+              <R>: kotlin.Int
+              $receiver: GET_VAR 'val tickLayouts: kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult> [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult> origin=null
+              selector: BLOCK type=kotlin.Function1<androidx.compose.ui.text.TextLayoutResult, kotlin.Int> origin=LAMBDA
+                COMPOSITE type=kotlin.Unit origin=null
+                FUNCTION_REFERENCE 'private final fun ApneaLineChartCanvas_4g2kuZs$lambda$53 (it: androidx.compose.ui.text.TextLayoutResult): kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt' type=kotlin.Function1<androidx.compose.ui.text.TextLayoutResult, kotlin.Int> origin=INLINE_LAMBDA reflectionTarget=null
+          VAR name:xLabelIndices type:kotlin.collections.List<kotlin.Int> [val]
+            BLOCK type=kotlin.collections.List<kotlin.Int> origin=null
+              BLOCK type=kotlin.Unit origin=null
+                CALL 'public abstract fun startReplaceGroup (key: kotlin.Int): kotlin.Unit declared in androidx.compose.runtime.Composer' type=kotlin.Unit origin=null
+                  $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  key: CONST Int type=kotlin.Int value=-850762736
+                CALL 'public final fun sourceInformation (composer: androidx.compose.runtime.Composer, sourceInformation: kotlin.String): kotlin.Unit declared in androidx.compose.runtime.ComposerKt' type=kotlin.Unit origin=null
+                  composer: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  sourceInformation: CONST String type=kotlin.String value="CC(remember):ApneaGraphsTab.kt#9igjgp"
+              VAR IR_TEMPORARY_VARIABLE name:tmp4_group type:kotlin.collections.List<kotlin.Int> [val]
+                CALL 'public final fun cache <T> (invalid: kotlin.Boolean, block: @[DisallowComposableCalls] kotlin.Function0<T of androidx.compose.runtime.ComposerKt.cache>): T of androidx.compose.runtime.ComposerKt.cache [inline] declared in androidx.compose.runtime.ComposerKt' type=kotlin.collections.List<kotlin.Int> origin=null
+                  <T>: kotlin.collections.List<kotlin.Int>
+                  $receiver: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  invalid: CALL 'public abstract fun changed (value: kotlin.Any?): kotlin.Boolean declared in androidx.compose.runtime.Composer' type=kotlin.Boolean origin=null
+                    $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                    value: GET_VAR 'points: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> origin=null
+                  block: BLOCK type=kotlin.Function0<kotlin.collections.List<kotlin.Int>> origin=LAMBDA
+                    COMPOSITE type=kotlin.Unit origin=null
+                    FUNCTION_REFERENCE 'private final fun ApneaLineChartCanvas_4g2kuZs$lambda$54 ($points: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>): kotlin.collections.List<kotlin.Int> declared in com.example.wags.ui.apnea.ApneaGraphsTabKt' type=kotlin.Function0<kotlin.collections.List<kotlin.Int>> origin=INLINE_LAMBDA reflectionTarget=null
+                      $points: GET_VAR 'points: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> origin=null
+              CALL 'public abstract fun endReplaceGroup (): kotlin.Unit declared in androidx.compose.runtime.Composer' type=kotlin.Unit origin=null
+                $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+              GET_VAR 'val tmp4_group: kotlin.collections.List<kotlin.Int> [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<kotlin.Int> origin=null
+          VAR name:xLayouts type:kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult> [val]
+            BLOCK type=kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult> origin=null
+              BLOCK type=kotlin.Unit origin=null
+                CALL 'public abstract fun startReplaceGroup (key: kotlin.Int): kotlin.Unit declared in androidx.compose.runtime.Composer' type=kotlin.Unit origin=null
+                  $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  key: CONST Int type=kotlin.Int value=-850759881
+                CALL 'public final fun sourceInformation (composer: androidx.compose.runtime.Composer, sourceInformation: kotlin.String): kotlin.Unit declared in androidx.compose.runtime.ComposerKt' type=kotlin.Unit origin=null
+                  composer: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  sourceInformation: CONST String type=kotlin.String value="CC(remember):ApneaGraphsTab.kt#9igjgp"
+              VAR IR_TEMPORARY_VARIABLE name:tmp5_group type:kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult> [val]
+                CALL 'public final fun cache <T> (invalid: kotlin.Boolean, block: @[DisallowComposableCalls] kotlin.Function0<T of androidx.compose.runtime.ComposerKt.cache>): T of androidx.compose.runtime.ComposerKt.cache [inline] declared in androidx.compose.runtime.ComposerKt' type=kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult> origin=null
+                  <T>: kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult>
+                  $receiver: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  invalid: CALL 'public final fun or (other: kotlin.Boolean): kotlin.Boolean [infix] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+                    $this: CALL 'public abstract fun changed (value: kotlin.Any?): kotlin.Boolean declared in androidx.compose.runtime.Composer' type=kotlin.Boolean origin=null
+                      $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                      value: GET_VAR 'points: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> origin=null
+                    other: CALL 'public abstract fun changed (value: kotlin.Any?): kotlin.Boolean declared in androidx.compose.runtime.Composer' type=kotlin.Boolean origin=null
+                      $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                      value: GET_VAR 'val xLabelIndices: kotlin.collections.List<kotlin.Int> [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<kotlin.Int> origin=null
+                  block: BLOCK type=kotlin.Function0<kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult>> origin=LAMBDA
+                    COMPOSITE type=kotlin.Unit origin=null
+                    FUNCTION_REFERENCE 'private final fun ApneaLineChartCanvas_4g2kuZs$lambda$56 ($xLabelIndices: kotlin.collections.List<kotlin.Int>, $textMeasurer: androidx.compose.ui.text.TextMeasurer, $points: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>, $tickStyle: androidx.compose.ui.text.TextStyle): kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult> declared in com.example.wags.ui.apnea.ApneaGraphsTabKt' type=kotlin.Function0<kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult>> origin=INLINE_LAMBDA reflectionTarget=null
+                      $xLabelIndices: GET_VAR 'val xLabelIndices: kotlin.collections.List<kotlin.Int> [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<kotlin.Int> origin=null
+                      $textMeasurer: GET_VAR 'val textMeasurer: androidx.compose.ui.text.TextMeasurer [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.text.TextMeasurer origin=null
+                      $points: GET_VAR 'points: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> origin=null
+                      $tickStyle: GET_VAR 'val tickStyle: androidx.compose.ui.text.TextStyle [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.text.TextStyle origin=null
+              CALL 'public abstract fun endReplaceGroup (): kotlin.Unit declared in androidx.compose.runtime.Composer' type=kotlin.Unit origin=null
+                $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+              GET_VAR 'val tmp5_group: kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult> [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult> origin=null
+          VAR name:reveal type:androidx.compose.animation.core.Animatable<kotlin.Float, androidx.compose.animation.core.AnimationVector1D> [val]
+            BLOCK type=androidx.compose.animation.core.Animatable<kotlin.Float, androidx.compose.animation.core.AnimationVector1D> origin=null
+              BLOCK type=kotlin.Unit origin=null
+                CALL 'public abstract fun startReplaceGroup (key: kotlin.Int): kotlin.Unit declared in androidx.compose.runtime.Composer' type=kotlin.Unit origin=null
+                  $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  key: CONST Int type=kotlin.Int value=-850753464
+                CALL 'public final fun sourceInformation (composer: androidx.compose.runtime.Composer, sourceInformation: kotlin.String): kotlin.Unit declared in androidx.compose.runtime.ComposerKt' type=kotlin.Unit origin=null
+                  composer: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  sourceInformation: CONST String type=kotlin.String value="CC(remember):ApneaGraphsTab.kt#9igjgp"
+              VAR IR_TEMPORARY_VARIABLE name:tmp6_group type:androidx.compose.animation.core.Animatable<kotlin.Float, androidx.compose.animation.core.AnimationVector1D> [val]
+                CALL 'public final fun cache <T> (invalid: kotlin.Boolean, block: @[DisallowComposableCalls] kotlin.Function0<T of androidx.compose.runtime.ComposerKt.cache>): T of androidx.compose.runtime.ComposerKt.cache [inline] declared in androidx.compose.runtime.ComposerKt' type=androidx.compose.animation.core.Animatable<kotlin.Float, androidx.compose.animation.core.AnimationVector1D> origin=null
+                  <T>: androidx.compose.animation.core.Animatable<kotlin.Float, androidx.compose.animation.core.AnimationVector1D>
+                  $receiver: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  invalid: CONST Boolean type=kotlin.Boolean value=false
+                  block: BLOCK type=kotlin.Function0<androidx.compose.animation.core.Animatable<kotlin.Float, androidx.compose.animation.core.AnimationVector1D>> origin=LAMBDA
+                    COMPOSITE type=kotlin.Unit origin=null
+                    FUNCTION_REFERENCE 'private final fun ApneaLineChartCanvas_4g2kuZs$lambda$57 (): androidx.compose.animation.core.Animatable<kotlin.Float, androidx.compose.animation.core.AnimationVector1D> declared in com.example.wags.ui.apnea.ApneaGraphsTabKt' type=kotlin.Function0<androidx.compose.animation.core.Animatable<kotlin.Float, androidx.compose.animation.core.AnimationVector1D>> origin=INLINE_LAMBDA reflectionTarget=null
+              CALL 'public abstract fun endReplaceGroup (): kotlin.Unit declared in androidx.compose.runtime.Composer' type=kotlin.Unit origin=null
+                $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+              GET_VAR 'val tmp6_group: androidx.compose.animation.core.Animatable<kotlin.Float, androidx.compose.animation.core.AnimationVector1D> [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.animation.core.Animatable<kotlin.Float, androidx.compose.animation.core.AnimationVector1D> origin=null
+          CALL 'public final fun LaunchedEffect (key1: kotlin.Any?, key2: kotlin.Any?, key3: kotlin.Any?, block: @[ExtensionFunctionType] kotlin.coroutines.SuspendFunction1<kotlinx.coroutines.CoroutineScope, kotlin.Unit>, $composer: androidx.compose.runtime.Composer?, $changed: kotlin.Int): kotlin.Unit declared in androidx.compose.runtime.EffectsKt' type=kotlin.Unit origin=null
+            key1: CALL 'public abstract fun <get-size> (): kotlin.Int declared in kotlin.collections.List' type=kotlin.Int origin=GET_PROPERTY
+              $this: GET_VAR 'points: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> origin=null
+            key2: BLOCK type=kotlin.String? origin=FOLDED_SAFE_CALL
+              WHEN type=kotlin.String? origin=FOLDED_SAFE_CALL
+                BRANCH
+                  if: COMPOSITE type=kotlin.Boolean origin=null
+                    VAR IR_TEMPORARY_VARIABLE name:tmp3_safe_receiver type:com.example.wags.ui.apnea.ApneaChartPoint? [val]
+                      CALL 'public final fun firstOrNull <T> (): T of kotlin.collections.CollectionsKt.firstOrNull? declared in kotlin.collections.CollectionsKt' type=com.example.wags.ui.apnea.ApneaChartPoint? origin=null
+                        <T>: com.example.wags.ui.apnea.ApneaChartPoint
+                        $receiver: GET_VAR 'points: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> origin=null
+                    CALL 'public final fun not (): kotlin.Boolean [operator] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+                      $this: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+                        arg0: GET_VAR 'val tmp3_safe_receiver: com.example.wags.ui.apnea.ApneaChartPoint? [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=com.example.wags.ui.apnea.ApneaChartPoint? origin=null
+                        arg1: CONST Null type=kotlin.Nothing? value=null
+                  then: CALL 'public final fun <get-label> (): kotlin.String declared in com.example.wags.ui.apnea.ApneaChartPoint' type=kotlin.String origin=GET_PROPERTY
+                    $this: GET_VAR 'val tmp3_safe_receiver: com.example.wags.ui.apnea.ApneaChartPoint? [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=com.example.wags.ui.apnea.ApneaChartPoint? origin=null
+                BRANCH
+                  if: CONST Boolean type=kotlin.Boolean value=true
+                  then: CONST Null type=kotlin.Nothing? value=null
+            key3: BLOCK type=kotlin.String? origin=FOLDED_SAFE_CALL
+              WHEN type=kotlin.String? origin=FOLDED_SAFE_CALL
+                BRANCH
+                  if: COMPOSITE type=kotlin.Boolean origin=null
+                    VAR IR_TEMPORARY_VARIABLE name:tmp4_safe_receiver type:com.example.wags.ui.apnea.ApneaChartPoint? [val]
+                      CALL 'public final fun lastOrNull <T> (): T of kotlin.collections.CollectionsKt.lastOrNull? declared in kotlin.collections.CollectionsKt' type=com.example.wags.ui.apnea.ApneaChartPoint? origin=null
+                        <T>: com.example.wags.ui.apnea.ApneaChartPoint
+                        $receiver: GET_VAR 'points: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> origin=null
+                    CALL 'public final fun not (): kotlin.Boolean [operator] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+                      $this: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+                        arg0: GET_VAR 'val tmp4_safe_receiver: com.example.wags.ui.apnea.ApneaChartPoint? [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=com.example.wags.ui.apnea.ApneaChartPoint? origin=null
+                        arg1: CONST Null type=kotlin.Nothing? value=null
+                  then: CALL 'public final fun <get-label> (): kotlin.String declared in com.example.wags.ui.apnea.ApneaChartPoint' type=kotlin.String origin=GET_PROPERTY
+                    $this: GET_VAR 'val tmp4_safe_receiver: com.example.wags.ui.apnea.ApneaChartPoint? [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=com.example.wags.ui.apnea.ApneaChartPoint? origin=null
+                BRANCH
+                  if: CONST Boolean type=kotlin.Boolean value=true
+                  then: CONST Null type=kotlin.Nothing? value=null
+            block: BLOCK type=@[ExtensionFunctionType] kotlin.coroutines.SuspendFunction1<kotlinx.coroutines.CoroutineScope, kotlin.Unit> origin=null
+              BLOCK type=kotlin.Unit origin=null
+                CALL 'public abstract fun startReplaceGroup (key: kotlin.Int): kotlin.Unit declared in androidx.compose.runtime.Composer' type=kotlin.Unit origin=null
+                  $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  key: CONST Int type=kotlin.Int value=-850749610
+                CALL 'public final fun sourceInformation (composer: androidx.compose.runtime.Composer, sourceInformation: kotlin.String): kotlin.Unit declared in androidx.compose.runtime.ComposerKt' type=kotlin.Unit origin=null
+                  composer: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  sourceInformation: CONST String type=kotlin.String value="CC(remember):ApneaGraphsTab.kt#9igjgp"
+              VAR IR_TEMPORARY_VARIABLE name:tmp7_group type:@[ExtensionFunctionType] kotlin.coroutines.SuspendFunction1<kotlinx.coroutines.CoroutineScope, kotlin.Unit> [val]
+                CALL 'public final fun cache <T> (invalid: kotlin.Boolean, block: @[DisallowComposableCalls] kotlin.Function0<T of androidx.compose.runtime.ComposerKt.cache>): T of androidx.compose.runtime.ComposerKt.cache [inline] declared in androidx.compose.runtime.ComposerKt' type=@[ExtensionFunctionType] kotlin.coroutines.SuspendFunction1<kotlinx.coroutines.CoroutineScope, kotlin.Unit> origin=null
+                  <T>: @[ExtensionFunctionType] kotlin.coroutines.SuspendFunction1<kotlinx.coroutines.CoroutineScope, kotlin.Unit>
+                  $receiver: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  invalid: CALL 'public open fun changedInstance (value: kotlin.Any?): kotlin.Boolean declared in androidx.compose.runtime.Composer' type=kotlin.Boolean origin=null
+                    $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                    value: GET_VAR 'val reveal: androidx.compose.animation.core.Animatable<kotlin.Float, androidx.compose.animation.core.AnimationVector1D> [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.animation.core.Animatable<kotlin.Float, androidx.compose.animation.core.AnimationVector1D> origin=null
+                  block: BLOCK type=kotlin.Function0<@[ExtensionFunctionType] kotlin.coroutines.SuspendFunction1<kotlinx.coroutines.CoroutineScope, kotlin.Unit>> origin=LAMBDA
+                    COMPOSITE type=kotlin.Unit origin=null
+                    FUNCTION_REFERENCE 'private final fun ApneaLineChartCanvas_4g2kuZs$lambda$58 ($reveal: androidx.compose.animation.core.Animatable<kotlin.Float, androidx.compose.animation.core.AnimationVector1D>): @[ExtensionFunctionType] kotlin.coroutines.SuspendFunction1<kotlinx.coroutines.CoroutineScope, kotlin.Unit> declared in com.example.wags.ui.apnea.ApneaGraphsTabKt' type=kotlin.Function0<@[ExtensionFunctionType] kotlin.coroutines.SuspendFunction1<kotlinx.coroutines.CoroutineScope, kotlin.Unit>> origin=INLINE_LAMBDA reflectionTarget=null
+                      $reveal: GET_VAR 'val reveal: androidx.compose.animation.core.Animatable<kotlin.Float, androidx.compose.animation.core.AnimationVector1D> [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.animation.core.Animatable<kotlin.Float, androidx.compose.animation.core.AnimationVector1D> origin=null
+              CALL 'public abstract fun endReplaceGroup (): kotlin.Unit declared in androidx.compose.runtime.Composer' type=kotlin.Unit origin=null
+                $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+              GET_VAR 'val tmp7_group: @[ExtensionFunctionType] kotlin.coroutines.SuspendFunction1<kotlinx.coroutines.CoroutineScope, kotlin.Unit> [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=@[ExtensionFunctionType] kotlin.coroutines.SuspendFunction1<kotlinx.coroutines.CoroutineScope, kotlin.Unit> origin=null
+            $composer: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+            $changed: CONST Int type=kotlin.Int value=0
+          VAR name:pathMeasure type:androidx.compose.ui.graphics.PathMeasure [val]
+            BLOCK type=androidx.compose.ui.graphics.PathMeasure origin=null
+              BLOCK type=kotlin.Unit origin=null
+                CALL 'public abstract fun startReplaceGroup (key: kotlin.Int): kotlin.Unit declared in androidx.compose.runtime.Composer' type=kotlin.Unit origin=null
+                  $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  key: CONST Int type=kotlin.Int value=-850744569
+                CALL 'public final fun sourceInformation (composer: androidx.compose.runtime.Composer, sourceInformation: kotlin.String): kotlin.Unit declared in androidx.compose.runtime.ComposerKt' type=kotlin.Unit origin=null
+                  composer: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  sourceInformation: CONST String type=kotlin.String value="CC(remember):ApneaGraphsTab.kt#9igjgp"
+              VAR IR_TEMPORARY_VARIABLE name:tmp8_group type:androidx.compose.ui.graphics.PathMeasure [val]
+                CALL 'public final fun cache <T> (invalid: kotlin.Boolean, block: @[DisallowComposableCalls] kotlin.Function0<T of androidx.compose.runtime.ComposerKt.cache>): T of androidx.compose.runtime.ComposerKt.cache [inline] declared in androidx.compose.runtime.ComposerKt' type=androidx.compose.ui.graphics.PathMeasure origin=null
+                  <T>: androidx.compose.ui.graphics.PathMeasure
+                  $receiver: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                  invalid: CONST Boolean type=kotlin.Boolean value=false
+                  block: BLOCK type=kotlin.Function0<androidx.compose.ui.graphics.PathMeasure> origin=LAMBDA
+                    COMPOSITE type=kotlin.Unit origin=null
+                    FUNCTION_REFERENCE 'private final fun ApneaLineChartCanvas_4g2kuZs$lambda$59 (): androidx.compose.ui.graphics.PathMeasure declared in com.example.wags.ui.apnea.ApneaGraphsTabKt' type=kotlin.Function0<androidx.compose.ui.graphics.PathMeasure> origin=INLINE_LAMBDA reflectionTarget=null
+              CALL 'public abstract fun endReplaceGroup (): kotlin.Unit declared in androidx.compose.runtime.Composer' type=kotlin.Unit origin=null
+                $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+              GET_VAR 'val tmp8_group: androidx.compose.ui.graphics.PathMeasure [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.graphics.PathMeasure origin=null
+          CALL 'public final fun Column (modifier: androidx.compose.ui.Modifier?, verticalArrangement: androidx.compose.foundation.layout.Arrangement.Vertical?, horizontalAlignment: androidx.compose.ui.Alignment.Horizontal?, content: @[ExtensionFunctionType] kotlin.Function3<androidx.compose.foundation.layout.ColumnScope, androidx.compose.runtime.Composer, kotlin.Int, kotlin.Unit>, $composer: androidx.compose.runtime.Composer?, $changed: kotlin.Int, $default: kotlin.Int): kotlin.Unit [inline] declared in androidx.compose.foundation.layout.ColumnKt' type=kotlin.Unit origin=null
+            modifier: GET_VAR 'modifier: androidx.compose.ui.Modifier? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.Modifier? origin=null
+            verticalArrangement: COMPOSITE type=kotlin.Nothing? origin=DEFAULT_VALUE
+              CONST Null type=kotlin.Nothing? value=null
+            horizontalAlignment: COMPOSITE type=kotlin.Nothing? origin=DEFAULT_VALUE
+              CONST Null type=kotlin.Nothing? value=null
+            content: BLOCK type=@[ExtensionFunctionType] kotlin.Function3<androidx.compose.foundation.layout.ColumnScope, androidx.compose.runtime.Composer, kotlin.Int, kotlin.Unit> origin=LAMBDA
+              COMPOSITE type=kotlin.Unit origin=null
+              FUNCTION_REFERENCE 'private final fun ApneaLineChartCanvas_4g2kuZs$lambda$75 ($points: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>, $$composer: androidx.compose.runtime.Composer?, $maxTickWidth: kotlin.Int, $$dirty: kotlin.Int, $ticks: kotlin.collections.List<kotlin.Float>, $tickLayouts: kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult>, $pathMeasure: androidx.compose.ui.graphics.PathMeasure, $reveal: androidx.compose.animation.core.Animatable<kotlin.Float, androidx.compose.animation.core.AnimationVector1D>, $overlayPoints: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>?, $xLabelIndices: kotlin.collections.List<kotlin.Int>, $xLayouts: kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult>, $onTap: kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit>?, $yMax: kotlin.Float, $yMin: kotlin.Float, $stepMode: kotlin.Boolean, $lineColor: androidx.compose.ui.graphics.Color, $overlayColor: androidx.compose.ui.graphics.Color, $tooltipPoint: com.example.wags.ui.apnea.ApneaChartPoint?, $composer: androidx.compose.runtime.Composer?, $changed: kotlin.Int): kotlin.Unit declared in com.example.wags.ui.apnea.ApneaGraphsTabKt' type=@[ExtensionFunctionType] kotlin.Function3<androidx.compose.foundation.layout.ColumnScope, androidx.compose.runtime.Composer, kotlin.Int, kotlin.Unit> origin=INLINE_LAMBDA reflectionTarget=null
+                $points: GET_VAR 'points: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> origin=null
+                $$composer: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+                $maxTickWidth: GET_VAR 'val maxTickWidth: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+                $$dirty: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+                $ticks: GET_VAR 'val ticks: kotlin.collections.List<kotlin.Float> [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<kotlin.Float> origin=null
+                $tickLayouts: GET_VAR 'val tickLayouts: kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult> [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult> origin=null
+                $pathMeasure: GET_VAR 'val pathMeasure: androidx.compose.ui.graphics.PathMeasure [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.graphics.PathMeasure origin=null
+                $reveal: GET_VAR 'val reveal: androidx.compose.animation.core.Animatable<kotlin.Float, androidx.compose.animation.core.AnimationVector1D> [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.animation.core.Animatable<kotlin.Float, androidx.compose.animation.core.AnimationVector1D> origin=null
+                $overlayPoints: GET_VAR 'overlayPoints: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>? origin=null
+                $xLabelIndices: GET_VAR 'val xLabelIndices: kotlin.collections.List<kotlin.Int> [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<kotlin.Int> origin=null
+                $xLayouts: GET_VAR 'val xLayouts: kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult> [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<androidx.compose.ui.text.TextLayoutResult> origin=null
+                $onTap: GET_VAR 'onTap: kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit>? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit>? origin=null
+                $yMax: GET_VAR 'yMax: kotlin.Float declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Float origin=null
+                $yMin: GET_VAR 'yMin: kotlin.Float declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Float origin=null
+                $stepMode: GET_VAR 'stepMode: kotlin.Boolean [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Boolean origin=null
+                $lineColor: GET_VAR 'lineColor: androidx.compose.ui.graphics.Color declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.graphics.Color origin=null
+                $overlayColor: GET_VAR 'overlayColor: androidx.compose.ui.graphics.Color [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.graphics.Color origin=null
+                $tooltipPoint: GET_VAR 'tooltipPoint: com.example.wags.ui.apnea.ApneaChartPoint? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=com.example.wags.ui.apnea.ApneaChartPoint? origin=null
+            $composer: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+            $changed: CALL 'public final fun and (other: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+              $this: CONST Int type=kotlin.Int value=14
+              other: CALL 'public final fun shr (bitCount: kotlin.Int): kotlin.Int [infix] declared in kotlin.Int' type=kotlin.Int origin=null
+                $this: GET_VAR 'val $dirty: kotlin.Int [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+                bitCount: CONST Int type=kotlin.Int value=12
+            $default: CONST Int type=kotlin.Int value=6
+          WHEN type=kotlin.Unit origin=IF
+            BRANCH
+              if: CALL 'public final fun isTraceInProgress (): kotlin.Boolean declared in androidx.compose.runtime.ComposerKt' type=kotlin.Boolean origin=null
+              then: CALL 'public final fun traceEventEnd (): kotlin.Unit declared in androidx.compose.runtime.ComposerKt' type=kotlin.Unit origin=null
+      BRANCH
+        if: CONST Boolean type=kotlin.Boolean value=true
+        then: CALL 'public abstract fun skipToGroupEnd (): kotlin.Unit declared in androidx.compose.runtime.Composer' type=kotlin.Unit origin=null
+          $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+    BLOCK type=kotlin.Unit origin=null
+      BLOCK type=kotlin.Unit origin=FOLDED_SAFE_CALL
+        WHEN type=kotlin.Unit origin=FOLDED_SAFE_CALL
+          BRANCH
+            if: COMPOSITE type=kotlin.Boolean origin=null
+              VAR IR_TEMPORARY_VARIABLE name:tmp10_safe_receiver type:androidx.compose.runtime.ScopeUpdateScope? [val]
+                CALL 'public abstract fun endRestartGroup (): androidx.compose.runtime.ScopeUpdateScope? declared in androidx.compose.runtime.Composer' type=androidx.compose.runtime.ScopeUpdateScope? origin=null
+                  $this: GET_VAR '$composer: androidx.compose.runtime.Composer? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.Composer? origin=null
+              CALL 'public final fun not (): kotlin.Boolean [operator] declared in kotlin.Boolean' type=kotlin.Boolean origin=null
+                $this: CALL 'public final fun EQEQ (arg0: kotlin.Any?, arg1: kotlin.Any?): kotlin.Boolean declared in kotlin.internal.ir' type=kotlin.Boolean origin=null
+                  arg0: GET_VAR 'val tmp10_safe_receiver: androidx.compose.runtime.ScopeUpdateScope? [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.ScopeUpdateScope? origin=null
+                  arg1: CONST Null type=kotlin.Nothing? value=null
+            then: CALL 'public abstract fun updateScope (block: kotlin.Function2<androidx.compose.runtime.Composer, kotlin.Int, kotlin.Unit>): kotlin.Unit declared in androidx.compose.runtime.ScopeUpdateScope' type=kotlin.Unit origin=null
+              $this: GET_VAR 'val tmp10_safe_receiver: androidx.compose.runtime.ScopeUpdateScope? [val] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.runtime.ScopeUpdateScope? origin=null
+              block: BLOCK type=kotlin.Function2<androidx.compose.runtime.Composer?, kotlin.Int, kotlin.Unit> origin=LAMBDA
+                COMPOSITE type=kotlin.Unit origin=null
+                CALL 'public final fun <jvm-indy> <T> (dynamicCall: T of kotlin.jvm.internal.<jvm-indy>, bootstrapMethodHandle: kotlin.Any, vararg bootstrapMethodArguments: kotlin.Any): T of kotlin.jvm.internal.<jvm-indy> declared in kotlin.jvm.internal' type=kotlin.Function2<androidx.compose.runtime.Composer?, kotlin.Int, kotlin.Unit> origin=null
+                  <T>: kotlin.Function2<androidx.compose.runtime.Composer?, kotlin.Int, kotlin.Unit>
+                  dynamicCall: CALL 'public final fun invoke (p0: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>, p1: androidx.compose.ui.graphics.Color, p2: kotlin.Float, p3: kotlin.Float, p4: androidx.compose.ui.Modifier?, p5: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>?, p6: androidx.compose.ui.graphics.Color, p7: kotlin.Boolean, p8: com.example.wags.ui.apnea.ApneaChartPoint?, p9: kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit>?, p10: kotlin.Function1<kotlin.Float, kotlin.String>, p11: kotlin.Int, p12: kotlin.Int, p13: kotlin.Int): kotlin.Function2<androidx.compose.runtime.Composer?, kotlin.Int, kotlin.Unit> declared in kotlin.jvm.internal.invokeDynamic' type=kotlin.Function2<androidx.compose.runtime.Composer?, kotlin.Int, kotlin.Unit> origin=null
+                    p0: GET_VAR 'points: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint> origin=null
+                    p1: GET_VAR 'lineColor: androidx.compose.ui.graphics.Color declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.graphics.Color origin=null
+                    p2: GET_VAR 'yMin: kotlin.Float declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Float origin=null
+                    p3: GET_VAR 'yMax: kotlin.Float declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Float origin=null
+                    p4: GET_VAR 'modifier: androidx.compose.ui.Modifier? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.Modifier? origin=null
+                    p5: GET_VAR 'overlayPoints: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>? origin=null
+                    p6: GET_VAR 'overlayColor: androidx.compose.ui.graphics.Color [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=androidx.compose.ui.graphics.Color origin=null
+                    p7: GET_VAR 'stepMode: kotlin.Boolean [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Boolean origin=null
+                    p8: GET_VAR 'tooltipPoint: com.example.wags.ui.apnea.ApneaChartPoint? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=com.example.wags.ui.apnea.ApneaChartPoint? origin=null
+                    p9: GET_VAR 'onTap: kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit>? [assignable] declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit>? origin=null
+                    p10: GET_VAR 'formatValue: kotlin.Function1<kotlin.Float, kotlin.String> declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Function1<kotlin.Float, kotlin.String> origin=null
+                    p11: GET_VAR '$changed: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+                    p12: GET_VAR '$changed1: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+                    p13: GET_VAR '$default: kotlin.Int declared in com.example.wags.ui.apnea.ApneaGraphsTabKt.ApneaLineChartCanvas-4g2kuZs' type=kotlin.Int origin=null
+                  bootstrapMethodHandle: CALL 'public final fun <jvm-method-handle> (tag: kotlin.Int, owner: kotlin.String, name: kotlin.String, descriptor: kotlin.String, isInterface: kotlin.Boolean): kotlin.Any declared in kotlin.jvm.internal' type=kotlin.Any origin=null
+                    tag: CONST Int type=kotlin.Int value=6
+                    owner: CONST String type=kotlin.String value="java/lang/invoke/LambdaMetafactory"
+                    name: CONST String type=kotlin.String value="metafactory"
+                    descriptor: CONST String type=kotlin.String value="(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;"
+                    isInterface: CONST Boolean type=kotlin.Boolean value=false
+                  bootstrapMethodArguments: VARARG type=kotlin.Array<kotlin.Any> varargElementType=kotlin.Any
+                    CALL 'public final fun <jvm-original-method-type> (method: kotlin.Any): kotlin.Any declared in kotlin.jvm.internal' type=kotlin.Any origin=null
+                      method: RAW_FUNCTION_REFERENCE 'public abstract fun invoke (p1: P1 of kotlin.Function2, p2: P2 of kotlin.Function2): R of kotlin.Function2 [operator] declared in kotlin.Function2' type=kotlin.Any
+                    RAW_FUNCTION_REFERENCE 'private final fun ApneaLineChartCanvas_4g2kuZs$lambda$76 ($points: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>, $lineColor: androidx.compose.ui.graphics.Color, $yMin: kotlin.Float, $yMax: kotlin.Float, $modifier: androidx.compose.ui.Modifier?, $overlayPoints: kotlin.collections.List<com.example.wags.ui.apnea.ApneaChartPoint>?, $overlayColor: androidx.compose.ui.graphics.Color, $stepMode: kotlin.Boolean, $tooltipPoint: com.example.wags.ui.apnea.ApneaChartPoint?, $onTap: kotlin.Function1<com.example.wags.ui.apnea.ApneaChartPoint, kotlin.Unit>?, $formatValue: kotlin.Function1<kotlin.Float, kotlin.String>, $$changed: kotlin.Int, $$changed1: kotlin.Int, $$default: kotlin.Int, $composer: androidx.compose.runtime.Composer?, $force: kotlin.Int): kotlin.Unit? declared in com.example.wags.ui.apnea.ApneaGraphsTabKt' type=kotlin.Any
+                    CALL 'public final fun <jvm-original-method-type> (method: kotlin.Any): kotlin.Any declared in kotlin.jvm.internal' type=kotlin.Any origin=null
+                      method: RAW_FUNCTION_REFERENCE 'public abstract fun invoke (p1: androidx.compose.runtime.Composer?, p2: kotlin.Int?): kotlin.Unit? [fake_override,operator] declared in kotlin.jvm.internal.invokeDynamic.<fake>' type=kotlin.Any
+          BRANCH
+            if: CONST Boolean type=kotlin.Boolean value=true
+            then: CONST Null type=kotlin.Any? value=null
+
+	at org.jetbrains.kotlin.backend.jvm.codegen.FunctionCodegen.generate(FunctionCodegen.kt:47)
+	at org.jetbrains.kotlin.backend.jvm.codegen.FunctionCodegen.generate$default(FunctionCodegen.kt:40)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ClassCodegen.generateMethodNode(ClassCodegen.kt:406)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ClassCodegen.generateMethod(ClassCodegen.kt:423)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ClassCodegen.generate(ClassCodegen.kt:168)
+	at org.jetbrains.kotlin.backend.jvm.FileCodegen.lower(JvmPhases.kt:39)
+	at org.jetbrains.kotlin.backend.common.phaser.PhaseFactoriesKt.createFilePhase$lambda$4(PhaseFactories.kt:71)
+	at org.jetbrains.kotlin.backend.common.phaser.PhaseBuildersKt$createSimpleNamedCompilerPhase$1.phaseBody(PhaseBuilders.kt:69)
+	at org.jetbrains.kotlin.backend.common.phaser.SimpleNamedCompilerPhase.phaseBody(CompilerPhase.kt:226)
+	at org.jetbrains.kotlin.backend.common.phaser.AbstractNamedCompilerPhase.invoke(CompilerPhase.kt:113)
+	at org.jetbrains.kotlin.backend.common.phaser.PerformByIrFilePhase.invokeSequential(performByIrFile.kt:62)
+	... 45 more
+Caused by: java.lang.OutOfMemoryError: GC overhead limit exceeded
+	at java.base/java.util.ArrayList.grow(ArrayList.java:239)
+	at java.base/java.util.ArrayList.grow(ArrayList.java:244)
+	at java.base/java.util.ArrayList.add(ArrayList.java:454)
+	at java.base/java.util.ArrayList.add(ArrayList.java:467)
+	at org.jetbrains.kotlin.codegen.inline.InlineScopesGeneratorKt.getLabelToIndexMap(InlineScopesGenerator.kt:421)
+	at org.jetbrains.kotlin.codegen.inline.MethodInliner.updateCallSiteLineNumbers(MethodInliner.kt:463)
+	at org.jetbrains.kotlin.codegen.inline.MethodInliner.doInline(MethodInliner.kt:438)
+	at org.jetbrains.kotlin.codegen.inline.MethodInliner.doInline(MethodInliner.kt:98)
+	at org.jetbrains.kotlin.codegen.inline.MethodInliner.access$doInline(MethodInliner.kt:41)
+	at org.jetbrains.kotlin.codegen.inline.MethodInliner$doInline$lambdaInliner$1.visitMethodInsn(MethodInliner.kt:353)
+	at org.jetbrains.org.objectweb.asm.tree.MethodInsnNode.accept(MethodInsnNode.java:115)
+	at org.jetbrains.org.objectweb.asm.tree.InsnList.accept(InsnList.java:144)
+	at org.jetbrains.org.objectweb.asm.tree.MethodNode.accept(MethodNode.java:751)
+	at org.jetbrains.kotlin.codegen.inline.MethodInliner.doInline(MethodInliner.kt:433)
+	at org.jetbrains.kotlin.codegen.inline.MethodInliner.doInline(MethodInliner.kt:98)
+	at org.jetbrains.kotlin.codegen.inline.MethodInliner.doInline(MethodInliner.kt:72)
+	at org.jetbrains.kotlin.codegen.inline.InlineCodegen.inlineCall(InlineCodegen.kt:127)
+	at org.jetbrains.kotlin.codegen.inline.InlineCodegen.performInline(InlineCodegen.kt:52)
+	at org.jetbrains.kotlin.backend.jvm.codegen.IrInlineCodegen.genInlineCall(IrInlineCodegen.kt:163)
+	at org.jetbrains.kotlin.backend.jvm.codegen.IrInlineCallGenerator.genCall(IrInlineCallGenerator.kt:36)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitCall(ExpressionCodegen.kt:653)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitCall(ExpressionCodegen.kt:138)
+	at org.jetbrains.kotlin.ir.expressions.IrCall.accept(IrCall.kt:24)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitVariable(ExpressionCodegen.kt:790)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitVariable(ExpressionCodegen.kt:138)
+	at org.jetbrains.kotlin.ir.declarations.IrVariable.accept(IrVariable.kt:36)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitStatementContainer(ExpressionCodegen.kt:579)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitContainerExpression(ExpressionCodegen.kt:593)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitContainerExpression(ExpressionCodegen.kt:138)
+	at org.jetbrains.kotlin.ir.visitors.IrElementVisitor$DefaultImpls.visitBlock(IrElementVisitor.kt:122)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitBlock(ExpressionCodegen.kt:413)
+	at org.jetbrains.kotlin.backend.jvm.codegen.ExpressionCodegen.visitBlock(ExpressionCodegen.kt:138)
+
+

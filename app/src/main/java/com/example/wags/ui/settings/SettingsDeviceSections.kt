@@ -23,7 +23,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.example.wags.R
-import com.example.wags.data.garmin.GarminConnectionState
 import com.example.wags.domain.model.BleConnectionState
 import com.example.wags.domain.model.DeviceType
 import com.example.wags.domain.model.ScannedDevice
@@ -87,70 +86,6 @@ fun ConnectedDeviceSection(
                     onClick = onDisconnect,
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
                 ) { Text("Disconnect") }
-            }
-        }
-    }
-}
-
-// ── Garmin watch sub-section ──────────────────────────────────────────────────
-
-@Composable
-fun GarminWatchSection(
-    garminState: GarminConnectionState,
-    onManage: () -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        SettingsSubSectionLabel("Garmin Watch")
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_watch),
-                    contentDescription = "Watch",
-                    tint = TextSecondary
-                )
-                val (statusText, statusColor) = when (val gs = garminState) {
-                    is GarminConnectionState.Connected ->
-                        "Connected: ${gs.deviceName}" to ReadinessGreen
-                    is GarminConnectionState.Initializing,
-                    is GarminConnectionState.SdkReady ->
-                        "Connecting…" to ReadinessOrange
-                    is GarminConnectionState.DeviceFound ->
-                        "Found: ${gs.deviceName}…" to ReadinessOrange
-                    is GarminConnectionState.WagsAppNotFound ->
-                        "WAGS app not found on ${gs.deviceName}" to ButtonDanger
-                    is GarminConnectionState.Error ->
-                        "Error" to ButtonDanger
-                    is GarminConnectionState.Uninitialized ->
-                        "Not connected" to TextSecondary
-                }
-                Text(
-                    text = statusText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = statusColor
-                )
-            }
-            Button(
-                onClick = onManage,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = SurfaceVariant,
-                    contentColor = TextPrimary
-                )
-            ) {
-                Text(
-                    if (garminState is GarminConnectionState.Connected) "Manage" else "Setup"
-                )
             }
         }
     }

@@ -35,8 +35,6 @@
     <queries>
         <package android:name="com.example.tail" />
         <provider android:authorities="com.example.tail.provider" />
-        <!-- Garmin Connect Mobile app — required for Connect IQ SDK communication -->
-        <package android:name="com.garmin.android.apps.connectmobile" />
         <!-- Spotify — required for isSpotifyInstalled() check and media button routing -->
         <package android:name="com.spotify.music" />
     </queries>

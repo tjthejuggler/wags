@@ -34,9 +34,6 @@ object ScreenContextMapper {
         WagsRoutes.MORNING_READINESS to ScreenContext(
             "Morning Readiness", "ui/morning/MorningReadinessScreen.kt", "MorningReadinessScreen, MorningReadinessViewModel"
         ),
-        WagsRoutes.GARMIN to ScreenContext(
-            "Garmin Watch", "ui/garmin/GarminScreen.kt", "GarminScreen"
-        ),
         WagsRoutes.MEDITATION to ScreenContext(
             "Meditation", "ui/meditation/MeditationScreen.kt", "MeditationScreen, MeditationViewModel"
         ),

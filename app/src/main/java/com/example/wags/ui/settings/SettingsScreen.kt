@@ -19,7 +19,6 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
-import com.example.wags.data.garmin.GarminConnectionState
 import com.example.wags.domain.model.BleConnectionState
 import com.example.wags.domain.model.TimeDimension
 import com.example.wags.ui.common.AdviceDialog
@@ -145,9 +144,7 @@ fun SettingsScreen(
         is BleConnectionState.Scanning -> "Scanning…"
         is BleConnectionState.Error -> "Sensor error"
         is BleConnectionState.Disconnected ->
-            if (state.garminState is GarminConnectionState.Connected)
-                "Garmin watch connected · no heart-rate sensor"
-            else "Heart-rate sensor · scan · Garmin watch"
+            "Heart-rate sensor · scan"
     }
 
     Scaffold(
@@ -203,11 +200,6 @@ fun SettingsScreen(
                     ConnectedDeviceSection(
                         deviceState = state.deviceState,
                         onDisconnect = { viewModel.disconnectDevice() }
-                    )
-                    SettingsSubSectionDivider()
-                    GarminWatchSection(
-                        garminState = state.garminState,
-                        onManage = { navController.navigate(WagsRoutes.GARMIN) }
                     )
                     SettingsSubSectionDivider()
                     NearbySensorsSection(

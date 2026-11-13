@@ -57,7 +57,6 @@ import com.example.wags.ui.session.SessionScreen
 import com.example.wags.ui.morning.MorningReadinessDetailScreen
 import com.example.wags.ui.morning.MorningReadinessHistoryScreen
 import com.example.wags.ui.morning.MorningReadinessScreen
-import com.example.wags.ui.garmin.GarminScreen
 import com.example.wags.ui.settings.AboutScreen
 import com.example.wags.ui.settings.CrashLogScreen
 import com.example.wags.ui.settings.SettingsScreen
@@ -91,8 +90,6 @@ object WagsRoutes {
     const val PERSONAL_BESTS = "personal_bests?drillType={drillType}&drillParamValue={drillParamValue}"
     const val PB_CHART = "pb_chart?lungVolume={lungVolume}&prepType={prepType}&timeOfDay={timeOfDay}&posture={posture}&audio={audio}&label={label}&drillType={drillType}&drillParamValue={drillParamValue}"
     // ── Meditation / NSDR ──────────────────────────────────────────────────────
-    // ── Garmin Watch ─────────────────────────────────────────────────────────
-    const val GARMIN = "garmin"
     const val CRASH_LOGS = "crash_logs"
     const val ABOUT = "about"
 
@@ -696,10 +693,6 @@ fun WagsNavGraph(navController: NavHostController = rememberNavController()) {
                     navController.navigate(WagsRoutes.apneaRecordDetail(recordId))
                 }
             )
-        }
-        // ── Garmin Watch ────────────────────────────────────────────────────
-        composable(WagsRoutes.GARMIN) {
-            GarminScreen(navController = navController)
         }
         composable(WagsRoutes.CRASH_LOGS) {
             CrashLogScreen(

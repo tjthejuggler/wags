@@ -43,7 +43,6 @@ android {
 
 dependencies {
 
-    implementation("com.garmin.connectiq:ciq-companion-app-sdk:2.3.0@aar")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -112,5 +111,4 @@ dependencies {
     // Coil – async image loading for album art in song picker
     implementation("io.coil-kt:coil-compose:2.6.0")
 
-    // Garmin Connect IQ Companion SDK – resolved via Maven on line 46
 }

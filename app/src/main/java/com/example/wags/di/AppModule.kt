@@ -16,12 +16,24 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import javax.inject.Named
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
+
+    /**
+     * Application-scoped CoroutineScope for long-running background operations.
+     * Uses SupervisorJob so individual failures don't cancel the whole scope.
+     */
+    @Provides
+    @Singleton
+    fun provideApplicationScope(
+        @IoDispatcher ioDispatcher: CoroutineDispatcher
+    ): CoroutineScope = CoroutineScope(SupervisorJob() + ioDispatcher)
 
     @Provides
     @Singleton

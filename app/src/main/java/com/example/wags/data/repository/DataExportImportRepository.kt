@@ -28,11 +28,10 @@ import javax.inject.Singleton
  *     telemetry, free_hold_telemetry, meditation_audios, meditation_sessions,
  *     morning_readiness_telemetry
  *
- * **SharedPreferences (4 files):**
+ * **SharedPreferences (3 files):**
  *   - wags_device_prefs (BLE device history, meditation audio dir)
  *   - apnea_prefs (apnea settings: lung volume, prep type, time of day, PB)
  *   - habit_integration_prefs (Tail app habit slot mappings)
- *   - garmin_prefs (Garmin watch pairing info)
  *
  * The export format is a ZIP file containing:
  *   - `wags.db` — the complete Room database file
@@ -57,8 +56,7 @@ class DataExportImportRepository @Inject constructor(
         private val SHARED_PREFS_FILES = listOf(
             "wags_device_prefs",
             "apnea_prefs",
-            "habit_integration_prefs",
-            "garmin_prefs"
+            "habit_integration_prefs"
         )
 
         /** ZIP entry paths */
