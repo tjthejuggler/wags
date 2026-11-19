@@ -30,6 +30,7 @@ import com.example.wags.ui.common.pip.PIP_ACTION_BROADCAST
 import com.example.wags.ui.common.pip.PipActionReceiver
 import com.example.wags.ui.common.pip.PipController
 import com.example.wags.data.meditation.AudioImportService
+import com.example.wags.data.meditation.MeditationService
 import com.example.wags.ui.debug.DebugBubbleOverlay
 import com.example.wags.ui.meditation.AudioImportBus
 import com.example.wags.ui.navigation.SectionShortcutBus
@@ -106,15 +107,23 @@ class MainActivity : ComponentActivity() {
      */
     private val processLifecycleObserver = object : DefaultLifecycleObserver {
         override fun onStop(owner: LifecycleOwner) {
+            // App moved to background — pause the BLE auto-connect loop
+            // immediately so reconnect attempts and scan cycles stop
+            // churning the radio while nobody is using the app.
+            autoConnectManager.setBackgrounded(true)
+
             // App moved to background — start the 10-minute countdown
             Log.d(TAG, "App moved to background — starting 10-min shutdown timer")
             backgroundShutdownJob = activityScope.launch {
                 delay(BACKGROUND_TIMEOUT_MS)
-                if (AudioImportService.isRunning) {
-                    // A background audio import is still downloading — don't
-                    // kill the process out from under it.
-                    Log.i(TAG, "Audio import running — deferring background shutdown")
-                    return@launch
+                // A background audio import may still be downloading, and a
+                // meditation session may still be recording with the screen
+                // off — don't kill the process out from under either; keep
+                // deferring until they finish instead of giving up after one
+                // check.
+                while (AudioImportService.isRunning || MeditationService.isSessionActive) {
+                    Log.i(TAG, "Audio import/meditation session running — deferring background shutdown")
+                    delay(IMPORT_DEFER_POLL_MS)
                 }
                 Log.i(TAG, "App in background for 10 min — shutting down")
                 finishAndRemoveTask()
@@ -123,7 +132,8 @@ class MainActivity : ComponentActivity() {
         }
 
         override fun onStart(owner: LifecycleOwner) {
-            // App returned to foreground — cancel the timer
+            // App returned to foreground — resume auto-connect and cancel the timer
+            autoConnectManager.setBackgrounded(false)
             backgroundShutdownJob?.let {
                 Log.d(TAG, "App returned to foreground — cancelling shutdown timer")
                 it.cancel()
@@ -350,6 +360,9 @@ class MainActivity : ComponentActivity() {
         private const val TAG = "BackgroundTimeout"
         /** 10 minutes in milliseconds. */
         private const val BACKGROUND_TIMEOUT_MS = 10L * 60 * 1_000
+
+        /** How often to re-check whether a running audio import has finished. */
+        private const val IMPORT_DEFER_POLL_MS = 60_000L
 
         /**
          * Matches youtube.com / youtu.be / music.youtube.com links inside

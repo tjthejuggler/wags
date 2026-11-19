@@ -70,6 +70,13 @@ class AutoConnectManager @Inject constructor(
      */
     @Volatile private var userConnectingUntil = 0L
 
+    /**
+     * True while the app process is in the background (activity stopped).
+     * Set from MainActivity's process-lifecycle observer; while true the
+     * main loop parks instead of scanning/connecting.
+     */
+    @Volatile private var appBackgrounded = false
+
     private val connectMutex = Mutex()
     private var loopJob: Job? = null
     private var connectingSince: Long = 0L
@@ -113,6 +120,20 @@ class AutoConnectManager @Inject constructor(
         if (wasActive && !active) {
             Log.d(TAG, "Session ended — triggering immediate reconnect check")
             reconnectNow = true
+        }
+    }
+
+    /**
+     * Parks the auto-connect loop while the app is in the background. The
+     * loop stops reconnect attempts and BLE background scans entirely —
+     * nobody is watching, so burning the radio hunting for a strap is pure
+     * battery waste. Established GATT connections are left untouched; only
+     * new attempts stop.
+     */
+    fun setBackgrounded(backgrounded: Boolean) {
+        appBackgrounded = backgrounded
+        if (backgrounded) {
+            deviceManager.genericBleManager.stopBackgroundScan()
         }
     }
 
@@ -188,6 +209,17 @@ class AutoConnectManager @Inject constructor(
                 deviceManager.genericBleManager.stopBackgroundScan()
                 while (sessionActive.get() && coroutineContext.isActive) delay(SESSION_POLL_MS)
                 Log.d(TAG, "Session ended — resuming")
+            }
+
+            // ── 1b. Park completely while the app is backgrounded ────────────
+            // No UI is visible, so reconnect attempts and BLE scans would only
+            // drain the battery. Established connections are kept; we simply
+            // stop hunting for new ones until the app returns to the foreground.
+            if (appBackgrounded) {
+                Log.d(TAG, "App backgrounded — parking auto-connect loop")
+                deviceManager.genericBleManager.stopBackgroundScan()
+                while (appBackgrounded && coroutineContext.isActive) delay(BACKGROUND_POLL_MS)
+                Log.d(TAG, "App foregrounded — resuming auto-connect loop")
             }
 
             // ── 2. Get unified device history (auto-connect eligible only) ────
@@ -403,6 +435,7 @@ class AutoConnectManager @Inject constructor(
         private const val NO_DEVICE_WAIT_MS = 30_000L
         private const val RECHECK_DISCONNECTED_MS = 5_000L
         private const val RECHECK_CONNECTED_MS = 30_000L
+        private const val BACKGROUND_POLL_MS = 2_000L
         private const val USER_DISCONNECT_COOLDOWN_MS = 60_000L
         private const val USER_CONNECT_GRACE_MS = 60_000L
     }

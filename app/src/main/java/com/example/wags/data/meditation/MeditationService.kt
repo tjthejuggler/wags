@@ -17,7 +17,6 @@ import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.provider.DocumentsContract
-import android.provider.Settings
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.wags.data.ble.HrDataSource
@@ -68,6 +67,16 @@ class MeditationService : Service() {
 
         private const val WAKE_LOCK_TIMEOUT_MS = 10 * 60 * 1000L // 10 minutes
         private const val TELEMETRY_FLUSH_INTERVAL_MS = 15_000L // 15 seconds
+
+        /**
+         * True while a meditation session is recording. Static so
+         * MainActivity's background shutdown timer can check it without
+         * binding to the service — same pattern as
+         * [AudioImportService.isRunning].
+         */
+        @Volatile
+        var isSessionActive: Boolean = false
+            private set
     }
 
     @Inject
@@ -114,7 +123,6 @@ class MeditationService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        requestBatteryOptimizationExemption()
         Log.d("MeditationService", "MeditationService created")
     }
 
@@ -167,6 +175,7 @@ class MeditationService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         Log.d("MeditationService", "MeditationService onDestroy — isSessionActive=$isSessionActive")
+        Companion.isSessionActive = false
 
         if (isSessionActive) {
             // Emergency save: flush remaining telemetry and mark session as completed.
@@ -199,6 +208,7 @@ class MeditationService : Service() {
         Log.w("MeditationService", "Foreground service timeout (type=$fgsType) — emergency saving session")
         if (isSessionActive) {
             isSessionActive = false
+            Companion.isSessionActive = false
             sessionJob?.cancel()
             hrDataCollectionJob?.cancel()
             telemetryFlushJob?.cancel()
@@ -245,6 +255,7 @@ class MeditationService : Service() {
         }
 
         isSessionActive = true
+        Companion.isSessionActive = true
         sessionStartMs = System.currentTimeMillis()
         this.timerDurationSeconds = timerDurationSeconds
         this.activeMonitorId = monitorId
@@ -319,6 +330,7 @@ class MeditationService : Service() {
         }
 
         isSessionActive = false
+        Companion.isSessionActive = false
         sessionJob?.cancel()
         hrDataCollectionJob?.cancel()
         telemetryFlushJob?.cancel()
@@ -637,25 +649,6 @@ class MeditationService : Service() {
             .build()
     }
 
-    private fun requestBatteryOptimizationExemption() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
-                try {
-                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                        data = Uri.parse("package:$packageName")
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                    }
-                    startActivity(intent)
-                    Log.d("MeditationService", "Requested battery optimization exemption")
-                } catch (e: Exception) {
-                    Log.e("MeditationService", "Failed to request battery optimization exemption", e)
-                }
-            } else {
-                Log.d("MeditationService", "Already exempt from battery optimizations")
-            }
-        }
-    }
 
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
