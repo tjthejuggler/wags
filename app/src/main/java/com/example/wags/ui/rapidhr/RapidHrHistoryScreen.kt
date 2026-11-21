@@ -42,6 +42,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import com.example.wags.domain.model.LocalTimeZones
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -468,7 +469,7 @@ private fun TransitionTimeChart(
                 (points.size <= 10 && i % 2 == 0)
             
             if (shouldShowDate) {
-                val date = Instant.ofEpochMilli(p.timestamp).atZone(zone).toLocalDate()
+                val date = LocalTimeZones.zonedDateTimeOf(p.timestamp, p.zoneId, zone).toLocalDate()
                 val dateLabel = if (date.year != LocalDate.now().year) {
                     date.format(chartDateFmtYear)
                 } else {
@@ -499,7 +500,7 @@ private fun SessionRow(
     onClick: () -> Unit
 ) {
     val zone = ZoneId.systemDefault()
-    val zdt = Instant.ofEpochMilli(session.timestamp).atZone(zone)
+    val zdt = LocalTimeZones.zonedDateTimeOf(session.timestamp, session.zoneId, zone)
     val direction = runCatching { RapidHrDirection.valueOf(session.direction) }
         .getOrDefault(RapidHrDirection.HIGH_TO_LOW)
 

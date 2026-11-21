@@ -8,6 +8,7 @@ import com.example.wags.data.db.entity.RapidHrTelemetryEntity
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.example.wags.domain.model.LocalTimeZones
 
 @Singleton
 class RapidHrRepository @Inject constructor(
@@ -18,7 +19,7 @@ class RapidHrRepository @Inject constructor(
     // ── Sessions ───────────────────────────────────────────────────────────────
 
     suspend fun saveSession(session: RapidHrSessionEntity): Long =
-        sessionDao.insert(session)
+        sessionDao.insert(session.copy(zoneId = session.zoneId ?: LocalTimeZones.currentZoneId()))
 
     fun observeAll(): Flow<List<RapidHrSessionEntity>> =
         sessionDao.observeAll()

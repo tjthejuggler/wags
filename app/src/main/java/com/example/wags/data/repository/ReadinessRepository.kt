@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
+import com.example.wags.domain.model.LocalTimeZones
 
 class ReadinessRepository @Inject constructor(
     private val dao: DailyReadingDao
@@ -38,7 +39,7 @@ class ReadinessRepository @Inject constructor(
         dao.getById(id)
 
     suspend fun saveReading(entity: DailyReadingEntity): Long =
-        dao.insert(entity)
+        dao.insert(entity.copy(zoneId = entity.zoneId ?: LocalTimeZones.currentZoneId()))
 
     suspend fun deleteReading(id: Long) =
         dao.deleteById(id)

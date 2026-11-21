@@ -37,6 +37,7 @@ import org.json.JSONArray
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import com.example.wags.domain.model.LocalTimeZones
 
 // ── Palette ────────────────────────────────────────────────────────────────────
 private val DetailBone   = Color(0xFFE8E8E8)
@@ -194,7 +195,7 @@ private fun SessionDetailContent(
     modifier: Modifier = Modifier
 ) {
     val zone = ZoneId.systemDefault()
-    val dateTime = Instant.ofEpochMilli(session.timestamp).atZone(zone)
+    val dateTime = LocalTimeZones.zonedDateTimeOf(session.timestamp, session.zoneId, zone)
     val dateLabel = dateTime.format(DateTimeFormatter.ofPattern("EEEE, MMMM d yyyy"))
     val timeLabel = dateTime.format(DateTimeFormatter.ofPattern("h:mm a"))
     val durationMin = session.durationSeconds / 60

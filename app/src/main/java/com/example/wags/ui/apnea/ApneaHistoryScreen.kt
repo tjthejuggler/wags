@@ -49,6 +49,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import com.example.wags.domain.model.LocalTimeZones
 
 // ── Tab definitions ────────────────────────────────────────────────────────────
 
@@ -406,8 +407,17 @@ private fun SharedHistoryFilterBar(
                                     newestRecord?.let { r ->
                                         onSetLungVolume(setOf(r.lungVolume))
                                         onSetPrepType(setOf(r.prepType))
+                                        // The time dimension is special: unlike the
+                                        // other settings it does NOT persist between
+                                        // sessions (it is re-derived at each session
+                                        // start), so "Current" here means NOW — the
+                                        // current hour bucket / time-of-day — not the
+                                        // most recent record's saved hour.
                                         onSetTimeOfDay(
-                                            setOf(if (byHour) TimeBuckets.fromTimestamp(r.timestamp) else r.timeOfDay)
+                                            setOf(
+                                                if (byHour) TimeBuckets.current()
+                                                else TimeOfDay.fromCurrentTime().name
+                                            )
                                         )
                                         onSetPosture(setOf(r.posture))
                                         onSetAudio(setOf(r.audio))
@@ -463,7 +473,10 @@ private fun SharedHistoryFilterBar(
                                 options = SettingFilterOptions.timeOfDayOptions(byHour),
                                 optionLabel = SettingFilterOptions::timeBucketLabel,
                                 selected = state.filterTimeOfDay,
-                                currentValue = null,
+                                // "Current" for time means NOW (the current hour /
+                                // time-of-day bucket), not a persisted setting.
+                                currentValue = if (byHour) TimeBuckets.current()
+                                               else TimeOfDay.fromCurrentTime().name,
                                 onSelectionChange = onSetTimeOfDay
                             )
                             MultiSelectFilterCategory(
@@ -1167,7 +1180,7 @@ private fun ApneaMultiSessionList(
 ) {
     val zone = ZoneId.systemDefault()
     val dateLabel = records.firstOrNull()?.let { r ->
-        Instant.ofEpochMilli(r.timestamp).atZone(zone)
+        LocalTimeZones.zonedDateTimeOf(r.timestamp, r.zoneId, zone)
             .format(DateTimeFormatter.ofPattern("EEEE, MMMM d yyyy"))
     } ?: ""
 
@@ -1220,7 +1233,7 @@ private fun ApneaSessionSummaryCard(
     onClick: () -> Unit
 ) {
     val zone = ZoneId.systemDefault()
-    val timeLabel = Instant.ofEpochMilli(record.timestamp).atZone(zone)
+    val timeLabel = LocalTimeZones.zonedDateTimeOf(record.timestamp, record.zoneId, zone)
         .format(DateTimeFormatter.ofPattern("h:mm a"))
 
     Card(

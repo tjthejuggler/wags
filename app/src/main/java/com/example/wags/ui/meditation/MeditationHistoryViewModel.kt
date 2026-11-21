@@ -18,6 +18,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
+import com.example.wags.domain.model.LocalTimeZones
 
 /** null = show all postures */
 typealias PostureFilter = MeditationPosture?
@@ -111,12 +112,12 @@ class MeditationHistoryViewModel @Inject constructor(
             else sessions.filter { it.posture == extra.postureFilter.name }
 
         val datesWithSessions = sessions.map { s ->
-            Instant.ofEpochMilli(s.timestamp).atZone(zone).toLocalDate()
+            LocalTimeZones.zonedDateTimeOf(s.timestamp, s.zoneId, zone).toLocalDate()
         }.toSet()
 
         val selectedDaySessions = extra.selectedDate?.let { date ->
             sessions.filter { s ->
-                Instant.ofEpochMilli(s.timestamp).atZone(zone).toLocalDate() == date
+                LocalTimeZones.zonedDateTimeOf(s.timestamp, s.zoneId, zone).toLocalDate() == date
             }
         } ?: emptyList()
 
@@ -201,13 +202,13 @@ class MeditationHistoryViewModel @Inject constructor(
         val windowStart = windowEnd.minusDays(days.toLong())
 
         val filtered = chronological.filter { entity ->
-            val date = Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate()
+            val date = LocalTimeZones.zonedDateTimeOf(entity.timestamp, entity.zoneId, zone).toLocalDate()
             date > windowStart && date <= windowEnd
         }
 
         // Can step back if there's any data before windowStart
         val canBack = chronological.any { entity ->
-            Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate() <= windowStart
+            LocalTimeZones.zonedDateTimeOf(entity.timestamp, entity.zoneId, zone).toLocalDate() <= windowStart
         }
 
         // Can step forward if offset < 0

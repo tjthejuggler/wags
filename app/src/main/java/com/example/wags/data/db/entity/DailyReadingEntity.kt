@@ -47,5 +47,14 @@ data class DailyReadingEntity(
      * duration selected by the user (60 / 120 / 240).
      */
     @ColumnInfo(defaultValue = "60")
-    val sessionDurationSeconds: Int = 60
+    val sessionDurationSeconds: Int = 60,
+
+    /**
+     * IANA zone the device was in when this reading was saved. Frozen at save
+     * time so the reading's local calendar day never changes when the user
+     * travels. Null on pre-fix rows; resolved by the one-time backfill or the
+     * read-time fallback (see LocalTimeZones).
+     */
+    @ColumnInfo(defaultValue = "NULL")
+    val zoneId: String? = null
 )

@@ -2,6 +2,7 @@ package com.example.wags.data.ipc
 
 import android.util.Log
 import com.example.wags.data.ipc.HabitIntegrationRepository.Slot
+import com.example.wags.domain.model.LocalTimeZones
 import com.example.wags.data.repository.ApneaRepository
 import com.example.wags.data.repository.MeditationRepository
 import com.example.wags.data.repository.ResonanceSessionRepository
@@ -158,14 +159,14 @@ class HabitBackfillManager @Inject constructor(
             for (session in resonanceRepo.getAll()) {
                 addSession(
                     minutes, sessions,
-                    dateStr = epochMsToDateStr(session.timestamp, zone),
+                    dateStr = epochMsToDateStr(session.timestamp, session.zoneId, zone),
                     minutes = HabitIntegrationRepository.secondsToMinutes(session.durationSeconds)
                 )
             }
             for (assessment in rfAssessmentRepo.getAll()) {
                 addSession(
                     minutes, sessions,
-                    dateStr = epochMsToDateStr(assessment.timestamp, zone),
+                    dateStr = epochMsToDateStr(assessment.timestamp, assessment.zoneId, zone),
                     minutes = HabitIntegrationRepository.secondsToMinutes(assessment.durationSeconds)
                 )
             }
@@ -177,7 +178,7 @@ class HabitBackfillManager @Inject constructor(
             for (session in meditationRepo.getAllSessions()) {
                 addSession(
                     minutes, sessions,
-                    dateStr = epochMsToDateStr(session.timestamp, zone),
+                    dateStr = epochMsToDateStr(session.timestamp, session.zoneId, zone),
                     minutes = HabitIntegrationRepository.millisToMinutes(session.durationMs)
                 )
             }
@@ -210,7 +211,7 @@ class HabitBackfillManager @Inject constructor(
             if (record.tableType !in types) continue
             addSession(
                 minutes, sessions,
-                dateStr = epochMsToDateStr(record.timestamp, zone),
+                dateStr = epochMsToDateStr(record.timestamp, record.zoneId, zone),
                 minutes = HabitIntegrationRepository.millisToMinutes(record.durationMs)
             )
         }
@@ -227,10 +228,15 @@ class HabitBackfillManager @Inject constructor(
         sessionsByDate[dateStr] = (sessionsByDate[dateStr] ?: 0) + 1
     }
 
-    /** Converts an epoch-ms timestamp to a `yyyy-MM-dd` string in [zone]. */
-    private fun epochMsToDateStr(epochMs: Long, zone: ZoneId): String =
+    /**
+     * Converts an epoch-ms timestamp to a `yyyy-MM-dd` string in the row's own
+     * frozen zone (fallback [zone] for pre-fix rows), so dates sent to Tail
+     * are the local dates *where the session happened* — not re-derived from
+     * the current zone after travelling.
+     */
+    private fun epochMsToDateStr(epochMs: Long, rowZoneId: String?, zone: ZoneId): String =
         Instant.ofEpochMilli(epochMs)
-            .atZone(zone)
+            .atZone(LocalTimeZones.effectiveZone(rowZoneId, zone))
             .toLocalDate()
             .toString() // ISO-8601 format: yyyy-MM-dd
 

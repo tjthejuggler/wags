@@ -282,6 +282,13 @@ interface ApneaRecordDao {
     @Update
     suspend fun update(entity: ApneaRecordEntity)
 
+    /**
+     * LocalTimeBackfillRunner: bulk-stamp the frozen zone + local hour on a
+     * pre-fix row (id-keyed; computed in Kotlin from the Tail zone seed).
+     */
+    @Query("UPDATE apnea_records SET zoneId = :zoneId, localHour = :localHour WHERE recordId = :recordId")
+    suspend fun stampLocalTime(recordId: Long, zoneId: String, localHour: Int)
+
     @Query("SELECT * FROM apnea_records ORDER BY timestamp DESC LIMIT :limit")
     fun getLatest(limit: Int): Flow<List<ApneaRecordEntity>>
 

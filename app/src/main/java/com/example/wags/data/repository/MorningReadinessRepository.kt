@@ -10,6 +10,7 @@ import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.example.wags.domain.model.LocalTimeZones
 
 @Singleton
 class MorningReadinessRepository @Inject constructor(
@@ -17,7 +18,8 @@ class MorningReadinessRepository @Inject constructor(
     private val telemetryDao: MorningReadinessTelemetryDao
 ) {
     /** Inserts the entity and returns the auto-generated row id. */
-    suspend fun save(entity: MorningReadinessEntity): Long = dao.insert(entity)
+    suspend fun save(entity: MorningReadinessEntity): Long =
+        dao.insert(entity.copy(zoneId = entity.zoneId ?: LocalTimeZones.currentZoneId()))
 
     /**
      * Save per-beat telemetry rows for a reading.

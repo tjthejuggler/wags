@@ -42,6 +42,7 @@ import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.abs
+import com.example.wags.domain.model.LocalTimeZones
 
 // ── Shared mini-chart composables (reused by detail screen) ───────────────────
 
@@ -599,7 +600,7 @@ private fun MultiSessionList(
 ) {
     val zone = ZoneId.systemDefault()
     val dateLabel = sessions.firstOrNull()?.let { s ->
-        Instant.ofEpochMilli(s.timestamp).atZone(zone)
+        LocalTimeZones.zonedDateTimeOf(s.timestamp, s.zoneId, zone)
             .format(DateTimeFormatter.ofPattern("EEEE, MMMM d yyyy"))
     } ?: ""
 
@@ -654,7 +655,7 @@ private fun SessionSummaryCard(
     onClick: () -> Unit
 ) {
     val zone = ZoneId.systemDefault()
-    val timeLabel = Instant.ofEpochMilli(session.timestamp).atZone(zone)
+    val timeLabel = LocalTimeZones.zonedDateTimeOf(session.timestamp, session.zoneId, zone)
         .format(DateTimeFormatter.ofPattern("h:mm a"))
     val audioName = session.audioId?.let { audioMap[it]?.let { a ->
         if (a.isNone) "Silent" else a.fileName

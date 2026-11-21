@@ -17,6 +17,7 @@ import javax.inject.Singleton
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.ln
+import com.example.wags.domain.model.LocalTimeZones
 
 // ── Session type filter ────────────────────────────────────────────────────────
 
@@ -175,7 +176,7 @@ class SettingsComparisonCalculator @Inject constructor(
         for (record in records) {
             val typeKey = ComparisonSessionType.keyOf(record.tableType)
             if (typeKey !in sessionTypeKeys) continue
-            val zdt = Instant.ofEpochMilli(record.timestamp).atZone(zone)
+            val zdt = LocalTimeZones.zonedDateTimeOf(record.timestamp, record.zoneId, zone)
             val date = zdt.toLocalDate()
 
             val target = when {

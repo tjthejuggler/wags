@@ -383,7 +383,7 @@ class AllApneaRecordsViewModel @Inject constructor(
                 r.prepType in s.filterPrepType &&
                 r.posture in s.filterPosture &&
                 r.audio in s.filterAudio &&
-                (if (byHourTod) TimeBuckets.fromTimestamp(r.timestamp) else r.timeOfDay) in s.filterTimeOfDay
+                (if (byHourTod) TimeBuckets.fromRecord(r.timestamp, r.localHour) else r.timeOfDay) in s.filterTimeOfDay
             }
 
             // Drill-parameter option spaces: every breath period / session duration

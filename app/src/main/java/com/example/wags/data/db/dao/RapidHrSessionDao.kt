@@ -18,6 +18,10 @@ data class RapidHrPreset(
 @Dao
 interface RapidHrSessionDao {
 
+    /** LocalTimeBackfillRunner: bulk-stamp the frozen zone on a pre-fix row. */
+    @Query("UPDATE rapid_hr_sessions SET zoneId = :zoneId WHERE id = :rowId")
+    suspend fun stampZone(rowId: Long, zoneId: String)
+
     @Insert
     suspend fun insert(session: RapidHrSessionEntity): Long
 

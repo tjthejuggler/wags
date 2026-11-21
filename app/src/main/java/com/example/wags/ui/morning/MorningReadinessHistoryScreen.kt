@@ -28,6 +28,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import com.example.wags.domain.model.LocalTimeZones
 
 // ── Tab definitions ────────────────────────────────────────────────────────────
 
@@ -424,7 +425,7 @@ private fun ReadingDetailCard(
     onDismiss: () -> Unit
 ) {
     val zone = ZoneId.systemDefault()
-    val dateTime = Instant.ofEpochMilli(reading.timestamp).atZone(zone)
+    val dateTime = LocalTimeZones.zonedDateTimeOf(reading.timestamp, reading.zoneId, zone)
     val dateLabel = dateTime.format(DateTimeFormatter.ofPattern("EEEE, MMMM d yyyy"))
     val timeLabel = dateTime.format(DateTimeFormatter.ofPattern("h:mm a"))
 

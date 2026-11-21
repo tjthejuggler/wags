@@ -89,7 +89,7 @@ object FreeHoldFeatureExtractor {
                 audio = r.audio,
                 daysSinceFirst = max(0.0, (r.timestamp - firstHoldTimestamp) / 86_400_000.0),
                 drillParam = if (includeDrillParam) r.drillParamValue else null,
-                hourOfDay = if (byHour) TimeBuckets.hourOfTimestamp(r.timestamp) else null
+                hourOfDay = if (byHour) TimeBuckets.hourOfRecord(r.timestamp, r.localHour) else null
             )
             y[i] = ln(r.durationMs / 1000.0)
         }

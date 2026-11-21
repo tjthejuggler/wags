@@ -32,7 +32,7 @@ import com.example.wags.data.db.entity.*
         ForecastCalibrationEntity::class,
         EucapnicPastConfigurationEntity::class
     ],
-    version = 46,
+    version = 47,
     exportSchema = false
 )
 abstract class WagsDatabase : RoomDatabase() {
@@ -1324,6 +1324,41 @@ abstract class WagsDatabase : RoomDatabase() {
                 db.execSQL(
                     "ALTER TABLE daily_readings ADD COLUMN sessionDurationSeconds INTEGER NOT NULL DEFAULT 60"
                 )
+            }
+        }
+
+        /**
+         * v46 → v47 (2026-11-21): Freeze local time at save time.
+         *
+         * Bug: apnea hour-bucket SQL derived each record's hour with SQLite
+         * `strftime(..., 'localtime')` — but Android app processes have no TZ
+         * env var, so SQLite 'localtime' is UTC. Kotlin paths re-derived the
+         * hour/day with the CURRENT device zone, so after travelling (e.g.
+         * Turkey UTC+3 → Malaysia UTC+8) every historical record silently
+         * re-bucketed and "PB at 07:00 with these settings" found nothing.
+         *
+         * Schema part of the fix:
+         *  - `zoneId` on every session-ish table: the IANA zone frozen at save
+         *    time (null = pre-fix row, until LocalTimeBackfillRunner repairs).
+         *  - `localHour` on apnea_records: the local hour (0–23) frozen at
+         *    save time, replacing ALL query-time hour derivation (-1 = legacy).
+         *
+         * The historic-value backfill needs the Tail-derived zone seed asset
+         * and therefore runs in LocalTimeBackfillRunner at app startup, not
+         * here (mirrors the MIGRATION_44_45 / MorningReadinessBackfillRunner
+         * pattern).
+         */
+        val MIGRATION_46_47 = object : Migration(46, 47) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE apnea_records ADD COLUMN zoneId TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE apnea_records ADD COLUMN localHour INTEGER NOT NULL DEFAULT -1")
+                db.execSQL("ALTER TABLE apnea_sessions ADD COLUMN zoneId TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE meditation_sessions ADD COLUMN zoneId TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE resonance_sessions ADD COLUMN zoneId TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE morning_readiness ADD COLUMN zoneId TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE daily_readings ADD COLUMN zoneId TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE rf_assessments ADD COLUMN zoneId TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE rapid_hr_sessions ADD COLUMN zoneId TEXT DEFAULT NULL")
             }
         }
     }

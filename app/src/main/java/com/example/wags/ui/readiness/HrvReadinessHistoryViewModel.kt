@@ -14,6 +14,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
+import com.example.wags.domain.model.LocalTimeZones
 
 /** A single (x=index, y=value) point for a line chart, with a date label. */
 data class HrvChartPoint(val index: Float, val value: Float, val dateLabel: String)
@@ -77,7 +78,7 @@ class HrvReadinessHistoryViewModel @Inject constructor(
 
         // Build date → readings map (newest first within each day)
         val byDate: Map<LocalDate, List<DailyReadingEntity>> = readings
-            .groupBy { Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate() }
+            .groupBy { LocalTimeZones.zonedDateTimeOf(it.timestamp, it.zoneId, zone).toLocalDate() }
 
         val dates = byDate.keys
 
@@ -145,13 +146,13 @@ class HrvReadinessHistoryViewModel @Inject constructor(
         val windowStart = windowEnd.minusDays(days.toLong())
 
         val filtered = chronological.filter { entity ->
-            val date = Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate()
+            val date = LocalTimeZones.zonedDateTimeOf(entity.timestamp, entity.zoneId, zone).toLocalDate()
             date > windowStart && date <= windowEnd
         }
 
         // Can step back if there's any data before windowStart
         val canBack = chronological.any { entity ->
-            Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate() <= windowStart
+            LocalTimeZones.zonedDateTimeOf(entity.timestamp, entity.zoneId, zone).toLocalDate() <= windowStart
         }
 
         // Can step forward if offset < 0
@@ -181,7 +182,7 @@ class HrvReadinessHistoryViewModel @Inject constructor(
         if (shouldAggregateByMonth) {
             // Group by year-month and calculate averages
             val byMonth: Map<String, List<DailyReadingEntity>> = chronological.groupBy { entity ->
-                val date = Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate()
+                val date = LocalTimeZones.zonedDateTimeOf(entity.timestamp, entity.zoneId, zone).toLocalDate()
                 "${date.year}-${date.monthValue.toString().padStart(2, '0')}"
             }
 

@@ -106,5 +106,23 @@ data class ApneaRecordEntity(
      * "tables done" counters.
      */
     @ColumnInfo(defaultValue = "1")
-    val countsAsRecord: Boolean = true
+    val countsAsRecord: Boolean = true,
+    /**
+     * IANA zone the device was in when this record was saved (e.g.
+     * "Europe/Istanbul"). Frozen at save time so the local calendar day of the
+     * record never changes when the user travels. Null on rows written before
+     * the fix; resolved by the one-time backfill or the read-time fallback.
+     */
+    @ColumnInfo(defaultValue = "NULL")
+    val zoneId: String? = null,
+    /**
+     * Local hour (0–23) of the hold's start, frozen at save time in the device
+     * zone of that moment. This is the column the By-the-Hour SQL filters
+     * compare against — deriving the hour from `timestamp` at query time (via
+     * SQLite 'localtime', which is UTC on Android) silently re-bucketed all
+     * history whenever the timezone changed. -1 marks pre-fix rows until the
+     * one-time backfill computes the true value.
+     */
+    @ColumnInfo(defaultValue = "-1")
+    val localHour: Int = -1
 )

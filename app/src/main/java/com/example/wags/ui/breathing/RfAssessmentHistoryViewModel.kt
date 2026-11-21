@@ -16,6 +16,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
+import com.example.wags.domain.model.LocalTimeZones
 
 /** A single (x=index, y=value) point for a line chart, with a date label. */
 data class RfChartPoint(val index: Float, val value: Float, val dateLabel: String)
@@ -94,11 +95,11 @@ class RfAssessmentHistoryViewModel @Inject constructor(
 
         // Build date → assessments map
         val assessmentsByDate: Map<LocalDate, List<RfAssessmentEntity>> = assessments
-            .groupBy { Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate() }
+            .groupBy { LocalTimeZones.zonedDateTimeOf(it.timestamp, it.zoneId, zone).toLocalDate() }
 
         // Build date → sessions map
         val sessionsByDate: Map<LocalDate, List<ResonanceSessionEntity>> = sessions
-            .groupBy { Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate() }
+            .groupBy { LocalTimeZones.zonedDateTimeOf(it.timestamp, it.zoneId, zone).toLocalDate() }
 
         val assessmentDates = assessmentsByDate.keys
         val sessionDates = sessionsByDate.keys
@@ -172,7 +173,7 @@ class RfAssessmentHistoryViewModel @Inject constructor(
         if (shouldAggregateByMonth) {
             // Group by year-month and calculate averages
             val byMonth: Map<String, List<RfAssessmentEntity>> = chronological.groupBy { entity ->
-                val date = Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate()
+                val date = LocalTimeZones.zonedDateTimeOf(entity.timestamp, entity.zoneId, zone).toLocalDate()
                 "${date.year}-${date.monthValue.toString().padStart(2, '0')}"
             }
 
@@ -246,7 +247,7 @@ class RfAssessmentHistoryViewModel @Inject constructor(
         if (shouldAggregateByMonth) {
             // Group by year-month and calculate averages
             val byMonth: Map<String, List<ResonanceSessionEntity>> = chronological.groupBy { entity ->
-                val date = Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate()
+                val date = LocalTimeZones.zonedDateTimeOf(entity.timestamp, entity.zoneId, zone).toLocalDate()
                 "${date.year}-${date.monthValue.toString().padStart(2, '0')}"
             }
 

@@ -14,6 +14,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
+import com.example.wags.domain.model.LocalTimeZones
 
 /**
  * A single bar in the trophy chart — one day's trophy data.
@@ -150,7 +151,7 @@ class TrophyChartViewModel @Inject constructor(
         val byDate = mutableMapOf<LocalDate, MutableList<Int>>()
         for ((recordId, trophyCount) in recordTrophies) {
             val record = recordById[recordId] ?: continue
-            val date = Instant.ofEpochMilli(record.timestamp).atZone(zone).toLocalDate()
+            val date = LocalTimeZones.zonedDateTimeOf(record.timestamp, record.zoneId, zone).toLocalDate()
             byDate.getOrPut(date) { mutableListOf() }.add(trophyCount)
         }
 

@@ -9,6 +9,10 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ApneaSessionDao {
+
+    /** LocalTimeBackfillRunner: bulk-stamp the frozen zone on a pre-fix row. */
+    @Query("UPDATE apnea_sessions SET zoneId = :zoneId WHERE sessionId = :rowId")
+    suspend fun stampZone(rowId: Long, zoneId: String)
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(session: ApneaSessionEntity): Long
 

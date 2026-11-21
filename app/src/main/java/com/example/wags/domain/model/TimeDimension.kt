@@ -65,15 +65,39 @@ object TimeBuckets {
             bucket.substring(1).toIntOrNull()?.takeIf { it in 0..23 }
         else null
 
-    /** Local hour (0–23) of the given epoch-ms timestamp. */
+    /**
+     * Local hour (0–23) of the given epoch-ms timestamp in the CURRENT device
+     * zone. ⚠ Only for "now" or current-session values — deriving a *stored*
+     * record's hour this way silently re-buckets history when the timezone
+     * changes (2026-11 timezone bug). For records use [hourOfRecord] /
+     * [fromRecord], which read the hour frozen at save time.
+     */
     fun hourOfTimestamp(timestampMs: Long): Int {
         val cal = Calendar.getInstance()
         cal.timeInMillis = timestampMs
         return cal.get(Calendar.HOUR_OF_DAY)
     }
 
-    /** Hour bucket for the given epoch-ms timestamp (e.g. a record's timestamp). */
+    /**
+     * Local hour of a STORED record: the `localHour` column frozen at save
+     * time when present (≥ 0), else the legacy current-zone derivation for
+     * rows the one-time backfill could not repair.
+     */
+    fun hourOfRecord(timestampMs: Long, localHour: Int): Int =
+        if (localHour in 0..23) localHour else hourOfTimestamp(timestampMs)
+
+    /**
+     * Hour bucket for the given epoch-ms timestamp — current-zone semantics,
+     * for "now"-style values only (see [hourOfTimestamp]).
+     */
     fun fromTimestamp(timestampMs: Long): String = fromHour(hourOfTimestamp(timestampMs))
+
+    /**
+     * Hour bucket of a STORED record (uses the frozen `localHour`; falls back
+     * to the legacy derivation for un-repaired rows).
+     */
+    fun fromRecord(timestampMs: Long, localHour: Int): String =
+        fromHour(hourOfRecord(timestampMs, localHour))
 
     /** Hour bucket for the current moment. */
     fun current(): String = fromTimestamp(System.currentTimeMillis())

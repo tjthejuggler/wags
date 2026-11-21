@@ -1,5 +1,6 @@
 package com.example.wags.data.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -36,5 +37,13 @@ data class RapidHrSessionEntity(
     val hrAtSecondCrossing: Int,
     val avgHrBpm: Float? = null,
     val monitorId: String? = null,
-    val isPersonalBest: Boolean = false
+    val isPersonalBest: Boolean = false,
+    /**
+     * IANA zone the device was in when this session was saved. Frozen at save
+     * time so the session's local calendar day never changes when the user
+     * travels. Null on pre-fix rows; resolved by the one-time backfill or the
+     * read-time fallback (see LocalTimeZones).
+     */
+    @ColumnInfo(defaultValue = "NULL")
+    val zoneId: String? = null
 )

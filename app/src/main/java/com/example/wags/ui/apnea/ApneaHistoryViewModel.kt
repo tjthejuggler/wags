@@ -36,6 +36,7 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
 import javax.inject.Inject
+import com.example.wags.domain.model.LocalTimeZones
 
 /** Sentinel value meaning "don't filter on this setting". */
 const val FILTER_ALL = "ALL"
@@ -352,7 +353,7 @@ class ApneaHistoryViewModel @Inject constructor(
 
         // Build date → records map for ALL records (calendar is not filtered by settings)
         val byDate: Map<LocalDate, List<ApneaRecordEntity>> = allRecords
-            .groupBy { Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate() }
+            .groupBy { LocalTimeZones.zonedDateTimeOf(it.timestamp, it.zoneId, zone).toLocalDate() }
 
         val selectedDayRecords = if (selectedDate != null) {
             byDate[selectedDate] ?: emptyList()
@@ -365,7 +366,7 @@ class ApneaHistoryViewModel @Inject constructor(
             r.prepType in chartFilter.prepType &&
             r.posture in chartFilter.posture &&
             r.audio in chartFilter.audio &&
-            (if (chartFilter.byHourTod) TimeBuckets.fromTimestamp(r.timestamp) else r.timeOfDay) in chartFilter.timeOfDay
+            (if (chartFilter.byHourTod) TimeBuckets.fromRecord(r.timestamp, r.localHour) else r.timeOfDay) in chartFilter.timeOfDay
         }
         val chartRecords = settingsFiltered
             .filter { it.tableType in chartFilter.eventTypes }
@@ -580,13 +581,13 @@ class ApneaHistoryViewModel @Inject constructor(
         val windowStart = windowEnd.minusDays(days.toLong())
 
         val filtered = chronological.filter { entity ->
-            val date = Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate()
+            val date = LocalTimeZones.zonedDateTimeOf(entity.timestamp, entity.zoneId, zone).toLocalDate()
             date > windowStart && date <= windowEnd
         }
 
         // Can step back if there's any data before windowStart
         val canBack = chronological.any { entity ->
-            Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate() <= windowStart
+            LocalTimeZones.zonedDateTimeOf(entity.timestamp, entity.zoneId, zone).toLocalDate() <= windowStart
         }
 
         // Can step forward if offset < 0
@@ -624,7 +625,7 @@ class ApneaHistoryViewModel @Inject constructor(
             val durationSec = e.durationMs / 1000f
             holdDuration.add(ApneaChartPoint(x, durationSec, label))
             // Hour-of-day bests: bucket by the record's local start hour.
-            val hour = Instant.ofEpochMilli(e.timestamp).atZone(zone).hour
+            val hour = LocalTimeZones.zonedDateTimeOf(e.timestamp, e.zoneId, zone).hour
             if (durationSec > bestSecByHour[hour]) bestSecByHour[hour] = durationSec
             holdsByHour[hour]++
             // Physiologically impossible values (< 10) are sensor glitches —
@@ -674,7 +675,7 @@ class ApneaHistoryViewModel @Inject constructor(
         if (chronological.isEmpty()) return emptyList<ApneaChartPoint>() to "day"
 
         val countsByDay = chronological.groupingBy {
-            Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate()
+            LocalTimeZones.zonedDateTimeOf(it.timestamp, it.zoneId, zone).toLocalDate()
         }.eachCount()
         val first = countsByDay.keys.min()
         val last = countsByDay.keys.max()
@@ -871,7 +872,7 @@ class ApneaHistoryViewModel @Inject constructor(
             val byDate = mutableMapOf<LocalDate, Int>()
             for ((recordId, trophyCount) in trophyMap) {
                 val record = recordById[recordId] ?: continue
-                val date = Instant.ofEpochMilli(record.timestamp).atZone(zone).toLocalDate()
+                val date = LocalTimeZones.zonedDateTimeOf(record.timestamp, record.zoneId, zone).toLocalDate()
                 byDate[date] = (byDate[date] ?: 0) + trophyCount
             }
             return byDate

@@ -5,12 +5,14 @@ import com.example.wags.data.db.entity.ResonanceSessionEntity
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.example.wags.domain.model.LocalTimeZones
 
 @Singleton
 class ResonanceSessionRepository @Inject constructor(
     private val dao: ResonanceSessionDao
 ) {
-    suspend fun save(entity: ResonanceSessionEntity): Long = dao.insert(entity)
+    suspend fun save(entity: ResonanceSessionEntity): Long =
+        dao.insert(entity.copy(zoneId = entity.zoneId ?: LocalTimeZones.currentZoneId()))
 
     fun observeAll(): Flow<List<ResonanceSessionEntity>> = dao.observeAll()
 

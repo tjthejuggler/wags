@@ -57,5 +57,14 @@ data class MeditationSessionEntity(
      * Used to detect and recover sessions interrupted by process death.
      */
     @ColumnInfo(defaultValue = "1")
-    val completed: Boolean = true
+    val completed: Boolean = true,
+
+    /**
+     * IANA zone the device was in when this session was saved. Frozen at save
+     * time so the session's local calendar day never changes when the user
+     * travels. Null on pre-fix rows; resolved by the one-time backfill or the
+     * read-time fallback (see LocalTimeZones).
+     */
+    @ColumnInfo(defaultValue = "NULL")
+    val zoneId: String? = null
 )

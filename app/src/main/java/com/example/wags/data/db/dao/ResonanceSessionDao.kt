@@ -6,6 +6,10 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ResonanceSessionDao {
+
+    /** LocalTimeBackfillRunner: bulk-stamp the frozen zone on a pre-fix row. */
+    @Query("UPDATE resonance_sessions SET zoneId = :zoneId WHERE sessionId = :rowId")
+    suspend fun stampZone(rowId: Long, zoneId: String)
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: ResonanceSessionEntity): Long
 

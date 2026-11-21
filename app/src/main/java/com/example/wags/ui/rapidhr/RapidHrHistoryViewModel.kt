@@ -16,6 +16,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
+import com.example.wags.domain.model.LocalTimeZones
 
 // ── Chart point ────────────────────────────────────────────────────────────────
 
@@ -23,7 +24,9 @@ data class RapidHrChartPoint(
     val index: Float,
     val valueMs: Long,
     val sessionId: Long,
-    val timestamp: Long
+    val timestamp: Long,
+    /** Frozen zone of the session row (null = pre-fix row). */
+    val zoneId: String? = null
 )
 
 // ── Time period ────────────────────────────────────────────────────────────────
@@ -126,17 +129,17 @@ class RapidHrHistoryViewModel @Inject constructor(
         val chartPoints = filtered
             .sortedBy { it.timestamp }
             .mapIndexed { i, s ->
-                RapidHrChartPoint(i.toFloat(), s.transitionDurationMs, s.id, s.timestamp)
+                RapidHrChartPoint(i.toFloat(), s.transitionDurationMs, s.id, s.timestamp, s.zoneId)
             }
 
         val zone = ZoneId.systemDefault()
         val datesWithSessions = sessions
-            .map { Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate() }
+            .map { LocalTimeZones.zonedDateTimeOf(it.timestamp, it.zoneId, zone).toLocalDate() }
             .toSet()
 
         val selectedDaySessions = extra.selectedDate?.let { date ->
             sessions.filter {
-                Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate() == date
+                LocalTimeZones.zonedDateTimeOf(it.timestamp, it.zoneId, zone).toLocalDate() == date
             }
         } ?: emptyList()
 

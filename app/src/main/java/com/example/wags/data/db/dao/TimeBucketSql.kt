@@ -8,9 +8,21 @@ package com.example.wags.data.db.dao
  * When the app's apnea time dimension is "By the Hour" (see
  * `com.example.wags.domain.model.TimeDimension`), the `:timeOfDay` query
  * parameter carries an hour bucket of the form "H00".."H23". Such values are
- * matched against the **local hour derived from the record's timestamp** —
- * which is what makes the feature fully retroactive: every historical record
- * already has a timestamp, so no migration or data rewrite is needed.
+ * matched against the record's `localHour` column — the **local hour frozen
+ * at save time** in the device zone of that moment.
+ *
+ * History (2026-11 timezone bug): these fragments used to derive the hour
+ * with `strftime('%H', timestamp/1000, 'unixepoch', 'localtime')`. Two
+ * defects: (1) Android app processes have no `TZ` env var, so SQLite
+ * 'localtime' resolved to **UTC** — a "constant global time" that never
+ * matched the local hours the rest of the app used; (2) even where the
+ * process zone was set, deriving a *stored* record's hour from the *current*
+ * zone silently re-bucketed all history whenever the user travelled. Both are
+ * fixed by the `localHour` column (frozen at save; repaired historically by
+ * LocalTimeBackfillRunner from the Tail-derived zone seed). The fallback
+ * expression below only covers un-repaired legacy rows (-1) and matches the
+ * UTC-hour derivation they had before, so behaviour never regresses for
+ * rows the seed could not place.
  *
  * Any other value (the legacy "MORNING"/"DAY"/"NIGHT" names, or the ""
  * / 'ALL' filter sentinels) keeps matching the stored `timeOfDay` column
@@ -20,17 +32,21 @@ package com.example.wags.data.db.dao
  * Room `@Query` annotation strings.
  */
 
-/** Local hour (0–23) of the un-aliased `timestamp` column (epoch ms). */
+/**
+ * Local hour (0–23) of the un-aliased `apnea_records` row: the frozen
+ * `localHour` column when present, else the legacy UTC-hour derivation for
+ * un-repaired rows.
+ */
 internal const val SQL_HOUR_OF_TS =
-    "CAST(strftime('%H', timestamp /1000, 'unixepoch', 'localtime') AS INTEGER)"
+    "COALESCE(NULLIF(localHour, -1), CAST(strftime('%H', timestamp /1000, 'unixepoch') AS INTEGER))"
 
-/** Local hour of `r.timestamp` (aliased outer table). */
+/** Same, for the outer table aliased as `r`. */
 internal const val SQL_HOUR_OF_TS_R =
-    "CAST(strftime('%H', r.timestamp /1000, 'unixepoch', 'localtime') AS INTEGER)"
+    "COALESCE(NULLIF(r.localHour, -1), CAST(strftime('%H', r.timestamp /1000, 'unixepoch') AS INTEGER))"
 
-/** Local hour of `o.timestamp` (aliased inner/other table in is-best queries). */
+/** Same, for the inner/other table aliased as `o` in is-best queries. */
 internal const val SQL_HOUR_OF_TS_O =
-    "CAST(strftime('%H', o.timestamp /1000, 'unixepoch', 'localtime') AS INTEGER)"
+    "COALESCE(NULLIF(o.localHour, -1), CAST(strftime('%H', o.timestamp /1000, 'unixepoch') AS INTEGER))"
 
 /** Exact bucket match on the un-aliased apnea_records table. */
 internal const val TOD_MATCH =

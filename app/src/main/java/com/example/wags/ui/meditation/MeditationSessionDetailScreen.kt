@@ -53,6 +53,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.abs
+import com.example.wags.domain.model.LocalTimeZones
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -210,9 +211,9 @@ fun MeditationSessionDetailScreen(
                     val audio     = state.audio
                     val telemetry = state.telemetry
                     val zone      = ZoneId.systemDefault()
-                    val dateLabel = Instant.ofEpochMilli(session.timestamp).atZone(zone)
+                    val dateLabel = LocalTimeZones.zonedDateTimeOf(session.timestamp, session.zoneId, zone)
                         .format(DateTimeFormatter.ofPattern("EEEE, MMMM d yyyy"))
-                    val timeLabel = Instant.ofEpochMilli(session.timestamp).atZone(zone)
+                    val timeLabel = LocalTimeZones.zonedDateTimeOf(session.timestamp, session.zoneId, zone)
                         .format(DateTimeFormatter.ofPattern("h:mm a"))
                     val durationMin = session.durationMs / 60_000L
                     val durationSec = (session.durationMs % 60_000L) / 1_000L
@@ -475,7 +476,7 @@ fun MeditationSessionDetailScreen(
                         DetailRow("Session ID", session.sessionId.toString())
                         DetailRow(
                             "Started",
-                            Instant.ofEpochMilli(session.timestamp).atZone(zone)
+                            LocalTimeZones.zonedDateTimeOf(session.timestamp, session.zoneId, zone)
                                 .format(DateTimeFormatter.ofPattern("MMM d yyyy, h:mm a"))
                         )
                         DetailRow("Duration", "${durationMin}m ${durationSec}s")

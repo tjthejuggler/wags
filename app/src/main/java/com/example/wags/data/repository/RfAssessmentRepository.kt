@@ -5,6 +5,7 @@ import com.example.wags.data.db.entity.RfAssessmentEntity
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.example.wags.domain.model.LocalTimeZones
 
 @Singleton
 class RfAssessmentRepository @Inject constructor(
@@ -12,7 +13,7 @@ class RfAssessmentRepository @Inject constructor(
 ) {
     /** Insert a completed session. */
     suspend fun saveSession(entity: RfAssessmentEntity) {
-        dao.insert(entity)
+        dao.insert(entity.copy(zoneId = entity.zoneId ?: LocalTimeZones.currentZoneId()))
     }
 
     /** Get all sessions, newest first. */

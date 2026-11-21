@@ -30,6 +30,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import com.example.wags.domain.model.LocalTimeZones
 
 // ── Tab definitions ────────────────────────────────────────────────────────────
 
@@ -623,9 +624,9 @@ private fun RfDayEventList(
 ) {
     val zone = ZoneId.systemDefault()
     val dateLabel = (assessments.firstOrNull()?.let { a ->
-        Instant.ofEpochMilli(a.timestamp).atZone(zone)
+        LocalTimeZones.zonedDateTimeOf(a.timestamp, a.zoneId, zone)
     } ?: sessions.firstOrNull()?.let { s ->
-        Instant.ofEpochMilli(s.timestamp).atZone(zone)
+        LocalTimeZones.zonedDateTimeOf(s.timestamp, s.zoneId, zone)
     })?.format(DateTimeFormatter.ofPattern("EEEE, MMMM d yyyy")) ?: ""
 
     val totalEvents = assessments.size + sessions.size
@@ -688,7 +689,7 @@ private fun RfAssessmentEventCard(
     onClick: () -> Unit
 ) {
     val zone = ZoneId.systemDefault()
-    val timeLabel = Instant.ofEpochMilli(assessment.timestamp).atZone(zone)
+    val timeLabel = LocalTimeZones.zonedDateTimeOf(assessment.timestamp, assessment.zoneId, zone)
         .format(DateTimeFormatter.ofPattern("h:mm a"))
 
     Card(
@@ -754,7 +755,7 @@ private fun RfSessionEventCard(
     onClick: () -> Unit
 ) {
     val zone = ZoneId.systemDefault()
-    val timeLabel = Instant.ofEpochMilli(session.timestamp).atZone(zone)
+    val timeLabel = LocalTimeZones.zonedDateTimeOf(session.timestamp, session.zoneId, zone)
         .format(DateTimeFormatter.ofPattern("h:mm a"))
     val durationMin = session.durationSeconds / 60
     val durationSec = session.durationSeconds % 60

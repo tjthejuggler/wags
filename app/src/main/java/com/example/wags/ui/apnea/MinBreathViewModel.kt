@@ -466,12 +466,14 @@ class MinBreathViewModel @Inject constructor(
                 if (durationMs <= 0) return@launch
                 val dimension = timeDimensionStore.current
                 // Effective time bucket of a record in the ACTIVE dimension:
-                // BY_HOUR derives the bucket from the record's start timestamp
-                // (the stored timeOfDay column is NOT used in that mode);
+                // BY_HOUR derives the bucket from the record's frozen local
+                // hour (the stored timeOfDay column is NOT used in that mode;
+                // the hour is read from localHour, saved in the zone of the
+                // moment, never re-derived from the current zone);
                 // TIME_OF_DAY uses the stored column directly.
-                fun recordBucket(timestampMs: Long, tod: String): String =
+                fun recordBucket(timestampMs: Long, localHour: Int, tod: String): String =
                     if (dimension == TimeDimension.BY_HOUR)
-                        TimeBuckets.fromTimestamp(timestampMs)
+                        TimeBuckets.fromRecord(timestampMs, localHour)
                     else tod
                 val currentBucket = TimeBuckets.normalizeSessionBucket(s.timeOfDay, dimension)
 
@@ -482,7 +484,7 @@ class MinBreathViewModel @Inject constructor(
                         it.posture == s.posture && it.audio == s.audio
                 }
                 val hourExactBest = settingsMatched
-                    .filter { recordBucket(it.timestamp, it.timeOfDay) == currentBucket }
+                    .filter { recordBucket(it.timestamp, it.localHour, it.timeOfDay) == currentBucket }
                     .maxOfOrNull { it.durationMs }
                 val exactBest = settingsMatched.maxOfOrNull { it.durationMs }
                 val anyBest = records.maxOfOrNull { it.durationMs }
@@ -1062,7 +1064,7 @@ class MinBreathViewModel @Inject constructor(
                         .filter { it.lungVolume in s.filterLungVolume }
                         .filter { it.prepType in s.filterPrepType }
                         .filter {
-                            (if (byHourTod) TimeBuckets.fromTimestamp(it.timestamp) else it.timeOfDay) in s.filterTimeOfDay
+                            (if (byHourTod) TimeBuckets.fromRecord(it.timestamp, it.localHour) else it.timeOfDay) in s.filterTimeOfDay
                         }
                         .filter { it.posture in s.filterPosture }
                         .filter { it.audio in s.filterAudio }

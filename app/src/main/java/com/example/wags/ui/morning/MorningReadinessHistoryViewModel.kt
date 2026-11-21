@@ -14,6 +14,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
+import com.example.wags.domain.model.LocalTimeZones
 
 /** A single (x=day-index, y=value) point for a line chart. */
 data class ChartPoint(val dayIndex: Float, val value: Float, val label: String)
@@ -90,11 +91,11 @@ class MorningReadinessHistoryViewModel @Inject constructor(
     ) { readings, selectedDate, timePeriod ->
         val zone = ZoneId.systemDefault()
         val dates = readings
-            .map { Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate() }
+            .map { LocalTimeZones.zonedDateTimeOf(it.timestamp, it.zoneId, zone).toLocalDate() }
             .toSet()
         val selectedReading = if (selectedDate != null) {
             readings.firstOrNull { entity ->
-                Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate() == selectedDate
+                LocalTimeZones.zonedDateTimeOf(entity.timestamp, entity.zoneId, zone).toLocalDate() == selectedDate
             }
         } else null
 
@@ -157,13 +158,13 @@ class MorningReadinessHistoryViewModel @Inject constructor(
         val windowStart = windowEnd.minusDays(days.toLong())
 
         val filtered = chronological.filter { entity ->
-            val date = Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate()
+            val date = LocalTimeZones.zonedDateTimeOf(entity.timestamp, entity.zoneId, zone).toLocalDate()
             date > windowStart && date <= windowEnd
         }
 
         // Can step back if there's any data before windowStart
         val canBack = chronological.any { entity ->
-            Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate() <= windowStart
+            LocalTimeZones.zonedDateTimeOf(entity.timestamp, entity.zoneId, zone).toLocalDate() <= windowStart
         }
 
         // Can step forward if offset < 0
@@ -189,7 +190,7 @@ class MorningReadinessHistoryViewModel @Inject constructor(
                 .atZone(zone).toLocalDate()
             val windowStart = newestDate.minusDays(days.toLong())
             chronological.filter { entity ->
-                Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate() >= windowStart
+                LocalTimeZones.zonedDateTimeOf(entity.timestamp, entity.zoneId, zone).toLocalDate() >= windowStart
             }
         } ?: chronological
 
@@ -217,7 +218,7 @@ class MorningReadinessHistoryViewModel @Inject constructor(
         if (shouldAggregateByMonth) {
             // Group by year-month and calculate averages
             val byMonth: Map<String, List<MorningReadinessEntity>> = windowed.groupBy { entity ->
-                val date = Instant.ofEpochMilli(entity.timestamp).atZone(zone).toLocalDate()
+                val date = LocalTimeZones.zonedDateTimeOf(entity.timestamp, entity.zoneId, zone).toLocalDate()
                 "${date.year}-${date.monthValue.toString().padStart(2, '0')}"
             }
 

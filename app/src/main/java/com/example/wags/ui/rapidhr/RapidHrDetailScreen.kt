@@ -38,6 +38,7 @@ import com.example.wags.ui.theme.*
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import com.example.wags.domain.model.LocalTimeZones
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -163,7 +164,7 @@ private fun DetailContent(
     modifier: Modifier = Modifier
 ) {
     val zone = ZoneId.systemDefault()
-    val zdt = Instant.ofEpochMilli(session.timestamp).atZone(zone)
+    val zdt = LocalTimeZones.zonedDateTimeOf(session.timestamp, session.zoneId, zone)
     val direction = runCatching { RapidHrDirection.valueOf(session.direction) }
         .getOrDefault(RapidHrDirection.HIGH_TO_LOW)
 

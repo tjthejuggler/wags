@@ -15,6 +15,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
+import com.example.wags.domain.model.LocalTimeZones
 
 data class DayValue(val date: LocalDate, val ms: Long)
 
@@ -73,7 +74,7 @@ class TimeChartViewModel @Inject constructor(
         val filtered = filterRecordsByDrill(records)
 
         val byDay = filtered
-            .groupBy { Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate() }
+            .groupBy { LocalTimeZones.zonedDateTimeOf(it.timestamp, it.zoneId, zone).toLocalDate() }
             .map { (date, recs) -> DayValue(date, recs.sumOf { it.durationMs }) }
             .sortedBy { it.date }
 
@@ -98,7 +99,7 @@ class TimeChartViewModel @Inject constructor(
             if (drillType == "FREE_HOLD" || drillType == "TOTAL") {
                 val freeHolds = records.filter { it.tableType == null }
                 freeHolds.forEach { r ->
-                    val date = Instant.ofEpochMilli(r.timestamp).atZone(zone).toLocalDate()
+                    val date = LocalTimeZones.zonedDateTimeOf(r.timestamp, r.zoneId, zone).toLocalDate()
                     dailyMap[date] = (dailyMap[date] ?: 0L) + r.durationMs
                 }
             }
@@ -106,14 +107,14 @@ class TimeChartViewModel @Inject constructor(
             // Table-based sessions
             if (drillType == "TOTAL") {
                 sessions.forEach { s ->
-                    val date = Instant.ofEpochMilli(s.timestamp).atZone(zone).toLocalDate()
+                    val date = LocalTimeZones.zonedDateTimeOf(s.timestamp, s.zoneId, zone).toLocalDate()
                     dailyMap[date] = (dailyMap[date] ?: 0L) + s.totalSessionDurationMs
                 }
             } else {
                 // Specific drill type from sessions
                 val tableType = drillType // e.g. "O2", "CO2", etc.
                 sessions.filter { it.tableType == tableType }.forEach { s ->
-                    val date = Instant.ofEpochMilli(s.timestamp).atZone(zone).toLocalDate()
+                    val date = LocalTimeZones.zonedDateTimeOf(s.timestamp, s.zoneId, zone).toLocalDate()
                     dailyMap[date] = (dailyMap[date] ?: 0L) + s.totalSessionDurationMs
                 }
             }
@@ -132,7 +133,7 @@ class TimeChartViewModel @Inject constructor(
             val filtered = sessions.filter { it.tableType == drillType }
 
             val byDay = filtered
-                .groupBy { Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate() }
+                .groupBy { LocalTimeZones.zonedDateTimeOf(it.timestamp, it.zoneId, zone).toLocalDate() }
                 .map { (date, sess) -> DayValue(date, sess.sumOf { it.totalSessionDurationMs }) }
                 .sortedBy { it.date }
 

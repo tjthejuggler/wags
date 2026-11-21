@@ -24,5 +24,13 @@ data class ApneaSessionEntity(
      * Null when no device was connected.
      */
     @ColumnInfo(defaultValue = "NULL")
-    val hrDeviceId: String? = null
+    val hrDeviceId: String? = null,
+    /**
+     * IANA zone the device was in when this session was saved. Frozen at save
+     * time so the session's local calendar day never changes when the user
+     * travels. Null on pre-fix rows; resolved by the one-time backfill or the
+     * read-time fallback (see LocalTimeZones).
+     */
+    @ColumnInfo(defaultValue = "NULL")
+    val zoneId: String? = null
 )

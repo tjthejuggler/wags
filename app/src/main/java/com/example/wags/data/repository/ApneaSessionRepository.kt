@@ -11,6 +11,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.example.wags.domain.model.LocalTimeZones
 
 @Singleton
 class ApneaSessionRepository @Inject constructor(
@@ -20,7 +21,7 @@ class ApneaSessionRepository @Inject constructor(
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) {
     suspend fun saveSession(session: ApneaSessionEntity): Long = withContext(ioDispatcher) {
-        apneaSessionDao.insert(session)
+        apneaSessionDao.insert(session.copy(zoneId = session.zoneId ?: LocalTimeZones.currentZoneId()))
     }
 
     suspend fun saveContractions(contractions: List<ContractionEntity>) = withContext(ioDispatcher) {

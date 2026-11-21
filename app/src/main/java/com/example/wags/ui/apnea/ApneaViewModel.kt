@@ -831,7 +831,7 @@ class ApneaViewModel @Inject constructor(
                             val rec = mapOf(
                                 "lungVolume" to r.lungVolume,
                                 "prepType"   to r.prepType,
-                                "timeOfDay"  to (if (TimeBuckets.isHourBucket(sel[2])) TimeBuckets.fromTimestamp(r.timestamp) else r.timeOfDay),
+                                "timeOfDay"  to (if (TimeBuckets.isHourBucket(sel[2])) TimeBuckets.fromRecord(r.timestamp, r.localHour) else r.timeOfDay),
                                 "posture"    to r.posture,
                                 "audio"      to r.audio
                             )
@@ -1885,7 +1885,7 @@ class ApneaViewModel @Inject constructor(
                     records.asSequence()
                         .filter {
                             it.lungVolume == lv && it.prepType == pt.name &&
-                                (if (TimeBuckets.isHourBucket(todBucket)) TimeBuckets.fromTimestamp(it.timestamp) else it.timeOfDay) == todBucket && it.posture == pos.name && it.audio == aud.name
+                                (if (TimeBuckets.isHourBucket(todBucket)) TimeBuckets.fromRecord(it.timestamp, it.localHour) else it.timeOfDay) == todBucket && it.posture == pos.name && it.audio == aud.name
                         }
                         .maxOfOrNull { it.timestamp }
 

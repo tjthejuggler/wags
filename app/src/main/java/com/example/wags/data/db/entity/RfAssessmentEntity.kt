@@ -80,5 +80,13 @@ data class RfAssessmentEntity(
     val powerSpectrumJson: String = "",
     /** One of Posture enum names: SITTING, LAYING */
     @ColumnInfo(defaultValue = "LAYING")
-    val posture: String = "LAYING"
+    val posture: String = "LAYING",
+    /**
+     * IANA zone the device was in when this assessment was saved. Frozen at
+     * save time so the assessment's local calendar day never changes when the
+     * user travels. Null on pre-fix rows; resolved by the one-time backfill
+     * or the read-time fallback (see LocalTimeZones).
+     */
+    @ColumnInfo(defaultValue = "NULL")
+    val zoneId: String? = null
 )

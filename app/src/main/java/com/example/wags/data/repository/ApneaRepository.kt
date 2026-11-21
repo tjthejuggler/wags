@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.example.wags.domain.model.LocalTimeZones
 
 @Singleton
 class ApneaRepository @Inject constructor(
@@ -67,7 +68,7 @@ class ApneaRepository @Inject constructor(
      * hour bucket (this is what makes the recalculation retroactive).
      */
     private fun recordTod(record: ApneaRecordEntity): String =
-        if (timeDimension.isByHour) TimeBuckets.fromTimestamp(record.timestamp) else record.timeOfDay
+        if (timeDimension.isByHour) TimeBuckets.fromRecord(record.timestamp, record.localHour) else record.timeOfDay
 
     /** Human label for any bucket value ("H08" → "08:00", "DAY" → "Day"). */
     private fun fmtBucket(s: String): String =
@@ -1272,7 +1273,7 @@ class ApneaRepository @Inject constructor(
         if (pool.isEmpty()) return emptyMap()
 
         fun todOf(r: ApneaRecordEntity): String =
-            if (byHour) TimeBuckets.fromTimestamp(r.timestamp) else r.timeOfDay
+            if (byHour) TimeBuckets.fromRecord(r.timestamp, r.localHour) else r.timeOfDay
 
         val fields = listOf<(ApneaRecordEntity) -> String>(
             { it.lungVolume }, { it.prepType }, { todOf(it) }, { it.posture }, { it.audio }
@@ -1330,7 +1331,7 @@ class ApneaRepository @Inject constructor(
         val byHour = timeDimension.isByHour
 
         fun todOf(r: ApneaRecordEntity): String =
-            if (byHour) TimeBuckets.fromTimestamp(r.timestamp) else r.timeOfDay
+            if (byHour) TimeBuckets.fromRecord(r.timestamp, r.localHour) else r.timeOfDay
 
         val result = HashMap<Long, Int>()
 
@@ -1429,8 +1430,24 @@ class ApneaRepository @Inject constructor(
     suspend fun getRecordByTimestampAndType(timestamp: Long, tableType: String): ApneaRecordEntity? =
         dao.getByTimestampAndType(timestamp, tableType)
 
+    /**
+     * Stamps the local-time fields frozen at save time (see LocalTimeZones):
+     * `zoneId` = the device's IANA zone now, `localHour` = the session-start
+     * timestamp's hour in that zone. This is exactly the value the old
+     * query-time derivation would have produced *at the moment of the hold* —
+     * frozen so it never changes when the user travels.
+     */
+    private fun withLocalTime(entity: ApneaRecordEntity): ApneaRecordEntity {
+        val zone = LocalTimeZones.currentZoneId()
+        val hour = LocalTimeZones.hourOf(entity.timestamp, zone)
+        return entity.copy(
+            zoneId = entity.zoneId ?: zone,
+            localHour = if (entity.localHour in 0..23) entity.localHour else hour
+        )
+    }
+
     suspend fun saveRecord(entity: ApneaRecordEntity): Long =
-        withContext(ioDispatcher) { dao.insert(withResonanceLink(entity)) }
+        withContext(ioDispatcher) { dao.insert(withResonanceLink(withLocalTime(entity))) }
 
     suspend fun updateRecord(entity: ApneaRecordEntity) =
         withContext(ioDispatcher) { dao.update(withResonanceLink(entity)) }

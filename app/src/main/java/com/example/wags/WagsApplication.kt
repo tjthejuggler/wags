@@ -20,6 +20,9 @@ class WagsApplication : Application() {
     @Inject
     lateinit var morningReadinessBackfillRunner: com.example.wags.data.repository.MorningReadinessBackfillRunner
 
+    @Inject
+    lateinit var localTimeBackfillRunner: com.example.wags.data.repository.LocalTimeBackfillRunner
+
     override fun onCreate() {
         super.onCreate()
         installCrashLogger()
@@ -36,6 +39,11 @@ class WagsApplication : Application() {
         // One-shot (2026-10-22): recompute legacy morning-readiness supine HRV
         // with pipeline v2 (dropped-beat reconstruction). No-op after first run.
         morningReadinessBackfillRunner.runIfNeeded()
+
+        // One-shot (2026-11-21): stamp the true IANA zone (from the Tail-derived
+        // travel seed) + frozen local hour on every pre-fix session row. No-op
+        // after first run.
+        localTimeBackfillRunner.runIfNeeded()
     }
 
     /**

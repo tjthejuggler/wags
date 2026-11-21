@@ -161,7 +161,9 @@ object RecordForecastCalculator {
                 ?: TimeBuckets.hourOfTimestamp(System.currentTimeMillis())
             DoubleArray(regressionRecords.size) { i ->
                 val dist = circularHourDistance(
-                    TimeBuckets.hourOfTimestamp(regressionRecords[i].timestamp), targetHour
+                    TimeBuckets.hourOfRecord(
+                        regressionRecords[i].timestamp, regressionRecords[i].localHour
+                    ), targetHour
                 )
                 max(
                     HOUR_WEIGHT_FLOOR,
@@ -543,7 +545,7 @@ object RecordForecastCalculator {
             { r: ApneaRecordEntity -> r.lungVolume },
             { r: ApneaRecordEntity -> r.prepType },
             if (todIsHour) {
-                { r: ApneaRecordEntity -> TimeBuckets.fromTimestamp(r.timestamp) }
+                { r: ApneaRecordEntity -> TimeBuckets.fromRecord(r.timestamp, r.localHour) }
             } else {
                 { r: ApneaRecordEntity -> r.timeOfDay }
             },

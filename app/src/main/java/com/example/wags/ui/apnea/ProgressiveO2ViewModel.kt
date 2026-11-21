@@ -979,7 +979,7 @@ class ProgressiveO2ViewModel @Inject constructor(
                         .filter { it.lungVolume in s.filterLungVolume }
                         .filter { it.prepType in s.filterPrepType }
                         .filter {
-                            (if (byHourTod) TimeBuckets.fromTimestamp(it.timestamp) else it.timeOfDay) in s.filterTimeOfDay
+                            (if (byHourTod) TimeBuckets.fromRecord(it.timestamp, it.localHour) else it.timeOfDay) in s.filterTimeOfDay
                         }
                         .filter { it.posture in s.filterPosture }
                         .filter { it.audio in s.filterAudio }

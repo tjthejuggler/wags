@@ -6,6 +6,10 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface DailyReadingDao {
+
+    /** LocalTimeBackfillRunner: bulk-stamp the frozen zone on a pre-fix row. */
+    @Query("UPDATE daily_readings SET zoneId = :zoneId WHERE readingId = :rowId")
+    suspend fun stampZone(rowId: Long, zoneId: String)
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: DailyReadingEntity): Long
 

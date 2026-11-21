@@ -85,5 +85,14 @@ data class MorningReadinessEntity(
      * be excluded from baseline calculations (but kept in history/charts).
      */
     @androidx.room.ColumnInfo(defaultValue = "0")
-    val qualityFlag: Boolean = false
+    val qualityFlag: Boolean = false,
+
+    /**
+     * IANA zone the device was in when this reading was saved. Frozen at save
+     * time so the reading's local calendar day never changes when the user
+     * travels. Null on pre-fix rows; resolved by the one-time backfill or the
+     * read-time fallback (see LocalTimeZones).
+     */
+    @androidx.room.ColumnInfo(defaultValue = "NULL")
+    val zoneId: String? = null
 )

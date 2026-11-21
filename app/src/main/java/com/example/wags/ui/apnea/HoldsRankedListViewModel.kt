@@ -106,7 +106,7 @@ class HoldsRankedListViewModel @Inject constructor(
             (prepType == FILTER_ALL || r.prepType == prepType) &&
             // Hour buckets are derived from the record's start timestamp.
             (timeOfDay == FILTER_ALL ||
-                (if (TimeBuckets.isHourBucket(timeOfDay)) TimeBuckets.fromTimestamp(r.timestamp) else r.timeOfDay) == timeOfDay) &&
+                (if (TimeBuckets.isHourBucket(timeOfDay)) TimeBuckets.fromRecord(r.timestamp, r.localHour) else r.timeOfDay) == timeOfDay) &&
             (posture == FILTER_ALL || r.posture == posture) &&
             (audio == FILTER_ALL || r.audio == audio)
         }

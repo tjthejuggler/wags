@@ -27,6 +27,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import com.example.wags.domain.model.LocalTimeZones
 
 // ── Tab definitions ────────────────────────────────────────────────────────────
 
@@ -477,7 +478,7 @@ private fun HrvMultiSessionList(
 ) {
     val zone = ZoneId.systemDefault()
     val dateLabel = readings.firstOrNull()?.let { r ->
-        Instant.ofEpochMilli(r.timestamp).atZone(zone)
+        LocalTimeZones.zonedDateTimeOf(r.timestamp, r.zoneId, zone)
             .format(DateTimeFormatter.ofPattern("EEEE, MMMM d yyyy"))
     } ?: ""
 
@@ -530,7 +531,7 @@ private fun HrvSessionSummaryCard(
     onClick: () -> Unit
 ) {
     val zone = ZoneId.systemDefault()
-    val timeLabel = Instant.ofEpochMilli(reading.timestamp).atZone(zone)
+    val timeLabel = LocalTimeZones.zonedDateTimeOf(reading.timestamp, reading.zoneId, zone)
         .format(DateTimeFormatter.ofPattern("h:mm a"))
 
     Card(

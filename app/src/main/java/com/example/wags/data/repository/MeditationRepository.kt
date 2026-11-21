@@ -16,6 +16,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.example.wags.domain.model.LocalTimeZones
 
 @Singleton
 class MeditationRepository @Inject constructor(
@@ -212,7 +213,7 @@ class MeditationRepository @Inject constructor(
     suspend fun getSessionById(id: Long): MeditationSessionEntity? = sessionDao.getById(id)
 
     suspend fun insertSession(session: MeditationSessionEntity): Long =
-        sessionDao.insert(session)
+        sessionDao.insert(session.copy(zoneId = session.zoneId ?: LocalTimeZones.currentZoneId()))
 
     suspend fun deleteSessionById(id: Long) = sessionDao.deleteById(id)
 
@@ -328,7 +329,9 @@ class MeditationRepository @Inject constructor(
         session: MeditationSessionEntity,
         telemetry: List<MeditationTelemetryEntity>
     ): Long = db.withTransaction {
-        val id = sessionDao.insert(session)
+        val id = sessionDao.insert(
+            session.copy(zoneId = session.zoneId ?: LocalTimeZones.currentZoneId())
+        )
         if (telemetry.isNotEmpty()) {
             telemetryDao.insertAll(telemetry.map { it.copy(sessionId = id) })
         }
